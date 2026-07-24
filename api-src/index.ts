@@ -10,6 +10,12 @@ let initPromise: Promise<void> | null = null;
 
 async function init() {
   try {
+    // Pull the latest SQLite snapshot from Vercel Blob before opening the DB.
+    // No-op locally (no BLOB_READ_WRITE_TOKEN) or on the first-ever cold start
+    // (no snapshot exists yet), in which case storage.ts falls back to the
+    // bundled seed.
+    const { initBlobSnapshot } = await import("../server/blob-persistence");
+    await initBlobSnapshot();
     const { registerRoutes } = await import("../server/routes");
     const httpServer = createServer(app);
     await registerRoutes(httpServer, app);

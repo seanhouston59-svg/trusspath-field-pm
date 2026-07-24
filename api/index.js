@@ -30,6 +30,108 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
+// server/blob-persistence.ts
+var blob_persistence_exports = {};
+__export(blob_persistence_exports, {
+  blobPersistMiddleware: () => blobPersistMiddleware,
+  forceFlush: () => forceFlush,
+  initBlobSnapshot: () => initBlobSnapshot,
+  markDirty: () => markDirty
+});
+function hasToken() {
+  return !!process.env.BLOB_READ_WRITE_TOKEN;
+}
+async function initBlobSnapshot() {
+  if (!hasToken()) return false;
+  if ((0, import_node_fs.existsSync)(TMP_DB)) {
+    return true;
+  }
+  try {
+    const meta = await (0, import_blob.head)(BLOB_KEY, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    const res = await fetch(meta.url);
+    if (!res.ok) throw new Error(`fetch ${res.status}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    (0, import_node_fs.writeFileSync)(TMP_DB, buf);
+    console.log(`[blob] restored data.db from blob (${buf.length} bytes)`);
+    return true;
+  } catch (err) {
+    console.log(`[blob] no existing snapshot (${err?.message ?? "unknown"}); using bundled seed`);
+    return false;
+  }
+}
+function markDirty() {
+  if (!hasToken()) return;
+  if (inFlight) {
+    dirtyDuringFlight = true;
+    return;
+  }
+  if (pending) clearTimeout(pending);
+  pending = setTimeout(() => {
+    pending = null;
+    void flush();
+  }, DEBOUNCE_MS);
+}
+async function flush() {
+  if (!hasToken()) return;
+  if (!(0, import_node_fs.existsSync)(TMP_DB)) return;
+  inFlight = (async () => {
+    try {
+      const buf = (0, import_node_fs.readFileSync)(TMP_DB);
+      await (0, import_blob.put)(BLOB_KEY, buf, {
+        access: "public",
+        // Blob API requires this; the token gates writes.
+        addRandomSuffix: false,
+        // Overwrite in place at the same key.
+        allowOverwrite: true,
+        contentType: "application/x-sqlite3",
+        token: process.env.BLOB_READ_WRITE_TOKEN
+      });
+      const { size } = (0, import_node_fs.statSync)(TMP_DB);
+      console.log(`[blob] uploaded data.db (${size} bytes)`);
+    } catch (err) {
+      console.error(`[blob] upload failed: ${err?.message ?? err}`);
+    } finally {
+      inFlight = null;
+      if (dirtyDuringFlight) {
+        dirtyDuringFlight = false;
+        markDirty();
+      }
+    }
+  })();
+  await inFlight;
+}
+async function forceFlush() {
+  if (pending) {
+    clearTimeout(pending);
+    pending = null;
+  }
+  await flush();
+  if (inFlight) await inFlight;
+}
+var import_node_fs, import_blob, BLOB_KEY, TMP_DB, DEBOUNCE_MS, pending, inFlight, dirtyDuringFlight, blobPersistMiddleware;
+var init_blob_persistence = __esm({
+  "server/blob-persistence.ts"() {
+    "use strict";
+    import_node_fs = require("node:fs");
+    import_blob = require("@vercel/blob");
+    BLOB_KEY = "trusspath/data.db";
+    TMP_DB = "/tmp/data.db";
+    DEBOUNCE_MS = 500;
+    pending = null;
+    inFlight = null;
+    dirtyDuringFlight = false;
+    blobPersistMiddleware = (req, res, next) => {
+      if (!hasToken()) return next();
+      const method = req.method.toUpperCase();
+      if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
+      res.on("finish", () => {
+        if (res.statusCode >= 200 && res.statusCode < 400) markDirty();
+      });
+      next();
+    };
+  }
+});
+
 // shared/schema.ts
 var import_sqlite_core, import_drizzle_orm, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
 var init_schema = __esm({
@@ -351,11 +453,11 @@ var init_schema = __esm({
 function resolveDbPath() {
   if (process.env.VERCEL) {
     const tmp = "/tmp/data.db";
-    if (!(0, import_node_fs.existsSync)(tmp)) {
+    if (!(0, import_node_fs2.existsSync)(tmp)) {
       const candidates = [(0, import_node_path.resolve)(process.cwd(), "data.db"), (0, import_node_path.resolve)(__dirname, "..", "data.db"), (0, import_node_path.resolve)(__dirname, "data.db")];
       for (const c of candidates) {
-        if ((0, import_node_fs.existsSync)(c)) {
-          (0, import_node_fs.copyFileSync)(c, tmp);
+        if ((0, import_node_fs2.existsSync)(c)) {
+          (0, import_node_fs2.copyFileSync)(c, tmp);
           break;
         }
       }
@@ -578,7 +680,7 @@ function migrate() {
   } catch {
   }
 }
-var import_better_sqlite3, import_better_sqlite32, import_drizzle_orm2, import_node_fs, import_node_path, import_node_crypto, sqlite, db, DatabaseStorage, storage;
+var import_better_sqlite3, import_better_sqlite32, import_drizzle_orm2, import_node_fs2, import_node_path, import_node_crypto, sqlite, db, DatabaseStorage, storage;
 var init_storage = __esm({
   "server/storage.ts"() {
     "use strict";
@@ -586,7 +688,7 @@ var init_storage = __esm({
     import_better_sqlite3 = require("drizzle-orm/better-sqlite3");
     import_better_sqlite32 = __toESM(require("better-sqlite3"), 1);
     import_drizzle_orm2 = require("drizzle-orm");
-    import_node_fs = require("node:fs");
+    import_node_fs2 = require("node:fs");
     import_node_path = require("node:path");
     import_node_crypto = require("node:crypto");
     sqlite = new import_better_sqlite32.default(resolveDbPath());
@@ -1073,7 +1175,7 @@ var init_storage = __esm({
         eqSeed.forEach((x) => db.insert(equipment).values(x).run());
         const PHOTO_DIR2 = process.env.VERCEL ? "/tmp/uploads/photos" : (0, import_node_path.resolve)(process.cwd(), "uploads/photos");
         try {
-          (0, import_node_fs.mkdirSync)(PHOTO_DIR2, { recursive: true });
+          (0, import_node_fs2.mkdirSync)(PHOTO_DIR2, { recursive: true });
         } catch {
         }
         const seedPhotoCandidates = [
@@ -1084,7 +1186,7 @@ var init_storage = __esm({
         ];
         let seedPhotoDir = null;
         for (const c of seedPhotoCandidates) {
-          if ((0, import_node_fs.existsSync)(c)) {
+          if ((0, import_node_fs2.existsSync)(c)) {
             seedPhotoDir = c;
             break;
           }
@@ -1092,10 +1194,10 @@ var init_storage = __esm({
         const copySeedPhoto = (name) => {
           if (!seedPhotoDir) return null;
           const src = (0, import_node_path.join)(seedPhotoDir, name);
-          if (!(0, import_node_fs.existsSync)(src)) return null;
+          if (!(0, import_node_fs2.existsSync)(src)) return null;
           const dst = (0, import_node_path.join)(PHOTO_DIR2, name);
           try {
-            if (!(0, import_node_fs.existsSync)(dst)) (0, import_node_fs.copyFileSync)(src, dst);
+            if (!(0, import_node_fs2.existsSync)(dst)) (0, import_node_fs2.copyFileSync)(src, dst);
           } catch {
           }
           let size = 0;
@@ -1651,7 +1753,7 @@ function hydrateSeedPhotos() {
   ];
   let src = null;
   for (const c of candidates) {
-    if (import_node_fs2.default.existsSync(c)) {
+    if (import_node_fs3.default.existsSync(c)) {
       src = c;
       break;
     }
@@ -1661,12 +1763,12 @@ function hydrateSeedPhotos() {
     return;
   }
   try {
-    const files = import_node_fs2.default.readdirSync(src);
+    const files = import_node_fs3.default.readdirSync(src);
     for (const f of files) {
       const dst = import_node_path2.default.join(PHOTO_DIR, f);
-      if (!import_node_fs2.default.existsSync(dst)) {
+      if (!import_node_fs3.default.existsSync(dst)) {
         try {
-          import_node_fs2.default.copyFileSync(import_node_path2.default.join(src, f), dst);
+          import_node_fs3.default.copyFileSync(import_node_path2.default.join(src, f), dst);
         } catch {
         }
       }
@@ -1708,6 +1810,7 @@ async function registerRoutes(_httpServer, app2) {
     if (req.method === "OPTIONS") return res.status(204).end();
     next();
   });
+  app2.use(blobPersistMiddleware);
   app2.use(authMiddleware);
   app2.post("/api/auth/signup", (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
@@ -1931,12 +2034,12 @@ async function registerRoutes(_httpServer, app2) {
     if (!photo) return res.status(404).json({ message: "Photo not found." });
     if (!photo.storedFileName) return res.status(404).json({ message: "No source file attached." });
     const abs = import_node_path2.default.resolve(PHOTO_DIR, photo.storedFileName);
-    if (!abs.startsWith(PHOTO_DIR + import_node_path2.default.sep) || !import_node_fs2.default.existsSync(abs)) {
+    if (!abs.startsWith(PHOTO_DIR + import_node_path2.default.sep) || !import_node_fs3.default.existsSync(abs)) {
       return res.status(404).json({ message: "File missing from storage." });
     }
     res.setHeader("Content-Type", photo.mimeType || "image/jpeg");
     res.setHeader("Content-Disposition", `inline; filename="${photo.originalFileName || photo.storedFileName}"`);
-    import_node_fs2.default.createReadStream(abs).pipe(res);
+    import_node_fs3.default.createReadStream(abs).pipe(res);
   });
   app2.delete("/api/photos/:id", (req, res) => {
     const id = parseInt(req.params.id, 10);
@@ -1945,7 +2048,7 @@ async function registerRoutes(_httpServer, app2) {
       const abs = import_node_path2.default.resolve(PHOTO_DIR, photo.storedFileName);
       if (abs.startsWith(PHOTO_DIR + import_node_path2.default.sep)) {
         try {
-          import_node_fs2.default.unlinkSync(abs);
+          import_node_fs3.default.unlinkSync(abs);
         } catch {
         }
       }
@@ -1987,12 +2090,12 @@ async function registerRoutes(_httpServer, app2) {
     if (!doc) return res.status(404).json({ message: "Document not found." });
     if (!doc.storedFileName) return res.status(404).json({ message: "No source file attached." });
     const abs = import_node_path2.default.resolve(UPLOAD_DIR, doc.storedFileName);
-    if (!abs.startsWith(UPLOAD_DIR + import_node_path2.default.sep) || !import_node_fs2.default.existsSync(abs)) {
+    if (!abs.startsWith(UPLOAD_DIR + import_node_path2.default.sep) || !import_node_fs3.default.existsSync(abs)) {
       return res.status(404).json({ message: "File missing from storage." });
     }
     res.setHeader("Content-Type", doc.mimeType || "application/octet-stream");
     res.setHeader("Content-Disposition", `inline; filename="${doc.originalFileName || doc.storedFileName}"`);
-    import_node_fs2.default.createReadStream(abs).pipe(res);
+    import_node_fs3.default.createReadStream(abs).pipe(res);
   });
   app2.delete("/api/documents/:id", (req, res) => {
     const id = parseInt(req.params.id, 10);
@@ -2001,7 +2104,7 @@ async function registerRoutes(_httpServer, app2) {
       const abs = import_node_path2.default.resolve(UPLOAD_DIR, doc.storedFileName);
       if (abs.startsWith(UPLOAD_DIR + import_node_path2.default.sep)) {
         try {
-          import_node_fs2.default.unlinkSync(abs);
+          import_node_fs3.default.unlinkSync(abs);
         } catch {
         }
       }
@@ -2072,12 +2175,12 @@ async function registerRoutes(_httpServer, app2) {
     if (!cap) return res.status(404).json({ message: "Capture not found." });
     if (!cap.storedFileName) return res.status(404).json({ message: "No source file attached." });
     const abs = import_node_path2.default.resolve(DRONE_DIR, cap.storedFileName);
-    if (!abs.startsWith(DRONE_DIR + import_node_path2.default.sep) || !import_node_fs2.default.existsSync(abs)) {
+    if (!abs.startsWith(DRONE_DIR + import_node_path2.default.sep) || !import_node_fs3.default.existsSync(abs)) {
       return res.status(404).json({ message: "File missing from storage." });
     }
     res.setHeader("Content-Type", cap.mimeType || "image/jpeg");
     res.setHeader("Content-Disposition", `inline; filename="${cap.originalFileName || cap.storedFileName}"`);
-    import_node_fs2.default.createReadStream(abs).pipe(res);
+    import_node_fs3.default.createReadStream(abs).pipe(res);
   });
   app2.delete("/api/drone-captures/:id", (req, res) => {
     const id = parseInt(req.params.id, 10);
@@ -2086,7 +2189,7 @@ async function registerRoutes(_httpServer, app2) {
       const abs = import_node_path2.default.resolve(DRONE_DIR, cap.storedFileName);
       if (abs.startsWith(DRONE_DIR + import_node_path2.default.sep)) {
         try {
-          import_node_fs2.default.unlinkSync(abs);
+          import_node_fs3.default.unlinkSync(abs);
         } catch {
         }
       }
@@ -2216,17 +2319,18 @@ async function registerRoutes(_httpServer, app2) {
   });
   return _httpServer;
 }
-var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, PUBLIC_API, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
+var import_node_path2, import_node_fs3, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, PUBLIC_API, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
 var init_routes = __esm({
   "server/routes.ts"() {
     "use strict";
     import_node_path2 = __toESM(require("node:path"), 1);
-    import_node_fs2 = __toESM(require("node:fs"), 1);
+    import_node_fs3 = __toESM(require("node:fs"), 1);
     import_multer = __toESM(require("multer"), 1);
     init_storage();
     init_jarvis();
     init_health();
     init_mailer();
+    init_blob_persistence();
     init_schema();
     SESSION_COOKIE = "tp_session";
     SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
@@ -2241,7 +2345,7 @@ var init_routes = __esm({
     ]);
     UPLOAD_DIR = process.env.VERCEL ? "/tmp/uploads/documents" : import_node_path2.default.resolve(process.cwd(), "uploads/documents");
     try {
-      import_node_fs2.default.mkdirSync(UPLOAD_DIR, { recursive: true });
+      import_node_fs3.default.mkdirSync(UPLOAD_DIR, { recursive: true });
     } catch {
     }
     ALLOWED_MIME = /* @__PURE__ */ new Set([
@@ -2269,7 +2373,7 @@ var init_routes = __esm({
     });
     PHOTO_DIR = process.env.VERCEL ? "/tmp/uploads/photos" : import_node_path2.default.resolve(process.cwd(), "uploads/photos");
     try {
-      import_node_fs2.default.mkdirSync(PHOTO_DIR, { recursive: true });
+      import_node_fs3.default.mkdirSync(PHOTO_DIR, { recursive: true });
     } catch {
     }
     photoHydrated = false;
@@ -2297,7 +2401,7 @@ var init_routes = __esm({
     });
     DRONE_DIR = process.env.VERCEL ? "/tmp/uploads/drone" : import_node_path2.default.resolve(process.cwd(), "uploads/drone");
     try {
-      import_node_fs2.default.mkdirSync(DRONE_DIR, { recursive: true });
+      import_node_fs3.default.mkdirSync(DRONE_DIR, { recursive: true });
     } catch {
     }
     droneUpload = (0, import_multer.default)({
@@ -2333,6 +2437,8 @@ var initError = null;
 var initPromise = null;
 async function init() {
   try {
+    const { initBlobSnapshot: initBlobSnapshot2 } = await Promise.resolve().then(() => (init_blob_persistence(), blob_persistence_exports));
+    await initBlobSnapshot2();
     const { registerRoutes: registerRoutes2 } = await Promise.resolve().then(() => (init_routes(), routes_exports));
     const httpServer = (0, import_node_http.createServer)(app);
     await registerRoutes2(httpServer, app);

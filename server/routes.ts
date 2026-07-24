@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { jarvisChat, jarvisBrief } from "./jarvis";
 import { runHealthScan } from "./health";
 import { sendSignupNotification } from "./mailer";
+import { blobPersistMiddleware } from "./blob-persistence";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
@@ -233,6 +234,11 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (req.method === "OPTIONS") return res.status(204).end();
     next();
   });
+
+  // Persist SQLite writes to Vercel Blob on every mutation. No-op when
+  // BLOB_READ_WRITE_TOKEN is not set (i.e., local dev), so behaviour is
+  // identical there.
+  app.use(blobPersistMiddleware);
 
   // Gate all /api/* routes behind auth (except the PUBLIC_API allowlist).
   app.use(authMiddleware);
