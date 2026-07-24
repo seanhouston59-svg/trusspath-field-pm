@@ -278,6 +278,24 @@ export const appSettings = sqliteTable("app_settings", {
   updatedAt: text("updated_at").notNull(),
 });
 
+/* ------------------------------ Accounts (Auth) ----------------------- */
+export const accounts = sqliteTable("accounts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  displayName: text("display_name").notNull(),
+  role: text("role").notNull().default("member"),  // owner | admin | member
+  company: text("company"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(), // random token
+  accountId: integer("account_id").notNull(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+
 /* ------------------------------ Insert schemas -------------------------- */
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
@@ -300,6 +318,23 @@ export const insertDroneCaptureSchema = createInsertSchema(droneCaptures).omit({
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
 export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
 export type AppSettingsRow = typeof appSettings.$inferSelect;
+
+/* -------- Auth insert schemas + types -------- */
+export const signupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  displayName: z.string().min(1),
+  company: z.string().optional(),
+});
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+export type Signup = z.infer<typeof signupSchema>;
+export type Login = z.infer<typeof loginSchema>;
+export type Account = typeof accounts.$inferSelect;
+export type AccountPublic = Omit<Account, "passwordHash">;
+export type Session = typeof sessions.$inferSelect;
 
 /** Default app settings (single source for server + client). */
 export const DEFAULT_SETTINGS = {

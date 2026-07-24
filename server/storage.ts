@@ -6,6 +6,7 @@ import {
   subscribers, demoRequests,
   appSettings,
   milestones,
+  accounts, sessions,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -18,13 +19,15 @@ import type {
   InsertPhoto, InsertDocument, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember,
   InsertIntegration,
   Milestone, InsertMilestone,
+  Account, AccountPublic, Session,
   Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest,
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
-import { eq } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import { existsSync, copyFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 // On Vercel (or any read-only FS) the bundled data.db is next to the function code.
 // Copy it into /tmp on cold start so writes work (ephemeral per instance).
@@ -185,6 +188,21 @@ function migrate() {
       status TEXT NOT NULL,
       notes TEXT
     );
+    CREATE TABLE IF NOT EXISTS accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      company TEXT,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      account_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL
+    );
   `);
 
   // Additive migration: add depends_on to tasks if missing (SQLite ALTER TABLE)
@@ -302,6 +320,15 @@ export interface IStorage {
   getSettings(): Record<string, any>;
   updateSettings(patch: Record<string, any>): Record<string, any>;
   resetAllData(): void;
+  // ----- Auth -----
+  createAccount(email: string, password: string, displayName: string, company?: string, role?: string): AccountPublic;
+  getAccountByEmail(email: string): Account | undefined;
+  getAccount(id: number): AccountPublic | undefined;
+  verifyPassword(email: string, password: string): AccountPublic | null;
+  createSession(accountId: number): Session;
+  getSession(token: string): { session: Session; account: AccountPublic } | null;
+  destroySession(token: string): void;
+  countAccounts(): number;
 }
 
 class DatabaseStorage implements IStorage {
@@ -581,6 +608,87 @@ class DatabaseStorage implements IStorage {
     })();
   }
 
+  /* ---------------------- Auth helpers ---------------------- */
+  private hashPassword(password: string): string {
+    const salt = randomBytes(16).toString("hex");
+    const derived = scryptSync(password, salt, 64).toString("hex");
+    return `${salt}:${derived}`;
+  }
+  private verifyHash(password: string, stored: string): boolean {
+    const [salt, hash] = stored.split(":");
+    if (!salt || !hash) return false;
+    const derived = scryptSync(password, salt, 64);
+    const target = Buffer.from(hash, "hex");
+    if (derived.length !== target.length) return false;
+    return timingSafeEqual(derived, target);
+  }
+  private toPublic(a: Account): AccountPublic {
+    const { passwordHash: _pw, ...rest } = a;
+    return rest;
+  }
+
+  createAccount(email: string, password: string, displayName: string, company?: string, role: string = "member"): AccountPublic {
+    const normEmail = email.trim().toLowerCase();
+    const existing = db.select().from(accounts).where(eq(accounts.email, normEmail)).get();
+    if (existing) throw new Error("Email already registered");
+    const now = new Date().toISOString();
+    const row = db.insert(accounts).values({
+      email: normEmail,
+      passwordHash: this.hashPassword(password),
+      displayName,
+      role,
+      company: company ?? null,
+      createdAt: now,
+    }).returning().get();
+    return this.toPublic(row);
+  }
+
+  getAccountByEmail(email: string): Account | undefined {
+    return db.select().from(accounts).where(eq(accounts.email, email.trim().toLowerCase())).get();
+  }
+  getAccount(id: number): AccountPublic | undefined {
+    const a = db.select().from(accounts).where(eq(accounts.id, id)).get();
+    return a ? this.toPublic(a) : undefined;
+  }
+  verifyPassword(email: string, password: string): AccountPublic | null {
+    const acc = this.getAccountByEmail(email);
+    if (!acc) return null;
+    if (!this.verifyHash(password, acc.passwordHash)) return null;
+    return this.toPublic(acc);
+  }
+  createSession(accountId: number): Session {
+    const now = new Date();
+    const expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30d
+    const token = randomBytes(32).toString("hex");
+    // best-effort cleanup of expired sessions
+    try { sqlite.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now.toISOString()); } catch {}
+    return db.insert(sessions).values({
+      id: token,
+      accountId,
+      createdAt: now.toISOString(),
+      expiresAt: expires.toISOString(),
+    }).returning().get();
+  }
+  getSession(token: string): { session: Session; account: AccountPublic } | null {
+    if (!token) return null;
+    const s = db.select().from(sessions).where(eq(sessions.id, token)).get();
+    if (!s) return null;
+    if (new Date(s.expiresAt).getTime() < Date.now()) {
+      db.delete(sessions).where(eq(sessions.id, token)).run();
+      return null;
+    }
+    const a = this.getAccount(s.accountId);
+    if (!a) return null;
+    return { session: s, account: a };
+  }
+  destroySession(token: string): void {
+    if (!token) return;
+    db.delete(sessions).where(eq(sessions.id, token)).run();
+  }
+  countAccounts(): number {
+    return db.select().from(accounts).all().length;
+  }
+
   /* ----------------------------- Seed ------------------------------ */
   private seed() {
     const existing = db.select().from(teamMembers).all();
@@ -783,6 +891,21 @@ class DatabaseStorage implements IStorage {
       { projectId: p[2].id, title: "Substantial completion — ready for school year", date: "2026-11-30", kind: "Closeout", status: "Upcoming", notes: "Must be turned over before Aug 2027 school year" },
     ];
     milestoneSeed.forEach((x) => db.insert(milestones).values(x).run());
+
+    // Seed a demo account so users can log in immediately.
+    // These credentials are advertised on the login screen.
+    try {
+      const anyAccount = db.select().from(accounts).all();
+      if (anyAccount.length === 0) {
+        this.createAccount(
+          "demo@trusspath.app",
+          "trusspath",
+          "Marcus Reyes",
+          "Meridian Builders",
+          "owner",
+        );
+      }
+    } catch {}
   }
 }
 

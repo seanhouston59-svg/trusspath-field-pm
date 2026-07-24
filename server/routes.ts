@@ -13,10 +13,67 @@ import {
   insertPhotoSchema, insertDocumentSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMessageSchema, insertNoteSchema, insertMilestoneSchema,
   insertTeamSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
+  signupSchema, loginSchema,
 } from "@shared/schema";
 
 function pid(req: any): number | undefined {
   return req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
+}
+
+/* -------------------- Auth middleware -------------------- */
+const SESSION_COOKIE = "tp_session";
+const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 days
+
+function parseCookies(header: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!header) return out;
+  for (const part of header.split(/;\s*/)) {
+    const idx = part.indexOf("=");
+    if (idx < 0) continue;
+    const k = part.slice(0, idx).trim();
+    const v = decodeURIComponent(part.slice(idx + 1).trim());
+    if (k) out[k] = v;
+  }
+  return out;
+}
+
+function setSessionCookie(res: any, token: string) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  res.setHeader(
+    "Set-Cookie",
+    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SEC}${secure}`
+  );
+}
+function clearSessionCookie(res: any) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  res.setHeader(
+    "Set-Cookie",
+    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`
+  );
+}
+
+// Public paths that do not require auth. Everything else under /api/* requires a session.
+const PUBLIC_API = new Set<string>([
+  "/api/auth/signup",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/me",
+  // marketing / landing page endpoints — safe to leave public
+  "/api/subscribers",
+  "/api/demo-requests",
+]);
+
+function authMiddleware(req: any, res: any, next: any) {
+  const p = req.path || req.url?.split("?")[0] || "";
+  if (!p.startsWith("/api")) return next();
+  if (PUBLIC_API.has(p)) return next();
+  const cookies = parseCookies(req.headers?.cookie);
+  const token = cookies[SESSION_COOKIE] || (req.headers?.authorization?.replace(/^Bearer\s+/i, "") ?? "");
+  const s = token ? storage.getSession(token) : null;
+  if (!s) return res.status(401).json({ message: "Unauthorized" });
+  req.account = s.account;
+  req.sessionToken = token;
+  next();
 }
 
 const UPLOAD_DIR = process.env.VERCEL
@@ -97,6 +154,53 @@ const droneUpload = multer({
 });
 
 export async function registerRoutes(_httpServer: Server, app: Express): Promise<Server> {
+  // Gate all /api/* routes behind auth (except the PUBLIC_API allowlist).
+  app.use(authMiddleware);
+
+  /* ------------------------- Auth ------------------------- */
+  app.post("/api/auth/signup", (req, res) => {
+    const parsed = signupSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const { email, password, displayName, company } = parsed.data;
+    try {
+      const account = storage.createAccount(email, password, displayName, company);
+      const session = storage.createSession(account.id);
+      setSessionCookie(res, session.id);
+      res.status(201).json({ account });
+    } catch (e: any) {
+      const msg = e?.message || "Signup failed";
+      const status = /already/i.test(msg) ? 409 : 500;
+      res.status(status).json({ message: msg });
+    }
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const { email, password } = parsed.data;
+    const account = storage.verifyPassword(email, password);
+    if (!account) return res.status(401).json({ message: "Invalid email or password" });
+    const session = storage.createSession(account.id);
+    setSessionCookie(res, session.id);
+    res.json({ account });
+  });
+
+  app.post("/api/auth/logout", (req: any, res) => {
+    const cookies = parseCookies(req.headers?.cookie);
+    const token = cookies[SESSION_COOKIE];
+    if (token) storage.destroySession(token);
+    clearSessionCookie(res);
+    res.json({ ok: true });
+  });
+
+  app.get("/api/auth/me", (req: any, res) => {
+    const cookies = parseCookies(req.headers?.cookie);
+    const token = cookies[SESSION_COOKIE];
+    const s = token ? storage.getSession(token) : null;
+    if (!s) return res.status(401).json({ account: null });
+    res.json({ account: s.account });
+  });
+
   // Team
   app.get("/api/team", (_req, res) => res.json(storage.getTeam()));
   app.post("/api/team", (req, res) => {

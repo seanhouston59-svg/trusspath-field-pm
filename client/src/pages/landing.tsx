@@ -376,6 +376,11 @@ export default function Landing() {
           </nav>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => scrollTo("demo")} data-testid="button-nav-demo">Book demo</Button>
+            <Link href="/login">
+              <Button variant="outline" size="sm" data-testid="button-nav-signin">
+                Sign in
+              </Button>
+            </Link>
             <Link href="/app">
               <Button size="sm" data-testid="button-nav-app">
                 Open app <ArrowRight className="ml-1 size-3.5" />

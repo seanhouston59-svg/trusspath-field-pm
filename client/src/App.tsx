@@ -8,12 +8,17 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { APP_ROUTES } from "@shared/app-manifest";
 import { AccessProvider, useAccess, ACCESS_LEVELS } from "@/lib/access";
+import { AuthProvider, useAuth } from "@/lib/auth";
+import { setPendingRedirect } from "@/lib/queryClient";
 import type { AccessLevel } from "@shared/access-levels";
 import { Layout } from "@/components/layout";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
+import { useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
 import Dashboard from "@/pages/dashboard";
 import Projects from "@/pages/projects";
 import ProjectDetail from "@/pages/project-detail";
@@ -118,25 +123,72 @@ function AccessGate() {
   return <AppRouter />;
 }
 
+/** Renders children only if the user is authenticated. While the auth check is
+ *  in flight, shows a splash. If unauthenticated, redirects to /login and shows
+ *  a splash until the redirect takes effect. */
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [loc] = useLocation();
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      setPendingRedirect(loc || "/app");
+      window.location.hash = `/login`;
+    }
+  }, [isLoading, isAuthenticated, loc]);
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-background">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading…
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function AppChrome() {
   const [loc] = useLocation();
-  if (loc === "/") return null;
+  const { isAuthenticated } = useAuth();
+  // Jarvis is only useful once you’re inside the app.
+  if (!isAuthenticated) return null;
+  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup") return null;
   return <JarvisPanel />;
+}
+
+/** Top-level router: public shell first, protected app second. */
+function RootRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={Landing} />
+      <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
+      {/* Everything else is a protected app route. */}
+      <Route>
+        <RequireAuth>
+          <AccessGate />
+        </RequireAuth>
+      </Route>
+    </Switch>
+  );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AccessProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router hook={useHashLocation}>
-              <AccessGate />
-              <AppChrome />
-            </Router>
-          </TooltipProvider>
-        </AccessProvider>
+        <AuthProvider>
+          <AccessProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router hook={useHashLocation}>
+                <RootRouter />
+                <AppChrome />
+              </Router>
+            </TooltipProvider>
+          </AccessProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

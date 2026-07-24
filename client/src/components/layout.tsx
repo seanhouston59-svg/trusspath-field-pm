@@ -6,6 +6,7 @@ import {
   FileStack, GitPullRequestArrow, StickyNote, Wrench, Image, FileText,
   Contact as ContactIcon, MessageSquare,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -13,6 +14,7 @@ import { Logo, Avatar } from "@/components/bits";
 import { APP_NAV } from "@shared/app-manifest";
 import { useSettings } from "@/hooks/use-data";
 import { useAccess, ACCESS_LEVELS } from "@/lib/access";
+import { useAuth } from "@/lib/auth";
 import type { AccessLevel } from "@shared/access-levels";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -83,14 +85,37 @@ function SidebarBrand() {
 
 function SidebarFooter() {
   const { def } = useAccess();
+  const { account, logout } = useAuth();
+  const displayName = account?.displayName || "Marcus Reyes";
+  const initials = displayName
+    .split(/\s+/)
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "MR";
+  const doLogout = async () => {
+    await logout();
+    window.location.hash = "/login";
+  };
   return (
-    <div className="mt-2 flex items-center gap-3 rounded-md bg-sidebar-accent/50 p-3">
-      <Avatar initials="MR" color="amber" size={36} />
-      <div className="min-w-0 leading-tight">
-        <div className="truncate text-sm font-medium text-sidebar-accent-foreground">Marcus Reyes</div>
-        <div className="ff-kicker truncate text-sidebar-foreground/50" style={{ fontSize: "0.6rem" }}>{def.label}</div>
+    <div className="mt-2 space-y-2">
+      <div className="flex items-center gap-3 rounded-md bg-sidebar-accent/50 p-3">
+        <Avatar initials={initials} color="amber" size={36} />
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-sm font-medium text-sidebar-accent-foreground" data-testid="text-user-name">{displayName}</div>
+          <div className="ff-kicker truncate text-sidebar-foreground/50" style={{ fontSize: "0.6rem" }}>{def.label}</div>
+        </div>
+        <HardHat className="ml-auto size-4 text-sidebar-foreground/40" />
       </div>
-      <HardHat className="ml-auto size-4 text-sidebar-foreground/40" />
+      <button
+        onClick={doLogout}
+        data-testid="button-logout"
+        className="flex w-full items-center gap-2 rounded-md border border-sidebar-border/60 bg-transparent px-3 py-2 text-sm text-sidebar-foreground/70 hover:text-sidebar-accent-foreground hover-elevate"
+      >
+        <LogOut className="size-4" />
+        Sign out
+      </button>
     </div>
   );
 }
@@ -133,6 +158,36 @@ function RoleSwitcher() {
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function TopbarUser() {
+  const { account, logout } = useAuth();
+  const displayName = account?.displayName || "Marcus Reyes";
+  const initials = displayName
+    .split(/\s+/)
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "MR";
+  const doLogout = async () => {
+    await logout();
+    window.location.hash = "/login";
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar initials={initials} color="amber" size={36} />
+      <button
+        onClick={doLogout}
+        aria-label="Sign out"
+        title="Sign out"
+        data-testid="button-logout-topbar"
+        className="inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate hover:text-foreground"
+      >
+        <LogOut className="size-4" />
+      </button>
+    </div>
   );
 }
 
@@ -192,7 +247,7 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
             {actions}
             <RoleSwitcher />
             <ThemeToggle />
-            <Avatar initials="MR" color="amber" size={36} />
+            <TopbarUser />
           </div>
         </header>
 
