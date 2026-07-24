@@ -5,8 +5,10 @@ import { PunchList } from "@/components/tables";
 import { PunchBoard } from "@/components/punch-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { ListToolbar, type View } from "@/components/list-toolbar";
-import { usePunchItems, useTeamMap, useProjects, useTeam, useCreatePunchItem } from "@/hooks/use-data";
+import { usePunchItems, useTeamMap, useProjects, useTeam, useCreatePunchItem, useUpdatePunchStatus } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
+import { ItemDetailSheet } from "@/components/item-detail-sheet";
+import type { PunchItem } from "@shared/schema";
 
 export default function PunchPage() {
   const { data: items = [], isLoading } = usePunchItems();
@@ -17,7 +19,10 @@ export default function PunchPage() {
   const projectOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
   const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
   const create = useCreatePunchItem();
+  const updateStatus = useUpdatePunchStatus();
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<PunchItem | null>(null);
+  const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 
   const [view, setView] = useState<View>("board");
   const [projectFilter, setProjectFilter] = useState<string>("all");
@@ -90,10 +95,35 @@ export default function PunchPage() {
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
       ) : view === "board" ? (
-        <PunchBoard items={filtered} team={team} projects={projectList} />
+        <PunchBoard items={filtered} team={team} projects={projectList} onCardClick={(i) => setSelected(i)} />
       ) : (
-        <PunchList items={filtered} team={team} projects={projectList} />
+        <PunchList items={filtered} team={team} projects={projectList} onRowClick={(i) => setSelected(i)} />
       )}
+
+      {selected && (() => {
+        const a = selected.assigneeId ? team.get(selected.assigneeId) : undefined;
+        return (
+          <ItemDetailSheet
+            open={!!selected}
+            onOpenChange={(o) => !o && setSelected(null)}
+            title={selected.title}
+            subtitle={projectName(selected.projectId)}
+            currentStatus={selected.status}
+            statusOptions={["Open", "In Progress", "Complete"]}
+            onStatusChange={(s) => {
+              updateStatus.mutate({ id: selected.id, status: s });
+              setSelected({ ...selected, status: s });
+            }}
+            isStatusPending={updateStatus.isPending}
+            fields={[
+              { label: "Location", value: selected.location },
+              { label: "Trade", value: selected.trade },
+              { label: "Assignee", value: a?.name ?? "Unassigned" },
+              { label: "Project", value: projectName(selected.projectId) },
+            ]}
+          />
+        );
+      })()}
     </Layout>
   );
 }

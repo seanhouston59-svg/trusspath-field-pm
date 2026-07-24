@@ -5,6 +5,7 @@ import { RfiTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
+import { ItemDetailSheet } from "@/components/item-detail-sheet";
 import {
   useRfis,
   useTeamMap,
@@ -43,6 +44,7 @@ export default function RfisPage() {
   const [view, setView] = useState<View>("board");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<Rfi | null>(null);
 
   const filtered = useMemo(() => {
     return rfis.filter((r) => {
@@ -129,6 +131,7 @@ export default function RfisPage() {
           entityLabel="RFI"
           entityTitle={(r) => `${r.number} — ${r.subject}`}
           idPrefix="rfi"
+          onCardClick={(r) => setSelected(r)}
           renderCard={(r) => {
             const a = r.assigneeId ? team.get(r.assigneeId) : undefined;
             const overdue = isOverdue(r.dueDate) && r.status !== "Closed";
@@ -161,8 +164,34 @@ export default function RfisPage() {
           }}
         />
       ) : (
-        <RfiTable rfis={filtered} team={team} projects={projectList} />
+        <RfiTable rfis={filtered} team={team} projects={projectList} onRowClick={(r) => setSelected(r)} />
       )}
+
+      {selected && (() => {
+        const a = selected.assigneeId ? team.get(selected.assigneeId) : undefined;
+        return (
+          <ItemDetailSheet
+            open={!!selected}
+            onOpenChange={(o) => !o && setSelected(null)}
+            eyebrow={selected.number}
+            title={selected.subject}
+            subtitle={projectName(selected.projectId)}
+            currentStatus={selected.status}
+            statusOptions={["Open", "In Review", "Answered", "Closed"]}
+            onStatusChange={(s) => {
+              updateStatus.mutate({ id: selected.id, status: s as Status });
+              setSelected({ ...selected, status: s });
+            }}
+            isStatusPending={updateStatus.isPending}
+            fields={[
+              { label: "Assignee", value: a?.name ?? "Unassigned" },
+              { label: "Project", value: projectName(selected.projectId) },
+              { label: "Date created", value: shortDate(selected.dateCreated), mono: true },
+              { label: "Due date", value: shortDate(selected.dueDate), mono: true },
+            ]}
+          />
+        );
+      })()}
     </Layout>
   );
 }

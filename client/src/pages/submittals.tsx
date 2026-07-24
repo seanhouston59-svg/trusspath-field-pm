@@ -5,6 +5,7 @@ import { SubmittalTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
+import { ItemDetailSheet } from "@/components/item-detail-sheet";
 import {
   useSubmittals,
   useTeamMap,
@@ -44,6 +45,7 @@ export default function SubmittalsPage() {
   const [view, setView] = useState<View>("board");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<Submittal | null>(null);
 
   const filtered = useMemo(() => {
     return items.filter((s) => {
@@ -133,6 +135,7 @@ export default function SubmittalsPage() {
           entityTitle={(s) => `${s.number} — ${s.subject}`}
           idPrefix="sub"
           columnClassName="md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+          onCardClick={(s) => setSelected(s)}
           renderCard={(s) => {
             const a = s.assigneeId ? team.get(s.assigneeId) : undefined;
             const overdue = isOverdue(s.dueDate) && s.status !== "Approved" && s.status !== "Rejected";
@@ -170,8 +173,35 @@ export default function SubmittalsPage() {
           }}
         />
       ) : (
-        <SubmittalTable items={filtered} team={team} projects={projectList} />
+        <SubmittalTable items={filtered} team={team} projects={projectList} onRowClick={(s) => setSelected(s)} />
       )}
+
+      {selected && (() => {
+        const a = selected.assigneeId ? team.get(selected.assigneeId) : undefined;
+        return (
+          <ItemDetailSheet
+            open={!!selected}
+            onOpenChange={(o) => !o && setSelected(null)}
+            eyebrow={selected.number}
+            title={selected.subject}
+            subtitle={projectName(selected.projectId)}
+            currentStatus={selected.status}
+            statusOptions={["Draft", "Submitted", "In Review", "Approved", "Rejected"]}
+            onStatusChange={(s) => {
+              updateStatus.mutate({ id: selected.id, status: s as Status });
+              setSelected({ ...selected, status: s });
+            }}
+            isStatusPending={updateStatus.isPending}
+            fields={[
+              { label: "Type", value: selected.type },
+              { label: "Assignee", value: a?.name ?? "Unassigned" },
+              { label: "Project", value: projectName(selected.projectId), full: true },
+              { label: "Date submitted", value: shortDate(selected.dateSubmitted), mono: true },
+              { label: "Due date", value: shortDate(selected.dueDate), mono: true },
+            ]}
+          />
+        );
+      })()}
     </Layout>
   );
 }

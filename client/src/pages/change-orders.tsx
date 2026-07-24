@@ -5,6 +5,7 @@ import { ChangeOrderTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
+import { ItemDetailSheet } from "@/components/item-detail-sheet";
 import {
   useChangeOrders,
   useProjects,
@@ -36,6 +37,7 @@ export default function ChangeOrdersPage() {
 
   const [view, setView] = useState<View>("board");
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<ChangeOrder | null>(null);
 
   const filtered = useMemo(() => {
     return items.filter((c) => {
@@ -110,6 +112,7 @@ export default function ChangeOrdersPage() {
           entityTitle={(c) => `${c.number} — ${c.title}`}
           idPrefix="co"
           columnClassName="md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+          onCardClick={(c) => setSelected(c)}
           renderCard={(c) => {
             const positive = c.amount >= 0;
             return (
@@ -147,7 +150,30 @@ export default function ChangeOrdersPage() {
           }}
         />
       ) : (
-        <ChangeOrderTable items={filtered} projects={projectList} />
+        <ChangeOrderTable items={filtered} projects={projectList} onRowClick={(c) => setSelected(c)} />
+      )}
+
+      {selected && (
+        <ItemDetailSheet
+          open={!!selected}
+          onOpenChange={(o) => !o && setSelected(null)}
+          eyebrow={selected.number}
+          title={selected.title}
+          subtitle={projectName(selected.projectId)}
+          currentStatus={selected.status}
+          statusOptions={["Draft", "Pending", "Approved", "Rejected", "Executed"]}
+          onStatusChange={(s) => {
+            updateStatus.mutate({ id: selected.id, status: s as Status });
+            setSelected({ ...selected, status: s });
+          }}
+          isStatusPending={updateStatus.isPending}
+          fields={[
+            { label: "Amount", value: <span className={selected.amount >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>{selected.amount >= 0 ? "+" : ""}{formatCurrency(selected.amount)}</span>, mono: true },
+            { label: "Schedule impact", value: `${selected.scheduleImpact > 0 ? "+" : ""}${selected.scheduleImpact} day${Math.abs(selected.scheduleImpact) === 1 ? "" : "s"}`, mono: true },
+            { label: "Project", value: projectName(selected.projectId), full: true },
+            { label: "Date issued", value: shortDate(selected.dateIssued), mono: true },
+          ]}
+        />
       )}
     </Layout>
   );

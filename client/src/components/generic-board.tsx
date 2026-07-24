@@ -38,6 +38,7 @@ export function GenericBoard<T, S extends string>({
   entityTitle,
   idPrefix,
   columnClassName,
+  onCardClick,
 }: {
   items: T[];
   columns: BoardColumn<S>[];
@@ -49,6 +50,7 @@ export function GenericBoard<T, S extends string>({
   entityTitle: (item: T) => string;
   idPrefix: string;
   columnClassName?: string;
+  onCardClick?: (item: T) => void;
 }) {
   const { toast } = useToast();
   const [dragOver, setDragOver] = useState<S | null>(null);
@@ -124,9 +126,18 @@ export function GenericBoard<T, S extends string>({
                       setDraggedId(null);
                       setDragOver(null);
                     }}
+                    onClick={(e) => {
+                      // Only fire click if we're not in the middle of a drag
+                      if (draggedId != null) return;
+                      // Don't fire if the click was inside an interactive child (button, select, link)
+                      const target = e.target as HTMLElement;
+                      if (target.closest("button, a, [role='button'], input, select, [role='combobox']")) return;
+                      onCardClick?.(it);
+                    }}
                     data-testid={`${idPrefix}-card-${id}`}
                     className={cn(
-                      "cursor-grab select-none rounded-md border border-border bg-card p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:cursor-grabbing",
+                      "select-none rounded-md border border-border bg-card p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:cursor-grabbing",
+                      onCardClick ? "cursor-pointer" : "cursor-grab",
                       draggedId === id && "opacity-40",
                     )}
                   >

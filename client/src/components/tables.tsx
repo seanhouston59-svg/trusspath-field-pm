@@ -42,7 +42,7 @@ function StatusSelect({ value, options, onChange, testId }: { value: string; opt
 }
 
 /* -------------------------------- Tasks -------------------------------- */
-export function TaskTable({ tasks, team, projects }: { tasks: Task[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[] }) {
+export function TaskTable({ tasks, team, projects, onRowClick }: { tasks: Task[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[]; onRowClick?: (t: Task) => void }) {
   const update = useUpdateTaskStatus();
   const { toast } = useToast();
   const [q, setQ] = useState("");
@@ -84,7 +84,7 @@ export function TaskTable({ tasks, team, projects }: { tasks: Task[]; team: Map<
               const a = t.assigneeId ? team.get(t.assigneeId) : undefined;
               const proj = projects?.find((p) => p.id === t.projectId);
               return (
-                <tr key={t.id} className="hover:bg-muted/30" data-testid={`row-task-${t.id}`}>
+                <tr key={t.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, a, [role='button'], [role='combobox']")) return; onRowClick?.(t); }} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} data-testid={`row-task-${t.id}`}>
                   <td className="px-4 py-2.5 font-medium">{t.title}</td>
                   {projects && <td className="px-4 py-2.5 text-muted-foreground">{proj?.name ?? "—"}</td>}
                   <td className="px-4 py-2.5 text-muted-foreground">{t.trade}</td>
@@ -126,7 +126,7 @@ export function TaskTable({ tasks, team, projects }: { tasks: Task[]; team: Map<
 }
 
 /* -------------------------------- RFIs -------------------------------- */
-export function RfiTable({ rfis, team, projects }: { rfis: Rfi[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[] }) {
+export function RfiTable({ rfis, team, projects, onRowClick }: { rfis: Rfi[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[]; onRowClick?: (r: Rfi) => void }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm">
@@ -146,7 +146,7 @@ export function RfiTable({ rfis, team, projects }: { rfis: Rfi[]; team: Map<numb
             const a = r.assigneeId ? team.get(r.assigneeId) : undefined;
             const proj = projects?.find((p) => p.id === r.projectId);
             return (
-              <tr key={r.id} className="hover:bg-muted/30" data-testid={`row-rfi-${r.id}`}>
+              <tr key={r.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, a, [role='button'], [role='combobox']")) return; onRowClick?.(r); }} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} data-testid={`row-rfi-${r.id}`}>
                 <td className="px-4 py-2.5 font-mono text-xs font-semibold text-primary">{r.number}</td>
                 <td className="px-4 py-2.5 font-medium">{r.subject}</td>
                 {projects && <td className="px-4 py-2.5 text-muted-foreground">{proj?.name ?? "—"}</td>}
@@ -172,7 +172,7 @@ export function RfiTable({ rfis, team, projects }: { rfis: Rfi[]; team: Map<numb
 }
 
 /* ----------------------------- Punch list ----------------------------- */
-export function PunchList({ items, team, projects }: { items: PunchItem[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[] }) {
+export function PunchList({ items, team, projects, onRowClick }: { items: PunchItem[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[]; onRowClick?: (i: PunchItem) => void }) {
   const update = useUpdatePunchStatus();
   const { toast } = useToast();
   return (
@@ -193,7 +193,7 @@ export function PunchList({ items, team, projects }: { items: PunchItem[]; team:
             const a = p.assigneeId ? team.get(p.assigneeId) : undefined;
             const proj = projects?.find((x) => x.id === p.projectId);
             return (
-              <tr key={p.id} className="hover:bg-muted/30" data-testid={`row-punch-${p.id}`}>
+              <tr key={p.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, a, [role='button'], [role='combobox']")) return; onRowClick?.(p); }} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} data-testid={`row-punch-${p.id}`}>
                 <td className="px-4 py-2.5 font-medium">{p.title}</td>
                 {projects && <td className="px-4 py-2.5 text-muted-foreground">{proj?.name ?? "—"}</td>}
                 <td className="px-4 py-2.5 text-muted-foreground">{p.location}</td>
@@ -277,7 +277,7 @@ export function DailyLogList({ logs, team, projects, onEdit, onDelete }: { logs:
 }
 
 /* ---------------------------- Submittals ------------------------------ */
-export function SubmittalTable({ items, team, projects }: { items: Submittal[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[] }) {
+export function SubmittalTable({ items, team, projects, onRowClick }: { items: Submittal[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[]; onRowClick?: (s: Submittal) => void }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm">
@@ -298,7 +298,7 @@ export function SubmittalTable({ items, team, projects }: { items: Submittal[]; 
             const a = s.assigneeId ? team.get(s.assigneeId) : undefined;
             const proj = projects?.find((p) => p.id === s.projectId);
             return (
-              <tr key={s.id} className="hover:bg-muted/30" data-testid={`row-sub-${s.id}`}>
+              <tr key={s.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, a, [role='button'], [role='combobox']")) return; onRowClick?.(s); }} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} data-testid={`row-sub-${s.id}`}>
                 <td className="px-4 py-2.5 font-mono text-xs font-semibold text-primary">{s.number}</td>
                 <td className="px-4 py-2.5 font-medium">{s.subject}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{s.type}</td>
@@ -318,7 +318,7 @@ export function SubmittalTable({ items, team, projects }: { items: Submittal[]; 
 }
 
 /* --------------------------- Change orders ---------------------------- */
-export function ChangeOrderTable({ items, projects }: { items: ChangeOrder[]; projects?: { id: number; name: string }[] }) {
+export function ChangeOrderTable({ items, projects, onRowClick }: { items: ChangeOrder[]; projects?: { id: number; name: string }[]; onRowClick?: (c: ChangeOrder) => void }) {
   const total = items.filter((c) => c.status === "Approved").reduce((s, c) => s + c.amount, 0);
   return (
     <div>
@@ -340,7 +340,7 @@ export function ChangeOrderTable({ items, projects }: { items: ChangeOrder[]; pr
             {items.map((c) => {
               const proj = projects?.find((p) => p.id === c.projectId);
               return (
-                <tr key={c.id} className="hover:bg-muted/30" data-testid={`row-co-${c.id}`}>
+                <tr key={c.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, a, [role='button'], [role='combobox']")) return; onRowClick?.(c); }} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} data-testid={`row-co-${c.id}`}>
                   <td className="px-4 py-2.5 font-mono text-xs font-semibold text-primary">{c.number}</td>
                   <td className="px-4 py-2.5 font-medium">{c.title}</td>
                   {projects && <td className="px-4 py-2.5 text-muted-foreground">{proj?.name ?? "—"}</td>}
@@ -360,7 +360,7 @@ export function ChangeOrderTable({ items, projects }: { items: ChangeOrder[]; pr
 }
 
 /* ---------------------------- Action items ---------------------------- */
-export function ActionItemTable({ items, projects }: { items: ActionItem[]; projects?: { id: number; name: string }[] }) {
+export function ActionItemTable({ items, projects, onRowClick }: { items: ActionItem[]; projects?: { id: number; name: string }[]; onRowClick?: (i: ActionItem) => void }) {
   const update = useUpdateActionItemStatus();
   const { toast } = useToast();
   return (
@@ -381,7 +381,7 @@ export function ActionItemTable({ items, projects }: { items: ActionItem[]; proj
           {items.map((a) => {
             const proj = projects?.find((p) => p.id === a.projectId);
             return (
-              <tr key={a.id} className="hover:bg-muted/30" data-testid={`row-ai-${a.id}`}>
+              <tr key={a.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, a, [role='button'], [role='combobox']")) return; onRowClick?.(a); }} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} data-testid={`row-ai-${a.id}`}>
                 <td className="px-4 py-2.5 font-medium">{a.title}</td>
                 {projects && <td className="px-4 py-2.5 text-muted-foreground">{proj?.name ?? "—"}</td>}
                 <td className="px-4 py-2.5 text-muted-foreground">{a.owner}</td>

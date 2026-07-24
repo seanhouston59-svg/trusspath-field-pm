@@ -5,8 +5,12 @@ import { TaskTable } from "@/components/tables";
 import { TaskBoard } from "@/components/task-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { ListToolbar, type View } from "@/components/list-toolbar";
-import { useTasks, useTeamMap, useProjects, useTeam, useCreateTask } from "@/hooks/use-data";
+import { useTasks, useTeamMap, useProjects, useTeam, useCreateTask, useUpdateTaskStatus } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
+import { ItemDetailSheet } from "@/components/item-detail-sheet";
+import { PriorityBadge } from "@/components/bits";
+import { shortDate } from "@/lib/format";
+import type { Task } from "@shared/schema";
 
 export default function TasksPage() {
   const { data: tasks = [], isLoading } = useTasks();
@@ -17,7 +21,10 @@ export default function TasksPage() {
   const projectOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
   const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
   const create = useCreateTask();
+  const updateStatus = useUpdateTaskStatus();
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Task | null>(null);
+  const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 
   // View + filters
   const [view, setView] = useState<View>("board");
@@ -93,10 +100,38 @@ export default function TasksPage() {
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
       ) : view === "board" ? (
-        <TaskBoard tasks={filtered} team={team} projects={projectList} />
+        <TaskBoard tasks={filtered} team={team} projects={projectList} onCardClick={(t) => setSelected(t)} />
       ) : (
-        <TaskTable tasks={filtered} team={team} projects={projectList} />
+        <TaskTable tasks={filtered} team={team} projects={projectList} onRowClick={(t) => setSelected(t)} />
       )}
+
+      {selected && (() => {
+        const a = selected.assigneeId ? team.get(selected.assigneeId) : undefined;
+        return (
+          <ItemDetailSheet
+            open={!!selected}
+            onOpenChange={(o) => !o && setSelected(null)}
+            title={selected.title}
+            subtitle={projectName(selected.projectId)}
+            currentStatus={selected.status}
+            statusOptions={["Not Started", "In Progress", "Blocked", "Complete"]}
+            onStatusChange={(s) => {
+              updateStatus.mutate({ id: selected.id, status: s });
+              setSelected({ ...selected, status: s });
+            }}
+            isStatusPending={updateStatus.isPending}
+            fields={[
+              { label: "Trade", value: selected.trade },
+              { label: "Priority", value: <PriorityBadge priority={selected.priority} /> },
+              { label: "Assignee", value: a?.name ?? "Unassigned" },
+              { label: "Project", value: projectName(selected.projectId) },
+              { label: "Due date", value: shortDate(selected.dueDate), mono: true },
+              ...(selected.startDate ? [{ label: "Start date", value: shortDate(selected.startDate), mono: true }] : []),
+              ...(selected.endDate ? [{ label: "End date", value: shortDate(selected.endDate), mono: true }] : []),
+            ]}
+          />
+        );
+      })()}
     </Layout>
   );
 }

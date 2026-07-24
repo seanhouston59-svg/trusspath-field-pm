@@ -5,6 +5,7 @@ import { ActionItemTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
+import { ItemDetailSheet } from "@/components/item-detail-sheet";
 import {
   useActionItems,
   useProjects,
@@ -37,6 +38,7 @@ export default function ActionItemsPage() {
   const [view, setView] = useState<View>("board");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<ActionItem | null>(null);
 
   const ownerOptions = useMemo(
     () =>
@@ -122,6 +124,7 @@ export default function ActionItemsPage() {
           entityTitle={(i) => i.title}
           idPrefix="ai"
           columnClassName="md:grid-cols-2 xl:grid-cols-3"
+          onCardClick={(i) => setSelected(i)}
           renderCard={(i) => {
             const overdue = isOverdue(i.dueDate) && i.status !== "Done";
             return (
@@ -149,7 +152,30 @@ export default function ActionItemsPage() {
           }}
         />
       ) : (
-        <ActionItemTable items={filtered} projects={projectList} />
+        <ActionItemTable items={filtered} projects={projectList} onRowClick={(i) => setSelected(i)} />
+      )}
+
+      {selected && (
+        <ItemDetailSheet
+          open={!!selected}
+          onOpenChange={(o) => !o && setSelected(null)}
+          title={selected.title}
+          subtitle={projectName(selected.projectId)}
+          currentStatus={selected.status}
+          statusOptions={["Open", "In Progress", "Done"]}
+          onStatusChange={(s) => {
+            updateStatus.mutate({ id: selected.id, status: s as Status });
+            setSelected({ ...selected, status: s });
+          }}
+          isStatusPending={updateStatus.isPending}
+          fields={[
+            { label: "Owner", value: selected.owner },
+            { label: "Priority", value: <PriorityBadge priority={selected.priority} /> },
+            { label: "Project", value: projectName(selected.projectId), full: true },
+            { label: "Due date", value: shortDate(selected.dueDate), mono: true },
+            { label: "Source", value: selected.source },
+          ]}
+        />
       )}
     </Layout>
   );

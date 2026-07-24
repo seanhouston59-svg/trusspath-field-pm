@@ -25,10 +25,12 @@ export function TaskBoard({
   tasks,
   team,
   projects,
+  onCardClick,
 }: {
   tasks: Task[];
   team: Map<number, TeamMember>;
   projects?: { id: number; name: string }[];
+  onCardClick?: (t: Task) => void;
 }) {
   const update = useUpdateTaskStatus();
   const { toast } = useToast();
@@ -105,9 +107,16 @@ export function TaskBoard({
                       setDraggedId(null);
                       setDragOver(null);
                     }}
+                    onClick={(e) => {
+                      if (draggedId != null) return;
+                      const target = e.target as HTMLElement;
+                      if (target.closest("button, a, [role='button'], [role='combobox']")) return;
+                      onCardClick?.(t);
+                    }}
                     data-testid={`board-card-${t.id}`}
                     className={cn(
-                      "cursor-grab select-none rounded-md border border-border bg-card p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:cursor-grabbing",
+                      "select-none rounded-md border border-border bg-card p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md active:cursor-grabbing",
+                      onCardClick ? "cursor-pointer" : "cursor-grab",
                       draggedId === t.id && "opacity-40",
                     )}
                   >
