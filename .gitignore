@@ -1,8 +1,10 @@
 node_modules/
 dist/
-api/index.js
-api/index.cjs
-api/data.db
+# Built API bundle & DB are committed so Vercel can pick them up.
+# (Locally rebuilt by 'npm run build' + script/build-api.ts.)
+# api/index.js
+# api/index.cjs
+# api/data.db
 .env
 .env.local
 .DS_Store
