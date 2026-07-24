@@ -66,8 +66,8 @@ const PUBLIC_API = new Set<string>([
   "/api/auth/logout",
   "/api/auth/me",
   // marketing / landing page endpoints — safe to leave public
-  "/api/subscribers",
-  "/api/demo-requests",
+  "/api/subscribe",
+  "/api/demo-request",
 ]);
 
 function authMiddleware(req: any, res: any, next: any) {

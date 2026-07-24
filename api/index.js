@@ -2234,8 +2234,8 @@ var init_routes = __esm({
       "/api/auth/logout",
       "/api/auth/me",
       // marketing / landing page endpoints — safe to leave public
-      "/api/subscribers",
-      "/api/demo-requests"
+      "/api/subscribe",
+      "/api/demo-request"
     ]);
     UPLOAD_DIR = process.env.VERCEL ? "/tmp/uploads/documents" : import_node_path2.default.resolve(process.cwd(), "uploads/documents");
     try {
