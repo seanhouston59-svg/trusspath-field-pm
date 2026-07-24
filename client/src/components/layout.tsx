@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
@@ -17,6 +17,7 @@ import { useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import type { AccessLevel } from "@shared/access-levels";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CommandPalette } from "@/components/command-palette";
 
 const ICONS: Record<string, any> = {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
@@ -229,6 +230,19 @@ function BackButton() {
 
 export function Layout({ children, title, actions }: { children: ReactNode; title: string; actions?: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
+
+  // ⌘K / Ctrl+K opens the command palette anywhere in the app.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
@@ -272,15 +286,20 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
             <h1 className="font-display text-lg font-bold tracking-tight">{title}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <div className="relative hidden sm:block">
+            <button
+              type="button"
+              onClick={() => setCmdOpen(true)}
+              onKeyDown={(e) => { if (e.key === "/") { e.preventDefault(); setCmdOpen(true); } }}
+              data-testid="button-search"
+              className="relative hidden sm:flex h-9 w-56 items-center rounded-md border border-border bg-muted/40 pl-9 pr-2 text-sm text-muted-foreground hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Open search"
+            >
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="search"
-                placeholder="Search…"
-                data-testid="input-search"
-                className="h-9 w-56 rounded-md border border-border bg-muted/40 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
+              <span className="flex-1 text-left">Search…</span>
+              <kbd className="ml-2 inline-flex h-5 select-none items-center gap-0.5 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                ⌘K
+              </kbd>
+            </button>
             {actions}
             <RoleSwitcher />
             <ThemeToggle />
@@ -292,6 +311,7 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
           <div className="mx-auto max-w-[1400px] p-4 md:p-6">{children}</div>
         </main>
       </div>
+      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </div>
   );
 }
