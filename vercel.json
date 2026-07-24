@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "vite build",
+  "buildCommand": "npx vite build && npx tsx script/build-api.ts",
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
   "framework": null,
