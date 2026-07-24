@@ -41,7 +41,7 @@ function resolveDbPath(): string {
 }
 
 const sqlite = new Database(resolveDbPath());
-sqlite.pragma("journal_mode = WAL");
+sqlite.pragma(process.env.VERCEL ? "journal_mode = MEMORY" : "journal_mode = WAL");
 export const db = drizzle(sqlite);
 
 function migrate() {

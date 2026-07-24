@@ -1,11 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run vercel-build",
+  "buildCommand": "vite build",
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
   "framework": null,
   "functions": {
-    "api/index.ts": {
+    "api/index.js": {
       "includeFiles": "data.db",
       "maxDuration": 30
     }

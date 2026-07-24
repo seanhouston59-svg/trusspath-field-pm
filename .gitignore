@@ -1,5 +1,8 @@
 node_modules/
 dist/
+api/index.js
+api/index.cjs
+api/data.db
 .env
 .env.local
 .DS_Store
