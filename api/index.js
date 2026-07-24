@@ -918,33 +918,44 @@ var init_storage = __esm({
       createSession(accountId) {
         const now = /* @__PURE__ */ new Date();
         const expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1e3);
-        const token = (0, import_node_crypto.randomBytes)(32).toString("hex");
-        try {
-          sqlite.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now.toISOString());
-        } catch {
-        }
-        return db.insert(sessions).values({
-          id: token,
-          accountId,
-          createdAt: now.toISOString(),
-          expiresAt: expires.toISOString()
-        }).returning().get();
+        const payload = `${accountId}.${expires.getTime()}`;
+        const b64 = (s) => Buffer.from(s).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const secret = process.env.SESSION_SECRET || "trusspath-dev-secret-change-me";
+        const sig = (0, import_node_crypto.scryptSync)(payload, secret, 32).toString("hex");
+        const token = `${b64(payload)}.${sig}`;
+        return { id: token, accountId, createdAt: now.toISOString(), expiresAt: expires.toISOString() };
       }
       getSession(token) {
-        if (!token) return null;
-        const s = db.select().from(sessions).where((0, import_drizzle_orm2.eq)(sessions.id, token)).get();
-        if (!s) return null;
-        if (new Date(s.expiresAt).getTime() < Date.now()) {
-          db.delete(sessions).where((0, import_drizzle_orm2.eq)(sessions.id, token)).run();
+        if (!token || typeof token !== "string") return null;
+        const parts = token.split(".");
+        if (parts.length !== 2) return null;
+        let payload;
+        try {
+          payload = Buffer.from(parts[0].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString();
+        } catch {
           return null;
         }
-        const a = this.getAccount(s.accountId);
-        if (!a) return null;
-        return { session: s, account: a };
+        const [accIdStr, expStr] = payload.split(".");
+        const accountId = Number(accIdStr);
+        const expMs = Number(expStr);
+        if (!Number.isFinite(accountId) || !Number.isFinite(expMs)) return null;
+        if (expMs < Date.now()) return null;
+        const secret = process.env.SESSION_SECRET || "trusspath-dev-secret-change-me";
+        const expected = (0, import_node_crypto.scryptSync)(payload, secret, 32).toString("hex");
+        const a = Buffer.from(parts[1], "hex");
+        const b = Buffer.from(expected, "hex");
+        if (a.length !== b.length || !(0, import_node_crypto.timingSafeEqual)(a, b)) return null;
+        const account = this.getAccount(accountId);
+        if (!account) return null;
+        const session = {
+          id: token,
+          accountId,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+          expiresAt: new Date(expMs).toISOString()
+        };
+        return { session, account };
       }
-      destroySession(token) {
-        if (!token) return;
-        db.delete(sessions).where((0, import_drizzle_orm2.eq)(sessions.id, token)).run();
+      destroySession(_token) {
       }
       countAccounts() {
         return db.select().from(accounts).all().length;
@@ -1537,7 +1548,9 @@ function authMiddleware(req, res, next) {
   if (!p.startsWith("/api")) return next();
   if (PUBLIC_API.has(p)) return next();
   const cookies = parseCookies(req.headers?.cookie);
-  const token = cookies[SESSION_COOKIE] || (req.headers?.authorization?.replace(/^Bearer\s+/i, "") ?? "");
+  const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+  const queryToken = typeof req.query?.token === "string" ? req.query.token : "";
+  const token = cookies[SESSION_COOKIE] || bearer || queryToken;
   const s = token ? storage.getSession(token) : null;
   if (!s) return res.status(401).json({ message: "Unauthorized" });
   req.account = s.account;
@@ -1621,7 +1634,7 @@ async function registerRoutes(_httpServer, app2) {
       const account = storage.createAccount(email, password, displayName, company);
       const session = storage.createSession(account.id);
       setSessionCookie(res, session.id);
-      res.status(201).json({ account });
+      res.status(201).json({ account, token: session.id });
     } catch (e) {
       const msg = e?.message || "Signup failed";
       const status = /already/i.test(msg) ? 409 : 500;
@@ -1636,7 +1649,7 @@ async function registerRoutes(_httpServer, app2) {
     if (!account) return res.status(401).json({ message: "Invalid email or password" });
     const session = storage.createSession(account.id);
     setSessionCookie(res, session.id);
-    res.json({ account });
+    res.json({ account, token: session.id });
   });
   app2.post("/api/auth/logout", (req, res) => {
     const cookies = parseCookies(req.headers?.cookie);
@@ -1646,8 +1659,9 @@ async function registerRoutes(_httpServer, app2) {
     res.json({ ok: true });
   });
   app2.get("/api/auth/me", (req, res) => {
+    const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") || "";
     const cookies = parseCookies(req.headers?.cookie);
-    const token = cookies[SESSION_COOKIE];
+    const token = bearer || cookies[SESSION_COOKIE];
     const s = token ? storage.getSession(token) : null;
     if (!s) return res.status(401).json({ account: null });
     res.json({ account: s.account });

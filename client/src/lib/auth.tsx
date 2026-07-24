@@ -1,9 +1,10 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "./queryClient";
+import { apiRequest, apiUrl, queryClient, setBearerToken, getBearerToken } from "./queryClient";
 import type { AccountPublic } from "@shared/schema";
 
 type MeResponse = { account: AccountPublic | null };
+type LoginResponse = { account: AccountPublic; token?: string };
 
 type AuthContextValue = {
   account: AccountPublic | null;
@@ -22,12 +23,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const meQuery = useQuery<MeResponse>({
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
-      const res = await fetch(
-        (import.meta as any).env?.BASE_URL
-          ? `${(import.meta as any).env.BASE_URL.replace(/\/$/, "")}/api/auth/me`
-          : "/api/auth/me",
-        { credentials: "include" }
-      );
+      // If we have no bearer token and we're cross-origin, skip the network round-trip.
+      // (Cookies can't reach the cross-origin API in strict browsers like Safari.)
+      const bearer = getBearerToken();
+      const headers: Record<string, string> = {};
+      if (bearer) headers["Authorization"] = `Bearer ${bearer}`;
+      const res = await fetch(apiUrl("/api/auth/me"), {
+        headers,
+        credentials: "include",
+      });
       if (res.status === 401) return { account: null };
       if (!res.ok) throw new Error(`Auth check failed: ${res.status}`);
       return (await res.json()) as MeResponse;
@@ -39,7 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMut = useMutation({
     mutationFn: async (creds: { email: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/login", creds);
-      const json = (await res.json()) as { account: AccountPublic };
+      const json = (await res.json()) as LoginResponse;
+      if (json.token) setBearerToken(json.token);
       return json.account;
     },
     onSuccess: (account) => {
@@ -52,7 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signupMut = useMutation({
     mutationFn: async (data: { email: string; password: string; displayName: string; company?: string }) => {
       const res = await apiRequest("POST", "/api/auth/signup", data);
-      const json = (await res.json()) as { account: AccountPublic };
+      const json = (await res.json()) as LoginResponse;
+      if (json.token) setBearerToken(json.token);
       return json.account;
     },
     onSuccess: (account) => {
@@ -63,7 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMut = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/auth/logout");
+      try { await apiRequest("POST", "/api/auth/logout"); } catch {}
+      setBearerToken(null);
     },
     onSuccess: () => {
       queryClient.setQueryData<MeResponse>(["/api/auth/me"], { account: null });

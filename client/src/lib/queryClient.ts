@@ -8,6 +8,40 @@ const BUILD_API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) || 
 const PROXY_API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 const API_BASE = BUILD_API_BASE || PROXY_API_BASE;
 
+// When we're calling a different origin (pplx preview -> Vercel), cookies get
+// blocked by Safari ITP even with SameSite=None. Fall back to a bearer token
+// in memory + Authorization header. Cookies still work fine same-origin.
+const IS_CROSS_ORIGIN = (() => {
+  try {
+    if (!API_BASE) return false;
+    if (typeof window === "undefined") return false;
+    const base = new URL(API_BASE, window.location.href);
+    return base.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+})();
+
+// In-memory bearer token. Only used when we can't rely on cookies (see above).
+// Not persisted across page reloads by design — the sandboxed iframe blocks
+// localStorage/sessionStorage anyway.
+let bearerToken: string | null = null;
+export function setBearerToken(t: string | null): void {
+  bearerToken = t;
+}
+export function getBearerToken(): string | null {
+  return bearerToken;
+}
+
+function buildHeaders(extra?: Record<string, string>): Record<string, string> {
+  const h: Record<string, string> = { ...(extra || {}) };
+  if (IS_CROSS_ORIGIN && bearerToken) {
+    h["Authorization"] = `Bearer ${bearerToken}`;
+  }
+  return h;
+}
+const FETCH_CREDS: RequestCredentials = IS_CROSS_ORIGIN ? "omit" : "include";
+
 /** Public paths that should NOT redirect to /login on 401. */
 const PUBLIC_HASH_PATHS = new Set<string>(["", "/", "/login", "/signup"]);
 
@@ -54,9 +88,9 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(`${API_BASE}${url}`, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: buildHeaders(data ? { "Content-Type": "application/json" } : {}),
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    credentials: FETCH_CREDS,
   });
 
   await throwIfResNotOk(res);
@@ -65,7 +99,14 @@ export async function apiRequest(
 
 /** Build a URL that works in dev (relative) and after deploy (proxied). */
 export function apiUrl(path: string): string {
-  return `${API_BASE}${path}`;
+  const base = `${API_BASE}${path}`;
+  // For cross-origin GETs used directly in <img src>/<a href> we can't set an
+  // Authorization header, so append the token as a query param instead.
+  if (IS_CROSS_ORIGIN && bearerToken) {
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}token=${encodeURIComponent(bearerToken)}`;
+  }
+  return base;
 }
 
 /** POST multipart/form-data. Returns the parsed JSON response. */
@@ -73,7 +114,8 @@ export async function apiUpload<T = unknown>(url: string, form: FormData): Promi
   const res = await fetch(`${API_BASE}${url}`, {
     method: "POST",
     body: form,
-    credentials: "include",
+    headers: buildHeaders(),
+    credentials: FETCH_CREDS,
   });
   await throwIfResNotOk(res);
   return (await res.json()) as T;
@@ -85,7 +127,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`${API_BASE}${queryKey.join("/")}`, { credentials: "include" });
+    const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
+      headers: buildHeaders(),
+      credentials: FETCH_CREDS,
+    });
 
     if (res.status === 401) {
       if (unauthorizedBehavior === "returnNull") return null;

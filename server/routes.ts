@@ -74,7 +74,11 @@ function authMiddleware(req: any, res: any, next: any) {
   if (!p.startsWith("/api")) return next();
   if (PUBLIC_API.has(p)) return next();
   const cookies = parseCookies(req.headers?.cookie);
-  const token = cookies[SESSION_COOKIE] || (req.headers?.authorization?.replace(/^Bearer\s+/i, "") ?? "");
+  // Accept token via cookie, Authorization: Bearer header, or ?token= query param
+  // (query is used for <img src> / <a href> where headers aren't possible).
+  const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+  const queryToken = typeof req.query?.token === "string" ? req.query.token : "";
+  const token = cookies[SESSION_COOKIE] || bearer || queryToken;
   const s = token ? storage.getSession(token) : null;
   if (!s) return res.status(401).json({ message: "Unauthorized" });
   req.account = s.account;
@@ -241,7 +245,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const account = storage.createAccount(email, password, displayName, company);
       const session = storage.createSession(account.id);
       setSessionCookie(res, session.id);
-      res.status(201).json({ account });
+      // Also return token in body for cross-origin clients that can't rely on cookies.
+      res.status(201).json({ account, token: session.id });
     } catch (e: any) {
       const msg = e?.message || "Signup failed";
       const status = /already/i.test(msg) ? 409 : 500;
@@ -257,7 +262,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!account) return res.status(401).json({ message: "Invalid email or password" });
     const session = storage.createSession(account.id);
     setSessionCookie(res, session.id);
-    res.json({ account });
+    res.json({ account, token: session.id });
   });
 
   app.post("/api/auth/logout", (req: any, res) => {
@@ -269,8 +274,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   app.get("/api/auth/me", (req: any, res) => {
+    // Prefer bearer header (cross-origin clients), fall back to cookie.
+    const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") || "";
     const cookies = parseCookies(req.headers?.cookie);
-    const token = cookies[SESSION_COOKIE];
+    const token = bearer || cookies[SESSION_COOKIE];
     const s = token ? storage.getSession(token) : null;
     if (!s) return res.status(401).json({ account: null });
     res.json({ account: s.account });

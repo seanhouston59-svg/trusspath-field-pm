@@ -657,33 +657,53 @@ class DatabaseStorage implements IStorage {
     return this.toPublic(acc);
   }
   createSession(accountId: number): Session {
+    // Stateless HMAC token so it works across serverless instances (each has its
+    // own /tmp copy of data.db, so DB-backed sessions can't be shared).
+    // Format: base64url(accountId.expMs).base64url(hmac_sha256(payload, secret))
     const now = new Date();
     const expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30d
-    const token = randomBytes(32).toString("hex");
-    // best-effort cleanup of expired sessions
-    try { sqlite.prepare("DELETE FROM sessions WHERE expires_at < ?").run(now.toISOString()); } catch {}
-    return db.insert(sessions).values({
-      id: token,
-      accountId,
-      createdAt: now.toISOString(),
-      expiresAt: expires.toISOString(),
-    }).returning().get();
+    const payload = `${accountId}.${expires.getTime()}`;
+    const b64 = (s: string | Buffer) =>
+      Buffer.from(s).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const secret = process.env.SESSION_SECRET || "trusspath-dev-secret-change-me";
+    const sig = scryptSync(payload, secret, 32).toString("hex");
+    const token = `${b64(payload)}.${sig}`;
+    return { id: token, accountId, createdAt: now.toISOString(), expiresAt: expires.toISOString() };
   }
   getSession(token: string): { session: Session; account: AccountPublic } | null {
-    if (!token) return null;
-    const s = db.select().from(sessions).where(eq(sessions.id, token)).get();
-    if (!s) return null;
-    if (new Date(s.expiresAt).getTime() < Date.now()) {
-      db.delete(sessions).where(eq(sessions.id, token)).run();
+    if (!token || typeof token !== "string") return null;
+    const parts = token.split(".");
+    if (parts.length !== 2) return null;
+    let payload: string;
+    try {
+      payload = Buffer.from(parts[0].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString();
+    } catch {
       return null;
     }
-    const a = this.getAccount(s.accountId);
-    if (!a) return null;
-    return { session: s, account: a };
+    const [accIdStr, expStr] = payload.split(".");
+    const accountId = Number(accIdStr);
+    const expMs = Number(expStr);
+    if (!Number.isFinite(accountId) || !Number.isFinite(expMs)) return null;
+    if (expMs < Date.now()) return null;
+    const secret = process.env.SESSION_SECRET || "trusspath-dev-secret-change-me";
+    const expected = scryptSync(payload, secret, 32).toString("hex");
+    // constant-time compare
+    const a = Buffer.from(parts[1], "hex");
+    const b = Buffer.from(expected, "hex");
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    const account = this.getAccount(accountId);
+    if (!account) return null;
+    const session: Session = {
+      id: token,
+      accountId,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(expMs).toISOString(),
+    };
+    return { session, account };
   }
-  destroySession(token: string): void {
-    if (!token) return;
-    db.delete(sessions).where(eq(sessions.id, token)).run();
+  destroySession(_token: string): void {
+    // Stateless tokens can't be revoked server-side without a denylist.
+    // Client clears the cookie/local token, which is enough for demo.
   }
   countAccounts(): number {
     return db.select().from(accounts).all().length;
