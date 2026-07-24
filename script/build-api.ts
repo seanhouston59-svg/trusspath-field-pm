@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
-import { readFile, rm, mkdir, copyFile } from "node:fs/promises";
+import { readFile, rm, mkdir, copyFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 // Bundle the Vercel serverless function so all sibling modules resolve.
 // Node modules stay external — Vercel installs them.
@@ -31,6 +32,17 @@ async function buildApi() {
   if (existsSync("data.db")) {
     if (!existsSync("api/data.db")) {
       await copyFile("data.db", "api/data.db");
+    }
+  }
+
+  // Bundle seed photos into api/seed-photos so they're available at runtime on Vercel.
+  const srcSeedDir = "server/seed-photos";
+  if (existsSync(srcSeedDir)) {
+    const dstSeedDir = "api/seed-photos";
+    await mkdir(dstSeedDir, { recursive: true });
+    const files = await readdir(srcSeedDir);
+    for (const f of files) {
+      await copyFile(join(srcSeedDir, f), join(dstSeedDir, f));
     }
   }
 }

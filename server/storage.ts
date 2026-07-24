@@ -25,8 +25,8 @@ import type {
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and, gt } from "drizzle-orm";
-import { existsSync, copyFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, copyFileSync, mkdirSync } from "node:fs";
+import { resolve, join } from "node:path";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 // On Vercel (or any read-only FS) the bundled data.db is next to the function code.
@@ -804,13 +804,60 @@ class DatabaseStorage implements IStorage {
     ];
     eqSeed.forEach((x) => db.insert(equipment).values(x).run());
 
-    const photoSeed: Omit<Photo, "id" | "storedFileName" | "originalFileName" | "mimeType" | "fileSizeBytes">[] = [
-      { projectId: p[0].id, caption: "Level 3 deck formwork — looking north", location: "L3, grid F", takenById: t[1].id, date: "2026-07-21", hue: 210 },
-      { projectId: p[0].id, caption: "Curtainwall frame at south elevation", location: "South facade", takenById: t[1].id, date: "2026-07-20", hue: 28 },
-      { projectId: p[0].id, caption: "Electrical rough-in — ICU wing", location: "L2, ICU", takenById: t[4].id, date: "2026-07-19", hue: 260 },
-      { projectId: p[1].id, caption: "Drywall finish — Floor 9", location: "Fl. 9", takenById: t[6].id, date: "2026-07-21", hue: 140 },
-      { projectId: p[2].id, caption: "Storm line trench — east lot", location: "East lot", takenById: t[3].id, date: "2026-07-21", hue: 190 },
+    // Copy bundled seed photos into the runtime photo dir (both local dev and Vercel /tmp).
+    const PHOTO_DIR = process.env.VERCEL
+      ? "/tmp/uploads/photos"
+      : resolve(process.cwd(), "uploads/photos");
+    try { mkdirSync(PHOTO_DIR, { recursive: true }); } catch {}
+    const seedPhotoCandidates = [
+      resolve(process.cwd(), "server/seed-photos"),
+      resolve(process.cwd(), "seed-photos"),
+      resolve(__dirname, "seed-photos"),
+      resolve(__dirname, "../server/seed-photos"),
     ];
+    let seedPhotoDir: string | null = null;
+    for (const c of seedPhotoCandidates) {
+      if (existsSync(c)) { seedPhotoDir = c; break; }
+    }
+    const copySeedPhoto = (name: string): { storedFileName: string; mimeType: string; fileSizeBytes: number } | null => {
+      if (!seedPhotoDir) return null;
+      const src = join(seedPhotoDir, name);
+      if (!existsSync(src)) return null;
+      const dst = join(PHOTO_DIR, name);
+      try { if (!existsSync(dst)) copyFileSync(src, dst); } catch {}
+      let size = 0;
+      try {
+        const fs2 = require("node:fs") as typeof import("node:fs");
+        size = fs2.statSync(dst).size;
+      } catch {}
+      return { storedFileName: name, mimeType: "image/jpeg", fileSizeBytes: size };
+    };
+    const photoFileMap: Record<string, string> = {
+      "Level 3 deck formwork — looking north": "photo-deck-formwork.jpg",
+      "Curtainwall frame at south elevation":  "photo-curtainwall.jpg",
+      "Electrical rough-in — ICU wing":        "photo-electrical.jpg",
+      "Drywall finish — Floor 9":              "photo-drywall.jpg",
+      "Storm line trench — east lot":          "photo-stormline.jpg",
+    };
+
+    const photoSeed: Omit<Photo, "id">[] = [
+      { projectId: p[0].id, caption: "Level 3 deck formwork — looking north", location: "L3, grid F", takenById: t[1].id, date: "2026-07-21", hue: 210, storedFileName: null, originalFileName: null, mimeType: null, fileSizeBytes: null },
+      { projectId: p[0].id, caption: "Curtainwall frame at south elevation", location: "South facade", takenById: t[1].id, date: "2026-07-20", hue: 28, storedFileName: null, originalFileName: null, mimeType: null, fileSizeBytes: null },
+      { projectId: p[0].id, caption: "Electrical rough-in — ICU wing", location: "L2, ICU", takenById: t[4].id, date: "2026-07-19", hue: 260, storedFileName: null, originalFileName: null, mimeType: null, fileSizeBytes: null },
+      { projectId: p[1].id, caption: "Drywall finish — Floor 9", location: "Fl. 9", takenById: t[6].id, date: "2026-07-21", hue: 140, storedFileName: null, originalFileName: null, mimeType: null, fileSizeBytes: null },
+      { projectId: p[2].id, caption: "Storm line trench — east lot", location: "East lot", takenById: t[3].id, date: "2026-07-21", hue: 190, storedFileName: null, originalFileName: null, mimeType: null, fileSizeBytes: null },
+    ];
+    for (const rec of photoSeed) {
+      const fname = photoFileMap[rec.caption];
+      if (!fname) continue;
+      const meta = copySeedPhoto(fname);
+      if (meta) {
+        rec.storedFileName = meta.storedFileName;
+        rec.originalFileName = fname;
+        rec.mimeType = meta.mimeType;
+        rec.fileSizeBytes = meta.fileSizeBytes;
+      }
+    }
     photoSeed.forEach((x) => db.insert(photos).values(x).run());
 
     const docSeed: Omit<DocumentRow, "id" | "storedFileName" | "originalFileName" | "mimeType" | "fileSizeBytes">[] = [

@@ -6,7 +6,7 @@
   "framework": null,
   "functions": {
     "api/index.js": {
-      "includeFiles": "data.db",
+      "includeFiles": "{data.db,seed-photos/**}",
       "maxDuration": 30
     }
   },
