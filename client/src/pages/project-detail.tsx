@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "wouter";
 import {
   MapPin, Calendar, Building2, DollarSign, ListChecks, HelpCircle, ClipboardList, CheckSquare,
+  ExternalLink,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
@@ -10,6 +11,7 @@ import {
   useProject, useTasks, useRfis, useDailyLogs, usePunchItems, useTeamMap,
 } from "@/hooks/use-data";
 import { formatCurrency, shortDate, formatDate } from "@/lib/format";
+import { googleMapsUrl } from "@/lib/maps";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -70,7 +72,23 @@ export default function ProjectDetail() {
             <div className="mt-1 text-sm text-muted-foreground">{project.client} · {project.type}</div>
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5"><MapPin className="size-4" /> {project.address}</span>
+            {googleMapsUrl(project.address) ? (
+              <a
+                href={googleMapsUrl(project.address)!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group inline-flex items-center gap-1.5 rounded-md text-muted-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title="Open in Google Maps"
+                aria-label={`Open ${project.address} in Google Maps`}
+                data-testid="link-project-address"
+              >
+                <MapPin className="size-4" />
+                <span className="underline-offset-2 group-hover:underline">{project.address}</span>
+                <ExternalLink className="size-3 opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+              </a>
+            ) : (
+              <span className="flex items-center gap-1.5"><MapPin className="size-4" /> {project.address}</span>
+            )}
           </div>
         </div>
 

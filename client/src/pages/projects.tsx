@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { MapPin, Calendar, Building2, Plus } from "lucide-react";
+import { MapPin, Calendar, Building2, Plus, ExternalLink } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { useProjects, useTeamMap, useTeam, useCreateProject } from "@/hooks/use-data";
 import { formatCurrency, shortDate } from "@/lib/format";
+import { googleMapsUrl } from "@/lib/maps";
 import { Button } from "@/components/ui/button";
 
 const TYPE_TINT: Record<string, string> = {
@@ -91,7 +92,30 @@ export default function Projects() {
                     <Building2 className="size-3.5" /> {p.client}
                   </div>
                   <div className="mt-2 flex flex-col gap-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5"><MapPin className="size-3.5" /> {p.address}</span>
+                    {(() => {
+                      const maps = googleMapsUrl(p.address);
+                      if (!maps) return (
+                        <span className="flex items-center gap-1.5"><MapPin className="size-3.5" /> {p.address}</span>
+                      );
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.open(maps, "_blank", "noopener,noreferrer");
+                          }}
+                          title="Open in Google Maps"
+                          aria-label={`Open ${p.address} in Google Maps`}
+                          data-testid={`link-address-${p.id}`}
+                          className="group -mx-1 inline-flex items-center gap-1.5 rounded-md px-1 text-left text-muted-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <MapPin className="size-3.5 shrink-0" />
+                          <span className="truncate underline-offset-2 group-hover:underline">{p.address}</span>
+                          <ExternalLink className="size-3 shrink-0 opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                        </button>
+                      );
+                    })()}
                     <span className="flex items-center gap-1.5"><Calendar className="size-3.5" /> {shortDate(p.startDate)} – {shortDate(p.endDate)}</span>
                   </div>
 
