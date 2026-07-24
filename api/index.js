@@ -638,6 +638,9 @@ var init_storage = __esm({
       createRfi(data) {
         return db.insert(rfis).values(data).returning().get();
       }
+      updateRfiStatus(id, status) {
+        return db.update(rfis).set({ status }).where((0, import_drizzle_orm2.eq)(rfis.id, id)).returning().get();
+      }
       getSubmittals(projectId) {
         if (projectId !== void 0) return db.select().from(submittals).where((0, import_drizzle_orm2.eq)(submittals.projectId, projectId)).all();
         return db.select().from(submittals).all();
@@ -645,12 +648,18 @@ var init_storage = __esm({
       createSubmittal(data) {
         return db.insert(submittals).values(data).returning().get();
       }
+      updateSubmittalStatus(id, status) {
+        return db.update(submittals).set({ status }).where((0, import_drizzle_orm2.eq)(submittals.id, id)).returning().get();
+      }
       getChangeOrders(projectId) {
         if (projectId !== void 0) return db.select().from(changeOrders).where((0, import_drizzle_orm2.eq)(changeOrders.projectId, projectId)).all();
         return db.select().from(changeOrders).all();
       }
       createChangeOrder(data) {
         return db.insert(changeOrders).values(data).returning().get();
+      }
+      updateChangeOrderStatus(id, status) {
+        return db.update(changeOrders).set({ status }).where((0, import_drizzle_orm2.eq)(changeOrders.id, id)).returning().get();
       }
       getActionItems(projectId) {
         if (projectId !== void 0) return db.select().from(actionItems).where((0, import_drizzle_orm2.eq)(actionItems.projectId, projectId)).all();
@@ -1713,17 +1722,38 @@ async function registerRoutes(_httpServer, app2) {
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(storage.createRfi(parsed.data));
   });
+  app2.patch("/api/rfis/:id/status", (req, res) => {
+    const status = String(req.body?.status ?? "");
+    if (!status) return res.status(400).json({ message: "status required" });
+    const updated = storage.updateRfiStatus(parseInt(req.params.id, 10), status);
+    if (!updated) return res.status(404).json({ message: "RFI not found" });
+    res.json(updated);
+  });
   app2.get("/api/submittals", (req, res) => res.json(storage.getSubmittals(pid(req))));
   app2.post("/api/submittals", (req, res) => {
     const parsed = insertSubmittalSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(storage.createSubmittal(parsed.data));
   });
+  app2.patch("/api/submittals/:id/status", (req, res) => {
+    const status = String(req.body?.status ?? "");
+    if (!status) return res.status(400).json({ message: "status required" });
+    const updated = storage.updateSubmittalStatus(parseInt(req.params.id, 10), status);
+    if (!updated) return res.status(404).json({ message: "Submittal not found" });
+    res.json(updated);
+  });
   app2.get("/api/change-orders", (req, res) => res.json(storage.getChangeOrders(pid(req))));
   app2.post("/api/change-orders", (req, res) => {
     const parsed = insertChangeOrderSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(storage.createChangeOrder(parsed.data));
+  });
+  app2.patch("/api/change-orders/:id/status", (req, res) => {
+    const status = String(req.body?.status ?? "");
+    if (!status) return res.status(400).json({ message: "status required" });
+    const updated = storage.updateChangeOrderStatus(parseInt(req.params.id, 10), status);
+    if (!updated) return res.status(404).json({ message: "Change order not found" });
+    res.json(updated);
   });
   app2.get("/api/action-items", (req, res) => res.json(storage.getActionItems(pid(req))));
   app2.post("/api/action-items", (req, res) => {

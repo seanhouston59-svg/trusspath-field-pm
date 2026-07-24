@@ -1,10 +1,29 @@
-import { useState } from "react";
-import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, FileEdit, Clock, CheckCircle2, XCircle, Zap } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ChangeOrderTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
-import { useChangeOrders, useProjects, useCreateChangeOrder } from "@/hooks/use-data";
+import { GenericBoard, type BoardColumn } from "@/components/generic-board";
+import { ListToolbar, type View } from "@/components/list-toolbar";
+import {
+  useChangeOrders,
+  useProjects,
+  useCreateChangeOrder,
+  useUpdateChangeOrderStatus,
+} from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
+import { formatCurrency, shortDate } from "@/lib/format";
+import type { ChangeOrder } from "@shared/schema";
+
+type Status = "Draft" | "Pending" | "Approved" | "Rejected" | "Executed";
+
+const COLUMNS: BoardColumn<Status>[] = [
+  { status: "Draft", label: "Draft", icon: FileEdit, accent: "text-muted-foreground" },
+  { status: "Pending", label: "Pending", icon: Clock, accent: "text-amber-500" },
+  { status: "Approved", label: "Approved", icon: CheckCircle2, accent: "text-emerald-500" },
+  { status: "Rejected", label: "Rejected", icon: XCircle, accent: "text-red-500" },
+  { status: "Executed", label: "Executed", icon: Zap, accent: "text-primary" },
+];
 
 export default function ChangeOrdersPage() {
   const { data: items = [], isLoading } = useChangeOrders();
@@ -12,7 +31,20 @@ export default function ChangeOrdersPage() {
   const projectList = projects.map((p) => ({ id: p.id, name: p.name }));
   const projectOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
   const create = useCreateChangeOrder();
+  const updateStatus = useUpdateChangeOrderStatus();
   const [open, setOpen] = useState(false);
+
+  const [view, setView] = useState<View>("board");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+
+  const filtered = useMemo(() => {
+    return items.filter((c) => {
+      if (projectFilter !== "all" && String(c.projectId) !== projectFilter) return false;
+      return true;
+    });
+  }, [items, projectFilter]);
+
+  const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 
   const fields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
@@ -25,9 +57,14 @@ export default function ChangeOrdersPage() {
   ];
 
   return (
-    <Layout title="Change Orders" actions={
-      <Button size="sm" onClick={() => setOpen(true)} data-testid="button-new-co"><Plus className="size-4" /> New Change Order</Button>
-    }>
+    <Layout
+      title="Change Orders"
+      actions={
+        <Button size="sm" onClick={() => setOpen(true)} data-testid="button-new-co">
+          <Plus className="size-4" /> New Change Order
+        </Button>
+      }
+    >
       <CreateEntityDialog
         open={open}
         onOpenChange={setOpen}
@@ -36,17 +73,82 @@ export default function ChangeOrdersPage() {
         defaults={{ status: "Draft", amount: 0, scheduleImpact: 0 }}
         submitLabel="Create Change Order"
         isPending={create.isPending}
-        onSubmit={(v) => create.mutateAsync({
-          projectId: Number(v.projectId),
-          number: String(v.number),
-          title: String(v.title),
-          status: String(v.status),
-          amount: Number(v.amount),
-          scheduleImpact: Number(v.scheduleImpact),
-          dateIssued: String(v.dateIssued),
-        })}
+        onSubmit={(v) =>
+          create.mutateAsync({
+            projectId: Number(v.projectId),
+            number: String(v.number),
+            title: String(v.title),
+            status: String(v.status),
+            amount: Number(v.amount),
+            scheduleImpact: Number(v.scheduleImpact),
+            dateIssued: String(v.dateIssued),
+          })
+        }
       />
-      {isLoading ? <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" /> : <ChangeOrderTable items={items} projects={projectList} />}
+
+      <ListToolbar
+        projects={projectList}
+        projectFilter={projectFilter}
+        onProjectFilter={setProjectFilter}
+        count={filtered.length}
+        total={items.length}
+        view={view}
+        onView={setView}
+        countTestId="text-co-count"
+      />
+
+      {isLoading ? (
+        <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
+      ) : view === "board" ? (
+        <GenericBoard<ChangeOrder, Status>
+          items={filtered}
+          columns={COLUMNS}
+          getStatus={(c) => c.status}
+          getId={(c) => c.id}
+          mutate={(args) => updateStatus.mutate(args)}
+          entityLabel="Change order"
+          entityTitle={(c) => `${c.number} — ${c.title}`}
+          idPrefix="co"
+          columnClassName="md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+          renderCard={(c) => {
+            const positive = c.amount >= 0;
+            return (
+              <>
+                <div className="mb-1 text-[10px] font-mono uppercase tracking-wide text-muted-foreground">
+                  {c.number}
+                </div>
+                <h4 className="text-sm font-medium leading-snug">{c.title}</h4>
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                  {projectName(c.projectId) ?? "—"}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                  <span
+                    className={
+                      positive
+                        ? "font-mono font-medium tabular-nums text-emerald-600 dark:text-emerald-400"
+                        : "font-mono font-medium tabular-nums text-red-600 dark:text-red-400"
+                    }
+                  >
+                    {positive ? "+" : ""}
+                    {formatCurrency(c.amount, { compact: true })}
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {c.scheduleImpact > 0
+                      ? `+${c.scheduleImpact}d`
+                      : c.scheduleImpact < 0
+                        ? `${c.scheduleImpact}d`
+                        : "0d"}
+                    <span className="mx-1.5 opacity-50">·</span>
+                    {shortDate(c.dateIssued)}
+                  </span>
+                </div>
+              </>
+            );
+          }}
+        />
+      ) : (
+        <ChangeOrderTable items={filtered} projects={projectList} />
+      )}
     </Layout>
   );
 }

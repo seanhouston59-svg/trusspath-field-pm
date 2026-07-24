@@ -137,6 +137,39 @@ export function useUpdatePunchStatus() {
   });
 }
 
+export function useUpdateRfiStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/rfis/${id}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/rfis"] }),
+  });
+}
+
+export function useUpdateSubmittalStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/submittals/${id}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/submittals"] }),
+  });
+}
+
+export function useUpdateChangeOrderStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/change-orders/${id}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/change-orders"] }),
+  });
+}
+
 export function useSubmittals(projectId?: number) {
   return useQuery<Submittal[]>({
     queryKey: ["/api/submittals", { projectId }],

@@ -337,6 +337,13 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(storage.createRfi(parsed.data));
   });
+  app.patch("/api/rfis/:id/status", (req, res) => {
+    const status = String(req.body?.status ?? "");
+    if (!status) return res.status(400).json({ message: "status required" });
+    const updated = storage.updateRfiStatus(parseInt(req.params.id, 10), status);
+    if (!updated) return res.status(404).json({ message: "RFI not found" });
+    res.json(updated);
+  });
 
   // Submittals
   app.get("/api/submittals", (req, res) => res.json(storage.getSubmittals(pid(req))));
@@ -345,6 +352,13 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(storage.createSubmittal(parsed.data));
   });
+  app.patch("/api/submittals/:id/status", (req, res) => {
+    const status = String(req.body?.status ?? "");
+    if (!status) return res.status(400).json({ message: "status required" });
+    const updated = storage.updateSubmittalStatus(parseInt(req.params.id, 10), status);
+    if (!updated) return res.status(404).json({ message: "Submittal not found" });
+    res.json(updated);
+  });
 
   // Change orders
   app.get("/api/change-orders", (req, res) => res.json(storage.getChangeOrders(pid(req))));
@@ -352,6 +366,13 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const parsed = insertChangeOrderSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(storage.createChangeOrder(parsed.data));
+  });
+  app.patch("/api/change-orders/:id/status", (req, res) => {
+    const status = String(req.body?.status ?? "");
+    if (!status) return res.status(400).json({ message: "status required" });
+    const updated = storage.updateChangeOrderStatus(parseInt(req.params.id, 10), status);
+    if (!updated) return res.status(404).json({ message: "Change order not found" });
+    res.json(updated);
   });
 
   // Action items

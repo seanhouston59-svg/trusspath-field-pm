@@ -264,6 +264,9 @@ export interface IStorage {
   getTasks(projectId?: number): Task[];
   createTask(data: InsertTask): Task;
   updateTaskStatus(id: number, status: string): Task | undefined;
+  updateRfiStatus(id: number, status: string): Rfi | undefined;
+  updateSubmittalStatus(id: number, status: string): Submittal | undefined;
+  updateChangeOrderStatus(id: number, status: string): ChangeOrder | undefined;
   getRfis(projectId?: number): Rfi[];
   createRfi(data: InsertRfi): Rfi;
   getSubmittals(projectId?: number): Submittal[];
@@ -370,6 +373,9 @@ class DatabaseStorage implements IStorage {
     return db.select().from(rfis).all();
   }
   createRfi(data: InsertRfi): Rfi { return db.insert(rfis).values(data).returning().get(); }
+  updateRfiStatus(id: number, status: string): Rfi | undefined {
+    return db.update(rfis).set({ status }).where(eq(rfis.id, id)).returning().get();
+  }
 
   getSubmittals(projectId?: number): Submittal[] {
     if (projectId !== undefined) return db.select().from(submittals).where(eq(submittals.projectId, projectId)).all();
@@ -378,6 +384,9 @@ class DatabaseStorage implements IStorage {
   createSubmittal(data: InsertSubmittal): Submittal {
     return db.insert(submittals).values(data).returning().get();
   }
+  updateSubmittalStatus(id: number, status: string): Submittal | undefined {
+    return db.update(submittals).set({ status }).where(eq(submittals.id, id)).returning().get();
+  }
 
   getChangeOrders(projectId?: number): ChangeOrder[] {
     if (projectId !== undefined) return db.select().from(changeOrders).where(eq(changeOrders.projectId, projectId)).all();
@@ -385,6 +394,9 @@ class DatabaseStorage implements IStorage {
   }
   createChangeOrder(data: InsertChangeOrder): ChangeOrder {
     return db.insert(changeOrders).values(data).returning().get();
+  }
+  updateChangeOrderStatus(id: number, status: string): ChangeOrder | undefined {
+    return db.update(changeOrders).set({ status }).where(eq(changeOrders.id, id)).returning().get();
   }
 
   getActionItems(projectId?: number): ActionItem[] {

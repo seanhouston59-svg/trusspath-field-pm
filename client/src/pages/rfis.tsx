@@ -1,10 +1,32 @@
-import { useState } from "react";
-import { Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, HelpCircle, Search, MessageSquare, Archive } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { RfiTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
-import { useRfis, useTeamMap, useProjects, useTeam, useCreateRfi } from "@/hooks/use-data";
+import { GenericBoard, type BoardColumn } from "@/components/generic-board";
+import { ListToolbar, type View } from "@/components/list-toolbar";
+import {
+  useRfis,
+  useTeamMap,
+  useProjects,
+  useTeam,
+  useCreateRfi,
+  useUpdateRfiStatus,
+} from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/bits";
+import { shortDate, isOverdue } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import type { Rfi } from "@shared/schema";
+
+type Status = "Open" | "In Review" | "Answered" | "Closed";
+
+const COLUMNS: BoardColumn<Status>[] = [
+  { status: "Open", label: "Open", icon: HelpCircle, accent: "text-amber-500" },
+  { status: "In Review", label: "In Review", icon: Search, accent: "text-primary" },
+  { status: "Answered", label: "Answered", icon: MessageSquare, accent: "text-blue-500" },
+  { status: "Closed", label: "Closed", icon: Archive, accent: "text-emerald-500" },
+];
 
 export default function RfisPage() {
   const { data: rfis = [], isLoading } = useRfis();
@@ -15,7 +37,25 @@ export default function RfisPage() {
   const projectOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
   const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
   const create = useCreateRfi();
+  const updateStatus = useUpdateRfiStatus();
   const [open, setOpen] = useState(false);
+
+  const [view, setView] = useState<View>("board");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+
+  const filtered = useMemo(() => {
+    return rfis.filter((r) => {
+      if (projectFilter !== "all" && String(r.projectId) !== projectFilter) return false;
+      if (assigneeFilter !== "all") {
+        if (assigneeFilter === "0" && r.assigneeId != null) return false;
+        if (assigneeFilter !== "0" && String(r.assigneeId ?? "") !== assigneeFilter) return false;
+      }
+      return true;
+    });
+  }, [rfis, projectFilter, assigneeFilter]);
+
+  const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 
   const fields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
@@ -27,10 +67,20 @@ export default function RfisPage() {
     { name: "dueDate", label: "Due Date", type: "date", required: true, half: true },
   ];
 
+  const peopleOptions = [
+    { value: "0", label: "Unassigned" },
+    ...teamList.map((m) => ({ value: String(m.id), label: m.name })),
+  ];
+
   return (
-    <Layout title="RFIs" actions={
-      <Button size="sm" onClick={() => setOpen(true)} data-testid="button-new-rfi"><Plus className="size-4" /> New RFI</Button>
-    }>
+    <Layout
+      title="RFIs"
+      actions={
+        <Button size="sm" onClick={() => setOpen(true)} data-testid="button-new-rfi">
+          <Plus className="size-4" /> New RFI
+        </Button>
+      }
+    >
       <CreateEntityDialog
         open={open}
         onOpenChange={setOpen}
@@ -39,17 +89,80 @@ export default function RfisPage() {
         defaults={{ status: "Open", assigneeId: "0" }}
         submitLabel="Create RFI"
         isPending={create.isPending}
-        onSubmit={(v) => create.mutateAsync({
-          projectId: Number(v.projectId),
-          number: String(v.number),
-          subject: String(v.subject),
-          status: String(v.status),
-          assigneeId: v.assigneeId === "0" ? undefined : Number(v.assigneeId),
-          dateCreated: String(v.dateCreated),
-          dueDate: String(v.dueDate),
-        })}
+        onSubmit={(v) =>
+          create.mutateAsync({
+            projectId: Number(v.projectId),
+            number: String(v.number),
+            subject: String(v.subject),
+            status: String(v.status),
+            assigneeId: v.assigneeId === "0" ? undefined : Number(v.assigneeId),
+            dateCreated: String(v.dateCreated),
+            dueDate: String(v.dueDate),
+          })
+        }
       />
-      {isLoading ? <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" /> : <RfiTable rfis={rfis} team={team} projects={projectList} />}
+
+      <ListToolbar
+        projects={projectList}
+        projectFilter={projectFilter}
+        onProjectFilter={setProjectFilter}
+        peopleLabel="assignees"
+        peopleOptions={peopleOptions}
+        peopleFilter={assigneeFilter}
+        onPeopleFilter={setAssigneeFilter}
+        count={filtered.length}
+        total={rfis.length}
+        view={view}
+        onView={setView}
+        countTestId="text-rfi-count"
+      />
+
+      {isLoading ? (
+        <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
+      ) : view === "board" ? (
+        <GenericBoard<Rfi, Status>
+          items={filtered}
+          columns={COLUMNS}
+          getStatus={(r) => r.status}
+          getId={(r) => r.id}
+          mutate={(args) => updateStatus.mutate(args)}
+          entityLabel="RFI"
+          entityTitle={(r) => `${r.number} — ${r.subject}`}
+          idPrefix="rfi"
+          renderCard={(r) => {
+            const a = r.assigneeId ? team.get(r.assigneeId) : undefined;
+            const overdue = isOverdue(r.dueDate) && r.status !== "Closed";
+            return (
+              <>
+                <div className="mb-1 text-[10px] font-mono uppercase tracking-wide text-muted-foreground">
+                  {r.number}
+                </div>
+                <h4 className="text-sm font-medium leading-snug">{r.subject}</h4>
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                  {projectName(r.projectId) ?? "—"}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {a ? (
+                      <>
+                        <Avatar initials={a.initials} color={a.color} size={18} />
+                        <span className="truncate text-muted-foreground">{a.name.split(" ")[0]}</span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Unassigned</span>
+                    )}
+                  </div>
+                  <span className={cn("shrink-0 tabular-nums text-muted-foreground", overdue && "font-medium text-red-500")}>
+                    {shortDate(r.dueDate)}
+                  </span>
+                </div>
+              </>
+            );
+          }}
+        />
+      ) : (
+        <RfiTable rfis={filtered} team={team} projects={projectList} />
+      )}
     </Layout>
   );
 }

@@ -1,15 +1,12 @@
 import { useMemo, useState } from "react";
-import { Plus, LayoutGrid, Rows3 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { PunchList } from "@/components/tables";
 import { PunchBoard } from "@/components/punch-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
+import { ListToolbar, type View } from "@/components/list-toolbar";
 import { usePunchItems, useTeamMap, useProjects, useTeam, useCreatePunchItem } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-
-type View = "table" | "board";
 
 export default function PunchPage() {
   const { data: items = [], isLoading } = usePunchItems();
@@ -75,65 +72,20 @@ export default function PunchPage() {
         }
       />
 
-      {/* Toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Select value={projectFilter} onValueChange={setProjectFilter}>
-          <SelectTrigger className="h-9 w-[200px]" data-testid="filter-project">
-            <SelectValue placeholder="All projects" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All projects</SelectItem>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={String(p.id)}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-          <SelectTrigger className="h-9 w-[180px]" data-testid="filter-assignee">
-            <SelectValue placeholder="All assignees" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All assignees</SelectItem>
-            <SelectItem value="0">Unassigned</SelectItem>
-            {teamList.map((m) => (
-              <SelectItem key={m.id} value={String(m.id)}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <span className="ml-1 text-xs text-muted-foreground" data-testid="text-punch-count">
-          {filtered.length} of {items.length}
-        </span>
-
-        <div className="ml-auto inline-flex rounded-md border border-border bg-muted/40 p-0.5">
-          <button
-            type="button"
-            onClick={() => setView("board")}
-            data-testid="view-board"
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition-colors",
-              view === "board" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <LayoutGrid className="size-3.5" /> Board
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("table")}
-            data-testid="view-table"
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition-colors",
-              view === "table" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Rows3 className="size-3.5" /> Table
-          </button>
-        </div>
-      </div>
+      <ListToolbar
+        projects={projectList}
+        projectFilter={projectFilter}
+        onProjectFilter={setProjectFilter}
+        peopleLabel="assignees"
+        peopleOptions={[{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))]}
+        peopleFilter={assigneeFilter}
+        onPeopleFilter={setAssigneeFilter}
+        count={filtered.length}
+        total={items.length}
+        view={view}
+        onView={setView}
+        countTestId="text-punch-count"
+      />
 
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
