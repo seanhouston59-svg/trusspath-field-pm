@@ -534,7 +534,7 @@ function PanZoom({
       <div
         ref={viewportRef}
         className={cn(
-          "relative h-[560px] w-full select-none overflow-hidden",
+          "relative h-[420px] md:h-[560px] w-full select-none overflow-hidden",
           isPanning ? "cursor-grabbing" : "cursor-grab"
         )}
         style={{ touchAction: "none" }}
@@ -559,7 +559,7 @@ function PanZoom({
 
       {/* Zoom controls */}
       <div
-        className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-md border border-border bg-background/95 p-1 shadow-sm backdrop-blur"
+        className="absolute bottom-3 left-3 md:left-auto md:right-3 z-10 flex items-center gap-1 rounded-md border border-border bg-background/95 p-1 shadow-sm backdrop-blur"
         data-testid="cpm-zoom-controls"
       >
         <button
@@ -612,7 +612,7 @@ function PanZoom({
         </button>
       </div>
 
-      <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-background/80 px-2 py-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground backdrop-blur">
+      <div className="pointer-events-none absolute left-3 top-3 hidden sm:block rounded-md bg-background/80 px-2 py-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground backdrop-blur">
         Drag to pan · Scroll to zoom
       </div>
     </div>

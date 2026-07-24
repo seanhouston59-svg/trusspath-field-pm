@@ -100,7 +100,7 @@ export function GenericBoard<T, S extends string>({
               onDrop(col.status);
             }}
             className={cn(
-              "flex min-h-[400px] flex-col rounded-lg border border-border bg-muted/20 p-3 transition-colors",
+              "flex min-h-[140px] md:min-h-[400px] flex-col rounded-lg border border-border bg-muted/20 p-3 transition-colors",
               isOver && "border-primary bg-primary/5",
             )}
           >

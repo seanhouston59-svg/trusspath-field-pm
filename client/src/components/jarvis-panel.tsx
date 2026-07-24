@@ -220,16 +220,18 @@ export function JarvisPanel() {
       <button
         onClick={() => setOpen(true)}
         data-testid="jarvis-launcher"
+        aria-label="Open JARVIS assistant"
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 0.75rem)" }}
         className={cn(
-          "fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full border border-primary/40 bg-card pl-3 pr-4 py-2.5 shadow-lg transition hover:border-primary",
+          "fixed right-3 md:right-5 md:bottom-5 z-50 flex items-center gap-2 rounded-full border border-primary/40 bg-card/95 backdrop-blur pl-2.5 pr-3 py-2 md:pl-3 md:pr-4 md:py-2.5 shadow-lg transition hover:border-primary",
           open && "ring-2 ring-primary/40"
         )}
       >
-        <span className="relative grid size-7 place-items-center rounded-full bg-primary/15 text-primary">
-          <Radio className="size-4" />
+        <span className="relative grid size-6 md:size-7 place-items-center rounded-full bg-primary/15 text-primary">
+          <Radio className="size-3.5 md:size-4" />
           <span className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
         </span>
-        <span className="font-display text-sm font-extrabold tracking-wide text-foreground">JARVIS</span>
+        <span className="font-display text-xs md:text-sm font-extrabold tracking-wide text-foreground">JARVIS</span>
       </button>
       )}
 

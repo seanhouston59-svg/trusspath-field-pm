@@ -45,7 +45,7 @@ export function ListToolbar({
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <Select value={projectFilter} onValueChange={onProjectFilter}>
-        <SelectTrigger className="h-9 w-[200px]" data-testid="filter-project">
+        <SelectTrigger className="h-10 md:h-9 flex-1 min-w-[140px] sm:w-[200px] sm:flex-none" data-testid="filter-project">
           <SelectValue placeholder="All projects" />
         </SelectTrigger>
         <SelectContent>
@@ -60,7 +60,7 @@ export function ListToolbar({
 
       {peopleOptions && onPeopleFilter && (
         <Select value={peopleFilter ?? "all"} onValueChange={onPeopleFilter}>
-          <SelectTrigger className="h-9 w-[180px]" data-testid="filter-people">
+          <SelectTrigger className="h-10 md:h-9 flex-1 min-w-[140px] sm:w-[180px] sm:flex-none" data-testid="filter-people">
             <SelectValue placeholder={`All ${peopleLabel ?? "people"}`} />
           </SelectTrigger>
           <SelectContent>
@@ -74,7 +74,7 @@ export function ListToolbar({
         </Select>
       )}
 
-      <span className="ml-1 text-xs text-muted-foreground" data-testid={countTestId}>
+      <span className="order-3 sm:order-none w-full sm:w-auto ml-0 sm:ml-1 text-xs text-muted-foreground" data-testid={countTestId}>
         {count} of {total}
       </span>
 

@@ -6,7 +6,7 @@ import {
   FileStack, GitPullRequestArrow, StickyNote, Wrench, Image, FileText,
   Contact as ContactIcon, MessageSquare,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
-  LogOut, ChevronLeft, Network,
+  LogOut, ChevronLeft, Network, MoreVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -192,6 +192,99 @@ function TopbarUser() {
   );
 }
 
+function MobileOverflowMenu() {
+  const [open, setOpen] = useState(false);
+  const { theme, toggle } = useTheme();
+  const { level, setLevel } = useAccess();
+  const { account, logout } = useAuth();
+  const displayName = account?.displayName || "Marcus Reyes";
+  const initials = displayName
+    .split(/\s+/)
+    .map((s) => s[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "MR";
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const doLogout = async () => {
+    setOpen(false);
+    await logout();
+    window.location.hash = "/login";
+  };
+
+  return (
+    <div className="relative md:hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label="More"
+        aria-expanded={open}
+        data-testid="button-overflow-menu"
+        className="inline-flex size-10 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate"
+      >
+        <MoreVertical className="size-5" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            role="menu"
+            className="absolute right-0 top-full z-50 mt-2 w-64 origin-top-right overflow-hidden rounded-lg border border-border bg-popover shadow-xl"
+            data-testid="overflow-menu"
+          >
+            <div className="flex items-center gap-3 border-b border-border px-3 py-3">
+              <Avatar initials={initials} color="amber" size={36} />
+              <div className="min-w-0 leading-tight">
+                <div className="truncate text-sm font-medium">{displayName}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{account?.email ?? ""}</div>
+              </div>
+            </div>
+            <div className="px-3 pt-3 pb-2">
+              <div className="pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Access level</div>
+              <Select value={level} onValueChange={(v) => setLevel(v as AccessLevel)}>
+                <SelectTrigger className="h-10 w-full gap-2" data-testid="role-switcher-mobile">
+                  <ShieldCheck className="size-4 text-primary" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACCESS_LEVELS.map((l) => (
+                    <SelectItem key={l.slug} value={l.slug}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <button
+              onClick={() => { toggle(); }}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted"
+              data-testid="button-theme-mobile"
+            >
+              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </button>
+            <div className="border-t border-border">
+              <button
+                onClick={doLogout}
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted"
+                data-testid="button-logout-mobile"
+              >
+                <LogOut className="size-4" />
+                Sign out
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function BackButton() {
   const [location] = useLocation();
   // Don't show on the dashboard itself
@@ -272,18 +365,19 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background px-4 md:px-6">
+        <header className="flex h-14 md:h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-3 md:px-6">
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
-            className="inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate md:hidden"
+            data-testid="button-menu"
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate md:hidden"
           >
             <Menu className="size-5" />
           </button>
           <BackButton />
-          <div className="flex items-center gap-2.5">
-            <span className="size-2.5 rounded-sm bg-primary" aria-hidden="true" />
-            <h1 className="font-display text-lg font-bold tracking-tight">{title}</h1>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="hidden sm:block size-2.5 rounded-sm bg-primary shrink-0" aria-hidden="true" />
+            <h1 className="truncate font-display text-base md:text-lg font-bold tracking-tight">{title}</h1>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <button
@@ -291,7 +385,7 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
               onClick={() => setCmdOpen(true)}
               onKeyDown={(e) => { if (e.key === "/") { e.preventDefault(); setCmdOpen(true); } }}
               data-testid="button-search"
-              className="relative hidden sm:flex h-9 w-56 items-center rounded-md border border-border bg-muted/40 pl-9 pr-2 text-sm text-muted-foreground hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+              className="relative hidden lg:flex h-9 w-56 items-center rounded-md border border-border bg-muted/40 pl-9 pr-2 text-sm text-muted-foreground hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Open search"
             >
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -300,15 +394,30 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
                 ⌘K
               </kbd>
             </button>
-            {actions}
-            <RoleSwitcher />
-            <ThemeToggle />
-            <TopbarUser />
+            {/* Mobile: search as icon only */}
+            <button
+              type="button"
+              onClick={() => setCmdOpen(true)}
+              data-testid="button-search-mobile"
+              aria-label="Search"
+              className="inline-flex size-10 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate lg:hidden"
+            >
+              <Search className="size-4" />
+            </button>
+            {actions && <div className="flex items-center gap-2 [&_button]:h-10 md:[&_button]:h-9">{actions}</div>}
+            {/* Desktop: show all controls inline */}
+            <div className="hidden md:flex items-center gap-2">
+              <RoleSwitcher />
+              <ThemeToggle />
+              <TopbarUser />
+            </div>
+            {/* Mobile: collapse into overflow menu */}
+            <MobileOverflowMenu />
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1400px] p-4 md:p-6">{children}</div>
+          <div className="mx-auto max-w-[1400px] p-3 sm:p-4 md:p-6">{children}</div>
         </main>
       </div>
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
