@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link, useParams } from "wouter";
+import { useParams } from "wouter";
 import {
-  ArrowLeft, MapPin, Calendar, Building2, DollarSign, ListChecks, HelpCircle, ClipboardList, CheckSquare,
+  MapPin, Calendar, Building2, DollarSign, ListChecks, HelpCircle, ClipboardList, CheckSquare,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
@@ -57,11 +57,7 @@ export default function ProjectDetail() {
   const sup = project.superintendentId ? team.get(project.superintendentId) : undefined;
 
   return (
-    <Layout title={project.name} actions={
-      <Link href="/projects" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" /> Back
-      </Link>
-    }>
+    <Layout title={project.name}>
       {/* Header */}
       <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">

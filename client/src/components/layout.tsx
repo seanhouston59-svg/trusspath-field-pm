@@ -6,7 +6,7 @@ import {
   FileStack, GitPullRequestArrow, StickyNote, Wrench, Image, FileText,
   Contact as ContactIcon, MessageSquare,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
-  LogOut,
+  LogOut, ChevronLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -191,6 +191,42 @@ function TopbarUser() {
   );
 }
 
+function BackButton() {
+  const [location] = useLocation();
+  // Don't show on the dashboard itself
+  if (location === "/app" || location === "/" || location === "") return null;
+  const goBack = () => {
+    if (typeof window === "undefined") return;
+    // If there's an in-app history entry, go back; otherwise fall back to /app.
+    // window.history.length > 1 alone isn't enough — after auth redirects that entry may be the login page,
+    // so we also require the previous URL to be same-origin via referrer (best-effort).
+    const canGoBack = window.history.length > 1;
+    if (canGoBack) {
+      window.history.back();
+      // Safety net: if for some reason back() lands us outside the app hash routes, bounce to /app.
+      window.setTimeout(() => {
+        const h = window.location.hash;
+        if (!h || h === "#" || h === "#/" || h.startsWith("#/login") || h.startsWith("#/signup")) {
+          window.location.hash = "/app";
+        }
+      }, 120);
+    } else {
+      window.location.hash = "/app";
+    }
+  };
+  return (
+    <button
+      onClick={goBack}
+      aria-label="Go back"
+      title="Back"
+      data-testid="button-back"
+      className="inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate hover:text-foreground"
+    >
+      <ChevronLeft className="size-5" />
+    </button>
+  );
+}
+
 export function Layout({ children, title, actions }: { children: ReactNode; title: string; actions?: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -230,6 +266,7 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
           >
             <Menu className="size-5" />
           </button>
+          <BackButton />
           <div className="flex items-center gap-2.5">
             <span className="size-2.5 rounded-sm bg-primary" aria-hidden="true" />
             <h1 className="font-display text-lg font-bold tracking-tight">{title}</h1>
