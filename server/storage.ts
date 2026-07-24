@@ -21,8 +21,26 @@ import type {
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq } from "drizzle-orm";
+import { existsSync, copyFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-const sqlite = new Database("data.db");
+// On Vercel (or any read-only FS) the bundled data.db is next to the function code.
+// Copy it into /tmp on cold start so writes work (ephemeral per instance).
+function resolveDbPath(): string {
+  if (process.env.VERCEL) {
+    const tmp = "/tmp/data.db";
+    if (!existsSync(tmp)) {
+      const candidates = [resolve(process.cwd(), "data.db"), resolve(__dirname, "..", "data.db"), resolve(__dirname, "data.db")];
+      for (const c of candidates) {
+        if (existsSync(c)) { copyFileSync(c, tmp); break; }
+      }
+    }
+    return tmp;
+  }
+  return "data.db";
+}
+
+const sqlite = new Database(resolveDbPath());
 sqlite.pragma("journal_mode = WAL");
 export const db = drizzle(sqlite);
 
