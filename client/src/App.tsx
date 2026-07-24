@@ -43,6 +43,7 @@ import Notes from "@/pages/notes";
 import Blueprints from "@/pages/blueprints";
 import Drone from "@/pages/drone";
 import SettingsPage from "@/pages/settings";
+import AdminSignups from "@/pages/admin-signups";
 
 // Single source of truth for routes lives in shared/app-manifest.ts (APP_ROUTES).
 // Map each manifest route pattern to its page component here.
@@ -76,6 +77,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
 function AppRouter() {
   return (
     <Switch>
+      <Route path="/admin/signups" component={AdminSignups} />
       {APP_ROUTES.filter((p) => ROUTE_COMPONENTS[p]).map((p) => (
         <Route key={p} path={p} component={ROUTE_COMPONENTS[p]} />
       ))}

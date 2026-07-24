@@ -1514,6 +1514,78 @@ var init_jarvis = __esm({
   }
 });
 
+// server/mailer.ts
+function renderHtml(n) {
+  const rows = Object.entries(n.fields).filter(([, v]) => v !== void 0 && v !== null && String(v).trim() !== "").map(
+    ([k, v]) => `<tr><td style="padding:6px 12px;color:#666;font-size:13px;text-transform:uppercase;letter-spacing:0.04em;">${escapeHtml(
+      k
+    )}</td><td style="padding:6px 12px;font-size:15px;color:#111;">${escapeHtml(String(v))}</td></tr>`
+  ).join("");
+  const kindLabel = n.kind === "subscriber" ? "New TrussPath subscriber" : "New TrussPath demo request";
+  return `<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
+    <div style="padding:16px 20px;background:#111;color:#fff;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(kindLabel)}</div>
+    <table style="width:100%;border-collapse:collapse;margin:12px 0;">${rows}</table>
+    <div style="padding:12px 20px;color:#888;font-size:12px;border-top:1px solid #eee;">Sent by trusspath-field-pm.vercel.app</div>
+  </div>
+</body></html>`;
+}
+function renderText(n) {
+  const rows = Object.entries(n.fields).filter(([, v]) => v !== void 0 && v !== null && String(v).trim() !== "").map(([k, v]) => `${k}: ${v}`).join("\n");
+  return `${n.subject}
+
+${rows}
+`;
+}
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+async function sendSignupNotification(n) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const to = process.env.SIGNUP_NOTIFY_TO || DEFAULT_TO;
+  const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;
+  if (!apiKey) {
+    console.log(`[mailer] RESEND_API_KEY not set \u2014 skipping email for ${n.kind}. Would send to ${to}.`);
+    return { ok: true, skipped: true };
+  }
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: n.subject,
+        html: renderHtml(n),
+        text: renderText(n)
+      })
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`[mailer] Resend ${resp.status}: ${body}`);
+      return { ok: false, error: `Resend ${resp.status}` };
+    }
+    const data = await resp.json().catch(() => ({}));
+    console.log(`[mailer] Sent ${n.kind} notification to ${to} (id=${data.id ?? "?"})`);
+    return { ok: true, id: data.id };
+  } catch (err) {
+    console.error("[mailer] Send failed:", err);
+    return { ok: false, error: String(err) };
+  }
+}
+var DEFAULT_TO, DEFAULT_FROM;
+var init_mailer = __esm({
+  "server/mailer.ts"() {
+    "use strict";
+    DEFAULT_TO = "houston.sean90@gmail.com";
+    DEFAULT_FROM = "TrussPath <onboarding@resend.dev>";
+  }
+});
+
 // server/routes.ts
 var routes_exports = {};
 __export(routes_exports, {
@@ -2055,15 +2127,49 @@ async function registerRoutes(_httpServer, app2) {
     const config = typeof req.body?.config === "string" ? req.body.config : void 0;
     res.json(storage.setIntegration(key, connected, config));
   });
-  app2.post("/api/subscribe", (req, res) => {
+  app2.post("/api/subscribe", async (req, res) => {
     const parsed = insertSubscriberSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    res.json(storage.createSubscriber(parsed.data));
+    const saved = storage.createSubscriber(parsed.data);
+    void sendSignupNotification({
+      kind: "subscriber",
+      subject: `New TrussPath subscriber \u2014 ${parsed.data.email}`,
+      fields: {
+        Email: parsed.data.email,
+        Plan: parsed.data.plan,
+        Source: parsed.data.source,
+        "Signed up": (/* @__PURE__ */ new Date()).toISOString()
+      }
+    });
+    res.json(saved);
   });
-  app2.post("/api/demo-request", (req, res) => {
+  app2.post("/api/demo-request", async (req, res) => {
     const parsed = insertDemoRequestSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    res.json(storage.createDemoRequest(parsed.data));
+    const saved = storage.createDemoRequest(parsed.data);
+    const d = parsed.data;
+    void sendSignupNotification({
+      kind: "demo-request",
+      subject: `New TrussPath demo request \u2014 ${d.name ?? d.email}`,
+      fields: {
+        Name: d.name,
+        Email: d.email,
+        Company: d.company,
+        Role: d.role,
+        Phone: d.phone,
+        "Project count": d.projectCount,
+        Message: d.message,
+        Source: d.source,
+        "Requested": (/* @__PURE__ */ new Date()).toISOString()
+      }
+    });
+    res.json(saved);
+  });
+  app2.get("/api/admin/signups", (_req, res) => {
+    res.json({
+      subscribers: storage.listSubscribers(),
+      demoRequests: storage.listDemoRequests()
+    });
   });
   app2.get("/api/jarvis/brief", async (req, res) => {
     try {
@@ -2118,6 +2224,7 @@ var init_routes = __esm({
     init_storage();
     init_jarvis();
     init_health();
+    init_mailer();
     init_schema();
     SESSION_COOKIE = "tp_session";
     SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;

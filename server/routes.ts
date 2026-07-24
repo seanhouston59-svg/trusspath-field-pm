@@ -6,6 +6,7 @@ import multer from "multer";
 import { storage } from "./storage";
 import { jarvisChat, jarvisBrief } from "./jarvis";
 import { runHealthScan } from "./health";
+import { sendSignupNotification } from "./mailer";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
@@ -345,6 +346,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(updated);
   });
 
+
   // Submittals
   app.get("/api/submittals", (req, res) => res.json(storage.getSubmittals(pid(req))));
   app.post("/api/submittals", (req, res) => {
@@ -359,6 +361,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!updated) return res.status(404).json({ message: "Submittal not found" });
     res.json(updated);
   });
+
 
   // Change orders
   app.get("/api/change-orders", (req, res) => res.json(storage.getChangeOrders(pid(req))));
@@ -375,6 +378,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(updated);
   });
 
+
   // Action items
   app.get("/api/action-items", (req, res) => res.json(storage.getActionItems(pid(req))));
   app.post("/api/action-items", (req, res) => {
@@ -389,6 +393,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!updated) return res.status(404).json({ message: "Action item not found" });
     res.json(updated);
   });
+
 
   // Daily logs
   app.get("/api/daily-logs", (req, res) => res.json(storage.getDailyLogs(pid(req))));
@@ -423,6 +428,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!updated) return res.status(404).json({ message: "Punch item not found" });
     res.json(updated);
   });
+
 
   // Contacts
   app.get("/api/contacts", (_req, res) => res.json(storage.getContacts()));
@@ -704,18 +710,55 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(storage.setIntegration(key, connected, config));
   });
 
-  // SUBSCRIBE — capture email + plan
-  app.post("/api/subscribe", (req, res) => {
+  // SUBSCRIBE — capture email + plan, notify owner by email
+  app.post("/api/subscribe", async (req, res) => {
     const parsed = insertSubscriberSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    res.json(storage.createSubscriber(parsed.data));
+    const saved = storage.createSubscriber(parsed.data);
+    // Fire-and-forget email so a mailer outage never blocks a signup.
+    void sendSignupNotification({
+      kind: "subscriber",
+      subject: `New TrussPath subscriber — ${parsed.data.email}`,
+      fields: {
+        Email: parsed.data.email,
+        Plan: (parsed.data as any).plan,
+        Source: (parsed.data as any).source,
+        "Signed up": new Date().toISOString(),
+      },
+    });
+    res.json(saved);
   });
 
-  // DEMO REQUEST — capture demo request
-  app.post("/api/demo-request", (req, res) => {
+  // DEMO REQUEST — capture demo request, notify owner by email
+  app.post("/api/demo-request", async (req, res) => {
     const parsed = insertDemoRequestSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    res.json(storage.createDemoRequest(parsed.data));
+    const saved = storage.createDemoRequest(parsed.data);
+    const d = parsed.data as any;
+    void sendSignupNotification({
+      kind: "demo-request",
+      subject: `New TrussPath demo request — ${d.name ?? d.email}`,
+      fields: {
+        Name: d.name,
+        Email: d.email,
+        Company: d.company,
+        Role: d.role,
+        Phone: d.phone,
+        "Project count": d.projectCount,
+        Message: d.message,
+        Source: d.source,
+        "Requested": new Date().toISOString(),
+      },
+    });
+    res.json(saved);
+  });
+
+  // ADMIN — list signups (used by /#/admin/signups)
+  app.get("/api/admin/signups", (_req, res) => {
+    res.json({
+      subscribers: storage.listSubscribers(),
+      demoRequests: storage.listDemoRequests(),
+    });
   });
 
   // JARVIS — AI assistant
