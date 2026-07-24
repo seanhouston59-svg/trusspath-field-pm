@@ -265,7 +265,7 @@ function DemoForm() {
 /* ============================ FAQ list ============================ */
 const FAQS: { q: string; a: string }[] = [
   {
-    q: "How is TrussPath different from Procore?",
+    q: "How is TrussPath different from legacy construction PM platforms?",
     a: "Same core capabilities (RFIs, submittals, change orders, punch lists, daily logs, blueprints, drone captures, schedule, and fleet) at roughly a third of the cost, plus a voice AI assistant, faster mobile experience, and no per-project fees. We're built for the field first, office second.",
   },
   {
@@ -273,8 +273,8 @@ const FAQS: { q: string; a: string }[] = [
     a: "Yes — 14 days on any plan, no credit card required. Import a real project and use it with your crew before you decide.",
   },
   {
-    q: "Can we migrate from Procore, PlanGrid, or spreadsheets?",
-    a: "Yes. Every paid plan includes a guided migration. We import projects, RFIs, submittals, daily logs, photos, and documents. Typical migration takes 3\u20135 business days.",
+    q: "Can we migrate from another platform or spreadsheets?",
+    a: "Yes. Every paid plan includes a guided migration. We import projects, RFIs, submittals, daily logs, photos, and documents from your existing tools. Typical migration takes 3\u20135 business days.",
   },
   {
     q: "Does it work offline?",
@@ -401,7 +401,7 @@ export default function Landing() {
               The project management platform your <span className="text-primary">jobsite actually uses</span>.
             </h1>
             <p className="mt-5 max-w-lg text-base text-muted-foreground md:text-lg">
-              RFIs, submittals, change orders, punch lists, daily logs, blueprints, drone captures, Gantt schedules, fleet tracking, and a voice AI foreman — one system replacing Procore, spreadsheets, and text threads.
+              RFIs, submittals, change orders, punch lists, daily logs, blueprints, drone captures, Gantt schedules, fleet tracking, and a voice AI foreman — one system replacing legacy PM software, spreadsheets, and text threads.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <Button size="lg" onClick={() => scrollTo("pricing")} data-testid="button-hero-subscribe">
@@ -496,7 +496,7 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
           <div className="mx-auto max-w-2xl text-center">
             <div className="ff-kicker text-primary">Features</div>
-            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Everything you'd expect from Procore. None of the bloat.</h2>
+            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Everything you'd expect from enterprise PM. None of the bloat.</h2>
             <p className="mt-3 text-muted-foreground">Purpose-built for the field. Fast on 4G. Works from a truck cab.</p>
           </div>
           <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -749,7 +749,7 @@ export default function Landing() {
             <ul className="mt-6 space-y-3 text-sm">
               {[
                 "Live walkthrough tailored to your workflows",
-                "Migration plan from Procore, PlanGrid, or spreadsheets",
+                "Migration plan from your existing PM tool or spreadsheets",
                 "Q&A with an ex-superintendent, not a sales rep",
                 "Custom pricing for teams of 50+",
               ].map((b) => (
