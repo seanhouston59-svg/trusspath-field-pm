@@ -3,12 +3,12 @@ import { useLocation } from "wouter";
 import {
   Search, Check, Plug, Download, ExternalLink, ArrowRight, Users, Calculator,
   Building2, FileSpreadsheet, HardDrive, Box, MessageSquare, MessagesSquare,
-  Mail, CalendarRange, GanttChartSquare, PenTool, FileText, HardHat, Clock,
+  Mail, CalendarRange, GanttChartSquare, PenTool, FileText, Clock,
   Timer, Activity, Wallet,
 } from "lucide-react";
 import {
   SiAdp, SiGooglesheets, SiGoogledrive, SiQuickbooks, SiDropbox, SiAutodesk,
-  SiGusto, SiPaychex, SiPlangrid, SiSage,
+  SiGusto, SiPaychex, SiSage,
 } from "react-icons/si";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -70,8 +70,6 @@ const CATALOG: CatalogItem[] = [
   // Design & BIM
   { key: "autodesk", name: "Autodesk Construction Cloud", category: "Design & BIM", description: "Link ACC drawings, models and sheets to records.", Icon: SiAutodesk, tint: "text-slate-700 dark:text-slate-300", action: "toggle" },
   { key: "bluebeam", name: "Bluebeam Revu", category: "Design & BIM", description: "Sync markups and punch from Bluebeam sessions.", Icon: PenTool, tint: "text-orange-600", action: "toggle" },
-  { key: "plangrid", name: "PlanGrid", category: "Design & BIM", description: "Autodesk PlanGrid field drawings and sheets.", Icon: SiPlangrid, tint: "text-blue-600", action: "toggle" },
-  { key: "procore", name: "Procore", category: "Design & BIM", description: "Sync projects, RFIs and submittals with Procore.", Icon: HardHat, tint: "text-amber-600", action: "toggle" },
 
   // Time Tracking
   { key: "clockshark", name: "ClockShark", category: "Time Tracking", description: "Crew time tracking with GPS and clock-in data.", Icon: Clock, tint: "text-sky-600", action: "toggle" },
