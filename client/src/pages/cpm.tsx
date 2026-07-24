@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
 import { useProjects, useTasks } from "@/hooks/use-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, Minus, Plus, Maximize2, RotateCcw } from "lucide-react";
 import type { Task } from "@shared/schema";
 import { shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -249,7 +249,7 @@ export default function CpmPage() {
                 <Legend />
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-auto rounded-b-lg border-t bg-muted/10">
+                <PanZoom contentWidth={width} contentHeight={height}>
                   <svg
                     width={width}
                     height={height}
@@ -257,6 +257,7 @@ export default function CpmPage() {
                     role="img"
                     aria-label="CPM network diagram"
                     data-testid="svg-cpm"
+                    style={{ display: "block", pointerEvents: "auto" }}
                   >
                     <defs>
                       <marker id="cpm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -341,7 +342,7 @@ export default function CpmPage() {
                       );
                     })}
                   </svg>
-                </div>
+                </PanZoom>
               </CardContent>
             </Card>
 
@@ -432,4 +433,192 @@ function Legend() {
       </span>
     </div>
   );
+}
+
+/* ---------------------------- Pan / Zoom viewport ------------------------- */
+
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 4;
+
+function PanZoom({
+  children,
+  contentWidth,
+  contentHeight,
+}: {
+  children: React.ReactNode;
+  contentWidth: number;
+  contentHeight: number;
+}) {
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(1);
+  const [tx, setTx] = useState(0);
+  const [ty, setTy] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStart = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+
+  const fitToViewport = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const vw = el.clientWidth - 24;
+    const vh = el.clientHeight - 24;
+    if (vw <= 0 || vh <= 0) return;
+    const s = Math.min(vw / contentWidth, vh / contentHeight, 1);
+    setScale(s);
+    setTx((el.clientWidth - contentWidth * s) / 2);
+    setTy((el.clientHeight - contentHeight * s) / 2);
+  }, [contentWidth, contentHeight]);
+
+  // Fit once on mount and whenever the content size changes.
+  useLayoutEffect(() => {
+    fitToViewport();
+  }, [fitToViewport]);
+
+  // Wheel: zoom around cursor. Prevent the outer page from scrolling.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      // Trackpad pinch arrives as wheel + ctrlKey; give it a stronger multiplier.
+      const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.02 : 0.0015));
+      setScale((prev) => {
+        const next = clamp(prev * factor, MIN_SCALE, MAX_SCALE);
+        // Anchor zoom on cursor: content point under cursor must stay put.
+        const k = next / prev;
+        setTx((t) => cx - k * (cx - t));
+        setTy((t) => cy - k * (cy - t));
+        return next;
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel as any);
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    // Left button on empty background = pan; ignore clicks that originate on interactive SVG nodes.
+    if (e.button !== 0 && e.button !== 1) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setIsPanning(true);
+    panStart.current = { x: e.clientX, y: e.clientY, tx, ty };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!panStart.current) return;
+    setTx(panStart.current.tx + (e.clientX - panStart.current.x));
+    setTy(panStart.current.ty + (e.clientY - panStart.current.y));
+  };
+  const endPan = (e: React.PointerEvent) => {
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    setIsPanning(false);
+    panStart.current = null;
+  };
+
+  const zoomBy = (mult: number) => {
+    const el = viewportRef.current;
+    if (!el) { setScale((s) => clamp(s * mult, MIN_SCALE, MAX_SCALE)); return; }
+    const cx = el.clientWidth / 2;
+    const cy = el.clientHeight / 2;
+    setScale((prev) => {
+      const next = clamp(prev * mult, MIN_SCALE, MAX_SCALE);
+      const k = next / prev;
+      setTx((t) => cx - k * (cx - t));
+      setTy((t) => cy - k * (cy - t));
+      return next;
+    });
+  };
+
+  return (
+    <div className="relative rounded-b-lg border-t bg-muted/10">
+      <div
+        ref={viewportRef}
+        className={cn(
+          "relative h-[560px] w-full select-none overflow-hidden",
+          isPanning ? "cursor-grabbing" : "cursor-grab"
+        )}
+        style={{ touchAction: "none" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        data-testid="cpm-viewport"
+      >
+        <div
+          style={{
+            transformOrigin: "0 0",
+            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+            width: contentWidth,
+            height: contentHeight,
+            willChange: "transform",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+
+      {/* Zoom controls */}
+      <div
+        className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-md border border-border bg-background/95 p-1 shadow-sm backdrop-blur"
+        data-testid="cpm-zoom-controls"
+      >
+        <button
+          type="button"
+          onClick={() => zoomBy(1 / 1.2)}
+          className="grid size-7 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Zoom out"
+          data-testid="cpm-zoom-out"
+        >
+          <Minus className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => { setScale(1); fitToViewport(); }}
+          className="min-w-[52px] rounded px-2 py-1 text-center text-[11px] font-semibold tabular-nums text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Reset zoom"
+          data-testid="cpm-zoom-reset"
+          title="Fit to view"
+        >
+          {Math.round(scale * 100)}%
+        </button>
+        <button
+          type="button"
+          onClick={() => zoomBy(1.2)}
+          className="grid size-7 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Zoom in"
+          data-testid="cpm-zoom-in"
+        >
+          <Plus className="size-3.5" />
+        </button>
+        <span className="mx-1 h-4 w-px bg-border" />
+        <button
+          type="button"
+          onClick={fitToViewport}
+          className="grid size-7 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Fit to view"
+          data-testid="cpm-zoom-fit"
+        >
+          <Maximize2 className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => { setScale(1); setTx(0); setTy(0); }}
+          className="grid size-7 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Reset view"
+          data-testid="cpm-zoom-reset-full"
+          title="Reset to 100%"
+        >
+          <RotateCcw className="size-3.5" />
+        </button>
+      </div>
+
+      <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-background/80 px-2 py-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground backdrop-blur">
+        Drag to pan · Scroll to zoom
+      </div>
+    </div>
+  );
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
 }
