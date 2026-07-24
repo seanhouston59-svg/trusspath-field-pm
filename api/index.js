@@ -1515,17 +1515,21 @@ function parseCookies(header) {
   return out;
 }
 function setSessionCookie(res, token) {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const isProd = process.env.NODE_ENV === "production";
+  const sameSite = isProd ? "None" : "Lax";
+  const secure = isProd ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
-    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SEC}${secure}`
+    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=${SESSION_MAX_AGE_SEC}${secure}`
   );
 }
 function clearSessionCookie(res) {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const isProd = process.env.NODE_ENV === "production";
+  const sameSite = isProd ? "None" : "Lax";
+  const secure = isProd ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
-    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`
+    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=0${secure}`
   );
 }
 function authMiddleware(req, res, next) {
@@ -1576,6 +1580,38 @@ function hydrateSeedPhotos() {
   photoHydrated = true;
 }
 async function registerRoutes(_httpServer, app2) {
+  const ALLOWED_ORIGIN_SUFFIXES = [
+    ".pplx.app",
+    ".vercel.app",
+    ".perplexity.ai"
+  ];
+  app2.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      let allowed = false;
+      try {
+        const host = new URL(origin).hostname;
+        allowed = host === "localhost" || host === "127.0.0.1" || ALLOWED_ORIGIN_SUFFIXES.some((suf) => host === suf.slice(1) || host.endsWith(suf));
+      } catch {
+      }
+      if (allowed) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader(
+          "Access-Control-Allow-Methods",
+          "GET,POST,PATCH,PUT,DELETE,OPTIONS"
+        );
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          req.headers["access-control-request-headers"] || "Content-Type, Authorization"
+        );
+        res.setHeader("Access-Control-Max-Age", "600");
+      }
+    }
+    if (req.method === "OPTIONS") return res.status(204).end();
+    next();
+  });
   app2.use(authMiddleware);
   app2.post("/api/auth/signup", (req, res) => {
     const parsed = signupSchema.safeParse(req.body);

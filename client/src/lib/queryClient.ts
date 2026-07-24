@@ -1,6 +1,12 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
+// API base URL. Resolution order:
+//   1. VITE_API_BASE env at build time (used for the pplx.app preview -> Vercel).
+//   2. __PORT_5000__ token replaced by deploy_website (sandbox proxy).
+//   3. Empty string -> same-origin relative fetch (local dev + Vercel prod).
+const BUILD_API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) || "";
+const PROXY_API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
+const API_BASE = BUILD_API_BASE || PROXY_API_BASE;
 
 /** Public paths that should NOT redirect to /login on 401. */
 const PUBLIC_HASH_PATHS = new Set<string>(["", "/", "/login", "/signup"]);

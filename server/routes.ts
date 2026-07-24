@@ -38,17 +38,23 @@ function parseCookies(header: string | undefined): Record<string, string> {
 }
 
 function setSessionCookie(res: any, token: string) {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const isProd = process.env.NODE_ENV === "production";
+  // In prod we may be embedded cross-origin (pplx.app preview -> vercel.app API),
+  // so we need SameSite=None; Secure for the browser to send the cookie back.
+  const sameSite = isProd ? "None" : "Lax";
+  const secure = isProd ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
-    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SEC}${secure}`
+    `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=${SESSION_MAX_AGE_SEC}${secure}`
   );
 }
 function clearSessionCookie(res: any) {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  const isProd = process.env.NODE_ENV === "production";
+  const sameSite = isProd ? "None" : "Lax";
+  const secure = isProd ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
-    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`
+    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=0${secure}`
   );
 }
 
@@ -185,6 +191,44 @@ const droneUpload = multer({
 });
 
 export async function registerRoutes(_httpServer: Server, app: Express): Promise<Server> {
+  // CORS: allow the pplx.app preview (and same-origin) to call this API with credentials.
+  // Cookies with SameSite=None require CORS + Access-Control-Allow-Credentials.
+  const ALLOWED_ORIGIN_SUFFIXES = [
+    ".pplx.app",
+    ".vercel.app",
+    ".perplexity.ai",
+  ];
+  app.use((req, res, next) => {
+    const origin = req.headers.origin as string | undefined;
+    if (origin) {
+      let allowed = false;
+      try {
+        const host = new URL(origin).hostname;
+        allowed =
+          host === "localhost" ||
+          host === "127.0.0.1" ||
+          ALLOWED_ORIGIN_SUFFIXES.some((suf) => host === suf.slice(1) || host.endsWith(suf));
+      } catch {}
+      if (allowed) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader(
+          "Access-Control-Allow-Methods",
+          "GET,POST,PATCH,PUT,DELETE,OPTIONS"
+        );
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          req.headers["access-control-request-headers"] as string ||
+            "Content-Type, Authorization"
+        );
+        res.setHeader("Access-Control-Max-Age", "600");
+      }
+    }
+    if (req.method === "OPTIONS") return res.status(204).end();
+    next();
+  });
+
   // Gate all /api/* routes behind auth (except the PUBLIC_API allowlist).
   app.use(authMiddleware);
 
