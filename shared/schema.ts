@@ -1,0 +1,359 @@
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+/* ----------------------------- Team members ----------------------------- */
+export const teamMembers = sqliteTable("team_members", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  role: text("role").notNull(),
+  trade: text("trade").notNull(),
+  company: text("company").notNull(),
+  initials: text("initials").notNull(),
+  color: text("color").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  companyPhoto: text("company_photo"),
+  accessLevel: text("access_level").notNull().default("project_manager"),
+});
+
+/* ------------------------------- Projects ------------------------------- */
+export const projects = sqliteTable("projects", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  number: text("number").notNull(),
+  client: text("client").notNull(),
+  type: text("type").notNull(),
+  status: text("status").notNull(),
+  address: text("address").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  budget: real("budget").notNull(),
+  spent: real("spent").notNull(),
+  progress: integer("progress").notNull(),
+  superintendentId: integer("superintendent_id"),
+});
+
+/* -------------------------------- Tasks --------------------------------- */
+export const tasks = sqliteTable("tasks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  title: text("title").notNull(),
+  trade: text("trade").notNull(),
+  status: text("status").notNull(),
+  priority: text("priority").notNull(),
+  assigneeId: integer("assignee_id"),
+  dueDate: text("due_date").notNull(),
+  // schedule positioning
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  seq: integer("seq"),
+});
+
+/* --------------------------------- RFIs --------------------------------- */
+export const rfis = sqliteTable("rfis", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  number: text("number").notNull(),
+  subject: text("subject").notNull(),
+  status: text("status").notNull(),
+  assigneeId: integer("assignee_id"),
+  dateCreated: text("date_created").notNull(),
+  dueDate: text("due_date").notNull(),
+});
+
+/* ----------------------------- Submittals ------------------------------ */
+export const submittals = sqliteTable("submittals", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  number: text("number").notNull(),
+  subject: text("subject").notNull(),
+  type: text("type").notNull(),
+  status: text("status").notNull(),
+  assigneeId: integer("assignee_id"),
+  dateSubmitted: text("date_submitted").notNull(),
+  dueDate: text("due_date").notNull(),
+});
+
+/* --------------------------- Change orders ----------------------------- */
+export const changeOrders = sqliteTable("change_orders", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  number: text("number").notNull(),
+  title: text("title").notNull(),
+  status: text("status").notNull(),
+  amount: real("amount").notNull(),
+  scheduleImpact: integer("schedule_impact").notNull(),
+  dateIssued: text("date_issued").notNull(),
+});
+
+/* ---------------------------- Action items ----------------------------- */
+export const actionItems = sqliteTable("action_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  title: text("title").notNull(),
+  owner: text("owner").notNull(),
+  status: text("status").notNull(),
+  priority: text("priority").notNull(),
+  dueDate: text("due_date").notNull(),
+  source: text("source").notNull(),
+});
+
+/* ------------------------------ Daily logs ------------------------------ */
+export const dailyLogs = sqliteTable("daily_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  date: text("date").notNull(),
+  authorId: integer("author_id"),
+  weather: text("weather").notNull(),
+  temp: integer("temp").notNull(),
+  crewCount: integer("crew_count").notNull(),
+  summary: text("summary").notNull(),
+  photos: text("photos"),
+});
+
+/* ----------------------------- Punch items ----------------------------- */
+export const punchItems = sqliteTable("punch_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  title: text("title").notNull(),
+  location: text("location").notNull(),
+  trade: text("trade").notNull(),
+  status: text("status").notNull(),
+  assigneeId: integer("assignee_id"),
+});
+
+/* ------------------------------ Contacts ------------------------------- */
+export const contacts = sqliteTable("contacts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  company: text("company").notNull(),
+  role: text("role").notNull(),
+  trade: text("trade").notNull(),
+  type: text("type").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email").notNull(),
+});
+
+/* ------------------------------ Equipment ------------------------------- */
+export const equipment = sqliteTable("equipment", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  status: text("status").notNull(),
+  projectId: integer("project_id"),
+  operator: text("operator"),
+  location: text("location"),
+});
+
+/* ------------------------------- Photos -------------------------------- */
+export const photos = sqliteTable("photos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  caption: text("caption").notNull(),
+  location: text("location").notNull(),
+  takenById: integer("taken_by_id"),
+  date: text("date").notNull(),
+  hue: integer("hue").notNull(),
+  storedFileName: text("stored_file_name"),
+  originalFileName: text("original_file_name"),
+  mimeType: text("mime_type"),
+  fileSizeBytes: integer("file_size_bytes"),
+});
+
+/* ----------------------------- Documents ------------------------------- */
+export const documents = sqliteTable("documents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  size: text("size").notNull(),
+  uploadedById: integer("uploaded_by_id"),
+  date: text("date").notNull(),
+  storedFileName: text("stored_file_name"),
+  originalFileName: text("original_file_name"),
+  mimeType: text("mime_type"),
+  fileSizeBytes: integer("file_size_bytes"),
+});
+
+/* ----------------------------- Blueprints ------------------------------ */
+export const blueprints = sqliteTable("blueprints", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  sheetNumber: text("sheet_number").notNull(),
+  title: text("title").notNull(),
+  discipline: text("discipline").notNull(),
+  revision: text("revision").notNull(),
+  status: text("status").notNull(),
+  uploadedById: integer("uploaded_by_id"),
+  date: text("date").notNull(),
+  hue: integer("hue").notNull(),
+});
+
+/* ---------------------------- Drone captures ---------------------------- */
+export const droneCaptures = sqliteTable("drone_captures", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  title: text("title").notNull(),
+  captureType: text("capture_type").notNull(),
+  pilot: text("pilot"),
+  flightDate: text("flight_date").notNull(),
+  altitude: text("altitude"),
+  area: text("area"),
+  status: text("status").notNull(),
+  hue: integer("hue").notNull(),
+  storedFileName: text("stored_file_name"),
+  originalFileName: text("original_file_name"),
+  mimeType: text("mime_type"),
+  fileSizeBytes: integer("file_size_bytes"),
+});
+
+/* ------------------------------ Messages ------------------------------- */
+export const messages = sqliteTable("messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  authorId: integer("author_id"),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+/* ----------------------------- Sticky notes --------------------------- */
+export const notes = sqliteTable("notes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id"),
+  body: text("body").notNull(),
+  color: text("color").notNull(),
+  x: integer("x").notNull(),
+  y: integer("y").notNull(),
+});
+
+export const integrations = sqliteTable("integrations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  key: text("key").notNull().unique(),
+  connected: integer("connected", { mode: "boolean" }).notNull().default(false),
+  connectedAt: text("connected_at"),
+  config: text("config"),
+});
+
+/* --------------------------- Subscribers ------------------------------- */
+export const subscribers = sqliteTable("subscribers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  plan: text("plan").notNull(),
+  billing: text("billing").notNull(),
+  company: text("company"),
+  createdAt: text("created_at").notNull(),
+});
+
+/* -------------------------- Demo requests ------------------------------ */
+export const demoRequests = sqliteTable("demo_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  company: text("company").notNull(),
+  phone: text("phone"),
+  teamSize: text("team_size"),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+});
+
+/* ------------------------------ Settings ------------------------------- */
+export const appSettings = sqliteTable("app_settings", {
+  id: integer("id").primaryKey(),
+  config: text("config").notNull().default("{}"),
+  updatedAt: text("updated_at").notNull(),
+});
+
+/* ------------------------------ Insert schemas -------------------------- */
+export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
+export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
+export const insertRfiSchema = createInsertSchema(rfis).omit({ id: true });
+export const insertSubmittalSchema = createInsertSchema(submittals).omit({ id: true });
+export const insertChangeOrderSchema = createInsertSchema(changeOrders).omit({ id: true });
+export const insertActionItemSchema = createInsertSchema(actionItems).omit({ id: true });
+export const insertDailyLogSchema = createInsertSchema(dailyLogs).omit({ id: true });
+export const insertPunchItemSchema = createInsertSchema(punchItems).omit({ id: true });
+export const insertTeamSchema = createInsertSchema(teamMembers).omit({ id: true });
+export const insertContactSchema = createInsertSchema(contacts).omit({ id: true });
+export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true });
+export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true });
+export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true });
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
+export const insertNoteSchema = createInsertSchema(notes).omit({ id: true });
+export const insertIntegrationSchema = createInsertSchema(integrations).omit({ id: true });
+export const insertBlueprintSchema = createInsertSchema(blueprints).omit({ id: true });
+export const insertDroneCaptureSchema = createInsertSchema(droneCaptures).omit({ id: true });
+export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
+export type AppSettingsRow = typeof appSettings.$inferSelect;
+
+/** Default app settings (single source for server + client). */
+export const DEFAULT_SETTINGS = {
+  voiceEnabled: true,
+  voiceRate: 0.97,
+  voicePitch: 0.9,
+  autoSpeak: true,
+  addressTerm: "sir",
+  tone: "concise" as "concise" | "detailed",
+  companyName: "TrussPath",
+  defaultProjectId: 0,
+};
+export type AppSettings = typeof DEFAULT_SETTINGS;
+export type Integration = typeof integrations.$inferSelect;
+export type InsertIntegration = z.infer<typeof insertIntegrationSchema>;
+
+export const insertSubscriberSchema = createInsertSchema(subscribers).omit({ id: true, createdAt: true }).extend({
+  email: z.string().email(),
+  plan: z.enum(["starter", "pro", "enterprise"]),
+  billing: z.enum(["monthly", "annual"]),
+  company: z.string().optional(),
+});
+export type Subscriber = typeof subscribers.$inferSelect;
+export type InsertSubscriber = z.infer<typeof insertSubscriberSchema>;
+
+export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({ id: true, createdAt: true }).extend({
+  name: z.string().min(1),
+  email: z.string().email(),
+  company: z.string().min(1),
+  phone: z.string().optional(),
+  teamSize: z.string().optional(),
+  notes: z.string().optional(),
+});
+export type DemoRequest = typeof demoRequests.$inferSelect;
+export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
+
+/* ------------------------------- Types ---------------------------------- */
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type InsertRfi = z.infer<typeof insertRfiSchema>;
+export type InsertSubmittal = z.infer<typeof insertSubmittalSchema>;
+export type InsertChangeOrder = z.infer<typeof insertChangeOrderSchema>;
+export type InsertActionItem = z.infer<typeof insertActionItemSchema>;
+export type InsertDailyLog = z.infer<typeof insertDailyLogSchema>;
+export type InsertPunchItem = z.infer<typeof insertPunchItemSchema>;
+export type InsertContact = z.infer<typeof insertContactSchema>;
+export type InsertTeamMember = z.infer<typeof insertTeamSchema>;
+export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
+export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type InsertNote = z.infer<typeof insertNoteSchema>;
+export type InsertBlueprint = z.infer<typeof insertBlueprintSchema>;
+export type InsertDroneCapture = z.infer<typeof insertDroneCaptureSchema>;
+
+export type Project = typeof projects.$inferSelect;
+export type Task = typeof tasks.$inferSelect;
+export type Rfi = typeof rfis.$inferSelect;
+export type Submittal = typeof submittals.$inferSelect;
+export type ChangeOrder = typeof changeOrders.$inferSelect;
+export type ActionItem = typeof actionItems.$inferSelect;
+export type DailyLog = typeof dailyLogs.$inferSelect;
+export type PunchItem = typeof punchItems.$inferSelect;
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type Contact = typeof contacts.$inferSelect;
+export type Equipment = typeof equipment.$inferSelect;
+export type Photo = typeof photos.$inferSelect;
+export type DocumentRow = typeof documents.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+export type Note = typeof notes.$inferSelect;
+export type Blueprint = typeof blueprints.$inferSelect;
+export type DroneCapture = typeof droneCaptures.$inferSelect;

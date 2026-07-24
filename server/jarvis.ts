@@ -1,0 +1,127 @@
+import OpenAI from "openai";
+import { storage } from "./storage";
+import { runHealthScan } from "./health";
+
+// Model routed through the platform OpenAI proxy (Responses API).
+const MODEL = "gpt_5_1";
+
+function buildPersona(s: Record<string, any> = {}): string {
+  const term = (s.addressTerm as string)?.trim() || "sir";
+  const tone = s.tone === "detailed" ? "detailed" : "concise";
+  const length = tone === "detailed"
+    ? "You may go into more depth when it helps, but stay organized."
+    : "Keep answers short unless asked for detail.";
+  return `You are JARVIS, the AI site assistant for TrussPath, a field construction project management platform.
+Adopt the persona of a poised, British AI steward: unfailingly polite, concise, proactive, and precise.
+Address the user as "${term}". Never use filler words. Prefer crisp short bullet points for lists. Light British phrasing is welcome but keep it professional and construction-literate.
+You have live read-only access to the project's data (tasks, RFIs, submittals, change orders, action items, team). Use it to give accurate, actionable answers.
+You cannot write data yourself. When the user asks to create or change something, tell them exactly what to do and which tab to use, and offer to draft the wording.
+You can run an APP HEALTH SCAN to find broken links or non-working modules. When the user asks about broken links, app health, what's broken, or what doesn't work, use the supplied scan results to answer concretely.
+${length}`;
+}
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isOpen(status: string): boolean {
+  const s = (status || "").toLowerCase();
+  return !["complete", "completed", "closed", "approved", "done"].includes(s);
+}
+
+function overdue(arr: any[], field: string): any[] {
+  const t = today();
+  return arr.filter((x) => x[field] && x[field] < t && isOpen(x.status));
+}
+function dueToday(arr: any[], field: string): any[] {
+  const t = today();
+  return arr.filter((x) => x[field] === t);
+}
+
+export type ContextBundle = { compact: string; projectName?: string };
+
+export function buildContext(projectId?: number): ContextBundle {
+  const p = projectId ? storage.getProject(projectId) : storage.getProjects()[0];
+  const pid = p?.id;
+  const tasks = storage.getTasks(pid);
+  const rfis = storage.getRfis(pid);
+  const subs = storage.getSubmittals(pid);
+  const cos = storage.getChangeOrders(pid);
+  const actions = storage.getActionItems(pid);
+  const team = storage.getTeam();
+
+  const L = (arr: any[], label: string, field: string) => {
+    const ov = overdue(arr, field).slice(0, 6);
+    const dt = dueToday(arr, field).slice(0, 6);
+    const open = arr.filter((x) => isOpen(x.status)).length;
+    const lines: string[] = [];
+    lines.push(`${label}: ${arr.length} total, ${open} open, ${overdue(arr, field).length} overdue, ${dueToday(arr, field).length} due today`);
+    if (ov.length) lines.push("  OVERDUE: " + ov.map((x) => `${x.number || ""} ${x.title || x.subject || ""}`.trim()).join(" | "));
+    if (dt.length) lines.push("  DUE TODAY: " + dt.map((x) => `${x.number || ""} ${x.title || x.subject || ""}`.trim()).join(" | "));
+    return lines.join("\n");
+  };
+
+  const blocks: string[] = [
+    `PROJECT: ${p?.name ?? "—"} | status ${p?.status ?? "—"} | ${p?.startDate ?? "?"} → ${p?.endDate ?? "?"}`,
+    `TODAY: ${today()}`,
+    L(tasks, "TASKS", "dueDate"),
+    L(rfis, "RFIS", "dueDate"),
+    L(subs, "SUBMITTALS", "dueDate"),
+    L(cos, "CHANGE ORDERS", "dateIssued"),
+    L(actions, "ACTION ITEMS", "dueDate"),
+    `TEAM: ${team.length} members (${team.slice(0, 8).map((m) => `${m.name} (${m.role})`).join(", ")})`,
+  ];
+
+  return { compact: blocks.join("\n"), projectName: p?.name };
+}
+
+type Msg = { role: "user" | "assistant"; content: string };
+
+const HEALTH_INTENT = /\b(broken|health|scan|not work|doesn'?t work|don'?t work|broken link|issues? in the app|what'?s broken|integrity)\b/i;
+
+function formatScan(r: ReturnType<typeof runHealthScan>): string {
+  const lines: string[] = [
+    `APP HEALTH SCAN — ${r.ok ? "PASS" : "ISSUES FOUND"}`,
+    `${r.linkCount} links checked against ${r.routeCount} registered routes; ${r.brokenLinks.length} broken.`,
+    `${r.moduleChecks.length} modules scanned; ${r.moduleChecks.filter((c) => c.status === "fail").length} failing.`,
+  ];
+  if (r.brokenLinks.length) lines.push("BROKEN LINKS: " + r.brokenLinks.map((l) => `${l.label} -> ${l.href} (${l.source})`).join(" | "));
+  const failing = r.moduleChecks.filter((c) => c.status === "fail");
+  if (failing.length) lines.push("FAILING MODULES: " + failing.map((c) => `${c.name} (${c.detail})`).join(" | "));
+  return lines.join("\n");
+}
+
+export async function jarvisChat(projectId: number | undefined, history: Msg[]): Promise<{ reply: string }> {
+  const { compact } = buildContext(projectId);
+  const settings = storage.getSettings();
+  const persona = buildPersona(settings);
+  const client = new OpenAI();
+
+  const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
+  const scanBlock = HEALTH_INTENT.test(lastUser) ? `\n\n--- APP HEALTH SCAN (live) ---\n${formatScan(runHealthScan())}` : "";
+
+  const resp = await client.responses.create({
+    model: MODEL,
+    instructions: `${persona}\n\n--- LIVE PROJECT DATA ---\n${compact}${scanBlock}`,
+    input: history.map((m) => ({ role: m.role, content: m.content })),
+  });
+  return { reply: resp.output_text ?? "" };
+}
+
+export async function jarvisBrief(projectId: number | undefined): Promise<{ brief: string; context: ContextBundle }> {
+  const context = buildContext(projectId);
+  const settings = storage.getSettings();
+  const persona = buildPersona(settings);
+  const client = new OpenAI();
+  const resp = await client.responses.create({
+    model: MODEL,
+    instructions: persona,
+    input: `Produce a crisp MORNING BRIEFING for today using the live project data below.
+Structure: (1) a one-line greeting, (2) "Priorities" — the 2-3 most urgent items today, (3) "Overdue" — what slipped, (4) one proactive recommendation.
+Keep it under ~160 words. Use short bullets. Do not invent items not in the data.
+
+--- LIVE PROJECT DATA ---
+${context.compact}`,
+  });
+  return { brief: resp.output_text ?? "", context };
+}

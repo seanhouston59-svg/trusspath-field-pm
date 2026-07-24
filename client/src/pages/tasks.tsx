@@ -1,0 +1,55 @@
+import { useState } from "react";
+import { Plus } from "lucide-react";
+import { Layout } from "@/components/layout";
+import { TaskTable } from "@/components/tables";
+import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
+import { useTasks, useTeamMap, useProjects, useTeam, useCreateTask } from "@/hooks/use-data";
+import { Button } from "@/components/ui/button";
+
+export default function TasksPage() {
+  const { data: tasks = [], isLoading } = useTasks();
+  const team = useTeamMap();
+  const { data: projects = [] } = useProjects();
+  const { data: teamList = [] } = useTeam();
+  const projectList = projects.map((p) => ({ id: p.id, name: p.name }));
+  const projectOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
+  const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
+  const create = useCreateTask();
+  const [open, setOpen] = useState(false);
+
+  const fields: FieldDef[] = [
+    { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
+    { name: "title", label: "Task Title", type: "text", required: true },
+    { name: "trade", label: "Trade", type: "text", placeholder: "Electrical", required: true, half: true },
+    { name: "status", label: "Status", type: "select", options: ["Not Started", "In Progress", "Complete"].map((v) => ({ value: v, label: v })), required: true, half: true },
+    { name: "priority", label: "Priority", type: "select", options: ["Low", "Medium", "High", "Critical"].map((v) => ({ value: v, label: v })), required: true, half: true },
+    { name: "assigneeId", label: "Assignee", type: "select", options: teamOptions, half: true },
+    { name: "dueDate", label: "Due Date", type: "date", required: true, half: true },
+  ];
+
+  return (
+    <Layout title="Tasks" actions={
+      <Button size="sm" onClick={() => setOpen(true)} data-testid="button-new-task"><Plus className="size-4" /> New Task</Button>
+    }>
+      <CreateEntityDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="New Task"
+        fields={fields}
+        defaults={{ status: "Not Started", priority: "Medium", assigneeId: "0" }}
+        submitLabel="Create Task"
+        isPending={create.isPending}
+        onSubmit={(v) => create.mutateAsync({
+          projectId: Number(v.projectId),
+          title: String(v.title),
+          trade: String(v.trade),
+          status: String(v.status),
+          priority: String(v.priority),
+          assigneeId: v.assigneeId === "0" ? undefined : Number(v.assigneeId),
+          dueDate: String(v.dueDate),
+        })}
+      />
+      {isLoading ? <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" /> : <TaskTable tasks={tasks} team={team} projects={projectList} />}
+    </Layout>
+  );
+}

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+*.log
+.vite/
+
+# SQLite WAL/SHM sidecar files — keep data.db committed but not the transient runtime files
+data.db-shm
+data.db-wal
+
+# Editor
+.vscode/
+.idea/
+
+# User uploads
+uploads/
