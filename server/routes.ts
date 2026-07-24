@@ -110,6 +110,37 @@ const PHOTO_DIR = process.env.VERCEL
   : path.resolve(process.cwd(), "uploads/photos");
 try { fs.mkdirSync(PHOTO_DIR, { recursive: true }); } catch {}
 
+// On serverless (Vercel), /tmp is ephemeral per invocation. The DB seed rows
+// reference stored file names, so we lazily hydrate PHOTO_DIR from the bundled
+// seed-photos directory on demand. First checks the standard candidates, then
+// copies any missing files into PHOTO_DIR. Safe to call repeatedly.
+let photoHydrated = false;
+function hydrateSeedPhotos(): void {
+  if (photoHydrated) return;
+  const candidates = [
+    path.resolve(process.cwd(), "seed-photos"),
+    path.resolve(process.cwd(), "server/seed-photos"),
+    path.resolve(__dirname, "seed-photos"),
+    path.resolve(__dirname, "../seed-photos"),
+    path.resolve(__dirname, "../server/seed-photos"),
+  ];
+  let src: string | null = null;
+  for (const c of candidates) {
+    if (fs.existsSync(c)) { src = c; break; }
+  }
+  if (!src) { photoHydrated = true; return; }
+  try {
+    const files = fs.readdirSync(src);
+    for (const f of files) {
+      const dst = path.join(PHOTO_DIR, f);
+      if (!fs.existsSync(dst)) {
+        try { fs.copyFileSync(path.join(src, f), dst); } catch {}
+      }
+    }
+  } catch {}
+  photoHydrated = true;
+}
+
 const IMAGE_MIME = new Set([
   "image/png",
   "image/jpeg",
@@ -384,6 +415,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   // Stream a photo's source image (inline)
   app.get("/api/photos/:id/file", (req, res) => {
+    hydrateSeedPhotos();
     const photo = storage.getPhoto(parseInt(req.params.id, 10));
     if (!photo) return res.status(404).json({ message: "Photo not found." });
     if (!photo.storedFileName) return res.status(404).json({ message: "No source file attached." });

@@ -1540,6 +1540,41 @@ function authMiddleware(req, res, next) {
   req.sessionToken = token;
   next();
 }
+function hydrateSeedPhotos() {
+  if (photoHydrated) return;
+  const candidates = [
+    import_node_path2.default.resolve(process.cwd(), "seed-photos"),
+    import_node_path2.default.resolve(process.cwd(), "server/seed-photos"),
+    import_node_path2.default.resolve(__dirname, "seed-photos"),
+    import_node_path2.default.resolve(__dirname, "../seed-photos"),
+    import_node_path2.default.resolve(__dirname, "../server/seed-photos")
+  ];
+  let src = null;
+  for (const c of candidates) {
+    if (import_node_fs2.default.existsSync(c)) {
+      src = c;
+      break;
+    }
+  }
+  if (!src) {
+    photoHydrated = true;
+    return;
+  }
+  try {
+    const files = import_node_fs2.default.readdirSync(src);
+    for (const f of files) {
+      const dst = import_node_path2.default.join(PHOTO_DIR, f);
+      if (!import_node_fs2.default.existsSync(dst)) {
+        try {
+          import_node_fs2.default.copyFileSync(import_node_path2.default.join(src, f), dst);
+        } catch {
+        }
+      }
+    }
+  } catch {
+  }
+  photoHydrated = true;
+}
 async function registerRoutes(_httpServer, app2) {
   app2.use(authMiddleware);
   app2.post("/api/auth/signup", (req, res) => {
@@ -1737,6 +1772,7 @@ async function registerRoutes(_httpServer, app2) {
     res.status(201).json(created);
   });
   app2.get("/api/photos/:id/file", (req, res) => {
+    hydrateSeedPhotos();
     const photo = storage.getPhoto(parseInt(req.params.id, 10));
     if (!photo) return res.status(404).json({ message: "Photo not found." });
     if (!photo.storedFileName) return res.status(404).json({ message: "No source file attached." });
@@ -1992,7 +2028,7 @@ async function registerRoutes(_httpServer, app2) {
   });
   return _httpServer;
 }
-var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, PUBLIC_API, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
+var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, PUBLIC_API, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
 var init_routes = __esm({
   "server/routes.ts"() {
     "use strict";
@@ -2047,6 +2083,7 @@ var init_routes = __esm({
       import_node_fs2.default.mkdirSync(PHOTO_DIR, { recursive: true });
     } catch {
     }
+    photoHydrated = false;
     IMAGE_MIME = /* @__PURE__ */ new Set([
       "image/png",
       "image/jpeg",
