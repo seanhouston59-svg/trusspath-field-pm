@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -48,6 +49,19 @@ export const tasks = sqliteTable("tasks", {
   startDate: text("start_date"),
   endDate: text("end_date"),
   seq: integer("seq"),
+  // comma-separated list of predecessor task ids (finish-to-start)
+  dependsOn: text("depends_on").default(sql`NULL`),
+});
+
+/* ------------------------------ Milestones ------------------------------ */
+export const milestones = sqliteTable("milestones", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id").notNull(),
+  title: text("title").notNull(),
+  date: text("date").notNull(),
+  kind: text("kind").notNull(), // e.g. Permit, Foundation, TCO, Closeout, Inspection
+  status: text("status").notNull(), // Upcoming, Complete, At Risk, Missed
+  notes: text("notes"),
 });
 
 /* --------------------------------- RFIs --------------------------------- */
@@ -283,6 +297,7 @@ export const insertNoteSchema = createInsertSchema(notes).omit({ id: true });
 export const insertIntegrationSchema = createInsertSchema(integrations).omit({ id: true });
 export const insertBlueprintSchema = createInsertSchema(blueprints).omit({ id: true });
 export const insertDroneCaptureSchema = createInsertSchema(droneCaptures).omit({ id: true });
+export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
 export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
 export type AppSettingsRow = typeof appSettings.$inferSelect;
 
@@ -339,6 +354,8 @@ export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type InsertBlueprint = z.infer<typeof insertBlueprintSchema>;
 export type InsertDroneCapture = z.infer<typeof insertDroneCaptureSchema>;
+export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
+export type Milestone = typeof milestones.$inferSelect;
 
 export type Project = typeof projects.$inferSelect;
 export type Task = typeof tasks.$inferSelect;

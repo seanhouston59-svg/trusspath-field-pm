@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Flag, Milestone, Layers, AlertTriangle, CalendarDays, Maximize2, Minimize2, Workflow, ChevronRight, BarChart3, X, FileText, ClipboardList, HelpCircle } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useProjects, useTasks, useChangeOrders, useSubmittals, useRfis, useSettings } from "@/hooks/use-data";
+import { useProjects, useTasks, useChangeOrders, useSubmittals, useRfis, useSettings, useMilestones } from "@/hooks/use-data";
 import { cn } from "@/lib/utils";
 import { shortDate } from "@/lib/format";
 
@@ -11,7 +11,8 @@ const LABEL_W = 268;
 const BASE_PX_PER_DAY = 9;
 const ROW_H = 40;
 const SECTION_H = 34;
-const HEADER_H = 58; // 34 (months) + 24 (weeks)
+const HEADER_H = 78; // 20 (milestones) + 34 (months) + 24 (weeks)
+const MILESTONE_H = 20;
 const SUMMARY_H = 6;
 
 // Cool operational palette — amber reserved for today / priority / brand.
@@ -60,6 +61,7 @@ type BarSpec = {
 type RowSpec = {
   h: number; section?: boolean; summary?: BarSpec; empty?: string;
   label: ReactNode; bar?: BarSpec; laneColor?: string;
+  taskId?: number;
 };
 
 export default function SchedulePage() {
@@ -77,6 +79,7 @@ export default function SchedulePage() {
   const { data: cos = [] } = useChangeOrders(projectId);
   const { data: subs = [] } = useSubmittals(projectId);
   const { data: rfis = [] } = useRfis(projectId);
+  const { data: milestones = [] } = useMilestones(projectId);
   const project = projects.find((p) => p.id === projectId);
   const [scrollLeft, setScrollLeft] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -204,6 +207,7 @@ export default function SchedulePage() {
           const priority = (t.priority === "Critical" || t.priority === "High") ? (t.priority as "Critical" | "High") : null;
           out.push({
             h: ROW_H,
+            taskId: t.id,
             label: (
               <div className="min-w-0">
                 <div className="truncate text-[13px] font-medium leading-tight">{t.title}</div>
@@ -241,6 +245,50 @@ export default function SchedulePage() {
     }
     return out;
   }, [tasks, overlays, cos, subs, rfis, project, start]);
+
+  // Build per-task geometry map: taskId -> { yCenter, xStart, xEnd }
+  const taskGeom = useMemo(() => {
+    const map = new Map<number, { y: number; x1: number; x2: number }>();
+    let y = 0;
+    rows.forEach((r) => {
+      if (r.taskId && r.bar) {
+        const yCenter = y + r.h / 2;
+        const x1 = r.bar.off * PX_PER_DAY;
+        const x2 = (r.bar.off + r.bar.dur) * PX_PER_DAY;
+        map.set(r.taskId, { y: yCenter, x1, x2 });
+      }
+      y += r.h;
+    });
+    return map;
+  }, [rows, PX_PER_DAY]);
+
+  // Dependency arrows: for each task with dependsOn, draw finish-to-start L-shaped arrow
+  const depArrows = useMemo(() => {
+    const arrows: Array<{ id: string; d: string; slipped: boolean }> = [];
+    tasks.forEach((t) => {
+      if (!t.dependsOn) return;
+      const succ = taskGeom.get(t.id);
+      if (!succ) return;
+      const predIds = String(t.dependsOn).split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n));
+      predIds.forEach((pid) => {
+        const pred = taskGeom.get(pid);
+        if (!pred) return;
+        // Check if successor starts before predecessor ends (schedule slip / risk)
+        const slipped = succ.x1 < pred.x2 - 1;
+        // L-shape: right edge of predecessor → left edge of successor
+        const startX = pred.x2;
+        const startY = pred.y;
+        const endX = succ.x1;
+        const endY = succ.y;
+        // Route with a small horizontal stub before the vertical bend to avoid overlap with bar cap
+        const stub = 8;
+        const midX = Math.max(startX + stub, endX - stub);
+        const d = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+        arrows.push({ id: `${pid}->${t.id}`, d, slipped });
+      });
+    });
+    return arrows;
+  }, [tasks, taskGeom]);
 
   const overallPct = tasks.length
     ? Math.round(tasks.reduce((a, t) => a + (STATUS_PROGRESS[t.status] ?? 0), 0) / tasks.length)
@@ -357,7 +405,8 @@ export default function SchedulePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <Stat icon={<Layers className="size-3.5" />} label="Tasks" value={String(tasks.length)} tint="text-blue-500" onClick={() => setDrill("tasks")} testId="flow-stat-tasks" />
                 <Stat icon={<AlertTriangle className="size-3.5" />} label="Risks" value={String(riskCount)} tint="text-amber-500" onClick={() => setDrill("risks")} testId="flow-stat-risks" />
-                <Stat icon={<Milestone className="size-3.5" />} label="Span" value={`${totalDays}d`} tint="text-muted-foreground" onClick={() => setView("gantt")} testId="flow-stat-span" />
+                <Stat icon={<Milestone className="size-3.5" />} label="Milestones" value={String(milestones.length)} tint="text-emerald-500" testId="flow-stat-milestones" />
+                <Stat icon={<CalendarDays className="size-3.5" />} label="Span" value={`${totalDays}d`} tint="text-muted-foreground" onClick={() => setView("gantt")} testId="flow-stat-span" />
               </div>
             </div>
 
@@ -456,7 +505,8 @@ export default function SchedulePage() {
             <div className="flex flex-wrap items-center gap-2">
               <Stat icon={<Layers className="size-3.5" />} label="Tasks" value={String(tasks.length)} tint="text-blue-500" onClick={() => setDrill("tasks")} testId="gantt-stat-tasks" />
               <Stat icon={<AlertTriangle className="size-3.5" />} label="Risks" value={String(riskCount)} tint="text-amber-500" onClick={() => setDrill("risks")} testId="gantt-stat-risks" />
-              <Stat icon={<Milestone className="size-3.5" />} label="Span" value={`${totalDays}d`} tint="text-muted-foreground" />
+              <Stat icon={<Milestone className="size-3.5" />} label="Milestones" value={String(milestones.length)} tint="text-emerald-500" testId="gantt-stat-milestones" />
+              <Stat icon={<CalendarDays className="size-3.5" />} label="Span" value={`${totalDays}d`} tint="text-muted-foreground" />
               <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5" data-testid="gantt-zoom">
                 {[{ d: 7, l: "1W" }, { d: 14, l: "2W" }, { d: 30, l: "1M" }, { d: 90, l: "Qtr" }, { d: 0, l: "All" }].map((o) => (
                   <button key={o.l} onClick={() => setVisibleDays(o.d)} data-testid={`gantt-zoom-${o.l}`} className={cn("rounded-md px-2 py-1 text-[11px] font-semibold transition-colors", visibleDays === o.d ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{o.l}</button>
@@ -507,6 +557,28 @@ export default function SchedulePage() {
               <div className="relative" style={{ width: timelineWidth }}>
                 {/* Two-tier glassy header */}
                 <div className="relative sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur" style={{ height: HEADER_H }}>
+                  {/* Milestone strip */}
+                  <div className="absolute inset-x-0 top-0 border-b border-border/40 bg-gradient-to-b from-amber-500/[0.04] to-transparent" style={{ height: MILESTONE_H }}>
+                    {milestones.map((m) => {
+                      const off = dayDiff(start, m.date);
+                      if (off < 0 || off > totalDays) return null;
+                      const x = off * PX_PER_DAY;
+                      const isRisk = m.status === "At Risk" || m.status === "Missed";
+                      const isDone = m.status === "Complete";
+                      const diaFill = isDone ? "fill-emerald-500 stroke-emerald-600"
+                        : isRisk ? "fill-rose-500 stroke-rose-600"
+                        : "fill-amber-500 stroke-amber-600";
+                      return (
+                        <div key={`ms-h-${m.id}`} className="group absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left: x }}
+                          title={`${m.title} — ${shortDate(m.date)}${m.notes ? " — " + m.notes : ""} · ${m.status}`}
+                          data-testid={`gantt-milestone-${m.id}`}>
+                          <svg width="14" height="14" viewBox="0 0 14 14" className="drop-shadow-sm">
+                            <path d="M 7 1 L 13 7 L 7 13 L 1 7 Z" className={diaFill} strokeWidth="1.5" />
+                          </svg>
+                        </div>
+                      );
+                    })}
+                  </div>
                   {months.map((m, i) => {
                     const off = dayDiff(start, m);
                     const next = months[i + 1] ?? end;
@@ -517,14 +589,14 @@ export default function SchedulePage() {
                     const maxOffset = Math.max(0, w - 88); // reserve room for label text
                     const labelOffset = Math.min(visibleLeft, maxOffset);
                     return (
-                      <div key={m} className={cn("absolute top-0 h-[34px] border-l border-amber-500/25 overflow-hidden", i % 2 ? "bg-amber-500/[0.05]" : "bg-transparent")} style={{ left: bandLeft, width: w }}>
+                      <div key={m} className={cn("absolute h-[34px] border-l border-amber-500/25 overflow-hidden", i % 2 ? "bg-amber-500/[0.05]" : "bg-transparent")} style={{ top: MILESTONE_H, left: bandLeft, width: w }}>
                         <span className="absolute top-0 whitespace-nowrap px-2 text-[11px] font-semibold leading-[34px] text-foreground/80" style={{ left: labelOffset }}>
                           {new Date(m + "T00:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                         </span>
                       </div>
                     );
                   })}
-                  <div className="absolute left-0 top-[34px] h-6 border-t border-border w-full">
+                  <div className="absolute left-0 h-6 border-t border-border w-full" style={{ top: MILESTONE_H + 34 }}>
                     {PX_PER_DAY >= 26 && days.length > 0 ? (
                       // Full day cells: weekday letter + day number
                       days.map((d) => {
@@ -641,6 +713,57 @@ export default function SchedulePage() {
                       {r.bar && <Bar b={r.bar} tall />}
                     </div>
                   ))}
+
+                  {/* Dependency arrows overlay (SVG, pointer-events-none so bars remain interactive) */}
+                  {depArrows.length > 0 && (
+                    <svg
+                      className="pointer-events-none absolute inset-0 z-10"
+                      width={timelineWidth}
+                      height={bodyHeight}
+                      viewBox={`0 0 ${timelineWidth} ${bodyHeight}`}
+                      preserveAspectRatio="none"
+                      data-testid="gantt-dep-arrows"
+                    >
+                      <defs>
+                        <marker id="gantt-arrow-ok" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" className="text-slate-400 dark:text-slate-500" />
+                        </marker>
+                        <marker id="gantt-arrow-slip" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" className="text-rose-500" />
+                        </marker>
+                      </defs>
+                      {depArrows.map((a) => (
+                        <path
+                          key={a.id}
+                          d={a.d}
+                          fill="none"
+                          strokeWidth={1.5}
+                          strokeDasharray={a.slipped ? "4 3" : undefined}
+                          className={a.slipped ? "stroke-rose-500" : "stroke-slate-400 dark:stroke-slate-500"}
+                          markerEnd={a.slipped ? "url(#gantt-arrow-slip)" : "url(#gantt-arrow-ok)"}
+                        />
+                      ))}
+                    </svg>
+                  )}
+
+                  {/* Milestone vertical guides in body (diamonds are in header) */}
+                  {milestones.length > 0 && (
+                    <div className="pointer-events-none absolute inset-0 z-[11]">
+                      {milestones.map((m) => {
+                        const off = dayDiff(start, m.date);
+                        if (off < 0 || off > totalDays) return null;
+                        const x = off * PX_PER_DAY;
+                        const isRisk = m.status === "At Risk" || m.status === "Missed";
+                        const isDone = m.status === "Complete";
+                        const line = isDone ? "bg-emerald-500/25" : isRisk ? "bg-rose-500/40" : "bg-amber-500/25";
+                        return (
+                          <div key={m.id} className="absolute top-0 h-full" style={{ left: x }}>
+                            <div className={cn("absolute inset-y-0 w-px", line)} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -683,6 +806,19 @@ export default function SchedulePage() {
             <span className="flex items-center gap-1.5">
               <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500 px-1.5 py-px text-[8px] font-bold uppercase text-white"><AlertTriangle className="size-2.5" />High</span>
               Priority
+            </span>
+            <span className="mx-1 h-3.5 w-px bg-border" />
+            <span className="flex items-center gap-1.5">
+              <svg width="11" height="11" viewBox="0 0 14 14" className="inline-block"><path d="M 7 1 L 13 7 L 7 13 L 1 7 Z" className="fill-amber-500 stroke-amber-600" strokeWidth="1.5" /></svg>
+              Milestone
+            </span>
+            <span className="flex items-center gap-1.5">
+              <svg width="11" height="11" viewBox="0 0 14 14" className="inline-block"><path d="M 7 1 L 13 7 L 7 13 L 1 7 Z" className="fill-rose-500 stroke-rose-600" strokeWidth="1.5" /></svg>
+              At risk
+            </span>
+            <span className="flex items-center gap-1.5">
+              <svg width="22" height="6" viewBox="0 0 22 6" className="inline-block"><path d="M 0 3 L 22 3" className="stroke-slate-400 dark:stroke-slate-500" strokeWidth="1.5" /></svg>
+              Dependency
             </span>
             <span className="ml-auto flex items-center gap-1.5"><span className="inline-block h-3.5 w-px bg-amber-500" /> Today</span>
           </div>

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiUpload } from "@/lib/queryClient";
-import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, InsertDailyLog, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertTeamMember, InsertContact, InsertPunchItem, InsertEquipment, InsertPhoto, InsertDocument, InsertBlueprint, InsertDroneCapture, PunchItem, TeamMember, Contact, Equipment, Photo, DocumentRow, Blueprint, DroneCapture, Message, Note, Integration, AppSettings } from "@shared/schema";
+import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, InsertDailyLog, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertTeamMember, InsertContact, InsertPunchItem, InsertEquipment, InsertPhoto, InsertDocument, InsertBlueprint, InsertDroneCapture, PunchItem, TeamMember, Contact, Equipment, Photo, DocumentRow, Blueprint, DroneCapture, Message, Note, Integration, AppSettings, Milestone, InsertMilestone } from "@shared/schema";
 import { DEFAULT_SETTINGS } from "@shared/schema";
 
 export function useTeam() {
@@ -33,6 +33,18 @@ export function useTasks(projectId?: number) {
       const res = await apiRequest("GET", `/api/tasks${qs}`);
       return res.json();
     },
+  });
+}
+
+export function useMilestones(projectId?: number) {
+  return useQuery<Milestone[]>({
+    queryKey: ["/api/milestones", { projectId }],
+    queryFn: async () => {
+      const qs = projectId !== undefined ? `?projectId=${projectId}` : "";
+      const res = await apiRequest("GET", `/api/milestones${qs}`);
+      return res.json();
+    },
+    enabled: projectId !== undefined,
   });
 }
 

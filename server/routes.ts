@@ -10,7 +10,7 @@ import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
   insertPunchItemSchema, insertContactSchema, insertEquipmentSchema,
-  insertPhotoSchema, insertDocumentSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMessageSchema, insertNoteSchema,
+  insertPhotoSchema, insertDocumentSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMessageSchema, insertNoteSchema, insertMilestoneSchema,
   insertTeamSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
 } from "@shared/schema";
@@ -377,6 +377,24 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const parsed = insertDroneCaptureSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(storage.createDroneCapture(parsed.data));
+  });
+
+  // Milestones
+  app.get("/api/milestones", (req, res) => res.json(storage.getMilestones(pid(req))));
+  app.post("/api/milestones", (req, res) => {
+    const parsed = insertMilestoneSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    res.status(201).json(storage.createMilestone(parsed.data));
+  });
+  app.patch("/api/milestones/:id", (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const updated = storage.updateMilestone(id, req.body ?? {});
+    if (!updated) return res.status(404).json({ message: "not found" });
+    res.json(updated);
+  });
+  app.delete("/api/milestones/:id", (req, res) => {
+    storage.deleteMilestone(parseInt(req.params.id, 10));
+    res.status(204).end();
   });
 
   // Drone capture file upload (multipart: metadata + image in one request)

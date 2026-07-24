@@ -5,6 +5,7 @@ import {
   integrations,
   subscribers, demoRequests,
   appSettings,
+  milestones,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -16,6 +17,7 @@ import type {
   InsertActionItem, InsertDailyLog, InsertPunchItem, InsertContact, InsertEquipment,
   InsertPhoto, InsertDocument, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember,
   InsertIntegration,
+  Milestone, InsertMilestone,
   Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest,
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -174,7 +176,24 @@ function migrate() {
       config TEXT NOT NULL DEFAULT '{}',
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS milestones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      date TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      notes TEXT
+    );
   `);
+
+  // Additive migration: add depends_on to tasks if missing (SQLite ALTER TABLE)
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(tasks)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "depends_on")) {
+      sqlite.exec("ALTER TABLE tasks ADD COLUMN depends_on TEXT");
+    }
+  } catch {}
   // backfill columns added after initial schema (idempotent)
   for (const col of ["ADD COLUMN photos TEXT"]) {
     try { sqlite.exec(`ALTER TABLE daily_logs ${col};`); } catch {}
@@ -263,6 +282,11 @@ export interface IStorage {
   getDroneCapture(id: number): DroneCapture | undefined;
   createDroneCapture(data: InsertDroneCapture): DroneCapture;
   deleteDroneCapture(id: number): void;
+  getMilestones(projectId?: number): Milestone[];
+  getMilestone(id: number): Milestone | undefined;
+  createMilestone(data: InsertMilestone): Milestone;
+  updateMilestone(id: number, data: Partial<InsertMilestone>): Milestone | undefined;
+  deleteMilestone(id: number): void;
   getMessages(projectId: number): Message[];
   createMessage(data: InsertMessage): Message;
   getNotes(projectId?: number): Note[];
@@ -435,6 +459,24 @@ class DatabaseStorage implements IStorage {
   deleteDroneCapture(id: number): void {
     db.delete(droneCaptures).where(eq(droneCaptures.id, id)).run();
   }
+  getMilestones(projectId?: number): Milestone[] {
+    if (projectId) {
+      return db.select().from(milestones).where(eq(milestones.projectId, projectId)).all();
+    }
+    return db.select().from(milestones).all();
+  }
+  getMilestone(id: number): Milestone | undefined {
+    return db.select().from(milestones).where(eq(milestones.id, id)).get();
+  }
+  createMilestone(data: InsertMilestone): Milestone {
+    return db.insert(milestones).values(data).returning().get();
+  }
+  updateMilestone(id: number, data: Partial<InsertMilestone>): Milestone | undefined {
+    return db.update(milestones).set(data).where(eq(milestones.id, id)).returning().get();
+  }
+  deleteMilestone(id: number): void {
+    db.delete(milestones).where(eq(milestones.id, id)).run();
+  }
   getMessages(projectId: number): Message[] {
     return db.select().from(messages).where(eq(messages.projectId, projectId)).all();
   }
@@ -564,16 +606,17 @@ class DatabaseStorage implements IStorage {
     ];
     const p = projectsSeed.map((x) => db.insert(projects).values(x).returning().get());
 
-    // tasks with schedule bars (seq = row order on gantt)
+    // tasks with schedule bars (seq = row order on gantt) + finish-to-start dependencies
     const tasksSeed: Omit<Task, "id">[] = [
-      { projectId: p[0].id, title: "Site work & utilities", trade: "Civil", status: "Complete", priority: "High", assigneeId: t[3].id, dueDate: "2025-11-15", startDate: "2025-09-02", endDate: "2025-11-15", seq: 1 },
-      { projectId: p[0].id, title: "Foundations & slab", trade: "Concrete", status: "Complete", priority: "High", assigneeId: t[3].id, dueDate: "2026-01-20", startDate: "2025-11-20", endDate: "2026-01-30", seq: 2 },
-      { projectId: p[0].id, title: "Structural steel — L1-L3", trade: "Steel", status: "In Progress", priority: "High", assigneeId: t[3].id, dueDate: "2026-04-15", startDate: "2026-02-02", endDate: "2026-04-30", seq: 3 },
-      { projectId: p[0].id, title: "Level 3 deck pour", trade: "Concrete", status: "In Progress", priority: "High", assigneeId: t[3].id, dueDate: "2026-07-24", startDate: "2026-07-10", endDate: "2026-07-28", seq: 4 },
-      { projectId: p[0].id, title: "Electrical rough-in — ICU", trade: "Electrical", status: "Not Started", priority: "Medium", assigneeId: t[4].id, dueDate: "2026-08-02", startDate: "2026-07-25", endDate: "2026-08-20", seq: 5 },
-      { projectId: p[0].id, title: "HVAC duct install — L2", trade: "HVAC", status: "In Progress", priority: "Medium", assigneeId: t[5].id, dueDate: "2026-07-28", startDate: "2026-07-05", endDate: "2026-08-10", seq: 6 },
-      { projectId: p[0].id, title: "Curtainwall glazing", trade: "Glazing", status: "Blocked", priority: "High", assigneeId: null, dueDate: "2026-07-22", startDate: "2026-07-15", endDate: "2026-08-15", seq: 7 },
-      { projectId: p[0].id, title: "Framing — rooms 204-218", trade: "Framing", status: "In Progress", priority: "Low", assigneeId: t[6].id, dueDate: "2026-07-30", startDate: "2026-07-12", endDate: "2026-08-05", seq: 8 },
+      // Lakeside — 8 tasks, id sequence 1..8
+      { projectId: p[0].id, title: "Site work & utilities", trade: "Civil", status: "Complete", priority: "High", assigneeId: t[3].id, dueDate: "2025-11-15", startDate: "2025-09-02", endDate: "2025-11-15", seq: 1, dependsOn: null },
+      { projectId: p[0].id, title: "Foundations & slab", trade: "Concrete", status: "Complete", priority: "High", assigneeId: t[3].id, dueDate: "2026-01-20", startDate: "2025-11-20", endDate: "2026-01-30", seq: 2, dependsOn: "1" },
+      { projectId: p[0].id, title: "Structural steel — L1-L3", trade: "Steel", status: "In Progress", priority: "High", assigneeId: t[3].id, dueDate: "2026-04-15", startDate: "2026-02-02", endDate: "2026-04-30", seq: 3, dependsOn: "2" },
+      { projectId: p[0].id, title: "Level 3 deck pour", trade: "Concrete", status: "In Progress", priority: "High", assigneeId: t[3].id, dueDate: "2026-07-24", startDate: "2026-07-10", endDate: "2026-07-28", seq: 4, dependsOn: "3" },
+      { projectId: p[0].id, title: "Electrical rough-in — ICU", trade: "Electrical", status: "Not Started", priority: "Medium", assigneeId: t[4].id, dueDate: "2026-08-02", startDate: "2026-07-25", endDate: "2026-08-20", seq: 5, dependsOn: "4" },
+      { projectId: p[0].id, title: "HVAC duct install — L2", trade: "HVAC", status: "In Progress", priority: "Medium", assigneeId: t[5].id, dueDate: "2026-07-28", startDate: "2026-07-05", endDate: "2026-08-10", seq: 6, dependsOn: "3" },
+      { projectId: p[0].id, title: "Curtainwall glazing", trade: "Glazing", status: "Blocked", priority: "High", assigneeId: null, dueDate: "2026-07-22", startDate: "2026-07-15", endDate: "2026-08-15", seq: 7, dependsOn: "3" },
+      { projectId: p[0].id, title: "Framing — rooms 204-218", trade: "Framing", status: "In Progress", priority: "Low", assigneeId: t[6].id, dueDate: "2026-07-30", startDate: "2026-07-12", endDate: "2026-08-05", seq: 8, dependsOn: "4" },
     ];
     tasksSeed.forEach((x) => db.insert(tasks).values(x).run());
 
@@ -711,6 +754,35 @@ class DatabaseStorage implements IStorage {
       { projectId: p[0].id, body: "Inspector confirmed for med-gas — keep L2 ICU clear.", color: "emerald", x: 120, y: 220 },
     ];
     noteSeed.forEach((x) => db.insert(notes).values(x).run());
+
+    // Milestones — key dates per project
+    const milestoneSeed: Omit<Milestone, "id">[] = [
+      // Lakeside Medical Pavilion
+      { projectId: p[0].id, title: "Building permit issued", date: "2025-08-20", kind: "Permit", status: "Complete", notes: "City of Denver — approved on first submission" },
+      { projectId: p[0].id, title: "Foundation complete", date: "2026-02-05", kind: "Foundation", status: "Complete", notes: null },
+      { projectId: p[0].id, title: "Structural topout — L3", date: "2026-05-08", kind: "Structure", status: "Complete", notes: null },
+      { projectId: p[0].id, title: "Curtainwall dry-in", date: "2026-08-20", kind: "Envelope", status: "At Risk", notes: "RFI-015 blocking south elevation glazing" },
+      { projectId: p[0].id, title: "MEP rough-in complete", date: "2026-10-15", kind: "MEP", status: "Upcoming", notes: null },
+      { projectId: p[0].id, title: "TCO — Temporary Cert. of Occupancy", date: "2026-11-30", kind: "TCO", status: "Upcoming", notes: null },
+      { projectId: p[0].id, title: "Substantial completion", date: "2026-12-18", kind: "Closeout", status: "Upcoming", notes: null },
+
+      // Union Tower Office
+      { projectId: p[1].id, title: "Building permit issued", date: "2026-01-14", kind: "Permit", status: "Complete", notes: null },
+      { projectId: p[1].id, title: "Excavation & shoring complete", date: "2026-04-22", kind: "Foundation", status: "Complete", notes: null },
+      { projectId: p[1].id, title: "Cooling tower delivery", date: "2026-08-12", kind: "Delivery", status: "At Risk", notes: "Re-spec via CO-021 pending" },
+      { projectId: p[1].id, title: "Structural topout", date: "2026-11-05", kind: "Structure", status: "Upcoming", notes: null },
+      { projectId: p[1].id, title: "Enclosure complete", date: "2027-03-30", kind: "Envelope", status: "Upcoming", notes: null },
+      { projectId: p[1].id, title: "Final acceptance", date: "2027-08-24", kind: "Closeout", status: "Upcoming", notes: null },
+
+      // Riverside K-8 School
+      { projectId: p[2].id, title: "Building permit issued", date: "2026-01-08", kind: "Permit", status: "Complete", notes: null },
+      { projectId: p[2].id, title: "Foundation complete", date: "2026-04-30", kind: "Foundation", status: "Complete", notes: null },
+      { projectId: p[2].id, title: "Structural topout", date: "2026-07-20", kind: "Structure", status: "Upcoming", notes: null },
+      { projectId: p[2].id, title: "Envelope dry-in", date: "2026-09-04", kind: "Envelope", status: "Upcoming", notes: null },
+      { projectId: p[2].id, title: "MEP rough-in complete", date: "2026-09-30", kind: "MEP", status: "Upcoming", notes: null },
+      { projectId: p[2].id, title: "Substantial completion — ready for school year", date: "2026-11-30", kind: "Closeout", status: "Upcoming", notes: "Must be turned over before Aug 2027 school year" },
+    ];
+    milestoneSeed.forEach((x) => db.insert(milestones).values(x).run());
   }
 }
 
