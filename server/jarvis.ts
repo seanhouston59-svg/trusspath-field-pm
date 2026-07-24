@@ -40,15 +40,15 @@ function dueToday(arr: any[], field: string): any[] {
 
 export type ContextBundle = { compact: string; projectName?: string };
 
-export function buildContext(projectId?: number): ContextBundle {
-  const p = projectId ? storage.getProject(projectId) : storage.getProjects()[0];
+export async function buildContext(projectId?: number): Promise<ContextBundle> {
+  const p = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
   const pid = p?.id;
-  const tasks = storage.getTasks(pid);
-  const rfis = storage.getRfis(pid);
-  const subs = storage.getSubmittals(pid);
-  const cos = storage.getChangeOrders(pid);
-  const actions = storage.getActionItems(pid);
-  const team = storage.getTeam();
+  const tasks = await storage.getTasks(pid);
+  const rfis = await storage.getRfis(pid);
+  const subs = await storage.getSubmittals(pid);
+  const cos = await storage.getChangeOrders(pid);
+  const actions = await storage.getActionItems(pid);
+  const team = await storage.getTeam();
 
   const L = (arr: any[], label: string, field: string) => {
     const ov = overdue(arr, field).slice(0, 6);
@@ -79,7 +79,7 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const HEALTH_INTENT = /\b(broken|health|scan|not work|doesn'?t work|don'?t work|broken link|issues? in the app|what'?s broken|integrity)\b/i;
 
-function formatScan(r: ReturnType<typeof runHealthScan>): string {
+function formatScan(r: Awaited<ReturnType<typeof runHealthScan>>): string {
   const lines: string[] = [
     `APP HEALTH SCAN — ${r.ok ? "PASS" : "ISSUES FOUND"}`,
     `${r.linkCount} links checked against ${r.routeCount} registered routes; ${r.brokenLinks.length} broken.`,
@@ -92,13 +92,13 @@ function formatScan(r: ReturnType<typeof runHealthScan>): string {
 }
 
 export async function jarvisChat(projectId: number | undefined, history: Msg[]): Promise<{ reply: string }> {
-  const { compact } = buildContext(projectId);
-  const settings = storage.getSettings();
+  const { compact } = await buildContext(projectId);
+  const settings = await storage.getSettings();
   const persona = buildPersona(settings);
   const client = new OpenAI();
 
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
-  const scanBlock = HEALTH_INTENT.test(lastUser) ? `\n\n--- APP HEALTH SCAN (live) ---\n${formatScan(runHealthScan())}` : "";
+  const scanBlock = HEALTH_INTENT.test(lastUser) ? `\n\n--- APP HEALTH SCAN (live) ---\n${formatScan(await runHealthScan())}` : "";
 
   const resp = await client.responses.create({
     model: MODEL,
@@ -109,8 +109,8 @@ export async function jarvisChat(projectId: number | undefined, history: Msg[]):
 }
 
 export async function jarvisBrief(projectId: number | undefined): Promise<{ brief: string; context: ContextBundle }> {
-  const context = buildContext(projectId);
-  const settings = storage.getSettings();
+  const context = await buildContext(projectId);
+  const settings = await storage.getSettings();
   const persona = buildPersona(settings);
   const client = new OpenAI();
   const resp = await client.responses.create({

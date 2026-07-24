@@ -15,7 +15,7 @@ export default function PunchPage() {
   const team = useTeamMap();
   const { data: projects = [] } = useProjects();
   const { data: teamList = [] } = useTeam();
-  const projectList = projects.map((p) => ({ id: p.id, name: p.name }));
+  const projectList = projects.map((p) => ({ id: p.id, name: p.name, address: p.address }));
   const projectOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
   const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
   const create = useCreatePunchItem();
@@ -23,6 +23,7 @@ export default function PunchPage() {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<PunchItem | null>(null);
   const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
+  const projectAddress = (id: number) => projectList.find((p) => p.id === id)?.address;
 
   const [view, setView] = useState<View>("board");
   const [projectFilter, setProjectFilter] = useState<string>("all");
@@ -116,7 +117,7 @@ export default function PunchPage() {
             }}
             isStatusPending={updateStatus.isPending}
             fields={[
-              { label: "Location", value: selected.location },
+              { label: "Location", value: selected.location, mapAddress: projectAddress(selected.projectId) },
               { label: "Trade", value: selected.trade },
               { label: "Assignee", value: a?.name ?? "Unassigned" },
               { label: "Project", value: projectName(selected.projectId) },

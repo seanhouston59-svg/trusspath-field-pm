@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAccess } from "@/lib/access";
 import { apiUrl } from "@/lib/queryClient";
 import { shortDate } from "@/lib/format";
+import { googleMapsUrlForLocation } from "@/lib/maps";
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"]);
 const isImage = (m?: string | null) => !!m && IMAGE_TYPES.has(m);
@@ -44,6 +45,7 @@ export default function PhotosPage() {
   const { data: projects = [] } = useProjects();
   const { data: teamList = [] } = useTeam();
   const projName = (id: number) => projects.find((p) => p.id === id)?.name ?? "";
+  const projAddress = (id: number) => projects.find((p) => p.id === id)?.address ?? "";
   const projectOptions = projects.map((p) => ({ value: String(p.id), label: p.name }));
   const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
   const create = useCreatePhoto();
@@ -190,7 +192,24 @@ export default function PhotosPage() {
                 <figcaption className="p-3">
                   <p className="text-sm font-medium leading-snug">{ph.caption}</p>
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1 truncate"><MapPin className="size-3" /> {ph.location || "—"}</span>
+                    {(() => {
+                      const href = googleMapsUrlForLocation(ph.location, projAddress(ph.projectId));
+                      return href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex min-w-0 items-center gap-1 truncate text-primary hover:underline"
+                          data-testid={`link-map-photo-${ph.id}`}
+                        >
+                          <MapPin className="size-3 shrink-0" />
+                          <span className="truncate">{ph.location || "—"}</span>
+                        </a>
+                      ) : (
+                        <span className="flex items-center gap-1 truncate"><MapPin className="size-3" /> {ph.location || "—"}</span>
+                      );
+                    })()}
                     {author && <Avatar initials={author.initials} color={author.color} size={22} />}
                   </div>
                   <div className="mt-1 truncate text-[11px] text-muted-foreground">{projName(ph.projectId)}</div>
@@ -224,17 +243,35 @@ export default function PhotosPage() {
                 <PhotoImage photo={viewing} />
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                {[
-                  { l: "Location", v: viewing.location || "—" },
-                  { l: "Project", v: projName(viewing.projectId) || "—" },
-                  { l: "Date", v: shortDate(viewing.date) },
-                  { l: "Taken by", v: authorOf(viewing)?.name ?? "—" },
-                ].map((m) => (
-                  <div key={m.l} className="rounded-md border border-border bg-muted/30 p-2">
-                    <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{m.l}</div>
-                    <div className="mt-0.5 truncate font-medium">{m.v}</div>
-                  </div>
-                ))}
+                {(() => {
+                  const locHref = googleMapsUrlForLocation(viewing.location, projAddress(viewing.projectId));
+                  const cells: { l: string; v: React.ReactNode }[] = [
+                    {
+                      l: "Location",
+                      v: locHref ? (
+                        <a
+                          href={locHref}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                          data-testid="link-map-photo-viewer"
+                        >
+                          <MapPin className="size-3 shrink-0" />
+                          <span>{viewing.location || "—"}</span>
+                        </a>
+                      ) : (viewing.location || "—"),
+                    },
+                    { l: "Project", v: projName(viewing.projectId) || "—" },
+                    { l: "Date", v: shortDate(viewing.date) },
+                    { l: "Taken by", v: authorOf(viewing)?.name ?? "—" },
+                  ];
+                  return cells.map((m) => (
+                    <div key={m.l} className="rounded-md border border-border bg-muted/30 p-2">
+                      <div className="text-[9px] uppercase tracking-wide text-muted-foreground">{m.l}</div>
+                      <div className="mt-0.5 truncate font-medium">{m.v}</div>
+                    </div>
+                  ));
+                })()}
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setFs(true)} data-testid="button-photo-fullscreen">
@@ -262,7 +299,22 @@ export default function PhotosPage() {
             <div className="min-w-0">
               <div className="truncate font-medium">{viewing.caption}</div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><MapPin className="size-3" /> {viewing.location || "—"}</span>
+                {(() => {
+                  const href = googleMapsUrlForLocation(viewing.location, projAddress(viewing.projectId));
+                  return href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="flex items-center gap-1 text-primary hover:underline"
+                      data-testid="link-map-photo-fullscreen"
+                    >
+                      <MapPin className="size-3" /> {viewing.location || "—"}
+                    </a>
+                  ) : (
+                    <span className="flex items-center gap-1"><MapPin className="size-3" /> {viewing.location || "—"}</span>
+                  );
+                })()}
                 <span>· {projName(viewing.projectId) || "—"}</span>
               </div>
             </div>

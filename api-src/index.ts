@@ -10,12 +10,10 @@ let initPromise: Promise<void> | null = null;
 
 async function init() {
   try {
-    // Pull the latest SQLite snapshot from Vercel Blob before opening the DB.
-    // No-op locally (no BLOB_READ_WRITE_TOKEN) or on the first-ever cold start
-    // (no snapshot exists yet), in which case storage.ts falls back to the
-    // bundled seed.
-    const { initBlobSnapshot } = await import("../server/blob-persistence");
-    await initBlobSnapshot();
+    // Ensure the Neon Postgres schema exists and demo data is seeded before
+    // handling any request. Idempotent — safe on every cold start.
+    const { ensureReady } = await import("../server/storage");
+    await ensureReady();
     const { registerRoutes } = await import("../server/routes");
     const httpServer = createServer(app);
     await registerRoutes(httpServer, app);

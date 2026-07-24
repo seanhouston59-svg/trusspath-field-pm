@@ -5,6 +5,7 @@ import { EquipmentStatusBadge } from "@/components/bits";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { useEquipment, useProjects, useCreateEquipment } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
+import { googleMapsUrlForLocation } from "@/lib/maps";
 
 const TYPE_ICON: Record<string, string> = {
   Crane: "🏗️", Excavator: "⛏️", "Skid Steer": "🚜", Lift: "🛗", Pump: "🚿",
@@ -14,6 +15,7 @@ export default function EquipmentPage() {
   const { data: items = [], isLoading } = useEquipment();
   const { data: projects = [] } = useProjects();
   const projName = (id: number | null) => projects.find((p) => p.id === id)?.name ?? "Fleet yard";
+  const projAddress = (id: number | null | undefined) => projects.find((p) => p.id === id)?.address ?? "";
   const projectOptions = [{ value: "0", label: "Fleet yard" }, ...projects.map((p) => ({ value: String(p.id), label: p.name }))];
   const create = useCreateEquipment();
   const [open, setOpen] = useState(false);
@@ -67,7 +69,22 @@ export default function EquipmentPage() {
                 <EquipmentStatusBadge status={e.status} />
               </div>
               <div className="mt-4 space-y-1.5 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2"><MapPin className="size-3.5" /> {e.location ?? "—"}</div>
+                {(() => {
+                  const href = googleMapsUrlForLocation(e.location, projAddress(e.projectId));
+                  return href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="flex items-center gap-2 text-primary hover:underline"
+                      data-testid={`link-map-eq-${e.id}`}
+                    >
+                      <MapPin className="size-3.5 shrink-0" /> {e.location ?? "—"}
+                    </a>
+                  ) : (
+                    <div className="flex items-center gap-2"><MapPin className="size-3.5" /> {e.location ?? "—"}</div>
+                  );
+                })()}
                 <div className="flex items-center gap-2"><User className="size-3.5" /> Operator: {e.operator ?? "—"}</div>
                 <div className="flex items-center gap-2"><span className="size-3.5">📁</span> {projName(e.projectId ?? null)}</div>
               </div>

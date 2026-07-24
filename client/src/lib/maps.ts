@@ -12,3 +12,22 @@ export function googleMapsUrl(address: string | null | undefined): string | null
   if (!q) return null;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 }
+
+/**
+ * Build a Google Maps URL for a location descriptor (e.g. "Level 4 mechanical room")
+ * combined with the parent project's street address. Location fields on their own
+ * are usually area descriptors, not geocodable places — pairing them with the
+ * project address gives Google Maps enough to drop a pin at the site.
+ *
+ * Returns null when both location and projectAddress are empty.
+ */
+export function googleMapsUrlForLocation(
+  location: string | null | undefined,
+  projectAddress: string | null | undefined,
+): string | null {
+  const loc = (location ?? "").trim();
+  const addr = (projectAddress ?? "").trim();
+  if (!loc && !addr) return null;
+  const q = [loc, addr].filter(Boolean).join(", ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}

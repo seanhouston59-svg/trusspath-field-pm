@@ -7,7 +7,6 @@ import { storage } from "./storage";
 import { jarvisChat, jarvisBrief } from "./jarvis";
 import { runHealthScan } from "./health";
 import { sendSignupNotification } from "./mailer";
-import { blobPersistMiddleware } from "./blob-persistence";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
@@ -71,7 +70,7 @@ const PUBLIC_API = new Set<string>([
   "/api/demo-request",
 ]);
 
-function authMiddleware(req: any, res: any, next: any) {
+async function authMiddleware(req: any, res: any, next: any) {
   const p = req.path || req.url?.split("?")[0] || "";
   if (!p.startsWith("/api")) return next();
   if (PUBLIC_API.has(p)) return next();
@@ -81,7 +80,7 @@ function authMiddleware(req: any, res: any, next: any) {
   const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") ?? "";
   const queryToken = typeof req.query?.token === "string" ? req.query.token : "";
   const token = cookies[SESSION_COOKIE] || bearer || queryToken;
-  const s = token ? storage.getSession(token) : null;
+  const s = token ? await storage.getSession(token) : null;
   if (!s) return res.status(401).json({ message: "Unauthorized" });
   req.account = s.account;
   req.sessionToken = token;
@@ -235,22 +234,17 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     next();
   });
 
-  // Persist SQLite writes to Vercel Blob on every mutation. No-op when
-  // BLOB_READ_WRITE_TOKEN is not set (i.e., local dev), so behaviour is
-  // identical there.
-  app.use(blobPersistMiddleware);
-
   // Gate all /api/* routes behind auth (except the PUBLIC_API allowlist).
   app.use(authMiddleware);
 
   /* ------------------------- Auth ------------------------- */
-  app.post("/api/auth/signup", (req, res) => {
+  app.post("/api/auth/signup", async (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     const { email, password, displayName, company } = parsed.data;
     try {
-      const account = storage.createAccount(email, password, displayName, company);
-      const session = storage.createSession(account.id);
+      const account = await storage.createAccount(email, password, displayName, company);
+      const session = await storage.createSession(account.id);
       setSessionCookie(res, session.id);
       // Also return token in body for cross-origin clients that can't rely on cookies.
       res.status(201).json({ account, token: session.id });
@@ -261,218 +255,218 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
-  app.post("/api/auth/login", (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     const { email, password } = parsed.data;
-    const account = storage.verifyPassword(email, password);
+    const account = await storage.verifyPassword(email, password);
     if (!account) return res.status(401).json({ message: "Invalid email or password" });
-    const session = storage.createSession(account.id);
+    const session = await storage.createSession(account.id);
     setSessionCookie(res, session.id);
     res.json({ account, token: session.id });
   });
 
-  app.post("/api/auth/logout", (req: any, res) => {
+  app.post("/api/auth/logout", async (req: any, res) => {
     const cookies = parseCookies(req.headers?.cookie);
     const token = cookies[SESSION_COOKIE];
-    if (token) storage.destroySession(token);
+    if (token) await storage.destroySession(token);
     clearSessionCookie(res);
     res.json({ ok: true });
   });
 
-  app.get("/api/auth/me", (req: any, res) => {
+  app.get("/api/auth/me", async (req: any, res) => {
     // Prefer bearer header (cross-origin clients), fall back to cookie.
     const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") || "";
     const cookies = parseCookies(req.headers?.cookie);
     const token = bearer || cookies[SESSION_COOKIE];
-    const s = token ? storage.getSession(token) : null;
+    const s = token ? await storage.getSession(token) : null;
     if (!s) return res.status(401).json({ account: null });
     res.json({ account: s.account });
   });
 
   // Team
-  app.get("/api/team", (_req, res) => res.json(storage.getTeam()));
-  app.post("/api/team", (req, res) => {
+  app.get("/api/team", async (_req, res) => res.json(await storage.getTeam()));
+  app.post("/api/team", async (req, res) => {
     const parsed = insertTeamSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createTeamMember(parsed.data));
+    res.status(201).json(await storage.createTeamMember(parsed.data));
   });
-  app.patch("/api/team/:id", (req, res) => {
+  app.patch("/api/team/:id", async (req, res) => {
     const parsed = insertTeamSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    const updated = storage.updateTeamMember(parseInt(req.params.id, 10), parsed.data);
+    const updated = await storage.updateTeamMember(parseInt(req.params.id, 10), parsed.data);
     if (!updated) return res.status(404).json({ message: "Team member not found" });
     res.json(updated);
   });
-  app.delete("/api/team/:id", (req, res) => {
-    storage.deleteTeamMember(parseInt(req.params.id, 10));
+  app.delete("/api/team/:id", async (req, res) => {
+    await storage.deleteTeamMember(parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
   // Projects
-  app.get("/api/projects", (_req, res) => res.json(storage.getProjects()));
-  app.get("/api/projects/:id", (req, res) => {
-    const project = storage.getProject(parseInt(req.params.id, 10));
+  app.get("/api/projects", async (_req, res) => res.json(await storage.getProjects()));
+  app.get("/api/projects/:id", async (req, res) => {
+    const project = await storage.getProject(parseInt(req.params.id, 10));
     if (!project) return res.status(404).json({ message: "Project not found" });
     res.json(project);
   });
-  app.post("/api/projects", (req, res) => {
+  app.post("/api/projects", async (req, res) => {
     const parsed = insertProjectSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createProject(parsed.data));
+    res.status(201).json(await storage.createProject(parsed.data));
   });
 
   // Tasks
-  app.get("/api/tasks", (req, res) => res.json(storage.getTasks(pid(req))));
-  app.post("/api/tasks", (req, res) => {
+  app.get("/api/tasks", async (req, res) => res.json(await storage.getTasks(pid(req))));
+  app.post("/api/tasks", async (req, res) => {
     const parsed = insertTaskSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createTask(parsed.data));
+    res.status(201).json(await storage.createTask(parsed.data));
   });
-  app.patch("/api/tasks/:id/status", (req, res) => {
+  app.patch("/api/tasks/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
-    const updated = storage.updateTaskStatus(parseInt(req.params.id, 10), status);
+    const updated = await storage.updateTaskStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Task not found" });
     res.json(updated);
   });
 
   // RFIs
-  app.get("/api/rfis", (req, res) => res.json(storage.getRfis(pid(req))));
-  app.post("/api/rfis", (req, res) => {
+  app.get("/api/rfis", async (req, res) => res.json(await storage.getRfis(pid(req))));
+  app.post("/api/rfis", async (req, res) => {
     const parsed = insertRfiSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createRfi(parsed.data));
+    res.status(201).json(await storage.createRfi(parsed.data));
   });
-  app.patch("/api/rfis/:id/status", (req, res) => {
+  app.patch("/api/rfis/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
-    const updated = storage.updateRfiStatus(parseInt(req.params.id, 10), status);
+    const updated = await storage.updateRfiStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "RFI not found" });
     res.json(updated);
   });
 
 
   // Submittals
-  app.get("/api/submittals", (req, res) => res.json(storage.getSubmittals(pid(req))));
-  app.post("/api/submittals", (req, res) => {
+  app.get("/api/submittals", async (req, res) => res.json(await storage.getSubmittals(pid(req))));
+  app.post("/api/submittals", async (req, res) => {
     const parsed = insertSubmittalSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createSubmittal(parsed.data));
+    res.status(201).json(await storage.createSubmittal(parsed.data));
   });
-  app.patch("/api/submittals/:id/status", (req, res) => {
+  app.patch("/api/submittals/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
-    const updated = storage.updateSubmittalStatus(parseInt(req.params.id, 10), status);
+    const updated = await storage.updateSubmittalStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Submittal not found" });
     res.json(updated);
   });
 
 
   // Change orders
-  app.get("/api/change-orders", (req, res) => res.json(storage.getChangeOrders(pid(req))));
-  app.post("/api/change-orders", (req, res) => {
+  app.get("/api/change-orders", async (req, res) => res.json(await storage.getChangeOrders(pid(req))));
+  app.post("/api/change-orders", async (req, res) => {
     const parsed = insertChangeOrderSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createChangeOrder(parsed.data));
+    res.status(201).json(await storage.createChangeOrder(parsed.data));
   });
-  app.patch("/api/change-orders/:id/status", (req, res) => {
+  app.patch("/api/change-orders/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
-    const updated = storage.updateChangeOrderStatus(parseInt(req.params.id, 10), status);
+    const updated = await storage.updateChangeOrderStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Change order not found" });
     res.json(updated);
   });
 
 
   // Action items
-  app.get("/api/action-items", (req, res) => res.json(storage.getActionItems(pid(req))));
-  app.post("/api/action-items", (req, res) => {
+  app.get("/api/action-items", async (req, res) => res.json(await storage.getActionItems(pid(req))));
+  app.post("/api/action-items", async (req, res) => {
     const parsed = insertActionItemSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createActionItem(parsed.data));
+    res.status(201).json(await storage.createActionItem(parsed.data));
   });
-  app.patch("/api/action-items/:id/status", (req, res) => {
+  app.patch("/api/action-items/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
-    const updated = storage.updateActionItemStatus(parseInt(req.params.id, 10), status);
+    const updated = await storage.updateActionItemStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Action item not found" });
     res.json(updated);
   });
 
 
   // Daily logs
-  app.get("/api/daily-logs", (req, res) => res.json(storage.getDailyLogs(pid(req))));
-  app.post("/api/daily-logs", (req, res) => {
+  app.get("/api/daily-logs", async (req, res) => res.json(await storage.getDailyLogs(pid(req))));
+  app.post("/api/daily-logs", async (req, res) => {
     const parsed = insertDailyLogSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createDailyLog(parsed.data));
+    res.status(201).json(await storage.createDailyLog(parsed.data));
   });
-  app.patch("/api/daily-logs/:id", (req, res) => {
+  app.patch("/api/daily-logs/:id", async (req, res) => {
     const parsed = insertDailyLogSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    const updated = storage.updateDailyLog(parseInt(req.params.id, 10), parsed.data);
+    const updated = await storage.updateDailyLog(parseInt(req.params.id, 10), parsed.data);
     if (!updated) return res.status(404).json({ message: "Daily log not found" });
     res.json(updated);
   });
-  app.delete("/api/daily-logs/:id", (req, res) => {
-    storage.deleteDailyLog(parseInt(req.params.id, 10));
+  app.delete("/api/daily-logs/:id", async (req, res) => {
+    await storage.deleteDailyLog(parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
   // Punch
-  app.get("/api/punch", (req, res) => res.json(storage.getPunchItems(pid(req))));
-  app.post("/api/punch", (req, res) => {
+  app.get("/api/punch", async (req, res) => res.json(await storage.getPunchItems(pid(req))));
+  app.post("/api/punch", async (req, res) => {
     const parsed = insertPunchItemSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createPunchItem(parsed.data));
+    res.status(201).json(await storage.createPunchItem(parsed.data));
   });
-  app.patch("/api/punch/:id/status", (req, res) => {
+  app.patch("/api/punch/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
-    const updated = storage.updatePunchStatus(parseInt(req.params.id, 10), status);
+    const updated = await storage.updatePunchStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Punch item not found" });
     res.json(updated);
   });
 
 
   // Contacts
-  app.get("/api/contacts", (_req, res) => res.json(storage.getContacts()));
-  app.post("/api/contacts", (req, res) => {
+  app.get("/api/contacts", async (_req, res) => res.json(await storage.getContacts()));
+  app.post("/api/contacts", async (req, res) => {
     const parsed = insertContactSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createContact(parsed.data));
+    res.status(201).json(await storage.createContact(parsed.data));
   });
-  app.patch("/api/contacts/:id", (req, res) => {
+  app.patch("/api/contacts/:id", async (req, res) => {
     const parsed = insertContactSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    const updated = storage.updateContact(parseInt(req.params.id, 10), parsed.data);
+    const updated = await storage.updateContact(parseInt(req.params.id, 10), parsed.data);
     if (!updated) return res.status(404).json({ message: "Contact not found" });
     res.json(updated);
   });
-  app.delete("/api/contacts/:id", (req, res) => {
-    storage.deleteContact(parseInt(req.params.id, 10));
+  app.delete("/api/contacts/:id", async (req, res) => {
+    await storage.deleteContact(parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
   // Equipment
-  app.get("/api/equipment", (req, res) => res.json(storage.getEquipment(pid(req))));
-  app.post("/api/equipment", (req, res) => {
+  app.get("/api/equipment", async (req, res) => res.json(await storage.getEquipment(pid(req))));
+  app.post("/api/equipment", async (req, res) => {
     const parsed = insertEquipmentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createEquipment(parsed.data));
+    res.status(201).json(await storage.createEquipment(parsed.data));
   });
 
   // Photos
-  app.get("/api/photos", (req, res) => res.json(storage.getPhotos(pid(req))));
-  app.post("/api/photos", (req, res) => {
+  app.get("/api/photos", async (req, res) => res.json(await storage.getPhotos(pid(req))));
+  app.post("/api/photos", async (req, res) => {
     const parsed = insertPhotoSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createPhoto(parsed.data));
+    res.status(201).json(await storage.createPhoto(parsed.data));
   });
 
   // Photo file upload (multipart: metadata + image in one request)
-  app.post("/api/photos/upload", photoUpload.single("file"), (req, res) => {
+  app.post("/api/photos/upload", photoUpload.single("file"), async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No image provided." });
     const projectId = parseInt(req.body.projectId, 10);
@@ -482,7 +476,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const location = req.body.location ? String(req.body.location) : "";
     const date = req.body.date ? String(req.body.date) : new Date().toISOString().slice(0, 10);
     const hue = req.body.hue ? parseInt(req.body.hue, 10) : Math.floor(Math.random() * 360);
-    const created = storage.createPhoto({
+    const created = await storage.createPhoto({
       projectId,
       caption,
       location,
@@ -498,9 +492,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Stream a photo's source image (inline)
-  app.get("/api/photos/:id/file", (req, res) => {
+  app.get("/api/photos/:id/file", async (req, res) => {
     hydrateSeedPhotos();
-    const photo = storage.getPhoto(parseInt(req.params.id, 10));
+    const photo = await storage.getPhoto(parseInt(req.params.id, 10));
     if (!photo) return res.status(404).json({ message: "Photo not found." });
     if (!photo.storedFileName) return res.status(404).json({ message: "No source file attached." });
     const abs = path.resolve(PHOTO_DIR, photo.storedFileName);
@@ -513,27 +507,27 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Delete a photo and its uploaded file
-  app.delete("/api/photos/:id", (req, res) => {
+  app.delete("/api/photos/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const photo = storage.getPhoto(id);
+    const photo = await storage.getPhoto(id);
     if (photo?.storedFileName) {
       const abs = path.resolve(PHOTO_DIR, photo.storedFileName);
       if (abs.startsWith(PHOTO_DIR + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
     }
-    storage.deletePhoto(id);
+    await storage.deletePhoto(id);
     res.status(204).end();
   });
 
   // Documents
-  app.get("/api/documents", (req, res) => res.json(storage.getDocuments(pid(req))));
-  app.post("/api/documents", (req, res) => {
+  app.get("/api/documents", async (req, res) => res.json(await storage.getDocuments(pid(req))));
+  app.post("/api/documents", async (req, res) => {
     const parsed = insertDocumentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createDocument(parsed.data));
+    res.status(201).json(await storage.createDocument(parsed.data));
   });
 
   // Document file upload (multipart: metadata + file in one request)
-  app.post("/api/documents/upload", upload.single("file"), (req, res) => {
+  app.post("/api/documents/upload", upload.single("file"), async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No file provided." });
     const projectId = parseInt(req.body.projectId, 10);
@@ -542,7 +536,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const name = req.body.name ? String(req.body.name) : file.originalname;
     const type = req.body.type ? String(req.body.type) : "Drawing";
     const date = req.body.date ? String(req.body.date) : new Date().toISOString().slice(0, 10);
-    const created = storage.createDocument({
+    const created = await storage.createDocument({
       projectId,
       name,
       type,
@@ -558,8 +552,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Stream a document's source file (inline so PDFs/images render in-browser)
-  app.get("/api/documents/:id/file", (req, res) => {
-    const doc = storage.getDocument(parseInt(req.params.id, 10));
+  app.get("/api/documents/:id/file", async (req, res) => {
+    const doc = await storage.getDocument(parseInt(req.params.id, 10));
     if (!doc) return res.status(404).json({ message: "Document not found." });
     if (!doc.storedFileName) return res.status(404).json({ message: "No source file attached." });
     const abs = path.resolve(UPLOAD_DIR, doc.storedFileName);
@@ -572,53 +566,53 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Delete a document and its uploaded file
-  app.delete("/api/documents/:id", (req, res) => {
+  app.delete("/api/documents/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const doc = storage.getDocument(id);
+    const doc = await storage.getDocument(id);
     if (doc?.storedFileName) {
       const abs = path.resolve(UPLOAD_DIR, doc.storedFileName);
       if (abs.startsWith(UPLOAD_DIR + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
     }
-    storage.deleteDocument(id);
+    await storage.deleteDocument(id);
     res.status(204).end();
   });
 
   // Blueprints
-  app.get("/api/blueprints", (req, res) => res.json(storage.getBlueprints(pid(req))));
-  app.post("/api/blueprints", (req, res) => {
+  app.get("/api/blueprints", async (req, res) => res.json(await storage.getBlueprints(pid(req))));
+  app.post("/api/blueprints", async (req, res) => {
     const parsed = insertBlueprintSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createBlueprint(parsed.data));
+    res.status(201).json(await storage.createBlueprint(parsed.data));
   });
 
   // Drone captures
-  app.get("/api/drone-captures", (req, res) => res.json(storage.getDroneCaptures(pid(req))));
-  app.post("/api/drone-captures", (req, res) => {
+  app.get("/api/drone-captures", async (req, res) => res.json(await storage.getDroneCaptures(pid(req))));
+  app.post("/api/drone-captures", async (req, res) => {
     const parsed = insertDroneCaptureSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createDroneCapture(parsed.data));
+    res.status(201).json(await storage.createDroneCapture(parsed.data));
   });
 
   // Milestones
-  app.get("/api/milestones", (req, res) => res.json(storage.getMilestones(pid(req))));
-  app.post("/api/milestones", (req, res) => {
+  app.get("/api/milestones", async (req, res) => res.json(await storage.getMilestones(pid(req))));
+  app.post("/api/milestones", async (req, res) => {
     const parsed = insertMilestoneSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createMilestone(parsed.data));
+    res.status(201).json(await storage.createMilestone(parsed.data));
   });
-  app.patch("/api/milestones/:id", (req, res) => {
+  app.patch("/api/milestones/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const updated = storage.updateMilestone(id, req.body ?? {});
+    const updated = await storage.updateMilestone(id, req.body ?? {});
     if (!updated) return res.status(404).json({ message: "not found" });
     res.json(updated);
   });
-  app.delete("/api/milestones/:id", (req, res) => {
-    storage.deleteMilestone(parseInt(req.params.id, 10));
+  app.delete("/api/milestones/:id", async (req, res) => {
+    await storage.deleteMilestone(parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
   // Drone capture file upload (multipart: metadata + image in one request)
-  app.post("/api/drone-captures/upload", droneUpload.single("file"), (req, res) => {
+  app.post("/api/drone-captures/upload", droneUpload.single("file"), async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No image provided." });
     const projectId = parseInt(req.body.projectId, 10);
@@ -631,7 +625,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const altitude = req.body.altitude ? String(req.body.altitude) : null;
     const area = req.body.area ? String(req.body.area) : null;
     const hue = req.body.hue ? parseInt(req.body.hue, 10) : Math.floor(Math.random() * 360);
-    const created = storage.createDroneCapture({
+    const created = await storage.createDroneCapture({
       projectId,
       title,
       captureType,
@@ -650,8 +644,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Stream a drone capture's source image (inline)
-  app.get("/api/drone-captures/:id/file", (req, res) => {
-    const cap = storage.getDroneCapture(parseInt(req.params.id, 10));
+  app.get("/api/drone-captures/:id/file", async (req, res) => {
+    const cap = await storage.getDroneCapture(parseInt(req.params.id, 10));
     if (!cap) return res.status(404).json({ message: "Capture not found." });
     if (!cap.storedFileName) return res.status(404).json({ message: "No source file attached." });
     const abs = path.resolve(DRONE_DIR, cap.storedFileName);
@@ -664,63 +658,63 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Delete a drone capture and its uploaded file
-  app.delete("/api/drone-captures/:id", (req, res) => {
+  app.delete("/api/drone-captures/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const cap = storage.getDroneCapture(id);
+    const cap = await storage.getDroneCapture(id);
     if (cap?.storedFileName) {
       const abs = path.resolve(DRONE_DIR, cap.storedFileName);
       if (abs.startsWith(DRONE_DIR + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
     }
-    storage.deleteDroneCapture(id);
+    await storage.deleteDroneCapture(id);
     res.status(204).end();
   });
 
   // Messages
-  app.get("/api/messages/:projectId", (req, res) => {
-    res.json(storage.getMessages(parseInt(req.params.projectId, 10)));
+  app.get("/api/messages/:projectId", async (req, res) => {
+    res.json(await storage.getMessages(parseInt(req.params.projectId, 10)));
   });
-  app.post("/api/messages", (req, res) => {
+  app.post("/api/messages", async (req, res) => {
     const parsed = insertMessageSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createMessage(parsed.data));
+    res.status(201).json(await storage.createMessage(parsed.data));
   });
 
   // Notes (sticky)
-  app.get("/api/notes", (req, res) => res.json(storage.getNotes(pid(req))));
-  app.post("/api/notes", (req, res) => {
+  app.get("/api/notes", async (req, res) => res.json(await storage.getNotes(pid(req))));
+  app.post("/api/notes", async (req, res) => {
     const parsed = insertNoteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(storage.createNote(parsed.data));
+    res.status(201).json(await storage.createNote(parsed.data));
   });
-  app.patch("/api/notes/:id", (req, res) => {
+  app.patch("/api/notes/:id", async (req, res) => {
     const x = Number(req.body?.x);
     const y = Number(req.body?.y);
     if (Number.isNaN(x) || Number.isNaN(y)) return res.status(400).json({ message: "x,y required" });
-    const updated = storage.updateNotePosition(parseInt(req.params.id, 10), x, y);
+    const updated = await storage.updateNotePosition(parseInt(req.params.id, 10), x, y);
     if (!updated) return res.status(404).json({ message: "Note not found" });
     res.json(updated);
   });
-  app.delete("/api/notes/:id", (req, res) => {
-    storage.deleteNote(parseInt(req.params.id, 10));
+  app.delete("/api/notes/:id", async (req, res) => {
+    await storage.deleteNote(parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
   // INTEGRATIONS — connect/disconnect third-party services
-  app.get("/api/integrations", (_req, res) => {
-    res.json(storage.getIntegrations());
+  app.get("/api/integrations", async (_req, res) => {
+    res.json(await storage.getIntegrations());
   });
-  app.patch("/api/integrations/:key", (req, res) => {
+  app.patch("/api/integrations/:key", async (req, res) => {
     const key = req.params.key;
     const connected = req.body?.connected === true;
     const config = typeof req.body?.config === "string" ? req.body.config : undefined;
-    res.json(storage.setIntegration(key, connected, config));
+    res.json(await storage.setIntegration(key, connected, config));
   });
 
   // SUBSCRIBE — capture email + plan, notify owner by email
   app.post("/api/subscribe", async (req, res) => {
     const parsed = insertSubscriberSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const saved = storage.createSubscriber(parsed.data);
+    const saved = await storage.createSubscriber(parsed.data);
     // Fire-and-forget email so a mailer outage never blocks a signup.
     void sendSignupNotification({
       kind: "subscriber",
@@ -739,7 +733,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.post("/api/demo-request", async (req, res) => {
     const parsed = insertDemoRequestSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const saved = storage.createDemoRequest(parsed.data);
+    const saved = await storage.createDemoRequest(parsed.data);
     const d = parsed.data as any;
     void sendSignupNotification({
       kind: "demo-request",
@@ -760,10 +754,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // ADMIN — list signups (used by /#/admin/signups)
-  app.get("/api/admin/signups", (_req, res) => {
+  app.get("/api/admin/signups", async (_req, res) => {
     res.json({
-      subscribers: storage.listSubscribers(),
-      demoRequests: storage.listDemoRequests(),
+      subscribers: await storage.listSubscribers(),
+      demoRequests: await storage.listDemoRequests(),
     });
   });
 
@@ -789,26 +783,26 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // SETTINGS — app preferences (persisted server-side; localStorage is blocked)
-  app.get("/api/settings", (_req, res) => {
-    res.json(storage.getSettings());
+  app.get("/api/settings", async (_req, res) => {
+    res.json(await storage.getSettings());
   });
-  app.patch("/api/settings", (req, res) => {
+  app.patch("/api/settings", async (req, res) => {
     const patch = req.body && typeof req.body === "object" ? req.body : {};
-    res.json(storage.updateSettings(patch));
+    res.json(await storage.updateSettings(patch));
   });
 
   // APP HEALTH SCAN — link + module integrity (deterministic, no AI)
-  app.get("/api/jarvis/health-scan", (_req, res) => {
-    try { res.json(runHealthScan()); }
+  app.get("/api/jarvis/health-scan", async (_req, res) => {
+    try { res.json(await runHealthScan()); }
     catch (err) { console.error("[health] scan error:", err); res.status(500).json({ message: "Health scan failed." }); }
   });
 
   // RESEED — gated destructive reset; requires { confirm: "RESET" }
-  app.post("/api/reseed", (req, res) => {
+  app.post("/api/reseed", async (req, res) => {
     if (req.body?.confirm !== "RESET") {
       return res.status(400).json({ message: "Confirmation required. Send { confirm: 'RESET' } to wipe and reseed demo data." });
     }
-    storage.resetAllData();
+    await storage.resetAllData();
     res.json({ ok: true, reseededAt: new Date().toISOString() });
   });
 

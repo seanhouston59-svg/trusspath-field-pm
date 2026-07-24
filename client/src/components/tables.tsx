@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, MapPin, Search } from "lucide-react";
 import { Avatar, TaskStatusBadge, PriorityBadge, RfiStatusBadge, SubmittalStatusBadge, ChangeOrderStatusBadge } from "@/components/bits";
 import type { Task, Rfi, PunchItem, DailyLog, TeamMember, Submittal, ChangeOrder, ActionItem } from "@shared/schema";
 import { shortDate, relativeDays, isOverdue, formatDate, formatCurrency } from "@/lib/format";
 import { useUpdateTaskStatus, useUpdatePunchStatus, useUpdateActionItemStatus } from "@/hooks/use-data";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { googleMapsUrlForLocation } from "@/lib/maps";
 
 const STATUSES = ["Not Started", "In Progress", "Blocked", "Complete"];
 
@@ -172,7 +173,7 @@ export function RfiTable({ rfis, team, projects, onRowClick }: { rfis: Rfi[]; te
 }
 
 /* ----------------------------- Punch list ----------------------------- */
-export function PunchList({ items, team, projects, onRowClick }: { items: PunchItem[]; team: Map<number, TeamMember>; projects?: { id: number; name: string }[]; onRowClick?: (i: PunchItem) => void }) {
+export function PunchList({ items, team, projects, onRowClick }: { items: PunchItem[]; team: Map<number, TeamMember>; projects?: { id: number; name: string; address?: string }[]; onRowClick?: (i: PunchItem) => void }) {
   const update = useUpdatePunchStatus();
   const { toast } = useToast();
   return (
@@ -196,7 +197,24 @@ export function PunchList({ items, team, projects, onRowClick }: { items: PunchI
               <tr key={p.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, a, [role='button'], [role='combobox']")) return; onRowClick?.(p); }} className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")} data-testid={`row-punch-${p.id}`}>
                 <td className="px-4 py-2.5 font-medium">{p.title}</td>
                 {projects && <td className="px-4 py-2.5 text-muted-foreground">{proj?.name ?? "—"}</td>}
-                <td className="px-4 py-2.5 text-muted-foreground">{p.location}</td>
+                <td className="px-4 py-2.5 text-muted-foreground">{(() => {
+                  const href = googleMapsUrlForLocation(p.location, proj?.address);
+                  return href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                      data-testid={`link-map-punch-${p.id}`}
+                    >
+                      <MapPin className="size-3 shrink-0" />
+                      <span>{p.location}</span>
+                    </a>
+                  ) : (
+                    p.location
+                  );
+                })()}</td>
                 <td className="px-4 py-2.5 text-muted-foreground">{p.trade}</td>
                 <td className="px-4 py-2.5">
                   {a ? (

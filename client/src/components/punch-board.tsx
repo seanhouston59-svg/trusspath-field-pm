@@ -5,6 +5,7 @@ import { Avatar } from "@/components/bits";
 import { useUpdatePunchStatus } from "@/hooks/use-data";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { googleMapsUrlForLocation } from "@/lib/maps";
 
 /**
  * Punch Board — kanban view of punch items grouped by status.
@@ -27,7 +28,7 @@ export function PunchBoard({
 }: {
   items: PunchItem[];
   team: Map<number, TeamMember>;
-  projects?: { id: number; name: string }[];
+  projects?: { id: number; name: string; address?: string }[];
   onCardClick?: (i: PunchItem) => void;
 }) {
   const update = useUpdatePunchStatus();
@@ -36,6 +37,7 @@ export function PunchBoard({
   const [draggedId, setDraggedId] = useState<number | null>(null);
 
   const projectName = (id: number) => projects?.find((p) => p.id === id)?.name;
+  const projectAddress = (id: number) => projects?.find((p) => p.id === id)?.address;
 
   function onDrop(status: Status) {
     if (draggedId == null) return;
@@ -123,8 +125,28 @@ export function PunchBoard({
                       </p>
                     )}
                     <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <MapPin className="size-3 shrink-0" />
-                      <span className="truncate">{it.location}</span>
+                      {(() => {
+                        const href = googleMapsUrlForLocation(it.location, projectAddress(it.projectId));
+                        return href ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="flex min-w-0 items-center gap-1.5 truncate text-primary hover:underline"
+                            data-testid={`link-map-punch-${it.id}`}
+                          >
+                            <MapPin className="size-3 shrink-0" />
+                            <span className="truncate">{it.location}</span>
+                          </a>
+                        ) : (
+                          <>
+                            <MapPin className="size-3 shrink-0" />
+                            <span className="truncate">{it.location}</span>
+                          </>
+                        );
+                      })()}
                       <span className="mx-1 shrink-0 opacity-50">·</span>
                       <span className="truncate">{it.trade}</span>
                     </div>

@@ -1,11 +1,11 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { pgTable, text, integer, serial, doublePrecision, boolean } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 /* ----------------------------- Team members ----------------------------- */
-export const teamMembers = sqliteTable("team_members", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const teamMembers = pgTable("team_members", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   role: text("role").notNull(),
   trade: text("trade").notNull(),
@@ -19,8 +19,8 @@ export const teamMembers = sqliteTable("team_members", {
 });
 
 /* ------------------------------- Projects ------------------------------- */
-export const projects = sqliteTable("projects", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const projects = pgTable("projects", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   number: text("number").notNull(),
   client: text("client").notNull(),
@@ -29,15 +29,15 @@ export const projects = sqliteTable("projects", {
   address: text("address").notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
-  budget: real("budget").notNull(),
-  spent: real("spent").notNull(),
+  budget: doublePrecision("budget").notNull(),
+  spent: doublePrecision("spent").notNull(),
   progress: integer("progress").notNull(),
   superintendentId: integer("superintendent_id"),
 });
 
 /* -------------------------------- Tasks --------------------------------- */
-export const tasks = sqliteTable("tasks", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   title: text("title").notNull(),
   trade: text("trade").notNull(),
@@ -50,23 +50,23 @@ export const tasks = sqliteTable("tasks", {
   endDate: text("end_date"),
   seq: integer("seq"),
   // comma-separated list of predecessor task ids (finish-to-start)
-  dependsOn: text("depends_on").default(sql`NULL`),
+  dependsOn: text("depends_on"),
 });
 
 /* ------------------------------ Milestones ------------------------------ */
-export const milestones = sqliteTable("milestones", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const milestones = pgTable("milestones", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   title: text("title").notNull(),
   date: text("date").notNull(),
-  kind: text("kind").notNull(), // e.g. Permit, Foundation, TCO, Closeout, Inspection
-  status: text("status").notNull(), // Upcoming, Complete, At Risk, Missed
+  kind: text("kind").notNull(),
+  status: text("status").notNull(),
   notes: text("notes"),
 });
 
 /* --------------------------------- RFIs --------------------------------- */
-export const rfis = sqliteTable("rfis", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const rfis = pgTable("rfis", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   number: text("number").notNull(),
   subject: text("subject").notNull(),
@@ -77,8 +77,8 @@ export const rfis = sqliteTable("rfis", {
 });
 
 /* ----------------------------- Submittals ------------------------------ */
-export const submittals = sqliteTable("submittals", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const submittals = pgTable("submittals", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   number: text("number").notNull(),
   subject: text("subject").notNull(),
@@ -90,20 +90,20 @@ export const submittals = sqliteTable("submittals", {
 });
 
 /* --------------------------- Change orders ----------------------------- */
-export const changeOrders = sqliteTable("change_orders", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const changeOrders = pgTable("change_orders", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   number: text("number").notNull(),
   title: text("title").notNull(),
   status: text("status").notNull(),
-  amount: real("amount").notNull(),
+  amount: doublePrecision("amount").notNull(),
   scheduleImpact: integer("schedule_impact").notNull(),
   dateIssued: text("date_issued").notNull(),
 });
 
 /* ---------------------------- Action items ----------------------------- */
-export const actionItems = sqliteTable("action_items", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const actionItems = pgTable("action_items", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   title: text("title").notNull(),
   owner: text("owner").notNull(),
@@ -114,8 +114,8 @@ export const actionItems = sqliteTable("action_items", {
 });
 
 /* ------------------------------ Daily logs ------------------------------ */
-export const dailyLogs = sqliteTable("daily_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const dailyLogs = pgTable("daily_logs", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   date: text("date").notNull(),
   authorId: integer("author_id"),
@@ -127,8 +127,8 @@ export const dailyLogs = sqliteTable("daily_logs", {
 });
 
 /* ----------------------------- Punch items ----------------------------- */
-export const punchItems = sqliteTable("punch_items", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const punchItems = pgTable("punch_items", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   title: text("title").notNull(),
   location: text("location").notNull(),
@@ -138,8 +138,8 @@ export const punchItems = sqliteTable("punch_items", {
 });
 
 /* ------------------------------ Contacts ------------------------------- */
-export const contacts = sqliteTable("contacts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const contacts = pgTable("contacts", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   company: text("company").notNull(),
   role: text("role").notNull(),
@@ -150,8 +150,8 @@ export const contacts = sqliteTable("contacts", {
 });
 
 /* ------------------------------ Equipment ------------------------------- */
-export const equipment = sqliteTable("equipment", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const equipment = pgTable("equipment", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").notNull(),
   status: text("status").notNull(),
@@ -161,8 +161,8 @@ export const equipment = sqliteTable("equipment", {
 });
 
 /* ------------------------------- Photos -------------------------------- */
-export const photos = sqliteTable("photos", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const photos = pgTable("photos", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   caption: text("caption").notNull(),
   location: text("location").notNull(),
@@ -176,8 +176,8 @@ export const photos = sqliteTable("photos", {
 });
 
 /* ----------------------------- Documents ------------------------------- */
-export const documents = sqliteTable("documents", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   name: text("name").notNull(),
   type: text("type").notNull(),
@@ -191,8 +191,8 @@ export const documents = sqliteTable("documents", {
 });
 
 /* ----------------------------- Blueprints ------------------------------ */
-export const blueprints = sqliteTable("blueprints", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const blueprints = pgTable("blueprints", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   sheetNumber: text("sheet_number").notNull(),
   title: text("title").notNull(),
@@ -205,8 +205,8 @@ export const blueprints = sqliteTable("blueprints", {
 });
 
 /* ---------------------------- Drone captures ---------------------------- */
-export const droneCaptures = sqliteTable("drone_captures", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const droneCaptures = pgTable("drone_captures", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   title: text("title").notNull(),
   captureType: text("capture_type").notNull(),
@@ -223,8 +223,8 @@ export const droneCaptures = sqliteTable("drone_captures", {
 });
 
 /* ------------------------------ Messages ------------------------------- */
-export const messages = sqliteTable("messages", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
   authorId: integer("author_id"),
   body: text("body").notNull(),
@@ -232,8 +232,8 @@ export const messages = sqliteTable("messages", {
 });
 
 /* ----------------------------- Sticky notes --------------------------- */
-export const notes = sqliteTable("notes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const notes = pgTable("notes", {
+  id: serial("id").primaryKey(),
   projectId: integer("project_id"),
   body: text("body").notNull(),
   color: text("color").notNull(),
@@ -241,17 +241,17 @@ export const notes = sqliteTable("notes", {
   y: integer("y").notNull(),
 });
 
-export const integrations = sqliteTable("integrations", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const integrations = pgTable("integrations", {
+  id: serial("id").primaryKey(),
   key: text("key").notNull().unique(),
-  connected: integer("connected", { mode: "boolean" }).notNull().default(false),
+  connected: boolean("connected").notNull().default(false),
   connectedAt: text("connected_at"),
   config: text("config"),
 });
 
 /* --------------------------- Subscribers ------------------------------- */
-export const subscribers = sqliteTable("subscribers", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const subscribers = pgTable("subscribers", {
+  id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   plan: text("plan").notNull(),
   billing: text("billing").notNull(),
@@ -260,8 +260,8 @@ export const subscribers = sqliteTable("subscribers", {
 });
 
 /* -------------------------- Demo requests ------------------------------ */
-export const demoRequests = sqliteTable("demo_requests", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const demoRequests = pgTable("demo_requests", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull(),
   company: text("company").notNull(),
@@ -272,25 +272,25 @@ export const demoRequests = sqliteTable("demo_requests", {
 });
 
 /* ------------------------------ Settings ------------------------------- */
-export const appSettings = sqliteTable("app_settings", {
+export const appSettings = pgTable("app_settings", {
   id: integer("id").primaryKey(),
   config: text("config").notNull().default("{}"),
   updatedAt: text("updated_at").notNull(),
 });
 
 /* ------------------------------ Accounts (Auth) ----------------------- */
-export const accounts = sqliteTable("accounts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const accounts = pgTable("accounts", {
+  id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
-  role: text("role").notNull().default("member"),  // owner | admin | member
+  role: text("role").notNull().default("member"),
   company: text("company"),
   createdAt: text("created_at").notNull(),
 });
 
-export const sessions = sqliteTable("sessions", {
-  id: text("id").primaryKey(), // random token
+export const sessions = pgTable("sessions", {
+  id: text("id").primaryKey(),
   accountId: integer("account_id").notNull(),
   createdAt: text("created_at").notNull(),
   expiresAt: text("expires_at").notNull(),
