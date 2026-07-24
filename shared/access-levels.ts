@@ -33,6 +33,7 @@ const R = {
   projectDetail: "/projects/:id",
   schedule: "/schedule",
   gantt: "/gantt",
+  cpm: "/cpm",
   integrations: "/integrations",
   tasks: "/tasks",
   actionItems: "/action-items",
@@ -82,7 +83,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt,
+      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.blueprints, R.equipment, R.drone,
       R.contacts, R.messages, R.notes,
@@ -96,7 +97,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt,
+      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.punch, R.dailyLogs, R.photos, R.documents, R.blueprints,
       R.messages, R.notes,
     ],
@@ -109,7 +110,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt,
+      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.rfis, R.submittals, R.photos, R.documents, R.blueprints, R.messages,
     ],
   },
@@ -121,7 +122,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: false, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt,
+      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.blueprints, R.equipment, R.drone,
       R.contacts, R.messages, R.notes,
