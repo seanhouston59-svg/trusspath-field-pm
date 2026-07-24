@@ -44,6 +44,7 @@ import Blueprints from "@/pages/blueprints";
 import Drone from "@/pages/drone";
 import SettingsPage from "@/pages/settings";
 import AdminSignups from "@/pages/admin-signups";
+import Cpm from "@/pages/cpm";
 
 // Single source of truth for routes lives in shared/app-manifest.ts (APP_ROUTES).
 // Map each manifest route pattern to its page component here.
@@ -54,6 +55,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/projects/:id": ProjectDetail,
   "/schedule": Schedule,
   "/gantt": Gantt,
+  "/cpm": Cpm,
   "/integrations": Integrations,
   "/tasks": Tasks,
   "/action-items": ActionItems,

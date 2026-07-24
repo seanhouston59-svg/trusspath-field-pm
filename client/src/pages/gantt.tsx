@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { Flag, Milestone, Layers, AlertTriangle, CalendarDays, Maximize2, Minimize2, Workflow, ChevronRight, BarChart3, X, FileText, ClipboardList, HelpCircle } from "lucide-react";
+import { Flag, Milestone, Layers, AlertTriangle, CalendarDays, Maximize2, Minimize2, Workflow, ChevronRight, BarChart3, X, FileText, ClipboardList, HelpCircle, Network } from "lucide-react";
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProjects, useTasks, useChangeOrders, useSubmittals, useRfis, useSettings, useMilestones } from "@/hooks/use-data";
@@ -381,7 +382,14 @@ export default function SchedulePage() {
             {p.name.split(" ")[0]}
           </button>
         ))}
-        <div className="ml-auto inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5" data-testid="gantt-view-tabs">
+        <Link
+          href="/cpm"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          data-testid="link-cpm"
+        >
+          <Network className="size-3.5" /> CPM Diagram
+        </Link>
+        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5" data-testid="gantt-view-tabs">
           <button onClick={() => setView("gantt")} data-testid="gantt-view-gantt" className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors", view === "gantt" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
             <BarChart3 className="size-3.5" /> Gantt
           </button>

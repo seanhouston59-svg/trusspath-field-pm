@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
-import { CalendarPlus, Download, Upload, Calendar as CalIcon, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { CalendarPlus, Download, Upload, Calendar as CalIcon, ChevronLeft, ChevronRight, ExternalLink, Network } from "lucide-react";
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { useProjects, useTasks, useRfis, useSubmittals, useChangeOrders } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
@@ -135,6 +136,13 @@ export default function SchedulePage() {
             {p.name.split(" ")[0]}
           </button>
         ))}
+        <Link
+          href="/cpm"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          data-testid="link-cpm-schedule"
+        >
+          <Network className="size-3.5" /> CPM Diagram
+        </Link>
       </div>
 
       {/* Google Calendar integration card */}

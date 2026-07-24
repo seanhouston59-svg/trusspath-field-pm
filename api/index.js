@@ -1243,6 +1243,7 @@ var init_app_manifest = __esm({
       "/projects/:id",
       "/schedule",
       "/gantt",
+      "/cpm",
       "/integrations",
       "/tasks",
       "/action-items",
@@ -1275,7 +1276,8 @@ var init_app_manifest = __esm({
         items: [
           { href: "/projects", label: "Projects", icon: "FolderKanban" },
           { href: "/schedule", label: "Schedule", icon: "CalendarRange" },
-          { href: "/gantt", label: "Gantt", icon: "GanttChartSquare" }
+          { href: "/gantt", label: "Gantt", icon: "GanttChartSquare" },
+          { href: "/cpm", label: "CPM Diagram", icon: "Network" }
         ]
       },
       {

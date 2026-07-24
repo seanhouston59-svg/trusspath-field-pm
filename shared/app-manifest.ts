@@ -12,7 +12,7 @@ export type RoutePattern = string;
 
 /** Every route registered in App.tsx (patterns; :id = dynamic segment). */
 export const APP_ROUTES: RoutePattern[] = [
-  "/", "/app", "/projects", "/projects/:id", "/schedule", "/gantt", "/integrations",
+  "/", "/app", "/projects", "/projects/:id", "/schedule", "/gantt", "/cpm", "/integrations",
   "/tasks", "/action-items", "/rfis", "/submittals", "/change-orders", "/punch",
   "/daily-logs", "/photos", "/documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/settings",
@@ -36,6 +36,7 @@ export const APP_NAV: NavGroup[] = [
       { href: "/projects", label: "Projects", icon: "FolderKanban" },
       { href: "/schedule", label: "Schedule", icon: "CalendarRange" },
       { href: "/gantt", label: "Gantt", icon: "GanttChartSquare" },
+      { href: "/cpm", label: "CPM Diagram", icon: "Network" },
     ],
   },
   {
