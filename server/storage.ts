@@ -30,10 +30,14 @@ import { resolve, join } from "node:path";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const CONN = process.env.DATABASE_URL;
-if (!CONN) {
-  console.warn("[storage] DATABASE_URL is not set — storage will fail until provided");
+if (!CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(CONN)) {
+  const msg = !CONN
+    ? "[storage] DATABASE_URL is not set. Set it in Vercel → Project → Settings → Environment Variables to the Neon pooled connection string (postgresql://user:password@host/dbname?sslmode=require)."
+    : "[storage] DATABASE_URL is malformed. Expected postgresql://user:password@host/dbname?sslmode=require. Check for empty strings, extra quotes, or missing credentials in the Vercel env var.";
+  console.error(msg);
+  // Throw only when actually used (lazy) so build-time bundling doesn't break.
 }
-const sql = neon(CONN || "postgresql://localhost/placeholder");
+const sql = neon(CONN || "postgresql://user:pass@localhost/placeholder");
 export const db = drizzle(sql);
 
 async function migrate() {

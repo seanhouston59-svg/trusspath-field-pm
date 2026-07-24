@@ -555,10 +555,11 @@ var init_storage = __esm({
     import_node_path = require("node:path");
     import_node_crypto = require("node:crypto");
     CONN = process.env.DATABASE_URL;
-    if (!CONN) {
-      console.warn("[storage] DATABASE_URL is not set \u2014 storage will fail until provided");
+    if (!CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(CONN)) {
+      const msg = !CONN ? "[storage] DATABASE_URL is not set. Set it in Vercel \u2192 Project \u2192 Settings \u2192 Environment Variables to the Neon pooled connection string (postgresql://user:password@host/dbname?sslmode=require)." : "[storage] DATABASE_URL is malformed. Expected postgresql://user:password@host/dbname?sslmode=require. Check for empty strings, extra quotes, or missing credentials in the Vercel env var.";
+      console.error(msg);
     }
-    sql = (0, import_serverless.neon)(CONN || "postgresql://localhost/placeholder");
+    sql = (0, import_serverless.neon)(CONN || "postgresql://user:pass@localhost/placeholder");
     db = (0, import_neon_http.drizzle)(sql);
     initPromise = null;
     DatabaseStorage = class {
