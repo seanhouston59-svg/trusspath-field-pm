@@ -16,3 +16,4 @@ data.db-wal
 
 # User uploads
 uploads/
+.vercel

@@ -19,8 +19,10 @@ function pid(req: any): number | undefined {
   return req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
 }
 
-const UPLOAD_DIR = path.resolve(process.cwd(), "uploads/documents");
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+const UPLOAD_DIR = process.env.VERCEL
+  ? "/tmp/uploads/documents"
+  : path.resolve(process.cwd(), "uploads/documents");
+try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch {}
 
 const ALLOWED_MIME = new Set([
   "application/pdf",
@@ -46,8 +48,10 @@ const upload = multer({
   },
 });
 
-const PHOTO_DIR = path.resolve(process.cwd(), "uploads/photos");
-fs.mkdirSync(PHOTO_DIR, { recursive: true });
+const PHOTO_DIR = process.env.VERCEL
+  ? "/tmp/uploads/photos"
+  : path.resolve(process.cwd(), "uploads/photos");
+try { fs.mkdirSync(PHOTO_DIR, { recursive: true }); } catch {}
 
 const IMAGE_MIME = new Set([
   "image/png",
@@ -72,8 +76,10 @@ const photoUpload = multer({
   },
 });
 
-const DRONE_DIR = path.resolve(process.cwd(), "uploads/drone");
-fs.mkdirSync(DRONE_DIR, { recursive: true });
+const DRONE_DIR = process.env.VERCEL
+  ? "/tmp/uploads/drone"
+  : path.resolve(process.cwd(), "uploads/drone");
+try { fs.mkdirSync(DRONE_DIR, { recursive: true }); } catch {}
 
 const droneUpload = multer({
   storage: multer.diskStorage({
