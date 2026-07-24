@@ -318,12 +318,20 @@ export interface IStorage {
 }
 
 // Ensure schema + seed are ready before any query. Idempotent + memoized.
+// On failure the cached promise is cleared so the next request retries — a
+// transient fetch error to Neon during cold-start init must not poison the
+// warm function instance forever.
 let initPromise: Promise<void> | null = null;
 export function ensureReady(): Promise<void> {
-  if (!initPromise) initPromise = (async () => {
-    await migrate();
-    await (storage as DatabaseStorage).seed();
-  })();
+  if (!initPromise) {
+    initPromise = (async () => {
+      await migrate();
+      await (storage as DatabaseStorage).seed();
+    })().catch((e) => {
+      initPromise = null;
+      throw e;
+    });
+  }
   return initPromise;
 }
 

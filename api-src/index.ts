@@ -7,8 +7,11 @@ app.use(express.urlencoded({ extended: false }));
 
 let initError: Error | null = null;
 let initPromise: Promise<void> | null = null;
+let initAttempts = 0;
 
 async function init() {
+  initError = null;
+  initAttempts += 1;
   try {
     // Ensure the Neon Postgres schema exists and demo data is seeded before
     // handling any request. Idempotent — safe on every cold start.
@@ -19,7 +22,7 @@ async function init() {
     await registerRoutes(httpServer, app);
   } catch (e: any) {
     initError = e;
-    console.error("[api/index] init failed:", e);
+    console.error(`[api/index] init failed (attempt ${initAttempts}):`, e);
   }
 }
 
@@ -27,11 +30,24 @@ initPromise = init();
 
 app.use(async (_req, _res, next) => {
   await initPromise;
+  // If the first boot failed (usually a transient fetch error to Neon on cold
+  // start), retry once before serving the request. This prevents a single
+  // network hiccup from poisoning the warm function instance.
+  if (initError && initAttempts < 3) {
+    initPromise = init();
+    await initPromise;
+  }
   next();
 });
 
 app.use((_req, res, next) => {
-  if (initError) return res.status(500).json({ ok: false, error: String(initError?.message || initError) });
+  if (initError) {
+    const raw = String(initError?.message || initError);
+    const friendly = /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(raw)
+      ? "Temporary connection issue reaching the database. Please try again in a moment."
+      : raw;
+    return res.status(503).json({ ok: false, error: friendly });
+  }
   next();
 });
 

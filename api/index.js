@@ -537,10 +537,15 @@ async function migrate() {
     phone = CASE WHEN phone IS NULL OR phone = '' THEN '(303) 555-' || substr('0000' || ((id * 137) % 9000 + 1000)::text, -4) ELSE phone END`;
 }
 function ensureReady() {
-  if (!initPromise) initPromise = (async () => {
-    await migrate();
-    await storage.seed();
-  })();
+  if (!initPromise) {
+    initPromise = (async () => {
+      await migrate();
+      await storage.seed();
+    })().catch((e) => {
+      initPromise = null;
+      throw e;
+    });
+  }
   return initPromise;
 }
 var import_neon_http, import_serverless, import_drizzle_orm, import_node_fs, import_node_path, import_node_crypto, CONN, sql, db, initPromise, DatabaseStorage, seedDone, storage;
@@ -2428,7 +2433,10 @@ app.use(import_express.default.json({ limit: "25mb" }));
 app.use(import_express.default.urlencoded({ extended: false }));
 var initError = null;
 var initPromise2 = null;
+var initAttempts = 0;
 async function init() {
+  initError = null;
+  initAttempts += 1;
   try {
     const { ensureReady: ensureReady2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
     await ensureReady2();
@@ -2437,16 +2445,24 @@ async function init() {
     await registerRoutes2(httpServer, app);
   } catch (e) {
     initError = e;
-    console.error("[api/index] init failed:", e);
+    console.error(`[api/index] init failed (attempt ${initAttempts}):`, e);
   }
 }
 initPromise2 = init();
 app.use(async (_req, _res, next) => {
   await initPromise2;
+  if (initError && initAttempts < 3) {
+    initPromise2 = init();
+    await initPromise2;
+  }
   next();
 });
 app.use((_req, res, next) => {
-  if (initError) return res.status(500).json({ ok: false, error: String(initError?.message || initError) });
+  if (initError) {
+    const raw = String(initError?.message || initError);
+    const friendly = /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(raw) ? "Temporary connection issue reaching the database. Please try again in a moment." : raw;
+    return res.status(503).json({ ok: false, error: friendly });
+  }
   next();
 });
 var index_default = app;
