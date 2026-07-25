@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
+import logoUrl from "@/../public/trusspath-logo.jpg";
 
 /* ----------------------------- Brand logo ----------------------------- */
 /* TrussPath app icon — 3D T-mark with truss crown. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <img src="/trusspath-logo.jpg" alt="TrussPath" className={cn("object-contain rounded-lg", className)} />
+    <img src={logoUrl} alt="TrussPath" className={cn("object-contain rounded-lg", className)} />
   );
 }
 
