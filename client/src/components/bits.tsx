@@ -1,25 +1,10 @@
 import { cn } from "@/lib/utils";
 
 /* ----------------------------- Brand logo ----------------------------- */
-/* TrussPath King Post truss mark — matches official brand identity.
-   Orange roof truss with king post, intermediate verticals, and
-   diagonal struts forming a W bracing pattern. */
+/* TrussPath logo — uses the official brand image asset. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      {/* Outer triangle — rafters + base */}
-      <path d="M32 12 L56 52 L8 52 Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
-      {/* King post — center vertical from peak to base */}
-      <line x1="32" y1="12" x2="32" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-      {/* Left intermediate vertical — 1/4 mark, base to rafter */}
-      <line x1="20" y1="52" x2="20" y2="33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-      {/* Right intermediate vertical — 3/4 mark, base to rafter */}
-      <line x1="44" y1="52" x2="44" y2="33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-      {/* Left diagonal strut — peak to 1/4 base */}
-      <line x1="32" y1="12" x2="20" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-      {/* Right diagonal strut — peak to 3/4 base */}
-      <line x1="32" y1="12" x2="44" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-    </svg>
+    <img src="/trusspath-logo.jpg" alt="TrussPath" className={cn("object-contain", className)} />
   );
 }
 

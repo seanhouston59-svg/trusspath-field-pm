@@ -371,8 +371,7 @@ export default function Landing() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <Logo className="h-7 w-7 text-[#e07412]" />
-            <div className="font-display text-base font-bold tracking-tight">TrussPath</div>
+            <Logo className="h-8 w-auto" />
           </div>
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
             <button onClick={() => scrollTo("features")} className="hover:text-foreground" data-testid="nav-features">Features</button>
@@ -793,8 +792,7 @@ export default function Landing() {
       <footer className="border-b border-border">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-4 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
-            <Logo className="h-5 w-5 text-[#e07412]" />
-            <span className="font-display text-sm font-bold text-foreground">TrussPath</span>
+            <Logo className="h-6 w-auto" />
             <span>© {new Date().getFullYear()}</span>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
