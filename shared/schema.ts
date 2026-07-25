@@ -322,6 +322,13 @@ export const accounts = pgTable("accounts", {
   role: text("role").notNull().default("member"),
   company: text("company"),
   createdAt: text("created_at").notNull(),
+  // Stripe billing
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: text("subscription_status"), // active, trialing, canceled, past_due, etc.
+  subscriptionPlan: text("subscription_plan"), // starter, pro, enterprise
+  subscriptionBilling: text("subscription_billing"), // monthly, annual
+  subscriptionCurrentPeriodEnd: text("subscription_current_period_end"),
 });
 
 export const sessions = pgTable("sessions", {

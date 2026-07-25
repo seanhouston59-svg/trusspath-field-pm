@@ -97,7 +97,6 @@ type SubscribeValues = z.infer<typeof subscribeSchema>;
 
 function SubscribeForm({ defaultPlan, billing }: { defaultPlan: Plan["key"]; billing: "monthly" | "annual" }) {
   const { toast } = useToast();
-  const [done, setDone] = useState(false);
   const form = useForm<SubscribeValues>({
     resolver: zodResolver(subscribeSchema),
     defaultValues: { email: "", company: "", plan: defaultPlan, billing },
@@ -106,28 +105,37 @@ function SubscribeForm({ defaultPlan, billing }: { defaultPlan: Plan["key"]; bil
   if (form.getValues("billing") !== billing) form.setValue("billing", billing);
   if (form.getValues("plan") !== defaultPlan) form.setValue("plan", defaultPlan);
 
-  const mut = useMutation({
-    mutationFn: async (v: SubscribeValues) => apiRequest("POST", "/api/subscribe", v),
-    onSuccess: () => {
-      setDone(true);
-      toast({ title: "You're on the list.", description: "We'll email your onboarding link shortly." });
-      form.reset({ email: "", company: "", plan: defaultPlan, billing });
+  const isEnterprise = form.watch("plan") === "enterprise";
+
+  const checkoutMut = useMutation({
+    mutationFn: async (v: SubscribeValues) => {
+      const res = await apiRequest("POST", "/api/billing/checkout", v);
+      return res.json() as Promise<{ url: string }>;
     },
-    onError: () => toast({ title: "Couldn't subscribe", description: "Please try again.", variant: "destructive" }),
+    onSuccess: (data) => {
+      window.location.href = data.url;
+    },
+    onError: (e: any) => {
+      const msg = e?.message || "Couldn't start checkout. Please try again.";
+      toast({ title: "Checkout failed", description: msg, variant: "destructive" });
+    },
   });
 
-  if (done) {
+  if (isEnterprise) {
     return (
-      <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 text-sm" data-testid="subscribe-success">
-        <div className="font-semibold text-primary">You're on the list.</div>
-        <p className="mt-1 text-muted-foreground">Check your inbox — we'll send onboarding steps for your team.</p>
-      </div>
+      <a
+        href="mailto:hello@trusspath.com?subject=Enterprise%20Demo%20Request"
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
+        data-testid="button-enterprise-contact"
+      >
+        Talk to sales <ArrowRight className="size-3.5" />
+      </a>
     );
   }
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit((v) => mut.mutate(v))} className="space-y-3" data-testid="form-subscribe">
+      <form onSubmit={form.handleSubmit((v) => checkoutMut.mutate(v))} className="space-y-3" data-testid="form-subscribe">
         <FormField control={form.control} name="email" render={({ field }) => (
           <FormItem>
             <FormLabel className="text-xs">Work email</FormLabel>
@@ -147,15 +155,15 @@ function SubscribeForm({ defaultPlan, billing }: { defaultPlan: Plan["key"]; bil
         )} />
         <Button
           type="submit"
-          disabled={mut.isPending}
+          disabled={checkoutMut.isPending}
           className="w-full"
           data-testid="button-subscribe-submit"
         >
-          {mut.isPending ? "Subscribing…" : "Subscribe"}
+          {checkoutMut.isPending ? "Redirecting to checkout…" : "Start subscription"}
           <ArrowRight className="ml-1 size-4" />
         </Button>
-        <p className="text-center text-[10px] text-muted-foreground">
-          14-day free trial · Cancel anytime · No card required
+        <p className="text-center text-[11px] text-muted-foreground">
+          Secure payment via Stripe. Cancel anytime.
         </p>
       </form>
     </Form>

@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Bot, Building2, Mic2, Stethoscope, TriangleAlert, RotateCcw, CheckCircle2, XCircle } from "lucide-react";
+import { Bot, Building2, Mic2, Stethoscope, TriangleAlert, RotateCcw, CheckCircle2, XCircle, CreditCard, ExternalLink } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useSettings, useUpdateSettings, useProjects, useHealthScan, useReseed, type HealthReport } from "@/hooks/use-data";
+import { useSettings, useUpdateSettings, useProjects, useHealthScan, useReseed, useBillingStatus, useManageBilling, type HealthReport } from "@/hooks/use-data";
 import type { AppSettings } from "@shared/schema";
 import { useAccess } from "@/lib/access";
 import { useToast } from "@/hooks/use-toast";
@@ -238,6 +238,65 @@ export default function SettingsPage() {
           )}
         </Card>
       </div>
+      <div className="mt-4">
+        <Card icon={CreditCard} title="Billing & Subscription" desc="Manage your subscription, payment method, and invoices via Stripe.">
+          <BillingSection />
+        </Card>
+      </div>
     </Layout>
+  );
+}
+
+function BillingSection() {
+  const { data: billing, isLoading } = useBillingStatus();
+  const manageMut = useManageBilling();
+  const { toast } = useToast();
+
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading billing info…</p>;
+
+  const statusColor = billing?.status === "active" ? "text-emerald-600" : billing?.status === "past_due" ? "text-red-500" : "text-muted-foreground";
+  const statusLabel = billing?.status ? billing.status.charAt(0).toUpperCase() + billing.status.slice(1) : "No subscription";
+
+  return (
+    <div className="space-y-3" data-testid="billing-section">
+      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+        <div>
+          <div className="text-xs text-muted-foreground">Plan</div>
+          <div className="font-display text-sm font-bold capitalize">{billing?.plan || "Free"}</div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">Status</div>
+          <div className={cn("text-sm font-semibold", statusColor)} data-testid="text-billing-status">{statusLabel}</div>
+        </div>
+        {billing?.currentPeriodEnd && (
+          <div>
+            <div className="text-xs text-muted-foreground">Renews</div>
+            <div className="text-sm font-medium">{new Date(billing.currentPeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+          </div>
+        )}
+        {billing?.billing && (
+          <div>
+            <div className="text-xs text-muted-foreground">Billing</div>
+            <div className="text-sm font-medium capitalize">{billing.billing}</div>
+          </div>
+        )}
+      </div>
+      {billing?.hasCustomer ? (
+        <Button
+          variant="outline"
+          onClick={() => manageMut.mutate(undefined, {
+            onError: (e: any) => toast({ title: "Failed to open billing portal", description: e?.message, variant: "destructive" }),
+          })}
+          disabled={manageMut.isPending}
+          data-testid="button-manage-billing"
+        >
+          <ExternalLink className="size-4" /> {manageMut.isPending ? "Opening…" : "Manage Billing"}
+        </Button>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          No billing account yet. Subscribe from the <a href="/#pricing" className="font-semibold text-primary hover:underline">pricing page</a> to get started.
+        </p>
+      )}
+    </div>
   );
 }

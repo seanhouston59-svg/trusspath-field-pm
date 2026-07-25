@@ -237,6 +237,12 @@ async function migrate() {
     created_at TEXT NOT NULL
   )`;
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS position TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_status TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_plan TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_billing TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_current_period_end TEXT`;
   await sql`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     account_id INTEGER NOT NULL,
@@ -369,6 +375,15 @@ export interface IStorage {
   getAccountByEmail(email: string): Promise<Account | undefined>;
   getAccount(id: number): Promise<AccountPublic | undefined>;
   updateAccountProfile(id: number, data: { displayName?: string; position?: string }): Promise<AccountPublic | undefined>;
+  updateAccountBilling(id: number, data: {
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    subscriptionStatus?: string;
+    subscriptionPlan?: string;
+    subscriptionBilling?: string;
+    subscriptionCurrentPeriodEnd?: string;
+  }): Promise<AccountPublic | undefined>;
+  getAccountByStripeCustomerId(customerId: string): Promise<Account | undefined>;
   verifyPassword(email: string, password: string): Promise<AccountPublic | null>;
   createSession(accountId: number): Session;
   getSession(token: string): Promise<{ session: Session; account: AccountPublic } | null>;
@@ -1001,6 +1016,31 @@ class DatabaseStorage implements IStorage {
     if (Object.keys(updateData).length === 0) return this.getAccount(id);
     const [row] = await db.update(accounts).set(updateData).where(eq(accounts.id, id)).returning();
     return row ? this.toPublic(row) : undefined;
+  }
+  async updateAccountBilling(id: number, data: {
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    subscriptionStatus?: string;
+    subscriptionPlan?: string;
+    subscriptionBilling?: string;
+    subscriptionCurrentPeriodEnd?: string;
+  }): Promise<AccountPublic | undefined> {
+    await ensureReady();
+    const updateData: Record<string, unknown> = {};
+    if (data.stripeCustomerId !== undefined) updateData.stripeCustomerId = data.stripeCustomerId;
+    if (data.stripeSubscriptionId !== undefined) updateData.stripeSubscriptionId = data.stripeSubscriptionId;
+    if (data.subscriptionStatus !== undefined) updateData.subscriptionStatus = data.subscriptionStatus;
+    if (data.subscriptionPlan !== undefined) updateData.subscriptionPlan = data.subscriptionPlan;
+    if (data.subscriptionBilling !== undefined) updateData.subscriptionBilling = data.subscriptionBilling;
+    if (data.subscriptionCurrentPeriodEnd !== undefined) updateData.subscriptionCurrentPeriodEnd = data.subscriptionCurrentPeriodEnd;
+    if (Object.keys(updateData).length === 0) return this.getAccount(id);
+    const [row] = await db.update(accounts).set(updateData).where(eq(accounts.id, id)).returning();
+    return row ? this.toPublic(row) : undefined;
+  }
+  async getAccountByStripeCustomerId(customerId: string): Promise<Account | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(accounts).where(eq(accounts.stripeCustomerId, customerId));
+    return rows[0];
   }
   async verifyPassword(email: string, password: string): Promise<AccountPublic | null> {
     const acc = await this.getAccountByEmail(email);

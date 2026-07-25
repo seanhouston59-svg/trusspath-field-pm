@@ -631,6 +631,22 @@ export function useEmptyDeletedItems() {
   });
 }
 
+/* ----------------------- Billing ----------------------- */
+export function useBillingStatus() {
+  return useQuery<{ plan: string | null; status: string | null; billing: string | null; currentPeriodEnd: string | null; hasCustomer: boolean }>({
+    queryKey: ["/api/billing/status"],
+  });
+}
+export function useManageBilling() {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/billing/portal");
+      return res.json() as Promise<{ url: string }>;
+    },
+    onSuccess: (data) => { window.location.href = data.url; },
+  });
+}
+
 /* ----------------------- Settings ----------------------- */
 export function useSettings() {
   return useQuery<AppSettings>({

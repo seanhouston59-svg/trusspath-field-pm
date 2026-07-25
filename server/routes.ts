@@ -65,6 +65,8 @@ const PUBLIC_API = new Set<string>([
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/me",
+  "/api/stripe/webhook",
+  "/api/billing/checkout",
   // marketing / landing page endpoints — safe to leave public
   "/api/subscribe",
   "/api/demo-request",
@@ -792,6 +794,171 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     // For now, all integrations return success on test.
     // Real provider-specific tests would check API credentials here.
     res.json({ ok: true, message: "Connection verified" });
+  });
+
+  // ============================ STRIPE BILLING ============================
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const stripe = stripeKey ? new (require("stripe")(stripeKey)) : null;
+
+  const PRICE_MAP: Record<string, { monthly?: string; annual?: string }> = {
+    starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },
+    pro: { monthly: process.env.STRIPE_PRICE_PRO_MONTHLY, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
+    enterprise: { monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY, annual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL },
+  };
+
+  const APP_URL = process.env.VITE_API_BASE || "https://trusspath-field-pm.vercel.app";
+
+  // Stripe webhook — must come BEFORE auth middleware (raw body, no session)
+  app.post("/api/stripe/webhook", async (req, res) => {
+    if (!stripe || !webhookSecret) return res.status(503).json({ error: "Stripe not configured" });
+    const sig = req.headers["stripe-signature"] as string;
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent((req as any).rawBody, sig, webhookSecret);
+    } catch (e: any) {
+      return res.status(400).send(`Webhook Error: ${e.message}`);
+    }
+    try {
+      switch (event.type) {
+        case "checkout.session.completed": {
+          const session = event.data.object;
+          const customerId = session.customer as string;
+          const subscriptionId = session.subscription as string;
+          if (customerId) {
+            const account = await storage.getAccountByStripeCustomerId(customerId);
+            if (account) {
+              await storage.updateAccountBilling(account.id, {
+                stripeCustomerId: customerId,
+                stripeSubscriptionId: subscriptionId,
+                subscriptionStatus: "active",
+              });
+            }
+          }
+          break;
+        }
+        case "customer.subscription.updated":
+        case "customer.subscription.created": {
+          const sub = event.data.object;
+          const customerId = sub.customer as string;
+          const account = await storage.getAccountByStripeCustomerId(customerId);
+          if (account) {
+            const planKey = sub.items?.data?.[0]?.price?.lookup_key || "";
+            const planMatch = planKey.match(/^(starter|pro|enterprise)/);
+            await storage.updateAccountBilling(account.id, {
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: sub.id,
+              subscriptionStatus: sub.status,
+              subscriptionCurrentPeriodEnd: sub.current_period_end
+                ? new Date(sub.current_period_end * 1000).toISOString()
+                : undefined,
+              subscriptionPlan: planMatch ? planMatch[1] : undefined,
+            });
+          }
+          break;
+        }
+        case "customer.subscription.deleted": {
+          const sub = event.data.object;
+          const customerId = sub.customer as string;
+          const account = await storage.getAccountByStripeCustomerId(customerId);
+          if (account) {
+            await storage.updateAccountBilling(account.id, {
+              subscriptionStatus: "canceled",
+              stripeSubscriptionId: null as any,
+            });
+          }
+          break;
+        }
+        case "invoice.payment_failed": {
+          const invoice = event.data.object;
+          const customerId = invoice.customer as string;
+          const account = await storage.getAccountByStripeCustomerId(customerId);
+          if (account) {
+            await storage.updateAccountBilling(account.id, { subscriptionStatus: "past_due" });
+          }
+          break;
+        }
+      }
+      res.json({ received: true });
+    } catch (e: any) {
+      console.error("[stripe webhook] error:", e);
+      res.status(500).json({ error: "Webhook handler failed" });
+    }
+  });
+
+  // Create checkout session
+  app.post("/api/billing/checkout", async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: "Billing is not configured yet. Please try again later or contact support." });
+    const { plan, billing, email, company } = req.body;
+    if (!plan || !billing || !email) return res.status(400).json({ error: "Missing plan, billing, or email" });
+    const priceId = (PRICE_MAP as any)[plan]?.[billing];
+    if (!priceId) return res.status(400).json({ error: `No price configured for ${plan} (${billing}). Set STRRIPE_PRICE_* env vars.` });
+
+    try {
+      // Check if user already has an account
+      const existingAccount = await storage.getAccountByEmail(email);
+      let customerId = existingAccount?.stripeCustomerId || undefined;
+
+      // Create or reuse customer
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email,
+          metadata: { plan, billing, company: company || "" },
+        });
+        customerId = customer.id;
+        // Link customer to account if one exists
+        if (existingAccount) {
+          await storage.updateAccountBilling(existingAccount.id, { stripeCustomerId: customerId });
+        }
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: "subscription",
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${APP_URL}/#/signup?checkout=success`,
+        cancel_url: `${APP_URL}/?checkout=cancelled`,
+        metadata: { plan, billing, email },
+        subscription_data: { metadata: { plan, billing } },
+      });
+
+      res.json({ url: session.url });
+    } catch (e: any) {
+      console.error("[stripe checkout] error:", e);
+      res.status(500).json({ error: e?.message || "Failed to create checkout session" });
+    }
+  });
+
+  // Customer portal — manage subscription (cancel, update payment, swap plan)
+  app.post("/api/billing/portal", async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: "Billing is not configured" });
+    const account = (req as any).account;
+    if (!account) return res.status(401).json({ error: "Not authenticated" });
+    if (!account.stripeCustomerId) return res.status(400).json({ error: "No billing account found" });
+
+    try {
+      const session = await stripe.billingPortal.sessions.create({
+        customer: account.stripeCustomerId,
+        return_url: `${APP_URL}/#/settings`,
+      });
+      res.json({ url: session.url });
+    } catch (e: any) {
+      console.error("[stripe portal] error:", e);
+      res.status(500).json({ error: e?.message || "Failed to create portal session" });
+    }
+  });
+
+  // Billing status for logged-in user
+  app.get("/api/billing/status", async (req, res) => {
+    const account = (req as any).account;
+    if (!account) return res.status(401).json({ error: "Not authenticated" });
+    res.json({
+      plan: account.subscriptionPlan || null,
+      status: account.subscriptionStatus || null,
+      billing: account.subscriptionBilling || null,
+      currentPeriodEnd: account.subscriptionCurrentPeriodEnd || null,
+      hasCustomer: !!account.stripeCustomerId,
+    });
   });
 
   // DELETED ITEMS BIN
