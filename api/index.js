@@ -1809,6 +1809,12 @@ Address the user as "${term}". Never use filler words. Prefer crisp short bullet
 You have live read-only access to the project's data (tasks, RFIs, submittals, change orders, action items, team). Use it to give accurate, actionable answers.
 You cannot write data yourself. When the user asks to create or change something, tell them exactly what to do and which tab to use, and offer to draft the wording.
 You can run an APP HEALTH SCAN to find broken links or non-working modules. When the user asks about broken links, app health, what's broken, or what doesn't work, use the supplied scan results to answer concretely.
+You are also a knowledgeable general assistant. Answer everyday questions helpfully:
+\u2022 Weather \u2014 give practical advice on checking conditions, heat stress, lightning safety, wind limits for cranes. If you don't have live data, say so and suggest resources (weather.gov, OSHA-NIOSH Heat Safety app).
+\u2022 Lunch/restaurants \u2014 suggest checking Google Maps or Yelp near the site, mention food trucks and meal prep tips. Be practical.
+\u2022 Construction safety \u2014 provide thorough OSHA-compliant guidance on PPE, fall protection, excavation, electrical safety, heat stress, toolbox talks, etc.
+\u2022 General knowledge \u2014 answer questions on any topic with your training knowledge. Be helpful, concise, and accurate.
+When you don't know something, say so honestly rather than guessing.
 ${length}`;
 }
 function today() {
@@ -1991,6 +1997,22 @@ ${coLine}` };
   if (greeting) return { reply: greeting };
   const qa = matchPatterns(lastUser, CONSTRUCTION_QA);
   if (qa) return { reply: qa };
+  if (/\b(what is|what's|tell me about|explain|how do|how does|what are)\b/i.test(lower)) {
+    if (/\b(safety|osha|safe)\b/i.test(lower)) {
+      return { reply: "Construction safety covers many areas, sir. Ask me specifically about:\n\u2022 PPE (personal protective equipment)\n\u2022 Fall protection\n\u2022 Excavation and trenching safety\n\u2022 Electrical safety (lockout/tagout)\n\u2022 Heat stress prevention\n\u2022 Toolbox talks\n\u2022 General site safety protocols" };
+    }
+    if (/\b(weather|rain|snow|wind|storm|temperature)\b/i.test(lower)) {
+      return { reply: "I can't pull live weather data yet, sir, but for site planning I'd recommend:\n\u2022 weather.gov for forecasts and severe weather alerts\n\u2022 OSHA-NIOSH Heat Safety Tool app for heat index\n\u2022 Lightning 30/30 rule: if thunder follows lightning by less than 30 seconds, seek shelter; wait 30 min after last thunder\n\u2022 Crane ops: stop at 20+ mph sustained wind (check manufacturer specs)\n\nConnect a weather API and I can give live conditions directly." };
+    }
+    if (/\b(lunch|food|eat|restaurant|hungry|dinner|breakfast|coffee)\b/i.test(lower)) {
+      return { reply: "I can't browse restaurants yet, sir, but for site lunch planning:\n\u2022 Check Google Maps or Yelp for spots within 10-15 min of your site\n\u2022 Look for quick service \u2014 delis, food trucks, fast-casual\n\u2022 Consider arranging a food truck on-site\n\u2022 Meal prep with a cooler saves time and money\n\u2022 Stay hydrated, especially in summer" };
+    }
+    return { reply: `That's a good question, sir. In the local mode I have detailed knowledge of construction topics (RFIs, change orders, submittals, safety protocols, PPE, OSHA standards, fall protection, heat stress) and your project data. 
+
+For questions outside construction, I have general knowledge built in \u2014 feel free to ask about weather, lunch spots, safety, or anything else. If I'm connected to the full LLM, I can answer virtually any question.
+
+Could you rephrase or be more specific about what you'd like to know?` };
+  }
   if (/\b(where|how|which tab|navigate|find|go to)\b/i.test(lower)) {
     const navMap = [
       { keywords: ["task", "to do", "todo", "work item"], answer: "Tasks are under the Tasks tab. Click 'New Task' to create one, or switch between list and board views." },
@@ -2009,13 +2031,15 @@ ${coLine}` };
     if (nav) return { reply: nav };
   }
   return {
-    reply: `I can help with construction questions and your project data, sir. Try asking:
-\u2022 "What is an RFI?"
-\u2022 "What's overdue?"
-\u2022 "Give me a status update"
-\u2022 "How many tasks are open?"
-\u2022 "What can you do?"
-\u2022 "Is anything broken?"`
+    reply: `I'm not sure I caught that, sir. Here's what I can help with:
+
+\u2022 Construction questions \u2014 RFIs, change orders, safety protocols, PPE, OSHA standards
+\u2022 General questions \u2014 weather guidance, lunch spots, time/date, jokes
+\u2022 Project data \u2014 "What's overdue?", "Give me a briefing", "How many tasks are open?"
+\u2022 Navigation \u2014 "Where do I create a task?", "How do I find the Gantt chart?"
+\u2022 App health \u2014 "Is anything broken?"
+
+What would you like to know?`
   };
 }
 var CONSTRUCTION_QA, GREETING_PATTERNS;
@@ -2082,8 +2106,44 @@ var init_jarvis_local = __esm({
         answer: "O&M (Operations & Maintenance) Manuals are documentation provided to the owner at project closeout, containing operating instructions, maintenance schedules, warranties, and equipment info for all installed systems. They're essential for long-term facility management."
       },
       {
-        keywords: ["what is", "what's", "explain", "define", "how do", "how does"],
-        answer: "I can explain construction terms and concepts. Try asking about: RFIs, change orders, submittals, punch lists, daily logs, milestones, Gantt charts, CPM, substantial completion, retainage, lien waivers, or O&M manuals. I also have live access to your project data \u2014 ask 'What's overdue?' or 'Give me a status update.'"
+        keywords: ["construction safety", "safety protocols", "site safety", "safety on site", "safety procedures", "safety rules", "osha"],
+        answer: "Here are the core construction site safety protocols, sir:\n\nPERSONAL PROTECTIVE EQUIPMENT (PPE):\n\u2022 Hard hats at all times in active work zones\n\u2022 Safety glasses for cutting, grinding, or drilling\n\u2022 Steel-toe boots\n\u2022 High-visibility vests near equipment and traffic\n\u2022 Gloves and hearing protection as needed\n\nFALL PROTECTION:\n\u2022 Guardrails, safety nets, or personal fall arrest systems at heights over 6 feet (construction standard)\n\u2022 Secure ladders \u2014 3 points of contact, extend 3 feet above landing\n\u2022 Cover and mark all floor openings\n\nEXCAVATION & TRENCHING:\n\u2022 Trenches over 5 feet need sloping, shoring, or shielding\n\u2022 Daily inspection by a competent person\n\u2022 Keep spoil piles at least 2 feet from edge\n\nELECTRICAL:\n\u2022 Lockout/tagout (LOTO) before servicing equipment\n\u2022 GFCI protection on all temporary power\n\u2022 Maintain minimum clearances from power lines\n\nGENERAL:\n\u2022 Daily safety briefings / toolbox talks\n\u2022 Keep walkways clear of debris\n\u2022 Fire extinguishers within 100 feet travel distance\n\u2022 Report all incidents and near-misses immediately\n\nWould you like detail on any specific area?"
+      },
+      {
+        keywords: ["fall protection", "harness", "fall arrest"],
+        answer: "Fall protection is required at heights of 6 feet or more in construction (OSHA 1926.501). Options include:\n\u2022 Guardrail systems \u2014 top rail at 42 inches +/- 3 inches\n\u2022 Safety net systems \u2014 installed as close under the work surface as practical\n\u2022 Personal fall arrest systems (PFAS) \u2014 full-body harness, lanyard, and anchor point rated for 5,000 lbs\n\u2022 Positioning device systems \u2014 for work on vertical surfaces\n\u2022 Warning line + safety monitoring for low-slope roofs\n\nAnchors must support 5,000 lbs per worker. Inspect harnesses before each use. D-ring placement: center back. Never tie a knot in a lanyard."
+      },
+      {
+        keywords: ["toolbox talk", "safety meeting", "safety briefing", "pre-job briefing"],
+        answer: "A Toolbox Talk is a short (5-15 minute) safety meeting held before work begins, typically covering:\n\u2022 The day's specific hazards and tasks\n\u2022 Required PPE for the day's work\n\u2022 Emergency procedures and evacuation routes\n\u2022 Equipment inspections needed\n\u2022 Weather conditions and heat/cold stress\n\u2022 Recent incidents or near-misses as learning moments\n\nBest practice: hold them daily, document attendance, and rotate topics. Keep them interactive \u2014 ask the crew what hazards they see."
+      },
+      {
+        keywords: ["heat stress", "heat exhaustion", "heat stroke", "hot weather safety"],
+        answer: "Heat illness prevention on construction sites:\n\nPREVENTION:\n\u2022 Provide shade and cool drinking water (1 quart/hour minimum)\n\u2022 Schedule heavy work for cooler hours\n\u2022 Acclimatize new workers \u2014 20% exposure day 1, increasing over 7-14 days\n\u2022 Take frequent breaks in shade\n\u2022 Monitor weather and heat index\n\nSIGNS OF HEAT EXHAUSTION: heavy sweating, weakness, dizziness, nausea, headache. Get to shade, drink water, cool down.\n\nSIGNS OF HEAT STROKE (emergency): confusion, loss of consciousness, hot dry skin (may still sweat), body temp above 103\xB0F. Call 911 immediately.\n\nOSHA doesn't have a specific heat standard yet, but the General Duty Clause applies. Some states (CA, WA, MN) have explicit heat illness prevention rules."
+      },
+      {
+        keywords: ["ppe", "personal protective equipment", "safety gear"],
+        answer: "Required PPE on construction sites (OSHA 1926):\n\u2022 Head protection (hard hats) \u2014 ANSI Z89.1\n\u2022 Eye and face protection \u2014 ANSI Z87.1\n\u2022 Foot protection (steel-toe boots) \u2014 ASTM F2413\n\u2022 Hand protection (gloves appropriate to task)\n\u2022 Hearing protection \u2014 needed at 85 dB+ exposure (8-hour TWA)\n\u2022 Respiratory protection \u2014 when airborne hazards exceed PELs\n\u2022 High-visibility apparel \u2014 ANSI/ISEA 107\n\nThe employer must provide PPE at no cost to employees (with limited exceptions). Workers must be trained on proper use, maintenance, and limitations."
+      },
+      {
+        keywords: ["weather"],
+        answer: "I can't pull live weather data yet, sir, but here's what I'd recommend for checking conditions on site:\n\n\u2022 OSHA-NIOSH Heat Safety Tool app \u2014 real-time heat index and precautions\n\u2022 NOAA Weather Radio or weather.gov for forecasts and severe weather alerts\n\u2022 Wind speed monitoring \u2014 crane operations must stop at 20+ mph sustained (manufacturer specs may be lower)\n\u2022 Lightning \u2014 the 30/30 rule: if thunder follows lightning by less than 30 seconds, seek shelter; wait 30 minutes after last thunder before resuming\n\nIf you connect a weather API, I can give you live conditions and alerts directly. Would you like me to note that as a feature request?"
+      },
+      {
+        keywords: ["lunch", "food", "eat", "restaurant", "lunch spots", "where to eat", "hungry"],
+        answer: "I can't browse nearby restaurants yet, sir, but here are some tips for site lunch planning:\n\n\u2022 Check Google Maps or Yelp for spots within 10-15 minutes of your site address\n\u2022 Look for places with quick service \u2014 delis, food trucks, fast-casual\n\u2022 Many job sites arrange a catering truck or food truck on-site for lunch\n\u2022 Consider meal prep \u2014 a cooler with sandwiches saves time and money\n\u2022 Stay hydrated \u2014 keep water and electrolyte drinks on hand, especially in summer\n\nIf you give me your project's address, I can note it so a future update could suggest nearby options. Would that be helpful?"
+      },
+      {
+        keywords: ["joke", "funny", "tell me something"],
+        answer: "Why did the construction worker bring a pencil to the job site?\n\nTo draw up plans, of course.\n\nIn all seriousness, sir \u2014 what can I help you with?"
+      },
+      {
+        keywords: ["time", "what time", "date", "what day", "today's date"],
+        answer: `It's currently ${(/* @__PURE__ */ new Date()).toLocaleString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" })}, sir.`
+      },
+      {
+        keywords: ["who made you", "who created you", "who built you"],
+        answer: "I'm JARVIS, built into TrussPath to assist with project management and general questions. Think of me as your digital site steward \u2014 always on duty."
       }
     ];
     GREETING_PATTERNS = [
@@ -2091,7 +2151,7 @@ var init_jarvis_local = __esm({
       { keywords: ["how are you", "how's it going", "you good"], answer: "All systems operational, sir. Ready to assist with project management tasks." },
       { keywords: ["thank you", "thanks", "cheers"], answer: "You're most welcome, sir." },
       { keywords: ["who are you", "what are you", "your name"], answer: "I'm JARVIS, your AI site assistant for TrussPath. I can answer construction questions, give project status updates, and help you navigate the platform." },
-      { keywords: ["what can you do", "help", "capabilities", "features"], answer: "I can help with:\n\u2022 Answering construction questions (RFIs, change orders, submittals, etc.)\n\u2022 Project status \u2014 ask 'What's overdue?' or 'Give me a briefing'\n\u2022 Guidance on which tab to use for tasks\n\u2022 App health checks \u2014 ask 'Is anything broken?'\n\nWhat would you like to know?" }
+      { keywords: ["what can you do", "help", "capabilities", "features"], answer: "I can help with:\n\u2022 Construction questions (RFIs, change orders, submittals, safety protocols, PPE, fall protection, OSHA standards)\n\u2022 General questions \u2014 weather guidance, lunch spots near your site, jokes, time/date\n\u2022 Project status \u2014 ask 'What's overdue?' or 'Give me a briefing'\n\u2022 Guidance on which tab to use for tasks\n\u2022 App health checks \u2014 ask 'Is anything broken?'\n\nWhat would you like to know?" }
     ];
   }
 });
