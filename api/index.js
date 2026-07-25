@@ -2271,11 +2271,12 @@ async function jarvisChat(projectId, history) {
 
 --- APP HEALTH SCAN (live) ---
 ${formatScan(await runHealthScan())}` : "";
+  const safetyBriefIntent = SAFETY_BRIEF_INTENT.test(lowerUser);
   let liveApiBlock = "";
   const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
   const address = project?.address;
   if (address) {
-    if (/\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lowerUser)) {
+    if (safetyBriefIntent || /\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lowerUser)) {
       const { getWeather: getWeather2 } = await Promise.resolve().then(() => (init_apis(), apis_exports));
       const weather = await getWeather2(address);
       if (weather) liveApiBlock += `
@@ -2294,9 +2295,21 @@ ${places}`;
       }
     }
   }
+  const safetyBriefBlock = safetyBriefIntent ? `
+
+The user is asking for a TEAM SAFETY BRIEF. Generate a comprehensive safety briefing suitable for a superintendent to read aloud to the crew at the start of the day. Include:
+1. Date and project name
+2. Current weather conditions (use the live weather data if available) and weather-related safety warnings
+3. Seasonal hazards relevant to the current time of year
+4. Two rotating safety topics from this list: fall protection, PPE, trenching/excavation, electrical safety/lockout-tagout, material handling/crane ops, housekeeping/trip hazards, hand/power tools, hot work/fire prevention
+5. Any project-specific safety concerns (overdue work, due-today items that could create pressure to rush)
+6. A strong closing reminder about everyone going home safe
+
+Keep it conversational \u2014 like a real superintendent talking, not a textbook. Write numbers out naturally. Use contractions.
+` : "";
   const resp = await client.responses.create({
     model: MODEL,
-    instructions: `${persona}
+    instructions: `${persona}${safetyBriefBlock}
 
 --- LIVE PROJECT DATA ---
 ${compact}${scanBlock}${liveApiBlock}`,
@@ -2321,7 +2334,7 @@ ${context.compact}`
   });
   return { brief: resp.output_text ?? "", context };
 }
-var import_openai, MODEL, HEALTH_INTENT;
+var import_openai, MODEL, HEALTH_INTENT, SAFETY_BRIEF_INTENT;
 var init_jarvis = __esm({
   "server/jarvis.ts"() {
     "use strict";
@@ -2330,6 +2343,7 @@ var init_jarvis = __esm({
     init_health();
     MODEL = "gpt_5_1";
     HEALTH_INTENT = /\b(broken|health|scan|not work|doesn'?t work|don'?t work|broken link|issues? in the app|what'?s broken|integrity)\b/i;
+    SAFETY_BRIEF_INTENT = /\b(safety brief|safety briefing|toolbox talk|safety meeting|team safety|give me a safety|generate a safety|safety stand)\b/i;
   }
 });
 
@@ -2366,6 +2380,124 @@ Overdue:
 ${overdue2}
 
 One thing to stay on top of \u2014 check the Schedule tab for any milestones coming up, and make sure everyone on the team has their tasks assigned.`;
+}
+function seasonalHazards() {
+  const month = (/* @__PURE__ */ new Date()).getMonth();
+  const hazards = [];
+  if (month >= 5 && month <= 7) {
+    hazards.push(
+      "Heat stress is the top concern right now. Provide shade and at least a quart of cool water per person per hour. Schedule heavy work for early morning. Watch for signs of heat exhaustion \u2014 heavy sweating, dizziness, nausea. If someone stops sweating or gets confused, that's heat stroke \u2014 call nine-one-one immediately."
+    );
+    hazards.push(
+      "Afternoon thunderstorms are common this time of year, especially in Colorado. Keep an eye on the sky. If you hear thunder within thirty seconds of lightning, get everyone to shelter and wait thirty minutes after the last thunder before going back out."
+    );
+  } else if (month >= 8 && month <= 10) {
+    hazards.push(
+      "Mornings are getting cold and frosty. Watch for slippery surfaces, especially scaffolding, ladders, and metal decking. Give surfaces time to dry or de-ice before starting work."
+    );
+    hazards.push(
+      "Shorter days mean less daylight. Make sure all work areas have adequate temporary lighting, and plan to wrap up exterior work before dusk. High-visibility vests are a must for everyone on site."
+    );
+  } else if (month === 11 || month <= 1) {
+    hazards.push(
+      "Winter conditions \u2014 ice and snow accumulation on scaffolds, ladders, roofs, and walkways. Clear snow and ice before work begins. Salt or sand walkways. No one works on an icy roof, period."
+    );
+    hazards.push(
+      "Cold stress is real. Dress in layers, take warm-up breaks, and watch for frostbite and hypothermia. Fingers, toes, ears, and nose go first. If someone gets sluggish or confused in the cold, get them warm and inside immediately."
+    );
+  } else {
+    hazards.push(
+      "Spring weather is unpredictable \u2014 watch for sudden rain, wind, and temperature swings. Rain makes surfaces slippery and can destabilize trenches. Inspect excavations after any rain before sending anyone in."
+    );
+    hazards.push(
+      "Mud and soft ground conditions \u2014 make sure equipment has stable footing and access roads are maintained. Watch for rutting that could cause equipment to tip."
+    );
+  }
+  return hazards;
+}
+async function buildSafetyBrief(projectId) {
+  const ctx = await buildContext(projectId);
+  const lines = ctx.compact.split("\n");
+  const projectLine = lines[0] ?? "No active project found.";
+  const todayLine = lines[1] ?? "";
+  const dateStr = (/* @__PURE__ */ new Date()).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  const address = project?.address;
+  let weatherBlock = "";
+  if (address) {
+    try {
+      const weather = await getWeather(address);
+      if (weather) {
+        weatherBlock = weather;
+      }
+    } catch {
+    }
+  }
+  const dayOfYear = Math.floor((Date.now() - new Date((/* @__PURE__ */ new Date()).getFullYear(), 0, 0).getTime()) / 864e5);
+  const topic1 = DAILY_SAFETY_TOPICS[dayOfYear % DAILY_SAFETY_TOPICS.length];
+  const topic2 = DAILY_SAFETY_TOPICS[(dayOfYear + 3) % DAILY_SAFETY_TOPICS.length];
+  const seasonal = seasonalHazards();
+  const overdueLines = lines.filter((l) => l.includes("OVERDUE"));
+  const dueTodayLines = lines.filter((l) => l.includes("DUE TODAY"));
+  let brief = `TEAM SAFETY BRIEF \u2014 ${dateStr}
+`;
+  brief += `${projectLine}
+`;
+  brief += `${todayLine}
+
+`;
+  if (weatherBlock) {
+    brief += `WEATHER CONDITIONS
+`;
+    brief += `${weatherBlock}
+
+`;
+  } else {
+    brief += `WEATHER CONDITIONS
+`;
+    brief += `Check local conditions before starting. weather.gov and the OSHA-NIOSH Heat Safety app are your best bet for real-time info.
+
+`;
+  }
+  brief += `SEASONAL HAZARDS
+`;
+  for (const h of seasonal) {
+    brief += `- ${h}
+`;
+  }
+  brief += `
+`;
+  brief += `TODAY'S SAFETY TOPICS
+`;
+  brief += `${topic1.title}
+${topic1.body}
+
+`;
+  brief += `${topic2.title}
+${topic2.body}
+
+`;
+  if (overdueLines.length || dueTodayLines.length) {
+    brief += `PROJECT-SPECIFIC ITEMS
+`;
+    if (overdueLines.length) {
+      brief += `- You've got overdue work across ${overdueLines.length} ${overdueLines.length === 1 ? "category" : "categories"}. Rushed work leads to mistakes and injuries. Make sure the crew has the time and resources to do it right.
+`;
+    }
+    if (dueTodayLines.length) {
+      brief += `- Items due today \u2014 confirm the right people are assigned and have what they need. Don't let deadlines push safety shortcuts.
+`;
+    }
+    brief += `
+`;
+  }
+  brief += `REMEMBER
+`;
+  brief += `Everyone goes home the way they came in. If you see something unsafe, stop work and fix it. No deadline is worth a injury. Speak up \u2014 your crew is counting on you.
+
+`;
+  brief += `Questions? Ask your superintendent or site safety officer. Stay sharp out there.`;
+  return brief;
 }
 async function localJarvisChat(projectId, history) {
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
@@ -2469,6 +2601,14 @@ If you've got a weather tip specific to your area, just say "remember that..." a
       return { reply: "I tried running a health scan but ran into an error. It might not be available in this environment." };
     }
   }
+  if (/\b(safety brief|safety briefing|toolbox talk|safety meeting|team safety|give me a safety|generate a safety|safety stand)\b/i.test(lower)) {
+    try {
+      const brief = await buildSafetyBrief(projectId);
+      return { reply: brief };
+    } catch {
+      return { reply: "I tried generating a safety brief but ran into an issue. Make sure you have a project selected with an address set, and I'll pull live weather data into it too." };
+    }
+  }
   if (/\b(brief|briefing|status|update|summary|overview|morning|standup|what'?s happening|what'?s the status|overdue|what.?s due)\b/i.test(lower)) {
     const ctx = await buildContext(projectId);
     return { reply: buildLocalBrief(ctx) };
@@ -2562,7 +2702,7 @@ What would you like to know?`
 And if there's something I don't know, just tell me the answer and I'll remember it for next time. What would you like to know?`
   };
 }
-var CONSTRUCTION_QA, GREETING_PATTERNS;
+var CONSTRUCTION_QA, GREETING_PATTERNS, DAILY_SAFETY_TOPICS;
 var init_jarvis_local = __esm({
   "server/jarvis-local.ts"() {
     "use strict";
@@ -2691,6 +2831,40 @@ If you know some good spots near your site, just tell me \u2014 say something li
 \u2022 App health \u2014 "is anything broken?"
 
 What would you like to know?` }
+    ];
+    DAILY_SAFETY_TOPICS = [
+      {
+        title: "Fall protection",
+        body: "Anyone working at six feet or higher needs fall protection \u2014 guardrails, safety nets, or personal fall arrest systems. Inspect your harness, lanyard, and anchor point before every use. A harness that's been through a fall gets tagged out and replaced, no exceptions. Tie off to something rated for five thousand pounds, not just whatever's handy."
+      },
+      {
+        title: "PPE check",
+        body: "Hard hats, safety glasses, steel-toe boots, and high-visibility vests for everyone on site. If you're grinding, drilling, or welding, add face shields and the right respiratory protection. Hearing protection above eighty-five decibels. If your PPE is damaged or worn out, replace it before you start working \u2014 not after."
+      },
+      {
+        title: "Trenching and excavation",
+        body: "Trenches deeper than five feet need a protective system \u2014 sloping, shoring, or shielding. Never enter a trench without it. Keep spoil piles at least two feet back from the edge. Daily inspections by a competent person before anyone goes in, and after any rain or vibration event. Ladders every twenty-five feet of lateral travel in trench excavations over four feet deep."
+      },
+      {
+        title: "Electrical safety and lockout/tagout",
+        body: "All temporary wiring needs GFCI protection. Inspect cords and tools before use \u2014 no frayed cables, no missing ground prongs. When working on electrical systems, follow lockout/tagout: isolate, lock, tag, verify dead, then work. Test before you touch. Only qualified electricians open panels or work on energized circuits."
+      },
+      {
+        title: "Material handling and crane ops",
+        body: "Rigging inspections before every lift \u2014 check slings, hooks, and shackles for wear. Never walk under a suspended load. Wind limits are twenty miles per hour sustained for most cranes, but check manufacturer specs because some are lower. Have a dedicated signal person for any lift where the operator can't see the load clearly."
+      },
+      {
+        title: "Housekeeping and trip hazards",
+        body: "Keep walkways clear of debris, tools, and materials. Clean up spills immediately \u2014 especially oil and grease. Stack materials neatly and away from edges. Extension cords should be routed overhead or protected, not running across walkways where people trip over them. A clean site is a safe site."
+      },
+      {
+        title: "Hand and power tools",
+        body: "Inspect tools before each use \u2014 guards in place, cords intact, blades sharp. Use the right tool for the job, not a make-do. Disconnect power before changing blades or bits. Never carry a tool by the cord or yank it to unplug. Tool handles should be tight and crack-free."
+      },
+      {
+        title: "Hot work and fire prevention",
+        body: "If you're welding, cutting, or grinding, clear the area of combustibles for at least thirty-five feet. Have a fire extinguisher within arm's reach. Assign a fire watch for at least thirty minutes after hot work ends \u2014 smoldering fires can start after everyone leaves. Check above and below the work area, not just at ground level."
+      }
     ];
   }
 });
@@ -3723,6 +3897,15 @@ async function registerRoutes(_httpServer, app2) {
     } catch (err) {
       console.error("[jarvis] chat error:", err);
       res.status(502).json({ message: "Jarvis is unavailable right now." });
+    }
+  });
+  app2.get("/api/jarvis/safety-brief", async (req, res) => {
+    try {
+      const brief = await buildSafetyBrief(pid(req));
+      res.json({ brief });
+    } catch (err) {
+      console.error("[jarvis] safety brief error:", err);
+      res.status(502).json({ message: "Could not generate safety brief." });
     }
   });
   app2.get("/api/settings", async (_req, res) => {

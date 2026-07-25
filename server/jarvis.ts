@@ -86,6 +86,7 @@ export async function buildContext(projectId?: number): Promise<ContextBundle> {
 type Msg = { role: "user" | "assistant"; content: string };
 
 const HEALTH_INTENT = /\b(broken|health|scan|not work|doesn'?t work|don'?t work|broken link|issues? in the app|what'?s broken|integrity)\b/i;
+const SAFETY_BRIEF_INTENT = /\b(safety brief|safety briefing|toolbox talk|safety meeting|team safety|give me a safety|generate a safety|safety stand)\b/i;
 
 function formatScan(r: Awaited<ReturnType<typeof runHealthScan>>): string {
   const lines: string[] = [
@@ -109,12 +110,16 @@ export async function jarvisChat(projectId: number | undefined, history: Msg[]):
   const lowerUser = lastUser.toLowerCase();
   const scanBlock = HEALTH_INTENT.test(lastUser) ? `\n\n--- APP HEALTH SCAN (live) ---\n${formatScan(await runHealthScan())}` : "";
 
+  // Check for safety brief intent — generate structured safety brief with live weather
+  const safetyBriefIntent = SAFETY_BRIEF_INTENT.test(lowerUser);
+
   // Fetch live weather/places data when relevant to the question
   let liveApiBlock = "";
   const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
   const address = project?.address;
   if (address) {
-    if (/\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lowerUser)) {
+    // Always fetch weather for safety briefs
+    if (safetyBriefIntent || /\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lowerUser)) {
       const { getWeather } = await import("./apis");
       const weather = await getWeather(address);
       if (weather) liveApiBlock += `\n\n--- LIVE WEATHER DATA ---\n${weather}`;
@@ -128,9 +133,14 @@ export async function jarvisChat(projectId: number | undefined, history: Msg[]):
     }
   }
 
+  // For safety briefs, use a specialized system prompt
+  const safetyBriefBlock = safetyBriefIntent
+    ? `\n\nThe user is asking for a TEAM SAFETY BRIEF. Generate a comprehensive safety briefing suitable for a superintendent to read aloud to the crew at the start of the day. Include:\n1. Date and project name\n2. Current weather conditions (use the live weather data if available) and weather-related safety warnings\n3. Seasonal hazards relevant to the current time of year\n4. Two rotating safety topics from this list: fall protection, PPE, trenching/excavation, electrical safety/lockout-tagout, material handling/crane ops, housekeeping/trip hazards, hand/power tools, hot work/fire prevention\n5. Any project-specific safety concerns (overdue work, due-today items that could create pressure to rush)\n6. A strong closing reminder about everyone going home safe\n\nKeep it conversational — like a real superintendent talking, not a textbook. Write numbers out naturally. Use contractions.\n`
+    : "";
+
   const resp = await client.responses.create({
     model: MODEL,
-    instructions: `${persona}\n\n--- LIVE PROJECT DATA ---\n${compact}${scanBlock}${liveApiBlock}`,
+    instructions: `${persona}${safetyBriefBlock}\n\n--- LIVE PROJECT DATA ---\n${compact}${scanBlock}${liveApiBlock}`,
     input: history.map((m) => ({ role: m.role, content: m.content })),
   });
   return { reply: resp.output_text ?? "" };

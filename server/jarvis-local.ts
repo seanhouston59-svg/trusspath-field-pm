@@ -154,6 +154,171 @@ ${overdue}
 One thing to stay on top of — check the Schedule tab for any milestones coming up, and make sure everyone on the team has their tasks assigned.`;
 }
 
+/* --------------------- Team Safety Brief Generator --------------------- */
+
+// Seasonal hazard topics based on current month
+function seasonalHazards(): string[] {
+  const month = new Date().getMonth(); // 0-11
+  const hazards: string[] = [];
+
+  // Summer months (June-August)
+  if (month >= 5 && month <= 7) {
+    hazards.push(
+      "Heat stress is the top concern right now. Provide shade and at least a quart of cool water per person per hour. Schedule heavy work for early morning. Watch for signs of heat exhaustion — heavy sweating, dizziness, nausea. If someone stops sweating or gets confused, that's heat stroke — call nine-one-one immediately."
+    );
+    hazards.push(
+      "Afternoon thunderstorms are common this time of year, especially in Colorado. Keep an eye on the sky. If you hear thunder within thirty seconds of lightning, get everyone to shelter and wait thirty minutes after the last thunder before going back out."
+    );
+  }
+  // Fall months (September-November)
+  else if (month >= 8 && month <= 10) {
+    hazards.push(
+      "Mornings are getting cold and frosty. Watch for slippery surfaces, especially scaffolding, ladders, and metal decking. Give surfaces time to dry or de-ice before starting work."
+    );
+    hazards.push(
+      "Shorter days mean less daylight. Make sure all work areas have adequate temporary lighting, and plan to wrap up exterior work before dusk. High-visibility vests are a must for everyone on site."
+    );
+  }
+  // Winter months (December-February)
+  else if (month === 11 || month <= 1) {
+    hazards.push(
+      "Winter conditions — ice and snow accumulation on scaffolds, ladders, roofs, and walkways. Clear snow and ice before work begins. Salt or sand walkways. No one works on an icy roof, period."
+    );
+    hazards.push(
+      "Cold stress is real. Dress in layers, take warm-up breaks, and watch for frostbite and hypothermia. Fingers, toes, ears, and nose go first. If someone gets sluggish or confused in the cold, get them warm and inside immediately."
+    );
+  }
+  // Spring months (March-May)
+  else {
+    hazards.push(
+      "Spring weather is unpredictable — watch for sudden rain, wind, and temperature swings. Rain makes surfaces slippery and can destabilize trenches. Inspect excavations after any rain before sending anyone in."
+    );
+    hazards.push(
+      "Mud and soft ground conditions — make sure equipment has stable footing and access roads are maintained. Watch for rutting that could cause equipment to tip."
+    );
+  }
+
+  return hazards;
+}
+
+// Always-relevant safety topics that rotate
+const DAILY_SAFETY_TOPICS = [
+  {
+    title: "Fall protection",
+    body: "Anyone working at six feet or higher needs fall protection — guardrails, safety nets, or personal fall arrest systems. Inspect your harness, lanyard, and anchor point before every use. A harness that's been through a fall gets tagged out and replaced, no exceptions. Tie off to something rated for five thousand pounds, not just whatever's handy.",
+  },
+  {
+    title: "PPE check",
+    body: "Hard hats, safety glasses, steel-toe boots, and high-visibility vests for everyone on site. If you're grinding, drilling, or welding, add face shields and the right respiratory protection. Hearing protection above eighty-five decibels. If your PPE is damaged or worn out, replace it before you start working — not after.",
+  },
+  {
+    title: "Trenching and excavation",
+    body: "Trenches deeper than five feet need a protective system — sloping, shoring, or shielding. Never enter a trench without it. Keep spoil piles at least two feet back from the edge. Daily inspections by a competent person before anyone goes in, and after any rain or vibration event. Ladders every twenty-five feet of lateral travel in trench excavations over four feet deep.",
+  },
+  {
+    title: "Electrical safety and lockout/tagout",
+    body: "All temporary wiring needs GFCI protection. Inspect cords and tools before use — no frayed cables, no missing ground prongs. When working on electrical systems, follow lockout/tagout: isolate, lock, tag, verify dead, then work. Test before you touch. Only qualified electricians open panels or work on energized circuits.",
+  },
+  {
+    title: "Material handling and crane ops",
+    body: "Rigging inspections before every lift — check slings, hooks, and shackles for wear. Never walk under a suspended load. Wind limits are twenty miles per hour sustained for most cranes, but check manufacturer specs because some are lower. Have a dedicated signal person for any lift where the operator can't see the load clearly.",
+  },
+  {
+    title: "Housekeeping and trip hazards",
+    body: "Keep walkways clear of debris, tools, and materials. Clean up spills immediately — especially oil and grease. Stack materials neatly and away from edges. Extension cords should be routed overhead or protected, not running across walkways where people trip over them. A clean site is a safe site.",
+  },
+  {
+    title: "Hand and power tools",
+    body: "Inspect tools before each use — guards in place, cords intact, blades sharp. Use the right tool for the job, not a make-do. Disconnect power before changing blades or bits. Never carry a tool by the cord or yank it to unplug. Tool handles should be tight and crack-free.",
+  },
+  {
+    title: "Hot work and fire prevention",
+    body: "If you're welding, cutting, or grinding, clear the area of combustibles for at least thirty-five feet. Have a fire extinguisher within arm's reach. Assign a fire watch for at least thirty minutes after hot work ends — smoldering fires can start after everyone leaves. Check above and below the work area, not just at ground level.",
+  },
+];
+
+export async function buildSafetyBrief(projectId: number | undefined): Promise<string> {
+  const ctx = await buildContext(projectId);
+  const lines = ctx.compact.split("\n");
+  const projectLine = lines[0] ?? "No active project found.";
+  const todayLine = lines[1] ?? "";
+  const dateStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+
+  // Get project for weather
+  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  const address = project?.address;
+
+  // Get live weather if available
+  let weatherBlock = "";
+  if (address) {
+    try {
+      const weather = await getWeather(address);
+      if (weather) {
+        weatherBlock = weather;
+      }
+    } catch {
+      // Weather optional
+    }
+  }
+
+  // Pick 2 rotating safety topics (based on day of year so it changes daily)
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  const topic1 = DAILY_SAFETY_TOPICS[dayOfYear % DAILY_SAFETY_TOPICS.length];
+  const topic2 = DAILY_SAFETY_TOPICS[(dayOfYear + 3) % DAILY_SAFETY_TOPICS.length];
+
+  // Seasonal hazards
+  const seasonal = seasonalHazards();
+
+  // Extract overdue items for safety relevance
+  const overdueLines = lines.filter((l) => l.includes("OVERDUE"));
+  const dueTodayLines = lines.filter((l) => l.includes("DUE TODAY"));
+
+  // Build the brief
+  let brief = `TEAM SAFETY BRIEF — ${dateStr}\n`;
+  brief += `${projectLine}\n`;
+  brief += `${todayLine}\n\n`;
+
+  // Weather conditions
+  if (weatherBlock) {
+    brief += `WEATHER CONDITIONS\n`;
+    brief += `${weatherBlock}\n\n`;
+  } else {
+    brief += `WEATHER CONDITIONS\n`;
+    brief += `Check local conditions before starting. weather.gov and the OSHA-NIOSH Heat Safety app are your best bet for real-time info.\n\n`;
+  }
+
+  // Seasonal hazards
+  brief += `SEASONAL HAZARDS\n`;
+  for (const h of seasonal) {
+    brief += `- ${h}\n`;
+  }
+  brief += `\n`;
+
+  // Today's safety topics
+  brief += `TODAY'S SAFETY TOPICS\n`;
+  brief += `${topic1.title}\n${topic1.body}\n\n`;
+  brief += `${topic2.title}\n${topic2.body}\n\n`;
+
+  // Project-specific safety items
+  if (overdueLines.length || dueTodayLines.length) {
+    brief += `PROJECT-SPECIFIC ITEMS\n`;
+    if (overdueLines.length) {
+      brief += `- You've got overdue work across ${overdueLines.length} ${overdueLines.length === 1 ? "category" : "categories"}. Rushed work leads to mistakes and injuries. Make sure the crew has the time and resources to do it right.\n`;
+    }
+    if (dueTodayLines.length) {
+      brief += `- Items due today — confirm the right people are assigned and have what they need. Don't let deadlines push safety shortcuts.\n`;
+    }
+    brief += `\n`;
+  }
+
+  // Closing
+  brief += `REMEMBER\n`;
+  brief += `Everyone goes home the way they came in. If you see something unsafe, stop work and fix it. No deadline is worth a injury. Speak up — your crew is counting on you.\n\n`;
+  brief += `Questions? Ask your superintendent or site safety officer. Stay sharp out there.`;
+
+  return brief;
+}
+
 export async function localJarvisChat(projectId: number | undefined, history: { role: "user" | "assistant"; content: string }[]): Promise<{ reply: string }> {
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   const lower = lastUser.toLowerCase().trim();
@@ -273,6 +438,16 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
       return { reply: lines.join("\n") };
     } catch {
       return { reply: "I tried running a health scan but ran into an error. It might not be available in this environment." };
+    }
+  }
+
+  // Check for safety brief intent
+  if (/\b(safety brief|safety briefing|toolbox talk|safety meeting|team safety|give me a safety|generate a safety|safety stand)\b/i.test(lower)) {
+    try {
+      const brief = await buildSafetyBrief(projectId);
+      return { reply: brief };
+    } catch {
+      return { reply: "I tried generating a safety brief but ran into an issue. Make sure you have a project selected with an address set, and I'll pull live weather data into it too." };
     }
   }
 

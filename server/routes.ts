@@ -5,7 +5,7 @@ import fs from "node:fs";
 import multer from "multer";
 import { storage } from "./storage";
 import { jarvisChat, jarvisBrief } from "./jarvis";
-import { localJarvisChat, buildLocalBrief } from "./jarvis-local";
+import { localJarvisChat, buildLocalBrief, buildSafetyBrief } from "./jarvis-local";
 import { buildContext } from "./jarvis";
 import { runHealthScan } from "./health";
 import { sendSignupNotification, sendPasswordResetEmail } from "./mailer";
@@ -1140,6 +1140,17 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     } catch (err) {
       console.error("[jarvis] chat error:", err);
       res.status(502).json({ message: "Jarvis is unavailable right now." });
+    }
+  });
+
+  // Jarvis safety brief — generates a team safety briefing with live weather + project data
+  app.get("/api/jarvis/safety-brief", async (req, res) => {
+    try {
+      const brief = await buildSafetyBrief(pid(req));
+      res.json({ brief });
+    } catch (err) {
+      console.error("[jarvis] safety brief error:", err);
+      res.status(502).json({ message: "Could not generate safety brief." });
     }
   });
 
