@@ -32,7 +32,7 @@ export default function Login() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "demo@trusspath.app", password: "trusspath" },
+    defaultValues: { email: "", password: "" },
   });
 
   // If already logged in, bounce straight to /app
@@ -146,15 +146,6 @@ export default function Login() {
               </Button>
             </form>
           </Form>
-
-          <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs">
-            <div className="font-medium mb-1">Try the demo</div>
-            <div className="text-muted-foreground">
-              Email <span className="font-mono">demo@trusspath.app</span>
-              <br />
-              Password <span className="font-mono">trusspath</span>
-            </div>
-          </div>
 
           <div className="text-sm text-muted-foreground">
             No account?{" "}
