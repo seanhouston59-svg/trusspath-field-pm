@@ -4,7 +4,7 @@ import {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
   CheckSquare, Users, Sun, Moon, Search, Menu, X, HardHat, CalendarRange,
   FileStack, GitPullRequestArrow, StickyNote, Wrench, Image, FileText,
-  Contact as ContactIcon, MessageSquare,
+  Contact as ContactIcon, MessageSquare, Building2,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
   LogOut, ChevronLeft, Network, MoreVertical,
 } from "lucide-react";
@@ -22,7 +22,7 @@ import { CommandPalette } from "@/components/command-palette";
 const ICONS: Record<string, any> = {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
   CheckSquare, Users, CalendarRange, FileStack, GitPullRequestArrow,
-  StickyNote, Wrench, Image, FileText, Contact: ContactIcon, MessageSquare,
+  StickyNote, Wrench, Image, FileText, Contact: ContactIcon, MessageSquare, Building2,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings: SettingsIcon, Network,
 };
 

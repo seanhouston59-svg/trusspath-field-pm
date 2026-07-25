@@ -190,6 +190,27 @@ export const documents = pgTable("documents", {
   fileSizeBytes: integer("file_size_bytes"),
 });
 
+/* ------------------------- Company Documents --------------------------- */
+export const companyDocuments = pgTable("company_documents", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  category: text("category").notNull(), // New Hire, Contract, HR, Safety, Vendor, Legal, Insurance, Other
+  status: text("status").notNull().default("Draft"), // Draft, Active, Archived
+  signatureRequired: boolean("signature_required").notNull().default(false),
+  signatureStatus: text("signature_status").notNull().default("Not Required"), // Not Required, Needs Signature, Sent, Signed, Expired
+  signerName: text("signer_name"),
+  signerEmail: text("signer_email"),
+  docusignUrl: text("docusign_url"),
+  dueDate: text("due_date"),
+  notes: text("notes"),
+  uploadedById: integer("uploaded_by_id"),
+  date: text("date").notNull(),
+  storedFileName: text("stored_file_name"),
+  originalFileName: text("original_file_name"),
+  mimeType: text("mime_type"),
+  fileSizeBytes: integer("file_size_bytes"),
+});
+
 /* ----------------------------- Blueprints ------------------------------ */
 export const blueprints = pgTable("blueprints", {
   id: serial("id").primaryKey(),
@@ -310,6 +331,7 @@ export const insertContactSchema = createInsertSchema(contacts).omit({ id: true 
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true });
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true });
+export const insertCompanyDocumentSchema = createInsertSchema(companyDocuments).omit({ id: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
 export const insertNoteSchema = createInsertSchema(notes).omit({ id: true });
 export const insertIntegrationSchema = createInsertSchema(integrations).omit({ id: true });
@@ -385,6 +407,7 @@ export type InsertTeamMember = z.infer<typeof insertTeamSchema>;
 export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type InsertCompanyDocument = z.infer<typeof insertCompanyDocumentSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type InsertBlueprint = z.infer<typeof insertBlueprintSchema>;
@@ -405,6 +428,7 @@ export type Contact = typeof contacts.$inferSelect;
 export type Equipment = typeof equipment.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
 export type DocumentRow = typeof documents.$inferSelect;
+export type CompanyDocument = typeof companyDocuments.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type Blueprint = typeof blueprints.$inferSelect;

@@ -12,11 +12,11 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
-var __copyProps = (to, from, except, desc) => {
+var __copyProps = (to, from, except, desc2) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
       if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
   }
   return to;
 };
@@ -31,7 +31,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // shared/schema.ts
-var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
+var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -197,6 +197,28 @@ var init_schema = __esm({
       mimeType: (0, import_pg_core.text)("mime_type"),
       fileSizeBytes: (0, import_pg_core.integer)("file_size_bytes")
     });
+    companyDocuments = (0, import_pg_core.pgTable)("company_documents", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      title: (0, import_pg_core.text)("title").notNull(),
+      category: (0, import_pg_core.text)("category").notNull(),
+      // New Hire, Contract, HR, Safety, Vendor, Legal, Insurance, Other
+      status: (0, import_pg_core.text)("status").notNull().default("Draft"),
+      // Draft, Active, Archived
+      signatureRequired: (0, import_pg_core.boolean)("signature_required").notNull().default(false),
+      signatureStatus: (0, import_pg_core.text)("signature_status").notNull().default("Not Required"),
+      // Not Required, Needs Signature, Sent, Signed, Expired
+      signerName: (0, import_pg_core.text)("signer_name"),
+      signerEmail: (0, import_pg_core.text)("signer_email"),
+      docusignUrl: (0, import_pg_core.text)("docusign_url"),
+      dueDate: (0, import_pg_core.text)("due_date"),
+      notes: (0, import_pg_core.text)("notes"),
+      uploadedById: (0, import_pg_core.integer)("uploaded_by_id"),
+      date: (0, import_pg_core.text)("date").notNull(),
+      storedFileName: (0, import_pg_core.text)("stored_file_name"),
+      originalFileName: (0, import_pg_core.text)("original_file_name"),
+      mimeType: (0, import_pg_core.text)("mime_type"),
+      fileSizeBytes: (0, import_pg_core.integer)("file_size_bytes")
+    });
     blueprints = (0, import_pg_core.pgTable)("blueprints", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
       projectId: (0, import_pg_core.integer)("project_id").notNull(),
@@ -298,6 +320,7 @@ var init_schema = __esm({
     insertEquipmentSchema = (0, import_drizzle_zod.createInsertSchema)(equipment).omit({ id: true });
     insertPhotoSchema = (0, import_drizzle_zod.createInsertSchema)(photos).omit({ id: true });
     insertDocumentSchema = (0, import_drizzle_zod.createInsertSchema)(documents).omit({ id: true });
+    insertCompanyDocumentSchema = (0, import_drizzle_zod.createInsertSchema)(companyDocuments).omit({ id: true });
     insertMessageSchema = (0, import_drizzle_zod.createInsertSchema)(messages).omit({ id: true });
     insertNoteSchema = (0, import_drizzle_zod.createInsertSchema)(notes).omit({ id: true });
     insertIntegrationSchema = (0, import_drizzle_zod.createInsertSchema)(integrations).omit({ id: true });
@@ -428,6 +451,25 @@ async function migrate() {
     project_id INTEGER NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL,
     size TEXT NOT NULL, uploaded_by_id INTEGER, date TEXT NOT NULL,
     stored_file_name TEXT, original_file_name TEXT, mime_type TEXT, file_size_bytes INTEGER
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS company_documents (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Draft',
+    signature_required BOOLEAN NOT NULL DEFAULT FALSE,
+    signature_status TEXT NOT NULL DEFAULT 'Not Required',
+    signer_name TEXT,
+    signer_email TEXT,
+    docusign_url TEXT,
+    due_date TEXT,
+    notes TEXT,
+    uploaded_by_id INTEGER,
+    date TEXT NOT NULL,
+    stored_file_name TEXT,
+    original_file_name TEXT,
+    mime_type TEXT,
+    file_size_bytes INTEGER
   )`;
   await sql`CREATE TABLE IF NOT EXISTS blueprints (
     id SERIAL PRIMARY KEY,
@@ -780,6 +822,29 @@ var init_storage = __esm({
       async deleteDocument(id) {
         await ensureReady();
         await db.delete(documents).where((0, import_drizzle_orm.eq)(documents.id, id));
+      }
+      async getCompanyDocuments() {
+        await ensureReady();
+        return await db.select().from(companyDocuments).orderBy((0, import_drizzle_orm.desc)(companyDocuments.date));
+      }
+      async getCompanyDocument(id) {
+        await ensureReady();
+        const rows = await db.select().from(companyDocuments).where((0, import_drizzle_orm.eq)(companyDocuments.id, id));
+        return rows[0];
+      }
+      async createCompanyDocument(data) {
+        await ensureReady();
+        const [row] = await db.insert(companyDocuments).values(data).returning();
+        return row;
+      }
+      async updateCompanyDocument(id, data) {
+        await ensureReady();
+        const [row] = await db.update(companyDocuments).set(data).where((0, import_drizzle_orm.eq)(companyDocuments.id, id)).returning();
+        return row;
+      }
+      async deleteCompanyDocument(id) {
+        await ensureReady();
+        await db.delete(companyDocuments).where((0, import_drizzle_orm.eq)(companyDocuments.id, id));
       }
       async getBlueprints(projectId) {
         await ensureReady();
@@ -1355,6 +1420,7 @@ var init_app_manifest = __esm({
       "/daily-logs",
       "/photos",
       "/documents",
+      "/company-documents",
       "/blueprints",
       "/equipment",
       "/drone",
@@ -1398,6 +1464,7 @@ var init_app_manifest = __esm({
           { href: "/daily-logs", label: "Daily Logs", icon: "ClipboardList" },
           { href: "/photos", label: "Photo Log", icon: "Image" },
           { href: "/documents", label: "Documents", icon: "FileText" },
+          { href: "/company-documents", label: "Company Documents", icon: "Building2" },
           { href: "/blueprints", label: "Blueprints", icon: "PencilRuler" },
           { href: "/equipment", label: "Fleet & Equipment", icon: "Wrench" }
         ]
@@ -2110,6 +2177,89 @@ async function registerRoutes(_httpServer, app2) {
       }
     }
     await storage.deleteDocument(id);
+    res.status(204).end();
+  });
+  const companyUploadDir = process.env.NODE_ENV === "production" ? "/tmp/uploads/company-documents" : import_node_path2.default.resolve(process.cwd(), "uploads/company-documents");
+  const companyUpload = (0, import_multer.default)({ storage: import_multer.default.diskStorage({
+    destination: (req, _file, cb) => {
+      import_node_fs2.default.mkdirSync(companyUploadDir, { recursive: true });
+      cb(null, companyUploadDir);
+    },
+    filename: (_req, file, cb) => {
+      const ext = import_node_path2.default.extname(file.originalname);
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    }
+  }) });
+  app2.get("/api/company-documents", async (_req, res) => res.json(await storage.getCompanyDocuments()));
+  app2.post("/api/company-documents", async (req, res) => {
+    const parsed = insertCompanyDocumentSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    res.status(201).json(await storage.createCompanyDocument(parsed.data));
+  });
+  app2.post("/api/company-documents/upload", companyUpload.single("file"), async (req, res) => {
+    const file = req.file;
+    const body = req.body;
+    const title = body.title ? String(body.title) : file ? file.originalname : "Untitled";
+    const category = body.category ? String(body.category) : "Other";
+    const signatureRequired = body.signatureRequired === "true" || body.signatureRequired === true;
+    const signerName = body.signerName ? String(body.signerName) : null;
+    const signerEmail = body.signerEmail ? String(body.signerEmail) : null;
+    const dueDate = body.dueDate ? String(body.dueDate) : null;
+    const notes2 = body.notes ? String(body.notes) : null;
+    const uploadedById = body.uploadedById ? parseInt(body.uploadedById, 10) : void 0;
+    const signatureStatus = signatureRequired ? "Needs Signature" : "Not Required";
+    const created = await storage.createCompanyDocument({
+      title,
+      category,
+      status: "Active",
+      signatureRequired,
+      signatureStatus,
+      signerName,
+      signerEmail,
+      dueDate,
+      notes: notes2,
+      uploadedById,
+      date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+      storedFileName: file?.filename ?? null,
+      originalFileName: file?.originalname ?? null,
+      mimeType: file?.mimetype ?? null,
+      fileSizeBytes: file?.size ?? null
+    });
+    res.status(201).json(created);
+  });
+  app2.patch("/api/company-documents/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const parsed = insertCompanyDocumentSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const updated = await storage.updateCompanyDocument(id, parsed.data);
+    if (!updated) return res.status(404).json({ message: "Company document not found." });
+    res.json(updated);
+  });
+  app2.get("/api/company-documents/:id/file", async (req, res) => {
+    const doc = await storage.getCompanyDocument(parseInt(req.params.id, 10));
+    if (!doc) return res.status(404).json({ message: "Company document not found." });
+    if (!doc.storedFileName) return res.status(404).json({ message: "No source file attached." });
+    const abs = import_node_path2.default.resolve(companyUploadDir, doc.storedFileName);
+    if (!abs.startsWith(companyUploadDir + import_node_path2.default.sep) || !import_node_fs2.default.existsSync(abs)) {
+      return res.status(404).json({ message: "File missing from storage." });
+    }
+    res.setHeader("Content-Type", doc.mimeType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `inline; filename="${doc.originalFileName || doc.storedFileName}"`);
+    import_node_fs2.default.createReadStream(abs).pipe(res);
+  });
+  app2.delete("/api/company-documents/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const doc = await storage.getCompanyDocument(id);
+    if (doc?.storedFileName) {
+      const abs = import_node_path2.default.resolve(companyUploadDir, doc.storedFileName);
+      if (abs.startsWith(companyUploadDir + import_node_path2.default.sep)) {
+        try {
+          import_node_fs2.default.unlinkSync(abs);
+        } catch {
+        }
+      }
+    }
+    await storage.deleteCompanyDocument(id);
     res.status(204).end();
   });
   app2.get("/api/blueprints", async (req, res) => res.json(await storage.getBlueprints(pid(req))));

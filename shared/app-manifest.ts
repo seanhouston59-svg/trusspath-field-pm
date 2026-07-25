@@ -14,7 +14,7 @@ export type RoutePattern = string;
 export const APP_ROUTES: RoutePattern[] = [
   "/", "/app", "/projects", "/projects/:id", "/schedule", "/gantt", "/cpm", "/integrations",
   "/tasks", "/action-items", "/rfis", "/submittals", "/change-orders", "/punch",
-  "/daily-logs", "/photos", "/documents", "/blueprints", "/equipment", "/drone",
+  "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/settings",
 ];
 
@@ -56,6 +56,7 @@ export const APP_NAV: NavGroup[] = [
       { href: "/daily-logs", label: "Daily Logs", icon: "ClipboardList" },
       { href: "/photos", label: "Photo Log", icon: "Image" },
       { href: "/documents", label: "Documents", icon: "FileText" },
+      { href: "/company-documents", label: "Company Documents", icon: "Building2" },
       { href: "/blueprints", label: "Blueprints", icon: "PencilRuler" },
       { href: "/equipment", label: "Fleet & Equipment", icon: "Wrench" },
     ],

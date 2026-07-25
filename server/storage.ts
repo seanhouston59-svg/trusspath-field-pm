@@ -1,7 +1,7 @@
 import {
   projects, tasks, rfis, submittals, changeOrders, actionItems,
   dailyLogs, punchItems, teamMembers, contacts, equipment, photos,
-  documents, blueprints, droneCaptures, messages, notes,
+  documents, companyDocuments, blueprints, droneCaptures, messages, notes,
   integrations,
   subscribers, demoRequests,
   appSettings,
@@ -12,11 +12,11 @@ import {
 import type {
   Project, Task, Rfi, Submittal, ChangeOrder, ActionItem,
   DailyLog, PunchItem, TeamMember, Contact, Equipment, Photo,
-  DocumentRow, Blueprint, DroneCapture, Message, Note,
+  DocumentRow, CompanyDocument, Blueprint, DroneCapture, Message, Note,
   Integration,
   InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder,
   InsertActionItem, InsertDailyLog, InsertPunchItem, InsertContact, InsertEquipment,
-  InsertPhoto, InsertDocument, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember,
+  InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember,
   InsertIntegration,
   Milestone, InsertMilestone,
   Account, AccountPublic, Session,
@@ -24,7 +24,7 @@ import type {
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { existsSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
@@ -131,6 +131,25 @@ async function migrate() {
     project_id INTEGER NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL,
     size TEXT NOT NULL, uploaded_by_id INTEGER, date TEXT NOT NULL,
     stored_file_name TEXT, original_file_name TEXT, mime_type TEXT, file_size_bytes INTEGER
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS company_documents (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Draft',
+    signature_required BOOLEAN NOT NULL DEFAULT FALSE,
+    signature_status TEXT NOT NULL DEFAULT 'Not Required',
+    signer_name TEXT,
+    signer_email TEXT,
+    docusign_url TEXT,
+    due_date TEXT,
+    notes TEXT,
+    uploaded_by_id INTEGER,
+    date TEXT NOT NULL,
+    stored_file_name TEXT,
+    original_file_name TEXT,
+    mime_type TEXT,
+    file_size_bytes INTEGER
   )`;
   await sql`CREATE TABLE IF NOT EXISTS blueprints (
     id SERIAL PRIMARY KEY,
@@ -291,6 +310,11 @@ export interface IStorage {
   getDocument(id: number): Promise<DocumentRow | undefined>;
   createDocument(data: InsertDocument): Promise<DocumentRow>;
   deleteDocument(id: number): Promise<void>;
+  getCompanyDocuments(): Promise<CompanyDocument[]>;
+  getCompanyDocument(id: number): Promise<CompanyDocument | undefined>;
+  createCompanyDocument(data: InsertCompanyDocument): Promise<CompanyDocument>;
+  updateCompanyDocument(id: number, data: Partial<InsertCompanyDocument>): Promise<CompanyDocument | undefined>;
+  deleteCompanyDocument(id: number): Promise<void>;
   getBlueprints(projectId?: number): Promise<Blueprint[]>;
   createBlueprint(data: InsertBlueprint): Promise<Blueprint>;
   getDroneCaptures(projectId?: number): Promise<DroneCapture[]>;
@@ -567,6 +591,29 @@ class DatabaseStorage implements IStorage {
   async deleteDocument(id: number): Promise<void> {
     await ensureReady();
     await db.delete(documents).where(eq(documents.id, id));
+  }
+  async getCompanyDocuments(): Promise<CompanyDocument[]> {
+    await ensureReady();
+    return await db.select().from(companyDocuments).orderBy(desc(companyDocuments.date));
+  }
+  async getCompanyDocument(id: number): Promise<CompanyDocument | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(companyDocuments).where(eq(companyDocuments.id, id));
+    return rows[0];
+  }
+  async createCompanyDocument(data: InsertCompanyDocument): Promise<CompanyDocument> {
+    await ensureReady();
+    const [row] = await db.insert(companyDocuments).values(data).returning();
+    return row;
+  }
+  async updateCompanyDocument(id: number, data: Partial<InsertCompanyDocument>): Promise<CompanyDocument | undefined> {
+    await ensureReady();
+    const [row] = await db.update(companyDocuments).set(data).where(eq(companyDocuments.id, id)).returning();
+    return row;
+  }
+  async deleteCompanyDocument(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(companyDocuments).where(eq(companyDocuments.id, id));
   }
   async getBlueprints(projectId?: number): Promise<Blueprint[]> {
     await ensureReady();

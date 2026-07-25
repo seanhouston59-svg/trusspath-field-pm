@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiUpload } from "@/lib/queryClient";
-import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, InsertDailyLog, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertTeamMember, InsertContact, InsertPunchItem, InsertEquipment, InsertPhoto, InsertDocument, InsertBlueprint, InsertDroneCapture, PunchItem, TeamMember, Contact, Equipment, Photo, DocumentRow, Blueprint, DroneCapture, Message, Note, Integration, AppSettings, Milestone, InsertMilestone } from "@shared/schema";
+import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, InsertDailyLog, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertTeamMember, InsertContact, InsertPunchItem, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, PunchItem, TeamMember, Contact, Equipment, Photo, DocumentRow, CompanyDocument, Blueprint, DroneCapture, Message, Note, Integration, AppSettings, Milestone, InsertMilestone } from "@shared/schema";
 import { DEFAULT_SETTINGS } from "@shared/schema";
 
 export function useTeam() {
@@ -442,6 +442,33 @@ export function useDeleteDocument() {
   return useMutation({
     mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/documents/${id}`); },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/documents"] }); },
+  });
+}
+export function useCompanyDocuments() {
+  return useQuery<CompanyDocument[]>({ queryKey: ["/api/company-documents"] });
+}
+export function useCreateCompanyDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { form: FormData }) => apiUpload<CompanyDocument>(`/api/company-documents/upload`, input.form),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/company-documents"] }); },
+  });
+}
+export function useUpdateCompanyDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertCompanyDocument> }) => {
+      const res = await apiRequest("PATCH", `/api/company-documents/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/company-documents"] }); },
+  });
+}
+export function useDeleteCompanyDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/company-documents/${id}`); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/company-documents"] }); },
   });
 }
 export function useCreateBlueprint() {

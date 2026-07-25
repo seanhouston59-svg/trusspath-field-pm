@@ -11,7 +11,7 @@ import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
   insertPunchItemSchema, insertContactSchema, insertEquipmentSchema,
-  insertPhotoSchema, insertDocumentSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMessageSchema, insertNoteSchema, insertMilestoneSchema,
+  insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMessageSchema, insertNoteSchema, insertMilestoneSchema,
   insertTeamSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
@@ -574,6 +574,80 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       if (abs.startsWith(UPLOAD_DIR + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
     }
     await storage.deleteDocument(id);
+    res.status(204).end();
+  });
+
+  // ---- Company Documents (DocuSign workflow) ----
+  const companyUploadDir = process.env.NODE_ENV === "production"
+    ? "/tmp/uploads/company-documents"
+    : path.resolve(process.cwd(), "uploads/company-documents");
+  const companyUpload = multer({ storage: multer.diskStorage({
+    destination: (req, _file, cb) => { fs.mkdirSync(companyUploadDir, { recursive: true }); cb(null, companyUploadDir); },
+    filename: (_req, file, cb) => { const ext = path.extname(file.originalname); cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`); },
+  }) });
+
+  app.get("/api/company-documents", async (_req, res) => res.json(await storage.getCompanyDocuments()));
+
+  app.post("/api/company-documents", async (req, res) => {
+    const parsed = insertCompanyDocumentSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    res.status(201).json(await storage.createCompanyDocument(parsed.data));
+  });
+
+  app.post("/api/company-documents/upload", companyUpload.single("file"), async (req, res) => {
+    const file = req.file;
+    const body = req.body;
+    const title = body.title ? String(body.title) : file ? file.originalname : "Untitled";
+    const category = body.category ? String(body.category) : "Other";
+    const signatureRequired = body.signatureRequired === "true" || body.signatureRequired === true;
+    const signerName = body.signerName ? String(body.signerName) : null;
+    const signerEmail = body.signerEmail ? String(body.signerEmail) : null;
+    const dueDate = body.dueDate ? String(body.dueDate) : null;
+    const notes = body.notes ? String(body.notes) : null;
+    const uploadedById = body.uploadedById ? parseInt(body.uploadedById, 10) : undefined;
+    const signatureStatus = signatureRequired ? "Needs Signature" : "Not Required";
+    const created = await storage.createCompanyDocument({
+      title, category, status: "Active", signatureRequired, signatureStatus,
+      signerName, signerEmail, dueDate, notes, uploadedById,
+      date: new Date().toISOString().slice(0, 10),
+      storedFileName: file?.filename ?? null,
+      originalFileName: file?.originalname ?? null,
+      mimeType: file?.mimetype ?? null,
+      fileSizeBytes: file?.size ?? null,
+    });
+    res.status(201).json(created);
+  });
+
+  app.patch("/api/company-documents/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const parsed = insertCompanyDocumentSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const updated = await storage.updateCompanyDocument(id, parsed.data);
+    if (!updated) return res.status(404).json({ message: "Company document not found." });
+    res.json(updated);
+  });
+
+  app.get("/api/company-documents/:id/file", async (req, res) => {
+    const doc = await storage.getCompanyDocument(parseInt(req.params.id, 10));
+    if (!doc) return res.status(404).json({ message: "Company document not found." });
+    if (!doc.storedFileName) return res.status(404).json({ message: "No source file attached." });
+    const abs = path.resolve(companyUploadDir, doc.storedFileName);
+    if (!abs.startsWith(companyUploadDir + path.sep) || !fs.existsSync(abs)) {
+      return res.status(404).json({ message: "File missing from storage." });
+    }
+    res.setHeader("Content-Type", doc.mimeType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `inline; filename="${doc.originalFileName || doc.storedFileName}"`);
+    fs.createReadStream(abs).pipe(res);
+  });
+
+  app.delete("/api/company-documents/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const doc = await storage.getCompanyDocument(id);
+    if (doc?.storedFileName) {
+      const abs = path.resolve(companyUploadDir, doc.storedFileName);
+      if (abs.startsWith(companyUploadDir + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
+    }
+    await storage.deleteCompanyDocument(id);
     res.status(204).end();
   });
 

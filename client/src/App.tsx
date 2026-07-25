@@ -34,6 +34,7 @@ import Contacts from "@/pages/contacts";
 import Equipment from "@/pages/equipment";
 import Photos from "@/pages/photos";
 import Documents from "@/pages/documents";
+import CompanyDocuments from "@/pages/company-documents";
 import Schedule from "@/pages/schedule";
 import Gantt from "@/pages/gantt";
 import Integrations from "@/pages/integrations";
@@ -66,6 +67,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/daily-logs": DailyLogs,
   "/photos": Photos,
   "/documents": Documents,
+  "/company-documents": CompanyDocuments,
   "/equipment": Equipment,
   "/blueprints": Blueprints,
   "/drone": Drone,
