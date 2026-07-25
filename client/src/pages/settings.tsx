@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Bot, Building2, Mic2, Stethoscope, TriangleAlert, RotateCcw, CheckCircle2, XCircle, CreditCard, ExternalLink } from "lucide-react";
+import { Bot, Building2, Mic2, Stethoscope, TriangleAlert, RotateCcw, CheckCircle2, XCircle, CreditCard, ExternalLink, Trash2 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { useSettings, useUpdateSettings, useProjects, useHealthScan, useReseed, useBillingStatus, useManageBilling, type HealthReport } from "@/hooks/use-data";
+import { useSettings, useUpdateSettings, useProjects, useHealthScan, useReseed, useWipeData, useBillingStatus, useManageBilling, type HealthReport } from "@/hooks/use-data";
 import type { AppSettings } from "@shared/schema";
 import { useAccess } from "@/lib/access";
 import { useToast } from "@/hooks/use-toast";
@@ -47,10 +47,12 @@ export default function SettingsPage() {
   const update = useUpdateSettings();
   const scan = useHealthScan();
   const reseed = useReseed();
+  const wipe = useWipeData();
   const { toast } = useToast();
   const { can } = useAccess();
   const [report, setReport] = useState<HealthReport | null>(null);
   const [resetText, setResetText] = useState("");
+  const [wipeText, setWipeText] = useState("");
   const [company, setCompany] = useState("");
   const [addr, setAddr] = useState("");
 
@@ -235,6 +237,44 @@ export default function SettingsPage() {
           </AlertDialog>
           ) : (
             <p className="text-xs text-muted-foreground">Resetting demo data requires Project Executive access.</p>
+          )}
+        </Card>
+
+        {/* Wipe — clean slate, no re-seed */}
+        <Card icon={TriangleAlert} title="Wipe All Data" desc="Permanently delete every project, task, record, and file — no re-seed. Use before going live for a clean start.">
+          {can("canResetData") ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" data-testid="setting-wipe-trigger"><Trash2 className="size-4" /> Wipe all data</Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Wipe ALL data? This cannot be undone.</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Every project, task, RFI, submittal, change order, photo, document, daily log, contact, team member, note, and message will be permanently deleted. Your account, settings, and subscription are preserved. The app will be empty — use this before going live with real data.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="py-2">
+                <Label htmlFor="wipe-confirm" className="text-xs">Type <span className="ff-mono font-bold">WIPE</span> to confirm</Label>
+                <Input id="wipe-confirm" value={wipeText} onChange={(e) => setWipeText(e.target.value)} className="mt-1" data-testid="setting-wipe-input" />
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setWipeText("")}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={wipeText !== "WIPE" || wipe.isPending}
+                  onClick={() => wipe.mutate(undefined, {
+                    onSuccess: () => { setWipeText(""); toast({ title: "All data wiped", description: "The app is now empty and ready for real data." }); },
+                    onError: () => toast({ title: "Wipe failed", variant: "destructive" }),
+                  })}
+                  data-testid="setting-wipe-confirm"
+                >
+                  {wipe.isPending ? "Wiping…" : "Permanently delete everything"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          ) : (
+            <p className="text-xs text-muted-foreground">Wiping data requires Project Executive access.</p>
           )}
         </Card>
       </div>

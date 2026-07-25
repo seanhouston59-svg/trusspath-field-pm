@@ -1145,5 +1145,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ ok: true, reseededAt: new Date().toISOString() });
   });
 
+  // WIPE — clears all project data WITHOUT re-seeding (clean slate)
+  app.post("/api/wipe-data", async (req, res) => {
+    if (req.body?.confirm !== "WIPE") {
+      return res.status(400).json({ message: "Confirmation required. Send { confirm: 'WIPE' } to permanently delete all project data." });
+    }
+    await storage.wipeAllData();
+    res.json({ ok: true, wipedAt: new Date().toISOString() });
+  });
+
   return _httpServer;
 }

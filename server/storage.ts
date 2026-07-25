@@ -379,6 +379,7 @@ export interface IStorage {
   getSettings(): Promise<Record<string, any>>;
   updateSettings(patch: Record<string, any>): Promise<Record<string, any>>;
   resetAllData(): Promise<void>;
+  wipeAllData(): Promise<void>;
   // ----- Auth -----
   createAccount(email: string, password: string, displayName: string, company?: string, role?: string): Promise<AccountPublic>;
   getAccountByEmail(email: string): Promise<Account | undefined>;
@@ -972,6 +973,15 @@ class DatabaseStorage implements IStorage {
     // Force re-seed on next request.
     seedDone = false;
     await this.seed();
+  }
+
+  async wipeAllData(): Promise<void> {
+    await ensureReady();
+    // Delete all project data — NO re-seed. Leaves a clean slate.
+    for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, companyDocuments, deletedItems, subscribers, demoRequests]) {
+      await db.delete(t);
+    }
+    seedDone = true; // prevent auto-seed from repopulating
   }
 
   /* ---------------------- Auth helpers ---------------------- */

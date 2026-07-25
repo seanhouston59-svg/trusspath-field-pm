@@ -700,3 +700,14 @@ export function useReseed() {
     onSuccess: () => { qc.invalidateQueries(); },
   });
 }
+
+export function useWipeData() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/wipe-data`, { confirm: "WIPE" });
+      return res.json();
+    },
+    onSuccess: () => { qc.invalidateQueries(); },
+  });
+}

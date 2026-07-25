@@ -1191,6 +1191,13 @@ var init_storage = __esm({
         seedDone = false;
         await this.seed();
       }
+      async wipeAllData() {
+        await ensureReady();
+        for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, companyDocuments, deletedItems, subscribers, demoRequests]) {
+          await db.delete(t);
+        }
+        seedDone = true;
+      }
       /* ---------------------- Auth helpers ---------------------- */
       hashPassword(password) {
         const salt = (0, import_node_crypto.randomBytes)(16).toString("hex");
@@ -2937,6 +2944,13 @@ async function registerRoutes(_httpServer, app2) {
     }
     await storage.resetAllData();
     res.json({ ok: true, reseededAt: (/* @__PURE__ */ new Date()).toISOString() });
+  });
+  app2.post("/api/wipe-data", async (req, res) => {
+    if (req.body?.confirm !== "WIPE") {
+      return res.status(400).json({ message: "Confirmation required. Send { confirm: 'WIPE' } to permanently delete all project data." });
+    }
+    await storage.wipeAllData();
+    res.json({ ok: true, wipedAt: (/* @__PURE__ */ new Date()).toISOString() });
   });
   return _httpServer;
 }
