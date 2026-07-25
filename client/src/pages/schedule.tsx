@@ -102,7 +102,7 @@ export default function SchedulePage() {
 
     // When a single project is selected, use its dates as fallback; otherwise require item dates
     tasks.forEach((t) => {
-      const s = clamp(t.startDate ?? project?.startDate); const e = clamp(t.endDate ?? t.dueDate);
+      const s = clamp(t.startDate ?? project?.startDate ?? ""); const e = clamp(t.endDate ?? t.dueDate ?? "");
       if (s && e) evs.push({ id: `task-${t.id}`, title: `${pName(t.projectId)}${t.title}`, type: "Task", source: "TrussPath", start: s, end: e, description: `${t.trade} · ${t.status}` });
     });
     rfis.forEach((r) => {
