@@ -4,7 +4,7 @@ import {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
   CheckSquare, Users, Sun, Moon, Search, Menu, X, CalendarRange,
   FileStack, GitPullRequestArrow, StickyNote, Wrench, Image, FileText,
-  Contact as ContactIcon, MessageSquare, Building2,
+  Contact as ContactIcon, MessageSquare, Building2, Clock,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
   LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2,
 } from "lucide-react";
@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 const ICONS: Record<string, any> = {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
   CheckSquare, Users, CalendarRange, FileStack, GitPullRequestArrow,
-  StickyNote, Wrench, Image, FileText, Contact: ContactIcon, MessageSquare, Building2,
+  StickyNote, Wrench, Image, FileText, Contact: ContactIcon, MessageSquare, Building2, Clock,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings: SettingsIcon, Trash2, Network,
 };
 

@@ -361,6 +361,34 @@ export const jarvisMemory = pgTable("jarvis_memory", {
   updatedAt: text("updated_at"),
 });
 
+/* ----------------------------- Timesheets ------------------------------ */
+export const timesheets = pgTable("timesheets", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  employeeName: text("employee_name").notNull(),
+  weekStart: text("week_start").notNull(),
+  weekEnd: text("week_end").notNull(),
+  totalHours: text("total_hours").notNull().default("0"),
+  status: text("status").notNull().default("draft"),
+  employeeSignature: text("employee_signature"),
+  managerSignature: text("manager_signature"),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at"),
+});
+
+export const timeEntries = pgTable("time_entries", {
+  id: serial("id").primaryKey(),
+  timesheetId: integer("timesheet_id").notNull(),
+  entryDate: text("entry_date").notNull(),
+  dayOfWeek: text("day_of_week").notNull(),
+  clientName: text("client_name"),
+  projectName: text("project_name"),
+  hoursWorked: text("hours_worked").notNull().default("0"),
+  activities: text("activities"),
+  createdAt: text("created_at").notNull(),
+});
+
 /* ------------------------------ Insert schemas -------------------------- */
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
@@ -383,6 +411,8 @@ export const insertIntegrationSchema = createInsertSchema(integrations).omit({ i
 export const insertBlueprintSchema = createInsertSchema(blueprints).omit({ id: true });
 export const insertDroneCaptureSchema = createInsertSchema(droneCaptures).omit({ id: true });
 export const insertJarvisMemorySchema = createInsertSchema(jarvisMemory).omit({ id: true, createdAt: true, updatedAt: true, hitCount: true });
+export const insertTimesheetSchema = createInsertSchema(timesheets).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
 export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
 export type AppSettingsRow = typeof appSettings.$inferSelect;
@@ -406,6 +436,10 @@ export type Session = typeof sessions.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type JarvisMemory = typeof jarvisMemory.$inferSelect;
 export type InsertJarvisMemory = z.infer<typeof insertJarvisMemorySchema>;
+export type Timesheet = typeof timesheets.$inferSelect;
+export type InsertTimesheet = z.infer<typeof insertTimesheetSchema>;
+export type TimeEntry = typeof timeEntries.$inferSelect;
+export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 
 /** Default app settings (single source for server + client). */
 export const DEFAULT_SETTINGS = {

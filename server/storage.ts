@@ -8,6 +8,7 @@ import {
   milestones,
   accounts, sessions, passwordResetTokens,
   jarvisMemory,
+  timesheets, timeEntries,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -23,6 +24,8 @@ import type {
   Account, AccountPublic, Session, PasswordResetToken,
   Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest,
   JarvisMemory, InsertJarvisMemory,
+  Timesheet, InsertTimesheet,
+  TimeEntry, InsertTimeEntry,
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -308,6 +311,31 @@ async function migrate() {
     created_at TEXT NOT NULL,
     updated_at TEXT
   )`;
+  await sql`CREATE TABLE IF NOT EXISTS timesheets (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    employee_name TEXT NOT NULL,
+    week_start TEXT NOT NULL,
+    week_end TEXT NOT NULL,
+    total_hours TEXT NOT NULL DEFAULT '0',
+    status TEXT NOT NULL DEFAULT 'draft',
+    employee_signature TEXT,
+    manager_signature TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS time_entries (
+    id SERIAL PRIMARY KEY,
+    timesheet_id INTEGER NOT NULL REFERENCES timesheets(id) ON DELETE CASCADE,
+    entry_date TEXT NOT NULL,
+    day_of_week TEXT NOT NULL,
+    client_name TEXT,
+    project_name TEXT,
+    hours_worked TEXT NOT NULL DEFAULT '0',
+    activities TEXT,
+    created_at TEXT NOT NULL
+  )`;
 }
 
 export interface IStorage {
@@ -426,6 +454,18 @@ export interface IStorage {
   updateJarvisMemory(id: number, data: Partial<InsertJarvisMemory>): Promise<JarvisMemory | undefined>;
   incrementJarvisMemoryHit(id: number): Promise<void>;
   deleteJarvisMemory(id: number): Promise<void>;
+  // Timesheets
+  getTimesheets(projectId?: number): Promise<Timesheet[]>;
+  getTimesheet(id: number): Promise<Timesheet | undefined>;
+  createTimesheet(data: InsertTimesheet): Promise<Timesheet>;
+  updateTimesheet(id: number, data: Partial<InsertTimesheet>): Promise<Timesheet | undefined>;
+  deleteTimesheet(id: number): Promise<void>;
+  // Time entries
+  getTimeEntries(timesheetId: number): Promise<TimeEntry[]>;
+  createTimeEntry(data: InsertTimeEntry): Promise<TimeEntry>;
+  updateTimeEntry(id: number, data: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
+  deleteTimeEntry(id: number): Promise<void>;
+  replaceTimeEntries(timesheetId: number, entries: InsertTimeEntry[]): Promise<void>;
 }
 
 // Ensure schema is ready before any query. Idempotent + memoized.
@@ -1251,6 +1291,71 @@ class DatabaseStorage implements IStorage {
   async deleteJarvisMemory(id: number): Promise<void> {
     await ensureReady();
     await db.delete(jarvisMemory).where(eq(jarvisMemory.id, id));
+  }
+
+  /* ----------------------------- Timesheets ---------------------------- */
+  async getTimesheets(projectId?: number): Promise<Timesheet[]> {
+    await ensureReady();
+    if (projectId != null) {
+      return await db.select().from(timesheets).where(eq(timesheets.projectId, projectId));
+    }
+    return await db.select().from(timesheets);
+  }
+
+  async getTimesheet(id: number): Promise<Timesheet | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(timesheets).where(eq(timesheets.id, id));
+    return rows[0];
+  }
+
+  async createTimesheet(data: InsertTimesheet): Promise<Timesheet> {
+    await ensureReady();
+    const now = new Date().toISOString();
+    const [row] = await db.insert(timesheets).values({ ...data, createdAt: now, updatedAt: now }).returning();
+    return row;
+  }
+
+  async updateTimesheet(id: number, data: Partial<InsertTimesheet>): Promise<Timesheet | undefined> {
+    await ensureReady();
+    const [row] = await db.update(timesheets).set({ ...data, updatedAt: new Date().toISOString() }).where(eq(timesheets.id, id)).returning();
+    return row;
+  }
+
+  async deleteTimesheet(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(timesheets).where(eq(timesheets.id, id));
+  }
+
+  /* --------------------------- Time entries ----------------------------- */
+  async getTimeEntries(timesheetId: number): Promise<TimeEntry[]> {
+    await ensureReady();
+    return await db.select().from(timeEntries).where(eq(timeEntries.timesheetId, timesheetId));
+  }
+
+  async createTimeEntry(data: InsertTimeEntry): Promise<TimeEntry> {
+    await ensureReady();
+    const [row] = await db.insert(timeEntries).values({ ...data, createdAt: new Date().toISOString() }).returning();
+    return row;
+  }
+
+  async updateTimeEntry(id: number, data: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined> {
+    await ensureReady();
+    const [row] = await db.update(timeEntries).set(data).where(eq(timeEntries.id, id)).returning();
+    return row;
+  }
+
+  async deleteTimeEntry(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(timeEntries).where(eq(timeEntries.id, id));
+  }
+
+  async replaceTimeEntries(timesheetId: number, entries: InsertTimeEntry[]): Promise<void> {
+    await ensureReady();
+    await db.delete(timeEntries).where(eq(timeEntries.timesheetId, timesheetId));
+    if (entries.length > 0) {
+      const now = new Date().toISOString();
+      await db.insert(timeEntries).values(entries.map((e) => ({ ...e, timesheetId, createdAt: now })));
+    }
   }
 
   /* ----------------------------- Seed ------------------------------ */

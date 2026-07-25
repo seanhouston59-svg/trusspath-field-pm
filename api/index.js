@@ -31,7 +31,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // shared/schema.ts
-var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, passwordResetTokens, jarvisMemory, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertJarvisMemorySchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
+var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, passwordResetTokens, jarvisMemory, timesheets, timeEntries, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertJarvisMemorySchema, insertTimesheetSchema, insertTimeEntrySchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -351,6 +351,31 @@ var init_schema = __esm({
       createdAt: (0, import_pg_core.text)("created_at").notNull(),
       updatedAt: (0, import_pg_core.text)("updated_at")
     });
+    timesheets = (0, import_pg_core.pgTable)("timesheets", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      employeeName: (0, import_pg_core.text)("employee_name").notNull(),
+      weekStart: (0, import_pg_core.text)("week_start").notNull(),
+      weekEnd: (0, import_pg_core.text)("week_end").notNull(),
+      totalHours: (0, import_pg_core.text)("total_hours").notNull().default("0"),
+      status: (0, import_pg_core.text)("status").notNull().default("draft"),
+      employeeSignature: (0, import_pg_core.text)("employee_signature"),
+      managerSignature: (0, import_pg_core.text)("manager_signature"),
+      notes: (0, import_pg_core.text)("notes"),
+      createdAt: (0, import_pg_core.text)("created_at").notNull(),
+      updatedAt: (0, import_pg_core.text)("updated_at")
+    });
+    timeEntries = (0, import_pg_core.pgTable)("time_entries", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      timesheetId: (0, import_pg_core.integer)("timesheet_id").notNull(),
+      entryDate: (0, import_pg_core.text)("entry_date").notNull(),
+      dayOfWeek: (0, import_pg_core.text)("day_of_week").notNull(),
+      clientName: (0, import_pg_core.text)("client_name"),
+      projectName: (0, import_pg_core.text)("project_name"),
+      hoursWorked: (0, import_pg_core.text)("hours_worked").notNull().default("0"),
+      activities: (0, import_pg_core.text)("activities"),
+      createdAt: (0, import_pg_core.text)("created_at").notNull()
+    });
     insertProjectSchema = (0, import_drizzle_zod.createInsertSchema)(projects).omit({ id: true });
     insertTaskSchema = (0, import_drizzle_zod.createInsertSchema)(tasks).omit({ id: true });
     insertRfiSchema = (0, import_drizzle_zod.createInsertSchema)(rfis).omit({ id: true });
@@ -372,6 +397,8 @@ var init_schema = __esm({
     insertBlueprintSchema = (0, import_drizzle_zod.createInsertSchema)(blueprints).omit({ id: true });
     insertDroneCaptureSchema = (0, import_drizzle_zod.createInsertSchema)(droneCaptures).omit({ id: true });
     insertJarvisMemorySchema = (0, import_drizzle_zod.createInsertSchema)(jarvisMemory).omit({ id: true, createdAt: true, updatedAt: true, hitCount: true });
+    insertTimesheetSchema = (0, import_drizzle_zod.createInsertSchema)(timesheets).omit({ id: true, createdAt: true, updatedAt: true });
+    insertTimeEntrySchema = (0, import_drizzle_zod.createInsertSchema)(timeEntries).omit({ id: true, createdAt: true });
     insertMilestoneSchema = (0, import_drizzle_zod.createInsertSchema)(milestones).omit({ id: true });
     insertSettingsSchema = (0, import_drizzle_zod.createInsertSchema)(appSettings).omit({ id: true, updatedAt: true });
     signupSchema = import_zod.z.object({
@@ -666,6 +693,31 @@ async function migrate() {
     hit_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     updated_at TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS timesheets (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    employee_name TEXT NOT NULL,
+    week_start TEXT NOT NULL,
+    week_end TEXT NOT NULL,
+    total_hours TEXT NOT NULL DEFAULT '0',
+    status TEXT NOT NULL DEFAULT 'draft',
+    employee_signature TEXT,
+    manager_signature TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS time_entries (
+    id SERIAL PRIMARY KEY,
+    timesheet_id INTEGER NOT NULL REFERENCES timesheets(id) ON DELETE CASCADE,
+    entry_date TEXT NOT NULL,
+    day_of_week TEXT NOT NULL,
+    client_name TEXT,
+    project_name TEXT,
+    hours_worked TEXT NOT NULL DEFAULT '0',
+    activities TEXT,
+    created_at TEXT NOT NULL
   )`;
 }
 function ensureReady() {
@@ -1531,6 +1583,61 @@ var init_storage = __esm({
         await ensureReady();
         await db.delete(jarvisMemory).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id));
       }
+      /* ----------------------------- Timesheets ---------------------------- */
+      async getTimesheets(projectId) {
+        await ensureReady();
+        if (projectId != null) {
+          return await db.select().from(timesheets).where((0, import_drizzle_orm.eq)(timesheets.projectId, projectId));
+        }
+        return await db.select().from(timesheets);
+      }
+      async getTimesheet(id) {
+        await ensureReady();
+        const rows = await db.select().from(timesheets).where((0, import_drizzle_orm.eq)(timesheets.id, id));
+        return rows[0];
+      }
+      async createTimesheet(data) {
+        await ensureReady();
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        const [row] = await db.insert(timesheets).values({ ...data, createdAt: now, updatedAt: now }).returning();
+        return row;
+      }
+      async updateTimesheet(id, data) {
+        await ensureReady();
+        const [row] = await db.update(timesheets).set({ ...data, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }).where((0, import_drizzle_orm.eq)(timesheets.id, id)).returning();
+        return row;
+      }
+      async deleteTimesheet(id) {
+        await ensureReady();
+        await db.delete(timesheets).where((0, import_drizzle_orm.eq)(timesheets.id, id));
+      }
+      /* --------------------------- Time entries ----------------------------- */
+      async getTimeEntries(timesheetId) {
+        await ensureReady();
+        return await db.select().from(timeEntries).where((0, import_drizzle_orm.eq)(timeEntries.timesheetId, timesheetId));
+      }
+      async createTimeEntry(data) {
+        await ensureReady();
+        const [row] = await db.insert(timeEntries).values({ ...data, createdAt: (/* @__PURE__ */ new Date()).toISOString() }).returning();
+        return row;
+      }
+      async updateTimeEntry(id, data) {
+        await ensureReady();
+        const [row] = await db.update(timeEntries).set(data).where((0, import_drizzle_orm.eq)(timeEntries.id, id)).returning();
+        return row;
+      }
+      async deleteTimeEntry(id) {
+        await ensureReady();
+        await db.delete(timeEntries).where((0, import_drizzle_orm.eq)(timeEntries.id, id));
+      }
+      async replaceTimeEntries(timesheetId, entries) {
+        await ensureReady();
+        await db.delete(timeEntries).where((0, import_drizzle_orm.eq)(timeEntries.timesheetId, timesheetId));
+        if (entries.length > 0) {
+          const now = (/* @__PURE__ */ new Date()).toISOString();
+          await db.insert(timeEntries).values(entries.map((e) => ({ ...e, timesheetId, createdAt: now })));
+        }
+      }
       /* ----------------------------- Seed ------------------------------ */
       async seed() {
         if (seedDone) return;
@@ -1834,6 +1941,7 @@ var init_app_manifest = __esm({
       "/contacts",
       "/messages",
       "/notes",
+      "/timesheets",
       "/deleted-items",
       "/settings"
     ];
@@ -1886,6 +1994,7 @@ var init_app_manifest = __esm({
         title: "People",
         items: [
           { href: "/team", label: "Team", icon: "Users" },
+          { href: "/timesheets", label: "Time Tracking", icon: "Clock" },
           { href: "/contacts", label: "Contacts", icon: "Contact" },
           { href: "/messages", label: "Messages", icon: "MessageSquare" }
         ]
@@ -3937,6 +4046,71 @@ async function registerRoutes(_httpServer, app2) {
     } catch (err) {
       console.error("[jarvis] safety brief error:", err);
       res.status(502).json({ message: "Could not generate safety brief." });
+    }
+  });
+  app2.get("/api/timesheets", async (req, res) => {
+    try {
+      const projectId = req.query.projectId ? Number(req.query.projectId) : void 0;
+      const rows = await storage.getTimesheets(projectId);
+      res.json(rows);
+    } catch (err) {
+      console.error("[timesheets] list error:", err);
+      res.status(500).json({ message: "Failed to list timesheets" });
+    }
+  });
+  app2.get("/api/timesheets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      const entries = await storage.getTimeEntries(id);
+      res.json({ ...ts, entries });
+    } catch (err) {
+      console.error("[timesheets] get error:", err);
+      res.status(500).json({ message: "Failed to get timesheet" });
+    }
+  });
+  app2.post("/api/timesheets", async (req, res) => {
+    try {
+      const ts = await storage.createTimesheet(req.body);
+      res.status(201).json(ts);
+    } catch (err) {
+      console.error("[timesheets] create error:", err);
+      res.status(500).json({ message: "Failed to create timesheet" });
+    }
+  });
+  app2.patch("/api/timesheets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const updated = await storage.updateTimesheet(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Timesheet not found" });
+      res.json(updated);
+    } catch (err) {
+      console.error("[timesheets] update error:", err);
+      res.status(500).json({ message: "Failed to update timesheet" });
+    }
+  });
+  app2.put("/api/timesheets/:id/entries", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const entries = Array.isArray(req.body) ? req.body : [];
+      await storage.replaceTimeEntries(id, entries);
+      const total = entries.reduce((sum, e) => sum + (parseFloat(e.hoursWorked) || 0), 0);
+      const updated = await storage.updateTimesheet(id, { totalHours: total.toFixed(2) });
+      res.json({ ...updated, entries: await storage.getTimeEntries(id) });
+    } catch (err) {
+      console.error("[timesheets] entries replace error:", err);
+      res.status(500).json({ message: "Failed to save time entries" });
+    }
+  });
+  app2.delete("/api/timesheets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteTimesheet(id);
+      res.status(204).send();
+    } catch (err) {
+      console.error("[timesheets] delete error:", err);
+      res.status(500).json({ message: "Failed to delete timesheet" });
     }
   });
   app2.get("/api/settings", async (_req, res) => {

@@ -15,7 +15,7 @@ export const APP_ROUTES: RoutePattern[] = [
   "/", "/app", "/projects", "/projects/:id", "/schedule", "/gantt", "/cpm", "/integrations",
   "/tasks", "/action-items", "/rfis", "/submittals", "/change-orders", "/punch",
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
-  "/team", "/contacts", "/messages", "/notes", "/deleted-items", "/settings",
+  "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings",
 ];
 
 export type NavLink = { href: string; label: string; icon: string };
@@ -71,6 +71,7 @@ export const APP_NAV: NavGroup[] = [
     title: "People",
     items: [
       { href: "/team", label: "Team", icon: "Users" },
+      { href: "/timesheets", label: "Time Tracking", icon: "Clock" },
       { href: "/contacts", label: "Contacts", icon: "Contact" },
       { href: "/messages", label: "Messages", icon: "MessageSquare" },
     ],

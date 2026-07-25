@@ -1188,6 +1188,86 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
+  /* ---------------------------- TIMESHEETS ---------------------------- */
+
+  // List timesheets (optionally filtered by project)
+  app.get("/api/timesheets", async (req, res) => {
+    try {
+      const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
+      const rows = await storage.getTimesheets(projectId);
+      res.json(rows);
+    } catch (err) {
+      console.error("[timesheets] list error:", err);
+      res.status(500).json({ message: "Failed to list timesheets" });
+    }
+  });
+
+  // Get single timesheet with its entries
+  app.get("/api/timesheets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      const entries = await storage.getTimeEntries(id);
+      res.json({ ...ts, entries });
+    } catch (err) {
+      console.error("[timesheets] get error:", err);
+      res.status(500).json({ message: "Failed to get timesheet" });
+    }
+  });
+
+  // Create timesheet
+  app.post("/api/timesheets", async (req, res) => {
+    try {
+      const ts = await storage.createTimesheet(req.body);
+      res.status(201).json(ts);
+    } catch (err) {
+      console.error("[timesheets] create error:", err);
+      res.status(500).json({ message: "Failed to create timesheet" });
+    }
+  });
+
+  // Update timesheet (status, signatures, total, notes)
+  app.patch("/api/timesheets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const updated = await storage.updateTimesheet(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Timesheet not found" });
+      res.json(updated);
+    } catch (err) {
+      console.error("[timesheets] update error:", err);
+      res.status(500).json({ message: "Failed to update timesheet" });
+    }
+  });
+
+  // Replace all time entries for a timesheet (bulk save)
+  app.put("/api/timesheets/:id/entries", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const entries = Array.isArray(req.body) ? req.body : [];
+      await storage.replaceTimeEntries(id, entries);
+      // Recalculate total
+      const total = entries.reduce((sum: number, e: any) => sum + (parseFloat(e.hoursWorked) || 0), 0);
+      const updated = await storage.updateTimesheet(id, { totalHours: total.toFixed(2) });
+      res.json({ ...updated, entries: await storage.getTimeEntries(id) });
+    } catch (err) {
+      console.error("[timesheets] entries replace error:", err);
+      res.status(500).json({ message: "Failed to save time entries" });
+    }
+  });
+
+  // Delete timesheet
+  app.delete("/api/timesheets/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteTimesheet(id);
+      res.status(204).send();
+    } catch (err) {
+      console.error("[timesheets] delete error:", err);
+      res.status(500).json({ message: "Failed to delete timesheet" });
+    }
+  });
+
   // SETTINGS — app preferences (persisted server-side; localStorage is blocked)
   app.get("/api/settings", async (_req, res) => {
     res.json(await storage.getSettings());

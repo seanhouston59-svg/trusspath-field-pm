@@ -41,6 +41,7 @@ import Integrations from "@/pages/integrations";
 import { JarvisPanel } from "@/components/jarvis-panel";
 import Messages from "@/pages/messages";
 import Notes from "@/pages/notes";
+import Timesheets from "@/pages/timesheets";
 import Blueprints from "@/pages/blueprints";
 import Drone from "@/pages/drone";
 import SettingsPage from "@/pages/settings";
@@ -78,6 +79,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/contacts": Contacts,
   "/messages": Messages,
   "/notes": Notes,
+  "/timesheets": Timesheets,
   "/deleted-items": DeletedItemsPage,
   "/settings": SettingsPage,
 };
