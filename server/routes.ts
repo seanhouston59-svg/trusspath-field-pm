@@ -5,6 +5,8 @@ import fs from "node:fs";
 import multer from "multer";
 import { storage } from "./storage";
 import { jarvisChat, jarvisBrief } from "./jarvis";
+import { localJarvisChat, buildLocalBrief } from "./jarvis-local";
+import { buildContext } from "./jarvis";
 import { runHealthScan } from "./health";
 import { sendSignupNotification, sendPasswordResetEmail } from "./mailer";
 import {
@@ -1109,8 +1111,15 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // JARVIS — AI assistant
   app.get("/api/jarvis/brief", async (req, res) => {
     try {
-      const result = await jarvisBrief(pid(req));
-      res.json(result);
+      // Try LLM-powered brief first; fall back to local if no API key or error
+      try {
+        const result = await jarvisBrief(pid(req));
+        res.json(result);
+      } catch (llmErr) {
+        console.log("[jarvis] LLM brief failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
+        const ctx = await buildContext(pid(req));
+        res.json({ brief: buildLocalBrief(ctx), context: ctx });
+      }
     } catch (err) {
       console.error("[jarvis] brief error:", err);
       res.status(502).json({ message: "Jarvis is unavailable right now." });
@@ -1119,8 +1128,15 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.post("/api/jarvis/chat", async (req, res) => {
     try {
       const history = Array.isArray(req.body?.messages) ? req.body.messages : [];
-      const result = await jarvisChat(pid(req), history);
-      res.json(result);
+      // Try LLM-powered chat first; fall back to local engine
+      try {
+        const result = await jarvisChat(pid(req), history);
+        res.json(result);
+      } catch (llmErr) {
+        console.log("[jarvis] LLM chat failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
+        const result = await localJarvisChat(pid(req), history);
+        res.json(result);
+      }
     } catch (err) {
       console.error("[jarvis] chat error:", err);
       res.status(502).json({ message: "Jarvis is unavailable right now." });
