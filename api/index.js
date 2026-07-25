@@ -31,7 +31,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // shared/schema.ts
-var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
+var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, passwordResetTokens, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -331,6 +331,13 @@ var init_schema = __esm({
       createdAt: (0, import_pg_core.text)("created_at").notNull(),
       expiresAt: (0, import_pg_core.text)("expires_at").notNull()
     });
+    passwordResetTokens = (0, import_pg_core.pgTable)("password_reset_tokens", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      token: (0, import_pg_core.text)("token").notNull().unique(),
+      accountId: (0, import_pg_core.integer)("account_id").notNull(),
+      expiresAt: (0, import_pg_core.text)("expires_at").notNull(),
+      usedAt: (0, import_pg_core.text)("used_at")
+    });
     insertProjectSchema = (0, import_drizzle_zod.createInsertSchema)(projects).omit({ id: true });
     insertTaskSchema = (0, import_drizzle_zod.createInsertSchema)(tasks).omit({ id: true });
     insertRfiSchema = (0, import_drizzle_zod.createInsertSchema)(rfis).omit({ id: true });
@@ -623,6 +630,13 @@ async function migrate() {
   await sql`UPDATE team_members SET
     email = CASE WHEN email IS NULL OR email = '' THEN lower(replace(name,' ','.')) || '@' || lower(replace(replace(company,' ',''),'.','')) || '.com' ELSE email END,
     phone = CASE WHEN phone IS NULL OR phone = '' THEN '(303) 555-' || substr('0000' || ((id * 137) % 9000 + 1000)::text, -4) ELSE phone END`;
+  await sql`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    token TEXT NOT NULL UNIQUE,
+    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+  )`;
 }
 function ensureReady() {
   if (!initPromise) {
@@ -1254,6 +1268,31 @@ var init_storage = __esm({
         if (!acc) return null;
         if (!this.verifyHash(password, acc.passwordHash)) return null;
         return this.toPublic(acc);
+      }
+      async createPasswordResetToken(accountId) {
+        await ensureReady();
+        const token = (0, import_node_crypto.randomBytes)(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1e3).toISOString();
+        await db.insert(passwordResetTokens).values({ token, accountId, expiresAt });
+        return token;
+      }
+      async getPasswordResetToken(token) {
+        await ensureReady();
+        const rows = await db.select().from(passwordResetTokens).where((0, import_drizzle_orm.eq)(passwordResetTokens.token, token));
+        return rows[0];
+      }
+      async usePasswordResetToken(token) {
+        await ensureReady();
+        const row = await this.getPasswordResetToken(token);
+        if (!row) return null;
+        if (row.usedAt) return null;
+        if (new Date(row.expiresAt) < /* @__PURE__ */ new Date()) return null;
+        const [updated] = await db.update(passwordResetTokens).set({ usedAt: (/* @__PURE__ */ new Date()).toISOString() }).where((0, import_drizzle_orm.eq)(passwordResetTokens.id, row.id)).returning();
+        return updated ?? null;
+      }
+      async updatePassword(accountId, newPassword) {
+        await ensureReady();
+        await db.update(accounts).set({ passwordHash: this.hashPassword(newPassword) }).where((0, import_drizzle_orm.eq)(accounts.id, accountId));
       }
       createSession(accountId) {
         const now = /* @__PURE__ */ new Date();
@@ -1928,6 +1967,62 @@ async function sendSignupNotification(n) {
     return { ok: false, error: String(err) };
   }
 }
+async function sendPasswordResetEmail(toEmail, resetUrl) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;
+  if (!apiKey) {
+    console.log(`[mailer] RESEND_API_KEY not set \u2014 skipping password reset email to ${toEmail}. Reset URL: ${resetUrl}`);
+    return { ok: true, skipped: true };
+  }
+  const html = `<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
+    <div style="padding:16px 20px;background:#111;color:#fff;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;">TrussPath \u2014 Password Reset</div>
+    <div style="padding:24px 20px;">
+      <p style="font-size:15px;color:#111;margin:0 0 16px;">We received a request to reset your TrussPath password.</p>
+      <p style="font-size:14px;color:#666;margin:0 0 24px;">Click the button below to set a new password. This link expires in 1 hour.</p>
+      <a href="${escapeHtml(resetUrl)}" style="display:inline-block;padding:12px 28px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Reset Password</a>
+      <p style="font-size:13px;color:#999;margin:24px 0 0;">If you didn't request this, you can safely ignore this email.</p>
+    </div>
+    <div style="padding:12px 20px;color:#888;font-size:12px;border-top:1px solid #eee;">TrussPath \u2014 Field Project Management</div>
+  </div>
+</body></html>`;
+  const text2 = `TrussPath \u2014 Password Reset
+
+We received a request to reset your TrussPath password.
+
+Click the link below to set a new password. This link expires in 1 hour.
+
+${resetUrl}
+
+If you didn't request this, you can safely ignore this email.`;
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        from,
+        to: [toEmail],
+        subject: "TrussPath \u2014 Reset your password",
+        html,
+        text: text2
+      })
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`[mailer] Resend ${resp.status}: ${body}`);
+      return { ok: false, error: `Resend ${resp.status}` };
+    }
+    console.log(`[mailer] Sent password reset email to ${toEmail}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[mailer] Password reset send failed:", err);
+    return { ok: false, error: String(err) };
+  }
+}
 var DEFAULT_TO, DEFAULT_FROM;
 var init_mailer = __esm({
   "server/mailer.ts"() {
@@ -2090,6 +2185,31 @@ async function registerRoutes(_httpServer, app2) {
     if (token) await storage.destroySession(token);
     clearSessionCookie(res);
     res.json({ ok: true });
+  });
+  app2.post("/api/auth/forgot-password", async (req, res) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (email) {
+      const account = await storage.getAccountByEmail(email);
+      if (account) {
+        const token = await storage.createPasswordResetToken(account.id);
+        const APP_URL2 = process.env.VITE_API_BASE || "https://trusspath.com";
+        const resetUrl = `${APP_URL2}/#/reset-password?token=${token}`;
+        sendPasswordResetEmail(email, resetUrl).catch(
+          (e) => console.error("[forgot-password] email send failed:", e)
+        );
+      }
+    }
+    res.json({ ok: true, message: "If an account exists with that email, a reset link has been sent." });
+  });
+  app2.post("/api/auth/reset-password", async (req, res) => {
+    const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!token || !password) return res.status(400).json({ message: "Token and new password are required" });
+    if (password.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
+    const resetToken = await storage.usePasswordResetToken(token);
+    if (!resetToken) return res.status(400).json({ message: "Invalid or expired reset token" });
+    await storage.updatePassword(resetToken.accountId, password);
+    res.json({ ok: true, message: "Password updated successfully" });
   });
   app2.get("/api/auth/me", async (req, res) => {
     const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") || "";
@@ -2819,6 +2939,8 @@ var init_routes = __esm({
       "/api/auth/login",
       "/api/auth/logout",
       "/api/auth/me",
+      "/api/auth/forgot-password",
+      "/api/auth/reset-password",
       "/api/stripe/webhook",
       "/api/billing/checkout",
       // marketing / landing page endpoints — safe to leave public

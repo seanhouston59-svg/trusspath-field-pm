@@ -338,6 +338,14 @@ export const sessions = pgTable("sessions", {
   expiresAt: text("expires_at").notNull(),
 });
 
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  accountId: integer("account_id").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+});
+
 /* ------------------------------ Insert schemas -------------------------- */
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
@@ -379,6 +387,7 @@ export type Login = z.infer<typeof loginSchema>;
 export type Account = typeof accounts.$inferSelect;
 export type AccountPublic = Omit<Account, "passwordHash">;
 export type Session = typeof sessions.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 /** Default app settings (single source for server + client). */
 export const DEFAULT_SETTINGS = {

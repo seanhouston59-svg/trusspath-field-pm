@@ -6,7 +6,7 @@ import multer from "multer";
 import { storage } from "./storage";
 import { jarvisChat, jarvisBrief } from "./jarvis";
 import { runHealthScan } from "./health";
-import { sendSignupNotification } from "./mailer";
+import { sendSignupNotification, sendPasswordResetEmail } from "./mailer";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
@@ -65,6 +65,8 @@ const PUBLIC_API = new Set<string>([
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/me",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
   "/api/stripe/webhook",
   "/api/billing/checkout",
   // marketing / landing page endpoints — safe to leave public
@@ -275,6 +277,39 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (token) await storage.destroySession(token);
     clearSessionCookie(res);
     res.json({ ok: true });
+  });
+
+  // Forgot password — generate reset token and email it
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    // Always return success — don't leak whether email exists
+    if (email) {
+      const account = await storage.getAccountByEmail(email);
+      if (account) {
+        const token = await storage.createPasswordResetToken(account.id);
+        const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
+        const resetUrl = `${APP_URL}/#/reset-password?token=${token}`;
+        // Fire-and-forget so email outages don't block the request
+        sendPasswordResetEmail(email, resetUrl).catch((e) =>
+          console.error("[forgot-password] email send failed:", e)
+        );
+      }
+    }
+    res.json({ ok: true, message: "If an account exists with that email, a reset link has been sent." });
+  });
+
+  // Reset password — validate token and set new password
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!token || !password) return res.status(400).json({ message: "Token and new password are required" });
+    if (password.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
+
+    const resetToken = await storage.usePasswordResetToken(token);
+    if (!resetToken) return res.status(400).json({ message: "Invalid or expired reset token" });
+
+    await storage.updatePassword(resetToken.accountId, password);
+    res.json({ ok: true, message: "Password updated successfully" });
   });
 
   app.get("/api/auth/me", async (req: any, res) => {

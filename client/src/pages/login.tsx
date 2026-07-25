@@ -157,6 +157,12 @@ export default function Login() {
               Back to home
             </Link>
           </div>
+
+          <div className="text-center text-sm">
+            <Link href="/forgot-password" className="text-muted-foreground hover:text-foreground hover:underline" data-testid="link-forgot-password">
+              Forgot password?
+            </Link>
+          </div>
         </div>
       </div>
     </div>

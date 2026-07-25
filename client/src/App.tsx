@@ -46,6 +46,7 @@ import Drone from "@/pages/drone";
 import SettingsPage from "@/pages/settings";
 import DeletedItemsPage from "@/pages/deleted-items";
 import { TermsOfService, PrivacyPolicy } from "@/pages/legal";
+import { ForgotPassword, ResetPassword } from "@/pages/password-reset";
 import AdminSignups from "@/pages/admin-signups";
 import Cpm from "@/pages/cpm";
 
@@ -175,6 +176,8 @@ function RootRouter() {
       <Route path="/signup" component={Signup} />
       <Route path="/terms" component={TermsOfService} />
       <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       {/* Everything else is a protected app route. */}
       <Route>
         <RequireAuth>

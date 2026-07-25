@@ -6,7 +6,7 @@ import {
   subscribers, demoRequests,
   appSettings,
   milestones,
-  accounts, sessions,
+  accounts, sessions, passwordResetTokens,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -19,7 +19,7 @@ import type {
   InsertPhoto, InsertDocument, InsertCompanyDocument, InsertDeletedItem, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember,
   InsertIntegration,
   Milestone, InsertMilestone,
-  Account, AccountPublic, Session,
+  Account, AccountPublic, Session, PasswordResetToken,
   Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest,
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
@@ -284,6 +284,15 @@ async function migrate() {
   await sql`UPDATE team_members SET
     email = CASE WHEN email IS NULL OR email = '' THEN lower(replace(name,' ','.')) || '@' || lower(replace(replace(company,' ',''),'.','')) || '.com' ELSE email END,
     phone = CASE WHEN phone IS NULL OR phone = '' THEN '(303) 555-' || substr('0000' || ((id * 137) % 9000 + 1000)::text, -4) ELSE phone END`;
+
+  // Password reset tokens table
+  await sql`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    token TEXT NOT NULL UNIQUE,
+    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+  )`;
 }
 
 export interface IStorage {
@@ -385,6 +394,10 @@ export interface IStorage {
   }): Promise<AccountPublic | undefined>;
   getAccountByStripeCustomerId(customerId: string): Promise<Account | undefined>;
   verifyPassword(email: string, password: string): Promise<AccountPublic | null>;
+  createPasswordResetToken(accountId: number): Promise<string>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  usePasswordResetToken(token: string): Promise<PasswordResetToken | null>;
+  updatePassword(accountId: number, newPassword: string): Promise<void>;
   createSession(accountId: number): Session;
   getSession(token: string): Promise<{ session: Session; account: AccountPublic } | null>;
   destroySession(token: string): void;
@@ -1047,6 +1060,36 @@ class DatabaseStorage implements IStorage {
     if (!acc) return null;
     if (!this.verifyHash(password, acc.passwordHash)) return null;
     return this.toPublic(acc);
+  }
+  async createPasswordResetToken(accountId: number): Promise<string> {
+    await ensureReady();
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+    await db.insert(passwordResetTokens).values({ token, accountId, expiresAt });
+    return token;
+  }
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(passwordResetTokens).where(eq(passwordResetTokens.token, token));
+    return rows[0];
+  }
+  async usePasswordResetToken(token: string): Promise<PasswordResetToken | null> {
+    await ensureReady();
+    const row = await this.getPasswordResetToken(token);
+    if (!row) return null;
+    if (row.usedAt) return null;
+    if (new Date(row.expiresAt) < new Date()) return null;
+    const [updated] = await db.update(passwordResetTokens)
+      .set({ usedAt: new Date().toISOString() })
+      .where(eq(passwordResetTokens.id, row.id))
+      .returning();
+    return updated ?? null;
+  }
+  async updatePassword(accountId: number, newPassword: string): Promise<void> {
+    await ensureReady();
+    await db.update(accounts)
+      .set({ passwordHash: this.hashPassword(newPassword) })
+      .where(eq(accounts.id, accountId));
   }
   createSession(accountId: number): Session {
     // Stateless HMAC token — no DB required.
