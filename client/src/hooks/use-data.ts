@@ -75,7 +75,6 @@ export function useMilestones(projectId?: number) {
       const res = await apiRequest("GET", `/api/milestones${qs}`);
       return res.json();
     },
-    enabled: projectId !== undefined,
   });
 }
 

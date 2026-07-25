@@ -45,9 +45,11 @@ type DayEvent = { event: CalEvent; isStart: boolean };
 export default function SchedulePage() {
   const { data: projects = [] } = useProjects();
   const active = projects.filter((p) => p.status !== "Planning");
+  const [showAll, setShowAll] = useState(true);
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
-  const projectId = selectedId ?? active[0]?.id;
+  const projectId = showAll ? undefined : (selectedId ?? active[0]?.id);
   const project = projects.find((p) => p.id === projectId);
+  const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
 
   const { data: tasks = [] } = useTasks(projectId);
   const { data: rfis = [] } = useRfis(projectId);
@@ -75,8 +77,9 @@ export default function SchedulePage() {
     setEventDialog({ open: true, editId: m.id });
   }
   function submitEvent() {
-    if (!project || !evTitle.trim() || !evDate) return;
-    const payload = { projectId: project.id, title: evTitle.trim(), date: evDate, kind: evKind, status: "Scheduled", notes: evNotes.trim() || undefined };
+    const targetProject = project ?? projects[0];
+    if (!targetProject || !evTitle.trim() || !evDate) return;
+    const payload = { projectId: targetProject.id, title: evTitle.trim(), date: evDate, kind: evKind, status: "Scheduled", notes: evNotes.trim() || undefined };
     if (eventDialog.editId) {
       updateMilestone.mutate({ id: eventDialog.editId, data: payload }, { onSuccess: () => setEventDialog({ open: false }) });
     } else {
@@ -94,20 +97,40 @@ export default function SchedulePage() {
   const [selectedDay, setSelectedDay] = useState<string>(todayIso());
 
   const fieldEvents = useMemo<CalEvent[]>(() => {
-    if (!project) return [];
     const evs: CalEvent[] = [];
-    tasks.forEach((t) => { const s = clamp(t.startDate ?? project.startDate); const e = clamp(t.endDate ?? t.dueDate); if (s && e) evs.push({ id: `task-${t.id}`, title: t.title, type: "Task", source: "TrussPath", start: s, end: e, description: `${t.trade} · ${t.status}` }); });
-    rfis.forEach((r) => { const s = clamp(r.dateCreated); const e = clamp(r.dueDate); if (s && e) evs.push({ id: `rfi-${r.id}`, title: `${r.number} ${r.subject}`, type: "RFI", source: "TrussPath", start: s, end: e, description: `RFI · ${r.status}` }); });
-    subs.forEach((s2) => { const s = clamp(s2.dateSubmitted); const e = clamp(s2.dueDate); if (s && e) evs.push({ id: `sub-${s2.id}`, title: `${s2.number} ${s2.subject}`, type: "Submittal", source: "TrussPath", start: s, end: e, description: `Submittal · ${s2.status}` }); });
-    cos.forEach((c) => { const s = clamp(c.dateIssued); const e = s ? (c.scheduleImpact > 0 ? addDays(s, c.scheduleImpact) : s) : null; if (s && e) evs.push({ id: `co-${c.id}`, title: `${c.number} ${c.title}`, type: "Change Order", source: "TrussPath", start: s, end: e, description: `CO · ${c.status} · $${c.amount.toLocaleString()}` }); });
-    if (project.startDate) evs.push({ id: `ms-s-${project.id}`, title: `${project.name} — Start`, type: "Milestone", source: "TrussPath", start: project.startDate, end: project.startDate, description: "Project start" });
-    if (project.endDate) evs.push({ id: `ms-e-${project.id}`, title: `${project.name} — Completion`, type: "Milestone", source: "TrussPath", start: project.endDate, end: project.endDate, description: "Project end" });
+    const pName = (pid: number) => showAll ? `${projectMap.get(pid) ?? ""} · ` : "";
+
+    // When a single project is selected, use its dates as fallback; otherwise require item dates
+    tasks.forEach((t) => {
+      const s = clamp(t.startDate ?? project?.startDate); const e = clamp(t.endDate ?? t.dueDate);
+      if (s && e) evs.push({ id: `task-${t.id}`, title: `${pName(t.projectId)}${t.title}`, type: "Task", source: "TrussPath", start: s, end: e, description: `${t.trade} · ${t.status}` });
+    });
+    rfis.forEach((r) => {
+      const s = clamp(r.dateCreated); const e = clamp(r.dueDate);
+      if (s && e) evs.push({ id: `rfi-${r.id}`, title: `${pName(r.projectId)}${r.number} ${r.subject}`, type: "RFI", source: "TrussPath", start: s, end: e, description: `RFI · ${r.status}` });
+    });
+    subs.forEach((s2) => {
+      const s = clamp(s2.dateSubmitted); const e = clamp(s2.dueDate);
+      if (s && e) evs.push({ id: `sub-${s2.id}`, title: `${pName(s2.projectId)}${s2.number} ${s2.subject}`, type: "Submittal", source: "TrussPath", start: s, end: e, description: `Submittal · ${s2.status}` });
+    });
+    cos.forEach((c) => {
+      const s = clamp(c.dateIssued); const e = s ? (c.scheduleImpact > 0 ? addDays(s, c.scheduleImpact) : s) : null;
+      if (s && e) evs.push({ id: `co-${c.id}`, title: `${pName(c.projectId)}${c.number} ${c.title}`, type: "Change Order", source: "TrussPath", start: s, end: e, description: `CO · ${c.status} · $${c.amount.toLocaleString()}` });
+    });
+
+    // Project start/end milestones for all visible projects
+    const visProjects = project ? [project] : projects;
+    visProjects.forEach((p) => {
+      if (p.startDate) evs.push({ id: `ms-s-${p.id}`, title: `${showAll ? `${p.name} — ` : ""}Start`, type: "Milestone", source: "TrussPath", start: p.startDate, end: p.startDate, description: "Project start" });
+      if (p.endDate) evs.push({ id: `ms-e-${p.id}`, title: `${showAll ? `${p.name} — ` : ""}Completion`, type: "Milestone", source: "TrussPath", start: p.endDate, end: p.endDate, description: "Project end" });
+    });
+
     milestones.forEach((m) => {
       const d = clamp(m.date);
-      if (d) evs.push({ id: `milestone-${m.id}`, title: m.title, type: "Milestone", source: "TrussPath", start: d, end: d, description: m.notes || m.kind });
+      if (d) evs.push({ id: `milestone-${m.id}`, title: `${showAll ? `${projectMap.get(m.projectId) ?? ""} · ` : ""}${m.title}`, type: "Milestone", source: "TrussPath", start: d, end: d, description: m.notes || m.kind });
     });
     return evs;
-  }, [project, tasks, rfis, subs, cos, milestones]);
+  }, [project, projects, showAll, projectMap, tasks, rfis, subs, cos, milestones]);
 
   const allEvents = useMemo(() => [...fieldEvents, ...imported], [fieldEvents, imported]);
 
@@ -152,8 +175,9 @@ export default function SchedulePage() {
   const goToday = () => { setViewYear(now.getFullYear()); setViewMonth(now.getMonth()); setSelectedDay(today); };
 
   const handleExport = () => {
-    const ics = buildICS(fieldEvents, `${project?.name ?? "TrussPath"} Schedule`);
-    downloadICS(`${(project?.name ?? "trusspath").replace(/\s+/g, "-").toLowerCase()}-schedule.ics`, ics);
+    const label = showAll ? "All Projects" : (project?.name ?? "TrussPath");
+    const ics = buildICS(fieldEvents, `${label} Schedule`);
+    downloadICS(`${label.replace(/\s+/g, "-").toLowerCase()}-schedule.ics`, ics);
   };
   const handleImport = async (file: File) => {
     const text = await file.text();
@@ -168,9 +192,14 @@ export default function SchedulePage() {
       {/* Project selector */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Project:</span>
+        <button onClick={() => setShowAll(true)}
+          className={cn("rounded-full border px-3 py-1 text-xs font-medium transition-colors", showAll ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted")}
+          data-testid="sched-all-projects">
+          All Projects
+        </button>
         {active.map((p) => (
-          <button key={p.id} onClick={() => setSelectedId(p.id)}
-            className={cn("rounded-full border px-3 py-1 text-xs font-medium transition-colors", projectId === p.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted")}>
+          <button key={p.id} onClick={() => { setShowAll(false); setSelectedId(p.id); }}
+            className={cn("rounded-full border px-3 py-1 text-xs font-medium transition-colors", !showAll && projectId === p.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted")}>
             {p.name.split(" ")[0]}
           </button>
         ))}
