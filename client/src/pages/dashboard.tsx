@@ -7,6 +7,7 @@ import { Layout } from "@/components/layout";
 import { Avatar, ProjectStatusBadge, PriorityBadge, Progress } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { useProjects, useTasks, useRfis, useSubmittals, usePunchItems, useTeamMap, useDailyLogs, useChangeOrders } from "@/hooks/use-data";
+import { useAuth } from "@/lib/auth";
 import { formatCurrency, shortDate, relativeDays, isOverdue } from "@/lib/format";
 import { useAccess } from "@/lib/access";
 import { NotificationsBox, WeatherBar, StickyNotepadBox } from "@/components/dashboard-widgets";
@@ -64,6 +65,7 @@ function ProgressRing({ value, size = 60, stroke = 6, tone = "primary" }: { valu
 
 export default function Dashboard() {
   const { can } = useAccess();
+  const { account } = useAuth();
   const { data: projects = [] } = useProjects();
   const { data: tasks = [] } = useTasks();
   const { data: rfis = [] } = useRfis();
@@ -125,8 +127,10 @@ export default function Dashboard() {
       <section className="mb-4 overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid="dashboard-hero">
         <div className="relative flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="ff-kicker text-primary">Field Command · Ops Briefing</div>
-            <h2 className="mt-1 font-display text-xl font-extrabold tracking-tight">Good day, Marcus.</h2>
+            <div className="ff-kicker text-primary">{account?.position || "Field Command · Ops Briefing"}</div>
+            <h2 className="mt-1 font-display text-xl font-extrabold tracking-tight">
+              Good day, {(account?.displayName || "there").split(/\s+/)[0]}.
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
               <span className="mx-1.5 text-muted-foreground/50">•</span>

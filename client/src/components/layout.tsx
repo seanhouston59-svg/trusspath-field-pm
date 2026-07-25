@@ -162,7 +162,7 @@ function SidebarFooter() {
   const { def } = useAccess();
   const { account, logout } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
-  const displayName = account?.displayName || "Marcus Reyes";
+  const displayName = account?.displayName || "User";
   const position = account?.position || def.label;
   const initials = displayName
     .split(/\s+/)
@@ -170,7 +170,7 @@ function SidebarFooter() {
     .filter(Boolean)
     .slice(0, 2)
     .join("")
-    .toUpperCase() || "MR";
+    .toUpperCase() || "U";
   const doLogout = async () => {
     await logout();
     window.location.hash = "/login";
@@ -246,14 +246,14 @@ function RoleSwitcher() {
 function TopbarUser() {
   const { account, logout } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
-  const displayName = account?.displayName || "Marcus Reyes";
+  const displayName = account?.displayName || "User";
   const initials = displayName
     .split(/\s+/)
     .map((s) => s[0])
     .filter(Boolean)
     .slice(0, 2)
     .join("")
-    .toUpperCase() || "MR";
+    .toUpperCase() || "U";
   const doLogout = async () => {
     await logout();
     window.location.hash = "/login";
@@ -289,7 +289,7 @@ function MobileOverflowMenu() {
   const { level, setLevel } = useAccess();
   const { account, logout } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
-  const displayName = account?.displayName || "Marcus Reyes";
+  const displayName = account?.displayName || "User";
   const position = account?.position || "";
   const initials = displayName
     .split(/\s+/)
@@ -297,7 +297,7 @@ function MobileOverflowMenu() {
     .filter(Boolean)
     .slice(0, 2)
     .join("")
-    .toUpperCase() || "MR";
+    .toUpperCase() || "U";
 
   // Close on Escape
   useEffect(() => {
