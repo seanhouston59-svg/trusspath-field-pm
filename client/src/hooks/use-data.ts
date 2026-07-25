@@ -79,6 +79,33 @@ export function useMilestones(projectId?: number) {
   });
 }
 
+export function useCreateMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: InsertMilestone) => { const res = await apiRequest("POST", `/api/milestones`, data); return res.json(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/milestones"] }); },
+  });
+}
+
+export function useUpdateMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertMilestone> }) => {
+      const res = await apiRequest("PATCH", `/api/milestones/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/milestones"] }); },
+  });
+}
+
+export function useDeleteMilestone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/milestones/${id}`); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/milestones"] }); },
+  });
+}
+
 export function useRfis(projectId?: number) {
   return useQuery<Rfi[]>({
     queryKey: ["/api/rfis", { projectId }],
