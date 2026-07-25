@@ -459,7 +459,11 @@ class DatabaseStorage implements IStorage {
   }
   async createProject(data: InsertProject): Promise<Project> {
     await ensureReady();
-    const [row] = await db.insert(projects).values(data).returning();
+    // Auto-generate project number: PRJ-001, PRJ-002, ...
+    const existing = await db.select().from(projects);
+    const nextNum = existing.length + 1;
+    const projectNumber = `PRJ-${String(nextNum).padStart(3, "0")}`;
+    const [row] = await db.insert(projects).values({ ...data, number: projectNumber }).returning();
     return row;
   }
 

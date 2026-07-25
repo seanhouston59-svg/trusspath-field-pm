@@ -14,11 +14,12 @@ import {
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "number" | "date" | "textarea" | "select" | "photo";
+  type?: "text" | "number" | "date" | "textarea" | "select" | "photo" | "info";
   options?: { value: string; label: string }[];
   placeholder?: string;
   required?: boolean;
   half?: boolean;
+  info?: string;
 };
 
 type Props = {
@@ -141,6 +142,10 @@ export function CreateEntityDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                ) : ctype === "info" ? (
+                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground" data-testid={`field-${f.name}`}>
+                    {f.info || "Auto-generated"}
+                  </div>
                 ) : (
                   <Input
                     id={f.name}

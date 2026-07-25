@@ -24,8 +24,8 @@ export default function Projects() {
   const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
 
   const fields: FieldDef[] = [
+    { name: "number", label: "Project #", type: "info", info: "Auto-generated as PRJ-001, PRJ-002, ...", half: true },
     { name: "name", label: "Project Name", type: "text", required: true, half: true },
-    { name: "number", label: "Project #", type: "text", placeholder: "PRJ-001", required: true, half: true },
     { name: "client", label: "Client", type: "text", required: true, half: true },
     { name: "type", label: "Type", type: "select", options: ["Commercial", "Residential", "Healthcare", "Education", "Industrial", "Civic"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "status", label: "Status", type: "select", options: ["Planning", "Active", "On Hold", "Complete"].map((v) => ({ value: v, label: v })), required: true, half: true },
@@ -51,7 +51,7 @@ export default function Projects() {
         isPending={create.isPending}
         onSubmit={(v) => create.mutateAsync({
           name: String(v.name),
-          number: String(v.number),
+          number: "auto",
           client: String(v.client),
           type: String(v.type),
           status: String(v.status),

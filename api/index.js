@@ -704,7 +704,10 @@ var init_storage = __esm({
       }
       async createProject(data) {
         await ensureReady();
-        const [row] = await db.insert(projects).values(data).returning();
+        const existing = await db.select().from(projects);
+        const nextNum = existing.length + 1;
+        const projectNumber = `PRJ-${String(nextNum).padStart(3, "0")}`;
+        const [row] = await db.insert(projects).values({ ...data, number: projectNumber }).returning();
         return row;
       }
       async getTasks(projectId) {
