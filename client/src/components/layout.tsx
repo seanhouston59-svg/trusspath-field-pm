@@ -78,7 +78,7 @@ function SidebarBrand() {
   return (
     <Link href="/app" className="group flex flex-col gap-2 px-1" data-testid="nav-brand">
       <div className="flex items-center gap-2.5">
-        <Logo className="size-8 text-primary transition-transform group-hover:-rotate-3" />
+        <Logo className="size-8 text-[#e07412] transition-transform group-hover:-rotate-3" />
         <div className="leading-tight">
           <div className="font-display text-base font-extrabold tracking-tight text-sidebar-accent-foreground">{company}</div>
           <div className="text-[11px] text-sidebar-foreground/50">Field Project Management</div>

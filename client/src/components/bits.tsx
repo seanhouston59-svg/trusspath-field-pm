@@ -1,16 +1,27 @@
 import { cn } from "@/lib/utils";
 
 /* ----------------------------- Brand logo ----------------------------- */
-/* Hex tile + ascending truss-path mark: triangulated truss nodes rising
-   along a forward path (structure + momentum). */
+/* TrussPath roof truss mark: orange triangular truss with internal W bracing.
+   Matches the official TrussPath brand identity. */
 export function Logo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      <path d="M32 3 L57 17.5 L57 46.5 L32 61 L7 46.5 L7 17.5 Z" fill="currentColor" />
-      <path d="M16 45 L25 45 L20.5 33 Z" fill="hsl(var(--sidebar))" />
-      <path d="M28 36 L37 36 L32.5 24 Z" fill="hsl(var(--sidebar))" />
-      <path d="M40 27 L49 27 L44.5 15 Z" fill="hsl(var(--sidebar))" />
-      <path d="M20.5 33 L32.5 24 L44.5 15" stroke="hsl(var(--sidebar))" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
+      {/* Outer triangle */}
+      <path d="M32 6 L58 54 L6 54 Z" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" />
+      {/* Horizontal base */}
+      <path d="M14 54 L50 54" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
+      {/* Vertical center post */}
+      <path d="M32 23 L32 54" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+      {/* Left diagonal strut */}
+      <path d="M32 54 L18 54" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+      <path d="M32 37 L20 54" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      {/* Right diagonal strut */}
+      <path d="M32 37 L44 54" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      {/* Apex node */}
+      <circle cx="32" cy="6" r="3" fill="currentColor" />
+      {/* Base nodes */}
+      <circle cx="6" cy="54" r="3" fill="currentColor" />
+      <circle cx="58" cy="54" r="3" fill="currentColor" />
     </svg>
   );
 }
