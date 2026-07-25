@@ -802,6 +802,8 @@ export default function Landing() {
             <button onClick={() => scrollTo("pricing")} className="hover:text-foreground">Pricing</button>
             <button onClick={() => scrollTo("demo")} className="hover:text-foreground">Demo</button>
             <Link href="/app" className="hover:text-foreground">Live app</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <a href="mailto:hello@trusspath.com" className="hover:text-foreground">hello@trusspath.com</a>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { HardHat, UserPlus } from "lucide-react";
 import { Logo } from "@/components/bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
@@ -18,6 +19,9 @@ const schema = z.object({
   email: z.string().email("Enter a valid email"),
   company: z.string().optional(),
   password: z.string().min(6, "At least 6 characters"),
+  agreeTerms: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the Terms and Privacy Policy" }),
+  }),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -29,7 +33,7 @@ export default function Signup() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { displayName: "", email: "", company: "", password: "" },
+    defaultValues: { displayName: "", email: "", company: "", password: "", agreeTerms: false as any },
   });
 
   useEffect(() => {
@@ -135,6 +139,28 @@ export default function Signup() {
                     <FormControl>
                       <Input type="password" placeholder="At least 6 characters" data-testid="input-password" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="agreeTerms"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start gap-2 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="checkbox-terms"
+                      />
+                    </FormControl>
+                    <div className="text-xs leading-relaxed text-muted-foreground">
+                      I agree to the{" "}
+                      <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>{" "}
+                      and{" "}
+                      <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
