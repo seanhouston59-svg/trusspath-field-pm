@@ -29,15 +29,25 @@ import { existsSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
-const CONN = process.env.DATABASE_URL;
-if (!CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(CONN)) {
-  const msg = !CONN
-    ? "[storage] DATABASE_URL is not set. Set it in Vercel → Project → Settings → Environment Variables to the Neon pooled connection string (postgresql://user:password@host/dbname?sslmode=require)."
+const RAW_CONN = process.env.DATABASE_URL;
+if (!RAW_CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(RAW_CONN)) {
+  const msg = !RAW_CONN
+    ? "[storage] DATABASE_URL is not set. Set it in Vercel → Project → Settings → Environment Variables to the Neon connection string (postgresql://user:password@host/dbname?sslmode=require)."
     : "[storage] DATABASE_URL is malformed. Expected postgresql://user:password@host/dbname?sslmode=require. Check for empty strings, extra quotes, or missing credentials in the Vercel env var.";
   console.error(msg);
-  // Throw only when actually used (lazy) so build-time bundling doesn't break.
 }
-const sql = neon(CONN || "postgresql://user:pass@localhost/placeholder");
+// The @neondatabase/serverless HTTP driver needs the non-pooled endpoint.
+// The "-pooler" host is for TCP/PgBouncer connections and can cause
+// intermittent fetch failures when used with the HTTP driver.
+// Strip "-pooler" from the hostname and remove TCP-only query params.
+const CONN = RAW_CONN
+  ? RAW_CONN
+      .replace(/-pooler\./, ".")
+      .replace(/[?&]channel_binding=[^&]*/g, "")
+      .replace(/[?&]sslmode=[^&]*/g, "")
+      .replace(/\?$/, "")
+  : "postgresql://user:pass@localhost/placeholder";
+const sql = neon(CONN);
 export const db = drizzle(sql);
 
 async function migrate() {

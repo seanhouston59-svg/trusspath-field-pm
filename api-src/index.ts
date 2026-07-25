@@ -31,9 +31,10 @@ initPromise = init();
 app.use(async (_req, _res, next) => {
   await initPromise;
   // If the first boot failed (usually a transient fetch error to Neon on cold
-  // start), retry once before serving the request. This prevents a single
-  // network hiccup from poisoning the warm function instance.
-  if (initError && initAttempts < 3) {
+  // start), retry up to 5 times with a small delay before serving the request.
+  // This prevents a single network hiccup from poisoning the warm function.
+  while (initError && initAttempts < 5) {
+    await new Promise((r) => setTimeout(r, 500 * initAttempts));
     initPromise = init();
     await initPromise;
   }

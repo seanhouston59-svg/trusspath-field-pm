@@ -548,7 +548,7 @@ function ensureReady() {
   }
   return initPromise;
 }
-var import_neon_http, import_serverless, import_drizzle_orm, import_node_fs, import_node_path, import_node_crypto, CONN, sql, db, initPromise, DatabaseStorage, seedDone, storage;
+var import_neon_http, import_serverless, import_drizzle_orm, import_node_fs, import_node_path, import_node_crypto, RAW_CONN, CONN, sql, db, initPromise, DatabaseStorage, seedDone, storage;
 var init_storage = __esm({
   "server/storage.ts"() {
     "use strict";
@@ -559,12 +559,13 @@ var init_storage = __esm({
     import_node_fs = require("node:fs");
     import_node_path = require("node:path");
     import_node_crypto = require("node:crypto");
-    CONN = process.env.DATABASE_URL;
-    if (!CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(CONN)) {
-      const msg = !CONN ? "[storage] DATABASE_URL is not set. Set it in Vercel \u2192 Project \u2192 Settings \u2192 Environment Variables to the Neon pooled connection string (postgresql://user:password@host/dbname?sslmode=require)." : "[storage] DATABASE_URL is malformed. Expected postgresql://user:password@host/dbname?sslmode=require. Check for empty strings, extra quotes, or missing credentials in the Vercel env var.";
+    RAW_CONN = process.env.DATABASE_URL;
+    if (!RAW_CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(RAW_CONN)) {
+      const msg = !RAW_CONN ? "[storage] DATABASE_URL is not set. Set it in Vercel \u2192 Project \u2192 Settings \u2192 Environment Variables to the Neon connection string (postgresql://user:password@host/dbname?sslmode=require)." : "[storage] DATABASE_URL is malformed. Expected postgresql://user:password@host/dbname?sslmode=require. Check for empty strings, extra quotes, or missing credentials in the Vercel env var.";
       console.error(msg);
     }
-    sql = (0, import_serverless.neon)(CONN || "postgresql://user:pass@localhost/placeholder");
+    CONN = RAW_CONN ? RAW_CONN.replace(/-pooler\./, ".").replace(/[?&]channel_binding=[^&]*/g, "").replace(/[?&]sslmode=[^&]*/g, "").replace(/\?$/, "") : "postgresql://user:pass@localhost/placeholder";
+    sql = (0, import_serverless.neon)(CONN);
     db = (0, import_neon_http.drizzle)(sql);
     initPromise = null;
     DatabaseStorage = class {
@@ -2451,7 +2452,8 @@ async function init() {
 initPromise2 = init();
 app.use(async (_req, _res, next) => {
   await initPromise2;
-  if (initError && initAttempts < 3) {
+  while (initError && initAttempts < 5) {
+    await new Promise((r) => setTimeout(r, 500 * initAttempts));
     initPromise2 = init();
     await initPromise2;
   }
