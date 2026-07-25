@@ -4,6 +4,7 @@ import {
   Activity, CircleDot, Clock, Building2, Hammer, FileWarning, GitPullRequestArrow,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
+import { GhostState, GhostCards } from "@/components/ghost-state";
 import { Avatar, ProjectStatusBadge, PriorityBadge, Progress } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { useProjects, useTasks, useRfis, useSubmittals, usePunchItems, useTeamMap, useDailyLogs, useChangeOrders } from "@/hooks/use-data";
@@ -122,6 +123,31 @@ export default function Dashboard() {
     <Layout title="Dashboard">
       {/* Collapsible weather bar (top) */}
       <WeatherBar logs={dailyLogs} projects={projects} />
+
+      {projects.length === 0 ? (
+        <div className="space-y-4">
+          <section className="mb-4 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="p-6">
+              <div className="ff-kicker text-primary">Welcome to TrussPath</div>
+              <h2 className="mt-1 font-display text-xl font-extrabold tracking-tight">
+                Good day, {(account?.displayName || "there").split(/\s+/)[0]}.
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Your workspace is ready. Create your first project to start tracking tasks, RFIs, daily logs, and more.
+              </p>
+            </div>
+          </section>
+          <GhostCards count={4} />
+          <GhostState
+            title="No projects yet"
+            description="Create your first project to populate the dashboard with real-time stats, tasks, and field updates."
+            icon={FolderKanban}
+            ctaLabel="Create your first project"
+            ctaHref="/projects"
+          />
+        </div>
+      ) : (
+      <>
 
       {/* Branded command hero */}
       <section className="mb-4 overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid="dashboard-hero">
@@ -353,6 +379,8 @@ export default function Dashboard() {
 
       {/* spacer so the floating Jarvis launcher never overlaps content */}
       <div className="h-20" />
+      </>
+      )}
     </Layout>
   );
 }

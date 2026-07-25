@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, ListChecks } from "lucide-react";
 import { Layout } from "@/components/layout";
+import { GhostState } from "@/components/ghost-state";
 import { TaskTable } from "@/components/tables";
 import { TaskBoard } from "@/components/task-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
@@ -99,6 +100,14 @@ export default function TasksPage() {
 
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
+      ) : filtered.length === 0 && tasks.length === 0 ? (
+        <GhostState
+          title="No tasks yet"
+          description="Create your first task to start tracking work across your projects."
+          icon={ListChecks}
+          ctaLabel="Create task"
+          ctaHref="/tasks?new=1"
+        />
       ) : view === "board" ? (
         <TaskBoard tasks={filtered} team={team} projects={projectList} onCardClick={(t) => setSelected(t)} />
       ) : (

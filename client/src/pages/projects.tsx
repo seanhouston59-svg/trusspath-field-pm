@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { MapPin, Calendar, Building2, Plus, ExternalLink } from "lucide-react";
+import { MapPin, Calendar, Building2, Plus, ExternalLink, FolderKanban } from "lucide-react";
 import { Layout } from "@/components/layout";
+import { GhostState } from "@/components/ghost-state";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { useProjects, useTeamMap, useTeam, useCreateProject } from "@/hooks/use-data";
@@ -67,6 +68,14 @@ export default function Projects() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-56 animate-pulse rounded-lg border border-border bg-muted" />)}
         </div>
+      ) : projects.length === 0 ? (
+        <GhostState
+          title="No projects yet"
+          description="Create your first project to start tracking tasks, RFIs, daily logs, punch lists, and more."
+          icon={FolderKanban}
+          ctaLabel="Create project"
+          ctaHref="/projects?new=1"
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((p) => {

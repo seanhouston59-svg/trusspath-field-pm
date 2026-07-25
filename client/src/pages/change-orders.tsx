@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, FileEdit, Clock, CheckCircle2, XCircle, Zap } from "lucide-react";
 import { Layout } from "@/components/layout";
+import { GhostState } from "@/components/ghost-state";
 import { ChangeOrderTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
@@ -101,6 +102,12 @@ export default function ChangeOrdersPage() {
 
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
+      ) : filtered.length === 0 && items.length === 0 ? (
+        <GhostState
+          title="No change orders yet"
+          description="Change orders will appear here once your team submits modifications to project scope."
+          icon={FileEdit}
+        />
       ) : view === "board" ? (
         <GenericBoard<ChangeOrder, Status>
           items={filtered}

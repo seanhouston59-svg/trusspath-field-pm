@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, CheckSquare } from "lucide-react";
 import { Layout } from "@/components/layout";
+import { GhostState } from "@/components/ghost-state";
 import { PunchList } from "@/components/tables";
 import { PunchBoard } from "@/components/punch-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
@@ -95,6 +96,12 @@ export default function PunchPage() {
 
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
+      ) : filtered.length === 0 && items.length === 0 ? (
+        <GhostState
+          title="No punch items yet"
+          description="Punch list items will appear here as your team identifies items needing correction."
+          icon={CheckSquare}
+        />
       ) : view === "board" ? (
         <PunchBoard items={filtered} team={team} projects={projectList} onCardClick={(i) => setSelected(i)} />
       ) : (
