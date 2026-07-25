@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Plus, ListChecks } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState } from "@/components/ghost-state";
@@ -24,6 +25,11 @@ export default function TasksPage() {
   const create = useCreateTask();
   const updateStatus = useUpdateTaskStatus();
   const [open, setOpen] = useState(false);
+  const [location] = useLocation();
+
+  useEffect(() => {
+    if (location.includes("new=1")) setOpen(true);
+  }, [location]);
   const [selected, setSelected] = useState<Task | null>(null);
   const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 

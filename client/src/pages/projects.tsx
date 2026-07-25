@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { MapPin, Calendar, Building2, Plus, ExternalLink, FolderKanban } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState } from "@/components/ghost-state";
@@ -20,6 +20,12 @@ export default function Projects() {
   const { data: teamList = [] } = useTeam();
   const create = useCreateProject();
   const [open, setOpen] = useState(false);
+  const [location] = useLocation();
+
+  // Auto-open create dialog when navigated with ?new=1
+  useEffect(() => {
+    if (location.includes("new=1")) setOpen(true);
+  }, [location]);
 
   const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
 
