@@ -266,6 +266,8 @@ export const integrations = pgTable("integrations", {
   id: serial("id").primaryKey(),
   key: text("key").notNull().unique(),
   connected: boolean("connected").notNull().default(false),
+  status: text("status").notNull().default("available"), // available, connected, needs_config, error
+  accountLabel: text("account_label"),
   connectedAt: text("connected_at"),
   config: text("config"),
 });

@@ -4,7 +4,7 @@ import {
   Search, Check, Plug, Download, ExternalLink, ArrowRight, Users, Calculator,
   Building2, FileSpreadsheet, HardDrive, Box, MessageSquare, MessagesSquare,
   Mail, CalendarRange, GanttChartSquare, PenTool, FileText, Clock,
-  Timer, Activity, Wallet,
+  Timer, Activity, Wallet, Unplug, Zap, Loader2,
 } from "lucide-react";
 import {
   SiAdp, SiGooglesheets, SiGoogledrive, SiQuickbooks, SiDropbox, SiAutodesk,
@@ -14,9 +14,16 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import {
   useProjects, useTasks, useRfis, useSubmittals, useChangeOrders,
-  useIntegrations, useToggleIntegration,
+  useIntegrations, useConnectIntegration, useDisconnectIntegration, useTestIntegration,
 } from "@/hooks/use-data";
+import type { Integration } from "@shared/schema";
 
 type IconType = React.ComponentType<{ className?: string; size?: number | string }>;
 type CatKey = "Payroll & HR" | "Accounting" | "Spreadsheets" | "Documents" | "Communication" | "Scheduling" | "Design & BIM" | "Time Tracking";
@@ -31,50 +38,51 @@ interface CatalogItem {
   action: "toggle" | "export-csv" | "link";
   href?: string;
   native?: boolean;
+  setupUrl?: string;
 }
 
 const CATALOG: CatalogItem[] = [
   // Payroll & HR
-  { key: "adp", name: "ADP", category: "Payroll & HR", description: "Sync crew payroll, benefits and time cards for field labor.", Icon: SiAdp, tint: "text-red-600", action: "toggle" },
-  { key: "trinet", name: "TriNet", category: "Payroll & HR", description: "PEO HR, benefits and payroll for your workforce.", Icon: Users, tint: "text-emerald-600", action: "toggle" },
-  { key: "paychex", name: "Paychex", category: "Payroll & HR", description: "Payroll processing, HR and retirement services.", Icon: SiPaychex, tint: "text-orange-600", action: "toggle" },
-  { key: "gusto", name: "Gusto", category: "Payroll & HR", description: "Modern payroll, benefits and crew onboarding.", Icon: SiGusto, tint: "text-rose-600", action: "toggle" },
-  { key: "intuit-payroll", name: "QuickBooks Payroll", category: "Payroll & HR", description: "Intuit payroll tied to job-cost accounting.", Icon: SiQuickbooks, tint: "text-green-600", action: "toggle" },
+  { key: "adp", name: "ADP", category: "Payroll & HR", description: "Sync crew payroll, benefits and time cards for field labor.", Icon: SiAdp, tint: "text-red-600", action: "toggle", setupUrl: "https://adp.com" },
+  { key: "trinet", name: "TriNet", category: "Payroll & HR", description: "PEO HR, benefits and payroll for your workforce.", Icon: Users, tint: "text-emerald-600", action: "toggle", setupUrl: "https://trinet.com" },
+  { key: "paychex", name: "Paychex", category: "Payroll & HR", description: "Payroll processing, HR and retirement services.", Icon: SiPaychex, tint: "text-orange-600", action: "toggle", setupUrl: "https://paychex.com" },
+  { key: "gusto", name: "Gusto", category: "Payroll & HR", description: "Modern payroll, benefits and crew onboarding.", Icon: SiGusto, tint: "text-rose-600", action: "toggle", setupUrl: "https://gusto.com" },
+  { key: "intuit-payroll", name: "QuickBooks Payroll", category: "Payroll & HR", description: "Intuit payroll tied to job-cost accounting.", Icon: SiQuickbooks, tint: "text-green-600", action: "toggle", setupUrl: "https://quickbooks.intuit.com" },
 
   // Accounting
-  { key: "quickbooks", name: "QuickBooks Online", category: "Accounting", description: "Two-way sync of invoices, bills and job costs.", Icon: SiQuickbooks, tint: "text-green-600", action: "toggle" },
-  { key: "sage", name: "Sage 100 Contractor", category: "Accounting", description: "Construction accounting and job-cost sync.", Icon: SiSage, tint: "text-emerald-600", action: "toggle" },
-  { key: "foundation", name: "Foundation", category: "Accounting", description: "Foundation Software construction accounting.", Icon: Calculator, tint: "text-blue-600", action: "toggle" },
-  { key: "netsuite", name: "Oracle NetSuite", category: "Accounting", description: "ERP financials, procurement and project accounting.", Icon: Building2, tint: "text-sky-600", action: "toggle" },
+  { key: "quickbooks", name: "QuickBooks Online", category: "Accounting", description: "Two-way sync of invoices, bills and job costs.", Icon: SiQuickbooks, tint: "text-green-600", action: "toggle", setupUrl: "https://quickbooks.intuit.com" },
+  { key: "sage", name: "Sage 100 Contractor", category: "Accounting", description: "Construction accounting and job-cost sync.", Icon: SiSage, tint: "text-emerald-600", action: "toggle", setupUrl: "https://sage.com" },
+  { key: "foundation", name: "Foundation", category: "Accounting", description: "Foundation Software construction accounting.", Icon: Calculator, tint: "text-blue-600", action: "toggle", setupUrl: "https://foundationsoft.com" },
+  { key: "netsuite", name: "Oracle NetSuite", category: "Accounting", description: "ERP financials, procurement and project accounting.", Icon: Building2, tint: "text-sky-600", action: "toggle", setupUrl: "https://netsuite.com" },
 
   // Spreadsheets
   { key: "google-sheets", name: "Google Sheets", category: "Spreadsheets", description: "Export your schedule, RFIs, submittals and COs to Sheets.", Icon: SiGooglesheets, tint: "text-emerald-600", action: "export-csv" },
   { key: "excel", name: "Microsoft Excel", category: "Spreadsheets", description: "Export project data to an Excel-ready workbook.", Icon: FileSpreadsheet, tint: "text-green-600", action: "export-csv" },
 
   // Documents
-  { key: "google-drive", name: "Google Drive", category: "Documents", description: "Attach drawings, submittals and photos from Drive.", Icon: SiGoogledrive, tint: "text-amber-600", action: "toggle" },
-  { key: "dropbox", name: "Dropbox", category: "Documents", description: "Sync project documents and field photos.", Icon: SiDropbox, tint: "text-blue-600", action: "toggle" },
-  { key: "onedrive", name: "Microsoft OneDrive", category: "Documents", description: "Browse and attach OneDrive files to records.", Icon: HardDrive, tint: "text-sky-600", action: "toggle" },
-  { key: "box", name: "Box", category: "Documents", description: "Enterprise document storage and plan sets.", Icon: Box, tint: "text-blue-600", action: "toggle" },
+  { key: "google-drive", name: "Google Drive", category: "Documents", description: "Attach drawings, submittals and photos from Drive.", Icon: SiGoogledrive, tint: "text-amber-600", action: "toggle", setupUrl: "https://drive.google.com" },
+  { key: "dropbox", name: "Dropbox", category: "Documents", description: "Sync project documents and field photos.", Icon: SiDropbox, tint: "text-blue-600", action: "toggle", setupUrl: "https://dropbox.com" },
+  { key: "onedrive", name: "Microsoft OneDrive", category: "Documents", description: "Browse and attach OneDrive files to records.", Icon: HardDrive, tint: "text-sky-600", action: "toggle", setupUrl: "https://onedrive.live.com" },
+  { key: "box", name: "Box", category: "Documents", description: "Enterprise document storage and plan sets.", Icon: Box, tint: "text-blue-600", action: "toggle", setupUrl: "https://box.com" },
 
   // Communication
-  { key: "slack", name: "Slack", category: "Communication", description: "Send the daily brief and alerts to project channels.", Icon: MessageSquare, tint: "text-purple-600", action: "toggle" },
-  { key: "teams", name: "Microsoft Teams", category: "Communication", description: "Post updates and RFIs into Teams channels.", Icon: MessagesSquare, tint: "text-indigo-600", action: "toggle" },
-  { key: "gmail", name: "Gmail", category: "Communication", description: "Email RFIs, submittals and daily logs directly.", Icon: Mail, tint: "text-red-600", action: "toggle" },
-  { key: "outlook", name: "Outlook", category: "Communication", description: "Outlook email and calendar integration.", Icon: Mail, tint: "text-blue-600", action: "toggle" },
+  { key: "slack", name: "Slack", category: "Communication", description: "Send the daily brief and alerts to project channels.", Icon: MessageSquare, tint: "text-purple-600", action: "toggle", setupUrl: "https://slack.com" },
+  { key: "teams", name: "Microsoft Teams", category: "Communication", description: "Post updates and RFIs into Teams channels.", Icon: MessagesSquare, tint: "text-indigo-600", action: "toggle", setupUrl: "https://teams.microsoft.com" },
+  { key: "gmail", name: "Gmail", category: "Communication", description: "Email RFIs, submittals and daily logs directly.", Icon: Mail, tint: "text-red-600", action: "toggle", setupUrl: "https://gmail.com" },
+  { key: "outlook", name: "Outlook", category: "Communication", description: "Outlook email and calendar integration.", Icon: Mail, tint: "text-blue-600", action: "toggle", setupUrl: "https://outlook.live.com" },
 
   // Scheduling
   { key: "google-calendar", name: "Google Calendar", category: "Scheduling", description: "Two-way calendar sync with tasks, RFIs and milestones.", Icon: CalendarRange, tint: "text-blue-600", action: "link", href: "/schedule", native: true },
   { key: "ms-project", name: "Microsoft Project", category: "Scheduling", description: "Import .mpp schedules into the Gantt view.", Icon: GanttChartSquare, tint: "text-emerald-600", action: "toggle" },
 
   // Design & BIM
-  { key: "autodesk", name: "Autodesk Construction Cloud", category: "Design & BIM", description: "Link ACC drawings, models and sheets to records.", Icon: SiAutodesk, tint: "text-slate-700 dark:text-slate-300", action: "toggle" },
-  { key: "bluebeam", name: "Bluebeam Revu", category: "Design & BIM", description: "Sync markups and punch from Bluebeam sessions.", Icon: PenTool, tint: "text-orange-600", action: "toggle" },
+  { key: "autodesk", name: "Autodesk Construction Cloud", category: "Design & BIM", description: "Link ACC drawings, models and sheets to records.", Icon: SiAutodesk, tint: "text-slate-700 dark:text-slate-300", action: "toggle", setupUrl: "https://construction.autodesk.com" },
+  { key: "bluebeam", name: "Bluebeam Revu", category: "Design & BIM", description: "Sync markups and punch from Bluebeam sessions.", Icon: PenTool, tint: "text-orange-600", action: "toggle", setupUrl: "https://bluebeam.com" },
 
   // Time Tracking
-  { key: "clockshark", name: "ClockShark", category: "Time Tracking", description: "Crew time tracking with GPS and clock-in data.", Icon: Clock, tint: "text-sky-600", action: "toggle" },
-  { key: "tsheets", name: "QuickBooks Time (TSheets)", category: "Time Tracking", description: "Employee time tracking and timesheet approval.", Icon: Timer, tint: "text-green-600", action: "toggle" },
-  { key: "hubstaff", name: "Hubstaff", category: "Time Tracking", description: "Time, activity and location for field crews.", Icon: Activity, tint: "text-orange-600", action: "toggle" },
+  { key: "clockshark", name: "ClockShark", category: "Time Tracking", description: "Crew time tracking with GPS and clock-in data.", Icon: Clock, tint: "text-sky-600", action: "toggle", setupUrl: "https://clockshark.com" },
+  { key: "tsheets", name: "QuickBooks Time (TSheets)", category: "Time Tracking", description: "Employee time tracking and timesheet approval.", Icon: Timer, tint: "text-green-600", action: "toggle", setupUrl: "https://tsheets.intuit.com" },
+  { key: "hubstaff", name: "Hubstaff", category: "Time Tracking", description: "Time, activity and location for field crews.", Icon: Activity, tint: "text-orange-600", action: "toggle", setupUrl: "https://hubstaff.com" },
 ];
 
 const CATEGORIES: CatKey[] = ["Payroll & HR", "Accounting", "Spreadsheets", "Documents", "Communication", "Scheduling", "Design & BIM", "Time Tracking"];
@@ -99,16 +107,22 @@ export default function IntegrationsPage() {
   const { data: cos = [] } = useChangeOrders(pid);
 
   const { data: rows = [], isLoading } = useIntegrations();
-  const toggle = useToggleIntegration();
+  const connectMut = useConnectIntegration();
+  const disconnectMut = useDisconnectIntegration();
+  const testMut = useTestIntegration();
+  const { toast } = useToast();
 
-  const connectedMap = useMemo(() => {
-    const m = new Map<string, boolean>();
-    rows.forEach((r) => m.set(r.key, !!r.connected));
+  const integrationMap = useMemo(() => {
+    const m = new Map<string, Integration>();
+    rows.forEach((r) => m.set(r.key, r));
     return m;
   }, [rows]);
 
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<CatKey | "All">("All");
+  const [connectItem, setConnectItem] = useState<CatalogItem | null>(null);
+  const [accountLabel, setAccountLabel] = useState("");
+  const [testing, setTesting] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -119,15 +133,15 @@ export default function IntegrationsPage() {
     });
   }, [query, cat]);
 
-  const connectedCount = CATALOG.filter((c) => c.native || connectedMap.get(c.key)).length;
+  const connectedCount = CATALOG.filter((c) => c.native || integrationMap.get(c.key)?.connected).length;
 
   const exportCsv = (item: CatalogItem) => {
-    const rows: string[][] = [["Type", "Number", "Title", "Trade/Category", "Start", "End/Due", "Status", "Amount"]];
-    tasks.forEach((t) => rows.push(["Task", t.seq ? String(t.seq) : `T-${t.id}`, t.title, t.trade, t.startDate ?? project?.startDate ?? "", t.endDate ?? t.dueDate, t.status, ""]));
-    rfis.forEach((r) => rows.push(["RFI", r.number, r.subject, "", r.dateCreated, r.dueDate, r.status, ""]));
-    subs.forEach((s) => rows.push(["Submittal", s.number, s.subject, s.type, s.dateSubmitted, s.dueDate, s.status, ""]));
-    cos.forEach((c) => rows.push(["Change Order", c.number, c.title, "", c.dateIssued, c.dateIssued, c.status, String(c.amount)]));
-    const csv = rows.map((r) => r.map(csvCell).join(",")).join("\n");
+    const csvRows: string[][] = [["Type", "Number", "Title", "Trade/Category", "Start", "End/Due", "Status", "Amount"]];
+    tasks.forEach((t) => csvRows.push(["Task", t.seq ? String(t.seq) : `T-${t.id}`, t.title, t.trade, t.startDate ?? project?.startDate ?? "", t.endDate ?? t.dueDate, t.status, ""]));
+    rfis.forEach((r) => csvRows.push(["RFI", r.number, r.subject, "", r.dateCreated, r.dueDate, r.status, ""]));
+    subs.forEach((s) => csvRows.push(["Submittal", s.number, s.subject, s.type, s.dateSubmitted, s.dueDate, s.status, ""]));
+    cos.forEach((c) => csvRows.push(["Change Order", c.number, c.title, "", c.dateIssued, c.dateIssued, c.status, String(c.amount)]));
+    const csv = csvRows.map((r) => r.map(csvCell).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -137,9 +151,42 @@ export default function IntegrationsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleToggle = (item: CatalogItem) => {
-    const next = !(connectedMap.get(item.key) ?? false);
-    toggle.mutate({ key: item.key, connected: next });
+  const openConnect = (item: CatalogItem) => {
+    const existing = integrationMap.get(item.key);
+    setAccountLabel(existing?.accountLabel ?? "");
+    setConnectItem(item);
+  };
+
+  const handleConnect = async () => {
+    if (!connectItem) return;
+    try {
+      await connectMut.mutateAsync({ key: connectItem.key, accountLabel: accountLabel.trim() || undefined });
+      toast({ title: `${connectItem.name} connected`, description: accountLabel ? `Account: ${accountLabel}` : undefined });
+      setConnectItem(null);
+    } catch {
+      toast({ title: "Connection failed", variant: "destructive" });
+    }
+  };
+
+  const handleDisconnect = async (item: CatalogItem) => {
+    try {
+      await disconnectMut.mutateAsync(item.key);
+      toast({ title: `${item.name} disconnected` });
+    } catch {
+      toast({ title: "Disconnect failed", variant: "destructive" });
+    }
+  };
+
+  const handleTest = async (item: CatalogItem) => {
+    setTesting(true);
+    try {
+      const result = await testMut.mutateAsync(item.key);
+      toast({ title: `${item.name}: ${result.message}`, description: result.ok ? "Connection is working" : "Connection issue detected" });
+    } catch {
+      toast({ title: "Test failed", variant: "destructive" });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const grouped = CATEGORIES.map((c) => ({ cat: c, items: filtered.filter((i) => i.category === c) })).filter((g) => g.items.length > 0);
@@ -199,7 +246,7 @@ export default function IntegrationsPage() {
         </div>
       ) : grouped.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-          No integrations match “{query}”.
+          No integrations match "{query}".
         </div>
       ) : (
         <div className="space-y-7">
@@ -208,7 +255,8 @@ export default function IntegrationsPage() {
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{c}</h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {items.map((item) => {
-                  const connected = item.native || (connectedMap.get(item.key) ?? false);
+                  const intRow = integrationMap.get(item.key);
+                  const connected = item.native || !!intRow?.connected;
                   return (
                     <div key={item.key}
                       className={cn("flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-colors", connected ? "border-primary/40" : "border-border")}
@@ -221,8 +269,12 @@ export default function IntegrationsPage() {
                           <div className="flex items-center gap-2">
                             <h3 className="truncate font-display text-sm font-bold">{item.name}</h3>
                             {item.native && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">NATIVE</span>}
+                            {connected && !item.native && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">CONNECTED</span>}
                           </div>
                           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                          {intRow?.accountLabel && connected && (
+                            <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{intRow.accountLabel}</p>
+                          )}
                         </div>
                       </div>
 
@@ -230,21 +282,34 @@ export default function IntegrationsPage() {
                         <span className={cn("inline-flex items-center gap-1 text-xs font-medium", connected ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")} data-testid={`integration-status-${item.key}`}>
                           {connected ? <><Check className="size-3.5" /> Connected</> : <>Not connected</>}
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           {item.action === "export-csv" && (
                             <Button size="sm" variant="outline" onClick={() => exportCsv(item)} data-testid={`integration-export-${item.key}`}>
-                              <Download className="size-3.5" /> Export CSV
+                              <Download className="size-3.5" /> Export
                             </Button>
                           )}
                           {item.action === "link" ? (
                             <Button size="sm" onClick={() => navigate(item.href!)} data-testid={`integration-open-${item.key}`}>
                               Open <ArrowRight className="size-3.5" />
                             </Button>
-                          ) : (
-                            <Button size="sm" variant={connected ? "outline" : "default"} onClick={() => handleToggle(item)} disabled={toggle.isPending} data-testid={`integration-toggle-${item.key}`}>
-                              {connected ? (<><ExternalLink className="size-3.5" /> Disconnect</>) : (<><Plug className="size-3.5" /> Connect</>)}
+                          ) : connected && !item.native ? (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => handleTest(item)} disabled={testing} data-testid={`integration-test-${item.key}`}>
+                                {testing ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
+                                Test
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => openConnect(item)} data-testid={`integration-manage-${item.key}`}>
+                                Manage
+                              </Button>
+                              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDisconnect(item)} disabled={disconnectMut.isPending} data-testid={`integration-disconnect-${item.key}`}>
+                                <Unplug className="size-3.5" />
+                              </Button>
+                            </>
+                          ) : !item.native ? (
+                            <Button size="sm" onClick={() => openConnect(item)} data-testid={`integration-connect-${item.key}`}>
+                              <Plug className="size-3.5" /> Connect
                             </Button>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -256,6 +321,56 @@ export default function IntegrationsPage() {
         </div>
       )}
 
+      {/* Connect dialog */}
+      <Dialog open={!!connectItem} onOpenChange={(o) => { if (!o) setConnectItem(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {connectItem && (
+                <>
+                  <span className={cn("grid size-8 place-items-center rounded-md bg-muted", connectItem.tint)}>
+                    <connectItem.Icon className="size-4" />
+                  </span>
+                  Connect {connectItem.name}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {connectItem && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{connectItem.description}</p>
+              <div>
+                <Label>Account Label</Label>
+                <Input
+                  value={accountLabel}
+                  onChange={(e) => setAccountLabel(e.target.value)}
+                  placeholder="e.g. My Company Workspace"
+                  className="mt-1.5"
+                  data-testid="input-integration-account-label"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">A friendly name to identify this connection.</p>
+              </div>
+              {connectItem.setupUrl && (
+                <div className="rounded-md border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    You'll be redirected to {connectItem.name} to authorize access. After authorizing, return here to complete the connection.
+                  </p>
+                  <a href={connectItem.setupUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline" data-testid="link-integration-setup">
+                    Open {connectItem.name} <ExternalLink className="size-3" />
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConnectItem(null)}>Cancel</Button>
+            <Button onClick={handleConnect} disabled={connectMut.isPending} data-testid="button-integration-connect-confirm">
+              {connectMut.isPending ? "Connecting…" : "Connect"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Footnote */}
       <div className="mt-8 rounded-lg border border-border bg-muted/30 p-4">
         <div className="flex items-start gap-3">
@@ -263,8 +378,8 @@ export default function IntegrationsPage() {
           <p className="text-xs text-muted-foreground">
             <span className="font-medium text-foreground">How connections work.</span>{" "}
             Google Calendar and the spreadsheet exports work out of the box today. Connecting a payroll, accounting or document
-            service saves its status so your team sees what's wired up; full data sync for each provider is configured with your
-            API credentials during onboarding. Toggle any card to mark it as connected.
+            service saves its status and account label so your team sees what's wired up. Click "Connect" to set up an integration,
+            "Test" to verify the connection, and "Manage" to update settings.
           </p>
         </div>
       </div>

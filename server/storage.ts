@@ -178,9 +178,13 @@ async function migrate() {
     id SERIAL PRIMARY KEY,
     key TEXT NOT NULL UNIQUE,
     connected BOOLEAN NOT NULL DEFAULT FALSE,
+    status TEXT NOT NULL DEFAULT 'available',
+    account_label TEXT,
     connected_at TEXT,
     config TEXT
   )`;
+  await sql`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'available'`;
+  await sql`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS account_label TEXT`;
   await sql`CREATE TABLE IF NOT EXISTS subscribers (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
@@ -336,6 +340,8 @@ export interface IStorage {
   deleteNote(id: number): Promise<void>;
   getIntegrations(): Promise<Integration[]>;
   setIntegration(key: string, connected: boolean, config?: string): Promise<Integration>;
+  connectIntegration(key: string, data: { accountLabel?: string; config?: string }): Promise<Integration>;
+  disconnectIntegration(key: string): Promise<Integration>;
   createSubscriber(data: InsertSubscriber): Promise<Subscriber>;
   listSubscribers(): Promise<Subscriber[]>;
   createDemoRequest(data: InsertDemoRequest): Promise<DemoRequest>;
@@ -720,6 +726,42 @@ class DatabaseStorage implements IStorage {
     const [row] = await db.insert(integrations)
       .values({ key, connected, connectedAt: connected ? now : null, config })
       .returning();
+    return row;
+  }
+  async connectIntegration(key: string, data: { accountLabel?: string; config?: string }): Promise<Integration> {
+    await ensureReady();
+    const now = new Date().toISOString();
+    const existingRows = await db.select().from(integrations).where(eq(integrations.key, key));
+    const existing = existingRows[0];
+    const values = {
+      connected: true,
+      status: "connected" as const,
+      connectedAt: now,
+      accountLabel: data.accountLabel ?? null,
+      config: data.config ?? existing?.config ?? null,
+    };
+    if (existing) {
+      const [row] = await db.update(integrations).set(values).where(eq(integrations.key, key)).returning();
+      return row;
+    }
+    const [row] = await db.insert(integrations).values({ key, ...values }).returning();
+    return row;
+  }
+  async disconnectIntegration(key: string): Promise<Integration> {
+    await ensureReady();
+    const existingRows = await db.select().from(integrations).where(eq(integrations.key, key));
+    const existing = existingRows[0];
+    const values = {
+      connected: false,
+      status: "available" as const,
+      connectedAt: null,
+      accountLabel: null,
+    };
+    if (existing) {
+      const [row] = await db.update(integrations).set(values).where(eq(integrations.key, key)).returning();
+      return row;
+    }
+    const [row] = await db.insert(integrations).values({ key, ...values }).returning();
     return row;
   }
 

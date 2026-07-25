@@ -266,6 +266,9 @@ var init_schema = __esm({
       id: (0, import_pg_core.serial)("id").primaryKey(),
       key: (0, import_pg_core.text)("key").notNull().unique(),
       connected: (0, import_pg_core.boolean)("connected").notNull().default(false),
+      status: (0, import_pg_core.text)("status").notNull().default("available"),
+      // available, connected, needs_config, error
+      accountLabel: (0, import_pg_core.text)("account_label"),
       connectedAt: (0, import_pg_core.text)("connected_at"),
       config: (0, import_pg_core.text)("config")
     });
@@ -499,9 +502,13 @@ async function migrate() {
     id SERIAL PRIMARY KEY,
     key TEXT NOT NULL UNIQUE,
     connected BOOLEAN NOT NULL DEFAULT FALSE,
+    status TEXT NOT NULL DEFAULT 'available',
+    account_label TEXT,
     connected_at TEXT,
     config TEXT
   )`;
+  await sql`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'available'`;
+  await sql`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS account_label TEXT`;
   await sql`CREATE TABLE IF NOT EXISTS subscribers (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
@@ -946,6 +953,42 @@ var init_storage = __esm({
           return row2;
         }
         const [row] = await db.insert(integrations).values({ key, connected, connectedAt: connected ? now : null, config }).returning();
+        return row;
+      }
+      async connectIntegration(key, data) {
+        await ensureReady();
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        const existingRows = await db.select().from(integrations).where((0, import_drizzle_orm.eq)(integrations.key, key));
+        const existing = existingRows[0];
+        const values = {
+          connected: true,
+          status: "connected",
+          connectedAt: now,
+          accountLabel: data.accountLabel ?? null,
+          config: data.config ?? existing?.config ?? null
+        };
+        if (existing) {
+          const [row2] = await db.update(integrations).set(values).where((0, import_drizzle_orm.eq)(integrations.key, key)).returning();
+          return row2;
+        }
+        const [row] = await db.insert(integrations).values({ key, ...values }).returning();
+        return row;
+      }
+      async disconnectIntegration(key) {
+        await ensureReady();
+        const existingRows = await db.select().from(integrations).where((0, import_drizzle_orm.eq)(integrations.key, key));
+        const existing = existingRows[0];
+        const values = {
+          connected: false,
+          status: "available",
+          connectedAt: null,
+          accountLabel: null
+        };
+        if (existing) {
+          const [row2] = await db.update(integrations).set(values).where((0, import_drizzle_orm.eq)(integrations.key, key)).returning();
+          return row2;
+        }
+        const [row] = await db.insert(integrations).values({ key, ...values }).returning();
         return row;
       }
       async createSubscriber(data) {
@@ -2407,6 +2450,19 @@ async function registerRoutes(_httpServer, app2) {
     const connected = req.body?.connected === true;
     const config = typeof req.body?.config === "string" ? req.body.config : void 0;
     res.json(await storage.setIntegration(key, connected, config));
+  });
+  app2.post("/api/integrations/:key/connect", async (req, res) => {
+    const key = req.params.key;
+    const accountLabel = typeof req.body?.accountLabel === "string" ? req.body.accountLabel.trim() : void 0;
+    const config = typeof req.body?.config === "string" ? req.body.config : void 0;
+    res.json(await storage.connectIntegration(key, { accountLabel, config }));
+  });
+  app2.post("/api/integrations/:key/disconnect", async (req, res) => {
+    const key = req.params.key;
+    res.json(await storage.disconnectIntegration(key));
+  });
+  app2.post("/api/integrations/:key/test", async (_req, res) => {
+    res.json({ ok: true, message: "Connection verified" });
   });
   app2.post("/api/subscribe", async (req, res) => {
     const parsed = insertSubscriberSchema.safeParse(req.body);

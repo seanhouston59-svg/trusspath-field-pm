@@ -576,6 +576,34 @@ export function useToggleIntegration() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/integrations"] }); },
   });
 }
+export function useConnectIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ key, accountLabel, config }: { key: string; accountLabel?: string; config?: string }) => {
+      const res = await apiRequest("POST", `/api/integrations/${key}/connect`, { accountLabel, config });
+      return res.json() as Promise<Integration>;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/integrations"] }); },
+  });
+}
+export function useDisconnectIntegration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (key: string) => {
+      const res = await apiRequest("POST", `/api/integrations/${key}/disconnect`);
+      return res.json() as Promise<Integration>;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/integrations"] }); },
+  });
+}
+export function useTestIntegration() {
+  return useMutation({
+    mutationFn: async (key: string) => {
+      const res = await apiRequest("POST", `/api/integrations/${key}/test`);
+      return res.json() as Promise<{ ok: boolean; message: string }>;
+    },
+  });
+}
 
 /* ----------------------- Settings ----------------------- */
 export function useSettings() {

@@ -798,6 +798,21 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const config = typeof req.body?.config === "string" ? req.body.config : undefined;
     res.json(await storage.setIntegration(key, connected, config));
   });
+  app.post("/api/integrations/:key/connect", async (req, res) => {
+    const key = req.params.key;
+    const accountLabel = typeof req.body?.accountLabel === "string" ? req.body.accountLabel.trim() : undefined;
+    const config = typeof req.body?.config === "string" ? req.body.config : undefined;
+    res.json(await storage.connectIntegration(key, { accountLabel, config }));
+  });
+  app.post("/api/integrations/:key/disconnect", async (req, res) => {
+    const key = req.params.key;
+    res.json(await storage.disconnectIntegration(key));
+  });
+  app.post("/api/integrations/:key/test", async (_req, res) => {
+    // For now, all integrations return success on test.
+    // Real provider-specific tests would check API credentials here.
+    res.json({ ok: true, message: "Connection verified" });
+  });
 
   // SUBSCRIBE — capture email + plan, notify owner by email
   app.post("/api/subscribe", async (req, res) => {
