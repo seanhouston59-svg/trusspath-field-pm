@@ -44,6 +44,7 @@ import Notes from "@/pages/notes";
 import Blueprints from "@/pages/blueprints";
 import Drone from "@/pages/drone";
 import SettingsPage from "@/pages/settings";
+import DeletedItemsPage from "@/pages/deleted-items";
 import AdminSignups from "@/pages/admin-signups";
 import Cpm from "@/pages/cpm";
 
@@ -75,6 +76,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/contacts": Contacts,
   "/messages": Messages,
   "/notes": Notes,
+  "/deleted-items": DeletedItemsPage,
   "/settings": SettingsPage,
 };
 

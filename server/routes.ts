@@ -314,7 +314,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(updated);
   });
   app.delete("/api/team/:id", async (req, res) => {
-    await storage.deleteTeamMember(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("team-members", parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
@@ -425,7 +425,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(updated);
   });
   app.delete("/api/daily-logs/:id", async (req, res) => {
-    await storage.deleteDailyLog(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("daily-logs", parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
@@ -460,7 +460,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(updated);
   });
   app.delete("/api/contacts/:id", async (req, res) => {
-    await storage.deleteContact(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("contacts", parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
@@ -524,12 +524,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // Delete a photo and its uploaded file
   app.delete("/api/photos/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const photo = await storage.getPhoto(id);
-    if (photo?.storedFileName) {
-      const abs = path.resolve(PHOTO_DIR, photo.storedFileName);
-      if (abs.startsWith(PHOTO_DIR + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
-    }
-    await storage.deletePhoto(id);
+    await storage.softDeleteEntity("photos", id);
     res.status(204).end();
   });
 
@@ -583,12 +578,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // Delete a document and its uploaded file
   app.delete("/api/documents/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const doc = await storage.getDocument(id);
-    if (doc?.storedFileName) {
-      const abs = path.resolve(UPLOAD_DIR, doc.storedFileName);
-      if (abs.startsWith(UPLOAD_DIR + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
-    }
-    await storage.deleteDocument(id);
+    await storage.softDeleteEntity("documents", id);
     res.status(204).end();
   });
 
@@ -657,12 +647,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   app.delete("/api/company-documents/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const doc = await storage.getCompanyDocument(id);
-    if (doc?.storedFileName) {
-      const abs = path.resolve(companyUploadDir, doc.storedFileName);
-      if (abs.startsWith(companyUploadDir + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
-    }
-    await storage.deleteCompanyDocument(id);
+    await storage.softDeleteEntity("company-documents", id);
     res.status(204).end();
   });
 
@@ -696,7 +681,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(updated);
   });
   app.delete("/api/milestones/:id", async (req, res) => {
-    await storage.deleteMilestone(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("milestones", parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
@@ -749,12 +734,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // Delete a drone capture and its uploaded file
   app.delete("/api/drone-captures/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const cap = await storage.getDroneCapture(id);
-    if (cap?.storedFileName) {
-      const abs = path.resolve(DRONE_DIR, cap.storedFileName);
-      if (abs.startsWith(DRONE_DIR + path.sep)) { try { fs.unlinkSync(abs); } catch {} }
-    }
-    await storage.deleteDroneCapture(id);
+    await storage.softDeleteEntity("drone-captures", id);
     res.status(204).end();
   });
 
@@ -784,7 +764,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(updated);
   });
   app.delete("/api/notes/:id", async (req, res) => {
-    await storage.deleteNote(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("notes", parseInt(req.params.id, 10));
     res.status(204).end();
   });
 
@@ -812,6 +792,29 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     // For now, all integrations return success on test.
     // Real provider-specific tests would check API credentials here.
     res.json({ ok: true, message: "Connection verified" });
+  });
+
+  // DELETED ITEMS BIN
+  app.get("/api/deleted-items", async (_req, res) => {
+    res.json(await storage.getDeletedItems());
+  });
+  app.post("/api/deleted-items/:type/:id/restore", async (req, res) => {
+    const { type, id } = req.params;
+    try {
+      const restored = await storage.restoreEntity(type, parseInt(id, 10));
+      res.json(restored);
+    } catch (e: any) {
+      res.status(404).json({ message: e?.message ?? "Item not found in bin" });
+    }
+  });
+  app.delete("/api/deleted-items/:type/:id/permanent", async (req, res) => {
+    const { type, id } = req.params;
+    await storage.permanentDeleteEntity(type, parseInt(id, 10));
+    res.status(204).end();
+  });
+  app.delete("/api/deleted-items", async (_req, res) => {
+    await storage.emptyDeletedItems();
+    res.status(204).end();
   });
 
   // SUBSCRIBE — capture email + plan, notify owner by email

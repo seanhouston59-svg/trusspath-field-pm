@@ -1,7 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createElement } from "react";
 import { apiRequest, apiUpload } from "@/lib/queryClient";
-import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, InsertDailyLog, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertTeamMember, InsertContact, InsertPunchItem, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, PunchItem, TeamMember, Contact, Equipment, Photo, DocumentRow, CompanyDocument, Blueprint, DroneCapture, Message, Note, Integration, AppSettings, Milestone, InsertMilestone } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, InsertDailyLog, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertTeamMember, InsertContact, InsertPunchItem, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, PunchItem, TeamMember, Contact, Equipment, Photo, DocumentRow, CompanyDocument, Blueprint, DroneCapture, Message, Note, Integration, AppSettings, Milestone, InsertMilestone, DeletedItem } from "@shared/schema";
 import { DEFAULT_SETTINGS } from "@shared/schema";
+
+function useDeleteWithUndo(entityType: string, queryKey: string, apiPath: string) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `${apiPath}/${id}`); },
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: [queryKey] });
+      qc.invalidateQueries({ queryKey: ["/api/deleted-items"] });
+      toast({
+        title: "Moved to Deleted Items",
+        description: "Item can be restored from the recycle bin.",
+        action: createElement(ToastAction, {
+          altText: "Undo",
+          onClick: async () => {
+            try {
+              await apiRequest("POST", `/api/deleted-items/${entityType}/${id}/restore`);
+              qc.invalidateQueries();
+              toast({ title: "Item restored" });
+            } catch {
+              toast({ title: "Restore failed", variant: "destructive" });
+            }
+          },
+        }, "Undo") as any,
+      });
+    },
+  });
+}
 
 export function useTeam() {
   return useQuery<TeamMember[]>({ queryKey: ["/api/team"] });
@@ -93,11 +124,7 @@ export function useUpdateDailyLog() {
 }
 
 export function useDeleteDailyLog() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/daily-logs/${id}`); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/daily-logs"] }); },
-  });
+  return useDeleteWithUndo("daily-logs", "/api/daily-logs", "/api/daily-logs");
 }
 
 export function usePunchItems(projectId?: number) {
@@ -348,15 +375,7 @@ export function useUpdateNotePosition() {
 }
 
 export function useDeleteNote() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/notes/${id}`);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/notes"] });
-    },
-  });
+  return useDeleteWithUndo("notes", "/api/notes", "/api/notes");
 }
 
 /* ----------------------- Generic create hooks ----------------------- */
@@ -424,11 +443,7 @@ export function useCreatePhoto() {
   });
 }
 export function useDeletePhoto() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/photos/${id}`); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/photos"] }); },
-  });
+  return useDeleteWithUndo("photos", "/api/photos", "/api/photos");
 }
 export function useCreateDocument() {
   const qc = useQueryClient();
@@ -438,11 +453,7 @@ export function useCreateDocument() {
   });
 }
 export function useDeleteDocument() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/documents/${id}`); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/documents"] }); },
-  });
+  return useDeleteWithUndo("documents", "/api/documents", "/api/documents");
 }
 export function useCompanyDocuments() {
   return useQuery<CompanyDocument[]>({ queryKey: ["/api/company-documents"] });
@@ -465,11 +476,7 @@ export function useUpdateCompanyDocument() {
   });
 }
 export function useDeleteCompanyDocument() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/company-documents/${id}`); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/company-documents"] }); },
-  });
+  return useDeleteWithUndo("company-documents", "/api/company-documents", "/api/company-documents");
 }
 export function useCreateBlueprint() {
   const qc = useQueryClient();
@@ -486,11 +493,7 @@ export function useCreateDroneCapture() {
   });
 }
 export function useDeleteDroneCapture() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/drone-captures/${id}`); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/drone-captures"] }); },
-  });
+  return useDeleteWithUndo("drone-captures", "/api/drone-captures", "/api/drone-captures");
 }
 
 /* ----------------------- Team member CRUD ----------------------- */
@@ -509,11 +512,7 @@ export function useUpdateTeamMember() {
   });
 }
 export function useDeleteTeamMember() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/team/${id}`); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/team"] }); },
-  });
+  return useDeleteWithUndo("team-members", "/api/team", "/api/team");
 }
 
 /* ----------------------- Contact CRUD ----------------------- */
@@ -532,11 +531,7 @@ export function useUpdateContact() {
   });
 }
 export function useDeleteContact() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/contacts/${id}`); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/contacts"] }); },
-  });
+  return useDeleteWithUndo("contacts", "/api/contacts", "/api/contacts");
 }
 
 // ---- JARVIS AI assistant ----
@@ -602,6 +597,37 @@ export function useTestIntegration() {
       const res = await apiRequest("POST", `/api/integrations/${key}/test`);
       return res.json() as Promise<{ ok: boolean; message: string }>;
     },
+  });
+}
+
+/* ----------------------- Deleted Items Bin ----------------------- */
+export function useDeletedItems() {
+  return useQuery<DeletedItem[]>({ queryKey: ["/api/deleted-items"] });
+}
+export function useRestoreItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ type, id }: { type: string; id: number }) => {
+      const res = await apiRequest("POST", `/api/deleted-items/${type}/${id}/restore`);
+      return res.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/deleted-items"] }); qc.invalidateQueries(); },
+  });
+}
+export function usePermanentDeleteItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ type, id }: { type: string; id: number }) => {
+      await apiRequest("DELETE", `/api/deleted-items/${type}/${id}/permanent`);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/deleted-items"] }); },
+  });
+}
+export function useEmptyDeletedItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => { await apiRequest("DELETE", "/api/deleted-items"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/deleted-items"] }); },
   });
 }
 

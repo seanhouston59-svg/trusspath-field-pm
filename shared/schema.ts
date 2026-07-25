@@ -211,6 +211,17 @@ export const companyDocuments = pgTable("company_documents", {
   fileSizeBytes: integer("file_size_bytes"),
 });
 
+/* --------------------------- Deleted Items ----------------------------- */
+export const deletedItems = pgTable("deleted_items", {
+  id: serial("id").primaryKey(),
+  entityType: text("entity_type").notNull(),
+  entityId: integer("entity_id").notNull(),
+  data: text("data").notNull(), // JSON-serialized row
+  projectName: text("project_name"),
+  deletedAt: text("deleted_at").notNull(),
+  deletedById: integer("deleted_by_id"),
+});
+
 /* ----------------------------- Blueprints ------------------------------ */
 export const blueprints = pgTable("blueprints", {
   id: serial("id").primaryKey(),
@@ -335,6 +346,7 @@ export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: tr
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true });
 export const insertCompanyDocumentSchema = createInsertSchema(companyDocuments).omit({ id: true });
+export const insertDeletedItemSchema = createInsertSchema(deletedItems).omit({ id: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
 export const insertNoteSchema = createInsertSchema(notes).omit({ id: true });
 export const insertIntegrationSchema = createInsertSchema(integrations).omit({ id: true });
@@ -411,6 +423,7 @@ export type InsertEquipment = z.infer<typeof insertEquipmentSchema>;
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type InsertCompanyDocument = z.infer<typeof insertCompanyDocumentSchema>;
+export type InsertDeletedItem = z.infer<typeof insertDeletedItemSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertNote = z.infer<typeof insertNoteSchema>;
 export type InsertBlueprint = z.infer<typeof insertBlueprintSchema>;
@@ -432,6 +445,7 @@ export type Equipment = typeof equipment.$inferSelect;
 export type Photo = typeof photos.$inferSelect;
 export type DocumentRow = typeof documents.$inferSelect;
 export type CompanyDocument = typeof companyDocuments.$inferSelect;
+export type DeletedItem = typeof deletedItems.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type Blueprint = typeof blueprints.$inferSelect;

@@ -31,7 +31,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // shared/schema.ts
-var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
+var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -219,6 +219,16 @@ var init_schema = __esm({
       mimeType: (0, import_pg_core.text)("mime_type"),
       fileSizeBytes: (0, import_pg_core.integer)("file_size_bytes")
     });
+    deletedItems = (0, import_pg_core.pgTable)("deleted_items", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      entityType: (0, import_pg_core.text)("entity_type").notNull(),
+      entityId: (0, import_pg_core.integer)("entity_id").notNull(),
+      data: (0, import_pg_core.text)("data").notNull(),
+      // JSON-serialized row
+      projectName: (0, import_pg_core.text)("project_name"),
+      deletedAt: (0, import_pg_core.text)("deleted_at").notNull(),
+      deletedById: (0, import_pg_core.integer)("deleted_by_id")
+    });
     blueprints = (0, import_pg_core.pgTable)("blueprints", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
       projectId: (0, import_pg_core.integer)("project_id").notNull(),
@@ -325,6 +335,7 @@ var init_schema = __esm({
     insertPhotoSchema = (0, import_drizzle_zod.createInsertSchema)(photos).omit({ id: true });
     insertDocumentSchema = (0, import_drizzle_zod.createInsertSchema)(documents).omit({ id: true });
     insertCompanyDocumentSchema = (0, import_drizzle_zod.createInsertSchema)(companyDocuments).omit({ id: true });
+    insertDeletedItemSchema = (0, import_drizzle_zod.createInsertSchema)(deletedItems).omit({ id: true });
     insertMessageSchema = (0, import_drizzle_zod.createInsertSchema)(messages).omit({ id: true });
     insertNoteSchema = (0, import_drizzle_zod.createInsertSchema)(notes).omit({ id: true });
     insertIntegrationSchema = (0, import_drizzle_zod.createInsertSchema)(integrations).omit({ id: true });
@@ -474,6 +485,15 @@ async function migrate() {
     original_file_name TEXT,
     mime_type TEXT,
     file_size_bytes INTEGER
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS deleted_items (
+    id SERIAL PRIMARY KEY,
+    entity_type TEXT NOT NULL,
+    entity_id INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    project_name TEXT,
+    deleted_at TEXT NOT NULL,
+    deleted_by_id INTEGER
   )`;
   await sql`CREATE TABLE IF NOT EXISTS blueprints (
     id SERIAL PRIMARY KEY,
@@ -855,6 +875,74 @@ var init_storage = __esm({
       async deleteCompanyDocument(id) {
         await ensureReady();
         await db.delete(companyDocuments).where((0, import_drizzle_orm.eq)(companyDocuments.id, id));
+      }
+      // ---- Deleted Items Bin ----
+      ENTITY_CONFIG = {
+        tasks: { table: tasks, nameCol: "title", projectCol: "projectId" },
+        rfis: { table: rfis, nameCol: "subject", projectCol: "projectId" },
+        submittals: { table: submittals, nameCol: "subject", projectCol: "projectId" },
+        "change-orders": { table: changeOrders, nameCol: "title", projectCol: "projectId" },
+        "action-items": { table: actionItems, nameCol: "title", projectCol: "projectId" },
+        "punch-items": { table: punchItems, nameCol: "title", projectCol: "projectId" },
+        "daily-logs": { table: dailyLogs, nameCol: "date", projectCol: "projectId" },
+        photos: { table: photos, nameCol: "caption", projectCol: "projectId" },
+        documents: { table: documents, nameCol: "name", projectCol: "projectId" },
+        "company-documents": { table: companyDocuments, nameCol: "title" },
+        equipment: { table: equipment, nameCol: "name", projectCol: "projectId" },
+        contacts: { table: contacts, nameCol: "name", projectCol: "projectId" },
+        notes: { table: notes, nameCol: "content" },
+        blueprints: { table: blueprints, nameCol: "title", projectCol: "projectId" },
+        milestones: { table: milestones, nameCol: "name", projectCol: "projectId" },
+        "team-members": { table: teamMembers, nameCol: "name" },
+        "drone-captures": { table: droneCaptures, nameCol: "label", projectCol: "projectId" }
+      };
+      async getDeletedItems() {
+        await ensureReady();
+        return await db.select().from(deletedItems).orderBy((0, import_drizzle_orm.desc)(deletedItems.deletedAt));
+      }
+      async softDeleteEntity(entityType, entityId, deletedById) {
+        await ensureReady();
+        const cfg = this.ENTITY_CONFIG[entityType];
+        if (!cfg) throw new Error(`Unknown entity type: ${entityType}`);
+        const rows = await db.select().from(cfg.table).where((0, import_drizzle_orm.eq)(cfg.table.id, entityId));
+        const row = rows[0];
+        if (!row) throw new Error(`${entityType} #${entityId} not found`);
+        let projectName = null;
+        if (cfg.projectCol && row[cfg.projectCol]) {
+          const projRows = await db.select().from(projects).where((0, import_drizzle_orm.eq)(projects.id, row[cfg.projectCol]));
+          projectName = projRows[0]?.name ?? null;
+        }
+        const [deleted] = await db.insert(deletedItems).values({
+          entityType,
+          entityId,
+          data: JSON.stringify(row),
+          projectName,
+          deletedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          deletedById: deletedById ?? null
+        }).returning();
+        await db.delete(cfg.table).where((0, import_drizzle_orm.eq)(cfg.table.id, entityId));
+        return deleted;
+      }
+      async restoreEntity(entityType, entityId) {
+        await ensureReady();
+        const cfg = this.ENTITY_CONFIG[entityType];
+        if (!cfg) throw new Error(`Unknown entity type: ${entityType}`);
+        const binRows = await db.select().from(deletedItems).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(deletedItems.entityType, entityType), (0, import_drizzle_orm.eq)(deletedItems.entityId, entityId)));
+        const binRow = binRows[0];
+        if (!binRow) throw new Error(`Deleted ${entityType} #${entityId} not found in bin`);
+        const rowData = JSON.parse(binRow.data);
+        const { id, ...rest } = rowData;
+        const restored = (await db.insert(cfg.table).values(rest).returning())[0];
+        await db.delete(deletedItems).where((0, import_drizzle_orm.eq)(deletedItems.id, binRow.id));
+        return restored;
+      }
+      async permanentDeleteEntity(entityType, entityId) {
+        await ensureReady();
+        await db.delete(deletedItems).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(deletedItems.entityType, entityType), (0, import_drizzle_orm.eq)(deletedItems.entityId, entityId)));
+      }
+      async emptyDeletedItems() {
+        await ensureReady();
+        await db.delete(deletedItems);
       }
       async getBlueprints(projectId) {
         await ensureReady();
@@ -1483,6 +1571,7 @@ var init_app_manifest = __esm({
       "/contacts",
       "/messages",
       "/notes",
+      "/deleted-items",
       "/settings"
     ];
     APP_NAV = [
@@ -1542,6 +1631,7 @@ var init_app_manifest = __esm({
         title: "System",
         items: [
           { href: "/integrations", label: "Integrations", icon: "Plug" },
+          { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" },
           { href: "/settings", label: "Settings", icon: "Settings" }
         ]
       }
@@ -2002,7 +2092,7 @@ async function registerRoutes(_httpServer, app2) {
     res.json(updated);
   });
   app2.delete("/api/team/:id", async (req, res) => {
-    await storage.deleteTeamMember(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("team-members", parseInt(req.params.id, 10));
     res.status(204).end();
   });
   app2.get("/api/projects", async (_req, res) => res.json(await storage.getProjects()));
@@ -2095,7 +2185,7 @@ async function registerRoutes(_httpServer, app2) {
     res.json(updated);
   });
   app2.delete("/api/daily-logs/:id", async (req, res) => {
-    await storage.deleteDailyLog(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("daily-logs", parseInt(req.params.id, 10));
     res.status(204).end();
   });
   app2.get("/api/punch", async (req, res) => res.json(await storage.getPunchItems(pid(req))));
@@ -2125,7 +2215,7 @@ async function registerRoutes(_httpServer, app2) {
     res.json(updated);
   });
   app2.delete("/api/contacts/:id", async (req, res) => {
-    await storage.deleteContact(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("contacts", parseInt(req.params.id, 10));
     res.status(204).end();
   });
   app2.get("/api/equipment", async (req, res) => res.json(await storage.getEquipment(pid(req))));
@@ -2179,17 +2269,7 @@ async function registerRoutes(_httpServer, app2) {
   });
   app2.delete("/api/photos/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const photo = await storage.getPhoto(id);
-    if (photo?.storedFileName) {
-      const abs = import_node_path2.default.resolve(PHOTO_DIR, photo.storedFileName);
-      if (abs.startsWith(PHOTO_DIR + import_node_path2.default.sep)) {
-        try {
-          import_node_fs2.default.unlinkSync(abs);
-        } catch {
-        }
-      }
-    }
-    await storage.deletePhoto(id);
+    await storage.softDeleteEntity("photos", id);
     res.status(204).end();
   });
   app2.get("/api/documents", async (req, res) => res.json(await storage.getDocuments(pid(req))));
@@ -2235,17 +2315,7 @@ async function registerRoutes(_httpServer, app2) {
   });
   app2.delete("/api/documents/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const doc = await storage.getDocument(id);
-    if (doc?.storedFileName) {
-      const abs = import_node_path2.default.resolve(UPLOAD_DIR, doc.storedFileName);
-      if (abs.startsWith(UPLOAD_DIR + import_node_path2.default.sep)) {
-        try {
-          import_node_fs2.default.unlinkSync(abs);
-        } catch {
-        }
-      }
-    }
-    await storage.deleteDocument(id);
+    await storage.softDeleteEntity("documents", id);
     res.status(204).end();
   });
   const companyUploadDir = process.env.NODE_ENV === "production" ? "/tmp/uploads/company-documents" : import_node_path2.default.resolve(process.cwd(), "uploads/company-documents");
@@ -2318,17 +2388,7 @@ async function registerRoutes(_httpServer, app2) {
   });
   app2.delete("/api/company-documents/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const doc = await storage.getCompanyDocument(id);
-    if (doc?.storedFileName) {
-      const abs = import_node_path2.default.resolve(companyUploadDir, doc.storedFileName);
-      if (abs.startsWith(companyUploadDir + import_node_path2.default.sep)) {
-        try {
-          import_node_fs2.default.unlinkSync(abs);
-        } catch {
-        }
-      }
-    }
-    await storage.deleteCompanyDocument(id);
+    await storage.softDeleteEntity("company-documents", id);
     res.status(204).end();
   });
   app2.get("/api/blueprints", async (req, res) => res.json(await storage.getBlueprints(pid(req))));
@@ -2356,7 +2416,7 @@ async function registerRoutes(_httpServer, app2) {
     res.json(updated);
   });
   app2.delete("/api/milestones/:id", async (req, res) => {
-    await storage.deleteMilestone(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("milestones", parseInt(req.params.id, 10));
     res.status(204).end();
   });
   app2.post("/api/drone-captures/upload", droneUpload.single("file"), async (req, res) => {
@@ -2403,17 +2463,7 @@ async function registerRoutes(_httpServer, app2) {
   });
   app2.delete("/api/drone-captures/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const cap = await storage.getDroneCapture(id);
-    if (cap?.storedFileName) {
-      const abs = import_node_path2.default.resolve(DRONE_DIR, cap.storedFileName);
-      if (abs.startsWith(DRONE_DIR + import_node_path2.default.sep)) {
-        try {
-          import_node_fs2.default.unlinkSync(abs);
-        } catch {
-        }
-      }
-    }
-    await storage.deleteDroneCapture(id);
+    await storage.softDeleteEntity("drone-captures", id);
     res.status(204).end();
   });
   app2.get("/api/messages/:projectId", async (req, res) => {
@@ -2439,7 +2489,7 @@ async function registerRoutes(_httpServer, app2) {
     res.json(updated);
   });
   app2.delete("/api/notes/:id", async (req, res) => {
-    await storage.deleteNote(parseInt(req.params.id, 10));
+    await storage.softDeleteEntity("notes", parseInt(req.params.id, 10));
     res.status(204).end();
   });
   app2.get("/api/integrations", async (_req, res) => {
@@ -2463,6 +2513,27 @@ async function registerRoutes(_httpServer, app2) {
   });
   app2.post("/api/integrations/:key/test", async (_req, res) => {
     res.json({ ok: true, message: "Connection verified" });
+  });
+  app2.get("/api/deleted-items", async (_req, res) => {
+    res.json(await storage.getDeletedItems());
+  });
+  app2.post("/api/deleted-items/:type/:id/restore", async (req, res) => {
+    const { type, id } = req.params;
+    try {
+      const restored = await storage.restoreEntity(type, parseInt(id, 10));
+      res.json(restored);
+    } catch (e) {
+      res.status(404).json({ message: e?.message ?? "Item not found in bin" });
+    }
+  });
+  app2.delete("/api/deleted-items/:type/:id/permanent", async (req, res) => {
+    const { type, id } = req.params;
+    await storage.permanentDeleteEntity(type, parseInt(id, 10));
+    res.status(204).end();
+  });
+  app2.delete("/api/deleted-items", async (_req, res) => {
+    await storage.emptyDeletedItems();
+    res.status(204).end();
   });
   app2.post("/api/subscribe", async (req, res) => {
     const parsed = insertSubscriberSchema.safeParse(req.body);

@@ -52,6 +52,7 @@ const R = {
   contacts: "/contacts",
   messages: "/messages",
   notes: "/notes",
+  deletedItems: "/deleted-items",
   settings: "/settings",
 };
 
