@@ -7,6 +7,7 @@ import {
   appSettings,
   milestones,
   accounts, sessions, passwordResetTokens,
+  jarvisMemory,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -21,6 +22,7 @@ import type {
   Milestone, InsertMilestone,
   Account, AccountPublic, Session, PasswordResetToken,
   Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest,
+  JarvisMemory, InsertJarvisMemory,
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -293,6 +295,19 @@ async function migrate() {
     expires_at TEXT NOT NULL,
     used_at TEXT
   )`;
+  await sql`CREATE TABLE IF NOT EXISTS jarvis_memory (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER,
+    question TEXT NOT NULL,
+    normalized_question TEXT NOT NULL,
+    topic TEXT,
+    answer TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    source TEXT NOT NULL DEFAULT 'user_taught',
+    hit_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT
+  )`;
 }
 
 export interface IStorage {
@@ -404,6 +419,13 @@ export interface IStorage {
   getSession(token: string): Promise<{ session: Session; account: AccountPublic } | null>;
   destroySession(token: string): void;
   countAccounts(): Promise<number>;
+  // Jarvis memory
+  getJarvisMemories(projectId?: number): Promise<JarvisMemory[]>;
+  searchJarvisMemory(query: string, projectId?: number): Promise<JarvisMemory | undefined>;
+  createJarvisMemory(data: InsertJarvisMemory): Promise<JarvisMemory>;
+  updateJarvisMemory(id: number, data: Partial<InsertJarvisMemory>): Promise<JarvisMemory | undefined>;
+  incrementJarvisMemoryHit(id: number): Promise<void>;
+  deleteJarvisMemory(id: number): Promise<void>;
 }
 
 // Ensure schema is ready before any query. Idempotent + memoized.
@@ -1161,6 +1183,76 @@ class DatabaseStorage implements IStorage {
     return rows.length;
   }
 
+  /* --------------------------- Jarvis memory --------------------------- */
+  async getJarvisMemories(projectId?: number): Promise<JarvisMemory[]> {
+    await ensureReady();
+    if (projectId != null) {
+      return await db.select().from(jarvisMemory).where(eq(jarvisMemory.projectId, projectId));
+    }
+    return await db.select().from(jarvisMemory);
+  }
+
+  async searchJarvisMemory(query: string, projectId?: number): Promise<JarvisMemory | undefined> {
+    await ensureReady();
+    const normalized = normalizeQuestion(query);
+    const all = await db.select().from(jarvisMemory);
+    // Filter to learned answers, prefer project-scoped then global
+    const learned = all.filter((m) => m.status === "learned" && m.answer);
+    if (!learned.length) return undefined;
+    const scoped = projectId != null
+      ? learned.filter((m) => m.projectId === projectId || m.projectId === null)
+      : learned;
+    // Score by token overlap
+    let best: { memory: JarvisMemory; score: number } | null = null;
+    for (const m of scoped) {
+      const score = tokenSimilarity(normalized, m.normalizedQuestion);
+      if (!best || score > best.score) best = { memory: m, score };
+    }
+    if (best && best.score > 0.2) {
+      await this.incrementJarvisMemoryHit(best.memory.id);
+      return best.memory;
+    }
+    return undefined;
+  }
+
+  async createJarvisMemory(data: InsertJarvisMemory): Promise<JarvisMemory> {
+    await ensureReady();
+    const now = new Date().toISOString();
+    const [row] = await db.insert(jarvisMemory).values({
+      ...data,
+      normalizedQuestion: data.normalizedQuestion || normalizeQuestion(data.question),
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+    return row;
+  }
+
+  async updateJarvisMemory(id: number, data: Partial<InsertJarvisMemory>): Promise<JarvisMemory | undefined> {
+    await ensureReady();
+    const now = new Date().toISOString();
+    const [row] = await db.update(jarvisMemory).set({
+      ...data,
+      updatedAt: now,
+    }).where(eq(jarvisMemory.id, id)).returning();
+    return row;
+  }
+
+  async incrementJarvisMemoryHit(id: number): Promise<void> {
+    await ensureReady();
+    const rows = await db.select().from(jarvisMemory).where(eq(jarvisMemory.id, id));
+    if (rows[0]) {
+      await db.update(jarvisMemory).set({
+        hitCount: (rows[0].hitCount || 0) + 1,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(jarvisMemory.id, id));
+    }
+  }
+
+  async deleteJarvisMemory(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(jarvisMemory).where(eq(jarvisMemory.id, id));
+  }
+
   /* ----------------------------- Seed ------------------------------ */
   async seed(): Promise<void> {
     if (seedDone) return;
@@ -1434,3 +1526,50 @@ class DatabaseStorage implements IStorage {
 
 let seedDone = false;
 export const storage: DatabaseStorage = new DatabaseStorage();
+
+/* ----------------------- Jarvis memory helpers ------------------------ */
+
+// Normalize a question for matching: lowercase, strip punctuation,
+// remove filler words, collapse whitespace.
+export function normalizeQuestion(q: string): string {
+  const stopWords = new Set([
+    "the", "a", "an", "is", "are", "was", "were", "what", "whats", "what's",
+    "where", "wheres", "where's", "how", "do", "does", "can", "could", "would",
+    "should", "i", "you", "me", "we", "they", "it", "to", "of", "in", "on",
+    "at", "for", "and", "or", "but", "so", "if", "then", "tell", "about",
+    "give", "some", "good", "best", "near", "by", "my", "our", "this", "that",
+    "there", "here", "with", "from", "as", "be", "been", "have", "has",
+  ]);
+  return q
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !stopWords.has(w))
+    .join(" ")
+    .trim();
+}
+
+// Simple token overlap similarity (Jaccard). Returns 0-1.
+export function tokenSimilarity(a: string, b: string): number {
+  const ta = new Set(a.split(/\s+/).filter(Boolean));
+  const tb = new Set(b.split(/\s+/).filter(Boolean));
+  if (!ta.size || !tb.size) return 0;
+  let overlap = 0;
+  ta.forEach((t) => { if (tb.has(t)) overlap++; });
+  return overlap / Math.max(ta.size, tb.size);
+}
+
+// Infer a topic from a question for categorization.
+export function inferTopic(q: string): string | null {
+  const lower = q.toLowerCase();
+  if (/lunch|food|eat|restaurant|hungry|dinner|breakfast|coffee/.test(lower)) return "lunch";
+  if (/weather|rain|snow|wind|storm|temperature|forecast/.test(lower)) return "weather";
+  if (/safety|osha|safe|ppe|harness|fall|trench|excavat/.test(lower)) return "safety";
+  if (/supplier|vendor|material|deliver/.test(lower)) return "suppliers";
+  if (/subcontractor|sub|trade|electrician|plumber|hvac/.test(lower)) return "subcontractors";
+  if (/hotel|motel|lodging|stay|accommodation/.test(lower)) return "lodging";
+  if (/hardware|store|supply|home depot|lowes/.test(lower)) return "hardware";
+  if (/dump|disposal|landfill|recycle/.test(lower)) return "disposal";
+  if (/permit|inspection|city|county|jurisdiction/.test(lower)) return "permits";
+  return null;
+}

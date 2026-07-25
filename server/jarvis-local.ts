@@ -1,4 +1,4 @@
-import { storage } from "./storage";
+import { storage, normalizeQuestion, inferTopic } from "./storage";
 import { buildContext, type ContextBundle } from "./jarvis";
 import { runHealthScan } from "./health";
 
@@ -85,11 +85,11 @@ const CONSTRUCTION_QA: { keywords: string[]; answer: string }[] = [
   },
   {
     keywords: ["weather"],
-    answer: "I can't pull live weather yet, but here's what I'd suggest for checking conditions on site:\n\nThe OSHA-NIOSH Heat Safety app gives you the real-time heat index and precautions. For forecasts and severe weather, weather.gov or a NOAA weather radio is your best bet.\n\nA couple of rules of thumb — crane operations need to stop when sustained winds hit twenty miles per hour or more, though check the manufacturer specs because some are lower. And for lightning, use the thirty/thirty rule: if thunder follows lightning by less than thirty seconds, get to shelter, and wait thirty minutes after the last thunder before going back out.\n\nIf we connect a weather API down the road, I can pull live conditions for you right here. Want me to note that as a feature request?",
+    answer: "I can't pull live weather yet, but here's what I'd suggest for checking conditions on site:\n\nThe OSHA-NIOSH Heat Safety app gives you the real-time heat index and precautions. For forecasts and severe weather, weather.gov or a NOAA weather radio is your best bet.\n\nA couple of rules of thumb — crane operations need to stop when sustained winds hit twenty miles per hour or more, though check the manufacturer specs because some are lower. And for lightning, use the thirty/thirty rule: if thunder follows lightning by less than thirty seconds, get to shelter, and wait thirty minutes after the last thunder before going back out.\n\nIf we connect a weather API down the road, I can pull live conditions for you right here. But also — if you've got a weather tip specific to your area, just say \"remember that...\" and I'll save it for next time.",
   },
   {
     keywords: ["lunch", "food", "eat", "restaurant", "lunch spots", "where to eat", "hungry"],
-    answer: "I can't browse restaurants yet, but here are some tips for lunch on a job site:\n\nCheck Google Maps or Yelp for spots within ten or fifteen minutes of your site address. Look for places with quick service — delis, food trucks, fast-casual spots. A lot of sites actually bring a food truck on-site for lunch, which saves everyone a trip. Meal prep with a cooler is another solid option — saves time and money.\n\nAnd don't forget to stay hydrated, especially in the summer.\n\nIf you give me your project's address, I can keep it on file so a future update could pull nearby options for you.",
+    answer: "I can't browse restaurants yet, but here are some tips for lunch on a job site:\n\nCheck Google Maps or Yelp for spots within ten or fifteen minutes of your site address. Look for places with quick service — delis, food trucks, fast-casual spots. A lot of sites actually bring a food truck on-site for lunch, which saves everyone a trip. Meal prep with a cooler is another solid option — saves time and money.\n\nAnd don't forget to stay hydrated, especially in the summer.\n\nIf you know some good spots near your site, just tell me — say something like \"remember that the best lunch spot near here is Tony's Deli\" and I'll save it. Next time you ask, I'll have it ready.",
   },
   {
     keywords: ["joke", "funny", "tell me something"],
@@ -156,6 +156,74 @@ One thing to stay on top of — check the Schedule tab for any milestones coming
 export async function localJarvisChat(projectId: number | undefined, history: { role: "user" | "assistant"; content: string }[]): Promise<{ reply: string }> {
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   const lower = lastUser.toLowerCase().trim();
+
+  // --- Check if user is teaching Jarvis ("remember that...", "note that...", etc.) ---
+  const teachMatch = lower.match(/^(?:remember|note|store|save|for this site|jarvis[,\s]+remember|jarvis[,\s]+note|jarvis[,\s]+save)[\s:,]+(.+)/i);
+  if (teachMatch) {
+    const fact = teachMatch[1].trim();
+    const topic = inferTopic(fact);
+    try {
+      await storage.createJarvisMemory({
+        projectId: projectId ?? null,
+        question: fact,
+        normalizedQuestion: normalizeQuestion(fact),
+        topic: topic || undefined,
+        answer: fact,
+        status: "learned",
+        source: "user_taught",
+      });
+      return { reply: `Got it — I'll remember that for next time${topic ? ` (filed under ${topic})` : ""}. Anything else you want me to keep track of?` };
+    } catch {
+      return { reply: "I tried to save that but ran into an issue. Try again in a moment." };
+    }
+  }
+
+  // --- Check if user is answering a pending question ---
+  // Look at the previous assistant message for the "teach me" prompt pattern
+  const prevAssistant = [...history].reverse().find((m, i, arr) => m.role === "assistant" && i > 0);
+  if (prevAssistant && /teach me|i don'?t have that|if you tell me|note that as|save that|i'?ll remember/i.test(prevAssistant.content)) {
+    // User might be providing an answer to a previous unanswered question
+    // Try to find the pending question from the previous user message
+    const prevUserMsg = [...history].reverse().find((m, i, arr) => m.role === "user" && i > 0);
+    if (prevUserMsg) {
+      const pendingQuestion = prevUserMsg.content;
+      const topic = inferTopic(pendingQuestion) || inferTopic(lastUser);
+      try {
+        // Check if there's already a pending memory for this question
+        const memories = await storage.getJarvisMemories(projectId);
+        const existing = memories.find((m) => m.status === "pending" && m.normalizedQuestion === normalizeQuestion(pendingQuestion));
+        if (existing) {
+          await storage.updateJarvisMemory(existing.id, {
+            answer: lastUser,
+            status: "learned",
+          });
+        } else {
+          await storage.createJarvisMemory({
+            projectId: projectId ?? null,
+            question: pendingQuestion,
+            normalizedQuestion: normalizeQuestion(pendingQuestion),
+            topic: topic || undefined,
+            answer: lastUser,
+            status: "learned",
+            source: "user_taught",
+          });
+        }
+        return { reply: `Perfect, I've got that saved now${topic ? ` under ${topic}` : ""}. Next time you ask, I'll have it ready. Anything else?` };
+      } catch {
+        // Fall through to normal processing if save fails
+      }
+    }
+  }
+
+  // --- Check learned memories first (before built-in responses) ---
+  try {
+    const learned = await storage.searchJarvisMemory(lastUser, projectId);
+    if (learned && learned.answer) {
+      return { reply: learned.answer };
+    }
+  } catch {
+    // Memory search failed, continue with built-in responses
+  }
 
   // Check for health scan intent
   if (/\b(broken|health|scan|not work|doesn'?t work|what'?s broken|integrity)\b/i.test(lower)) {
@@ -232,8 +300,37 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
     if (nav) return { reply: nav };
   }
 
-  // Default fallback
+  // Default fallback — store the question as pending and ask the user to teach Jarvis
+  const topic = inferTopic(lastUser);
+  try {
+    // Check if we already have a pending memory for this question
+    const memories = await storage.getJarvisMemories(projectId);
+    const alreadyPending = memories.find((m) =>
+      m.status === "pending" &&
+      m.normalizedQuestion === normalizeQuestion(lastUser)
+    );
+    if (!alreadyPending) {
+      await storage.createJarvisMemory({
+        projectId: projectId ?? null,
+        question: lastUser,
+        normalizedQuestion: normalizeQuestion(lastUser),
+        topic: topic || undefined,
+        answer: null,
+        status: "pending",
+        source: "user_taught",
+      });
+    }
+  } catch {
+    // Storage failed, still give a helpful response
+  }
+
+  if (topic) {
+    return {
+      reply: `I don't have an answer for that one yet${topic === "lunch" ? " — I can't browse restaurants from here" : ""}. But here's the thing — if you tell me the answer, I'll remember it for next time.\n\nJust say something like "remember that the best lunch spot near this site is Jimmy's Deli" and I'll file it away. Next time you ask, I'll have it ready.\n\nWhat would you like to know?`
+    };
+  }
+
   return {
-    reply: `I'm not quite sure I caught that. Here's what I can help with:\n\n- Construction questions — RFIs, change orders, submittals, safety protocols, PPE, OSHA standards\n- General stuff — weather guidance, lunch spots, the time, jokes\n- Project data — "what's overdue?", "give me a briefing", "how many tasks are open?"\n- Navigation — "where do I create a task?", "how do I find the Gantt chart?"\n- App health — "is anything broken?"\n\nWhat would you like to know?`
+    reply: `I'm not quite sure I caught that. Here's what I can help with:\n\n- Construction questions — RFIs, change orders, submittals, safety protocols, PPE, OSHA standards\n- General stuff — weather guidance, lunch spots, the time, jokes\n- Project data — "what's overdue?", "give me a briefing", "how many tasks are open?"\n- Navigation — "where do I create a task?", "how do I find the Gantt chart?"\n- App health — "is anything broken?"\n\nAnd if there's something I don't know, just tell me the answer and I'll remember it for next time. What would you like to know?`
   };
 }

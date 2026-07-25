@@ -346,6 +346,21 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   usedAt: text("used_at"),
 });
 
+/* --------------------------- Jarvis memory ---------------------------- */
+export const jarvisMemory = pgTable("jarvis_memory", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id"),
+  question: text("question").notNull(),
+  normalizedQuestion: text("normalized_question").notNull(),
+  topic: text("topic"),
+  answer: text("answer"),
+  status: text("status").notNull().default("pending"),
+  source: text("source").notNull().default("user_taught"),
+  hitCount: integer("hit_count").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at"),
+});
+
 /* ------------------------------ Insert schemas -------------------------- */
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
@@ -367,6 +382,7 @@ export const insertNoteSchema = createInsertSchema(notes).omit({ id: true });
 export const insertIntegrationSchema = createInsertSchema(integrations).omit({ id: true });
 export const insertBlueprintSchema = createInsertSchema(blueprints).omit({ id: true });
 export const insertDroneCaptureSchema = createInsertSchema(droneCaptures).omit({ id: true });
+export const insertJarvisMemorySchema = createInsertSchema(jarvisMemory).omit({ id: true, createdAt: true, updatedAt: true, hitCount: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
 export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
 export type AppSettingsRow = typeof appSettings.$inferSelect;
@@ -388,6 +404,8 @@ export type Account = typeof accounts.$inferSelect;
 export type AccountPublic = Omit<Account, "passwordHash">;
 export type Session = typeof sessions.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type JarvisMemory = typeof jarvisMemory.$inferSelect;
+export type InsertJarvisMemory = z.infer<typeof insertJarvisMemorySchema>;
 
 /** Default app settings (single source for server + client). */
 export const DEFAULT_SETTINGS = {

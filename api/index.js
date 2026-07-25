@@ -31,7 +31,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // shared/schema.ts
-var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, passwordResetTokens, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
+var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, passwordResetTokens, jarvisMemory, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertJarvisMemorySchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -338,6 +338,19 @@ var init_schema = __esm({
       expiresAt: (0, import_pg_core.text)("expires_at").notNull(),
       usedAt: (0, import_pg_core.text)("used_at")
     });
+    jarvisMemory = (0, import_pg_core.pgTable)("jarvis_memory", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id"),
+      question: (0, import_pg_core.text)("question").notNull(),
+      normalizedQuestion: (0, import_pg_core.text)("normalized_question").notNull(),
+      topic: (0, import_pg_core.text)("topic"),
+      answer: (0, import_pg_core.text)("answer"),
+      status: (0, import_pg_core.text)("status").notNull().default("pending"),
+      source: (0, import_pg_core.text)("source").notNull().default("user_taught"),
+      hitCount: (0, import_pg_core.integer)("hit_count").notNull().default(0),
+      createdAt: (0, import_pg_core.text)("created_at").notNull(),
+      updatedAt: (0, import_pg_core.text)("updated_at")
+    });
     insertProjectSchema = (0, import_drizzle_zod.createInsertSchema)(projects).omit({ id: true });
     insertTaskSchema = (0, import_drizzle_zod.createInsertSchema)(tasks).omit({ id: true });
     insertRfiSchema = (0, import_drizzle_zod.createInsertSchema)(rfis).omit({ id: true });
@@ -358,6 +371,7 @@ var init_schema = __esm({
     insertIntegrationSchema = (0, import_drizzle_zod.createInsertSchema)(integrations).omit({ id: true });
     insertBlueprintSchema = (0, import_drizzle_zod.createInsertSchema)(blueprints).omit({ id: true });
     insertDroneCaptureSchema = (0, import_drizzle_zod.createInsertSchema)(droneCaptures).omit({ id: true });
+    insertJarvisMemorySchema = (0, import_drizzle_zod.createInsertSchema)(jarvisMemory).omit({ id: true, createdAt: true, updatedAt: true, hitCount: true });
     insertMilestoneSchema = (0, import_drizzle_zod.createInsertSchema)(milestones).omit({ id: true });
     insertSettingsSchema = (0, import_drizzle_zod.createInsertSchema)(appSettings).omit({ id: true, updatedAt: true });
     signupSchema = import_zod.z.object({
@@ -402,7 +416,10 @@ var storage_exports = {};
 __export(storage_exports, {
   db: () => db,
   ensureReady: () => ensureReady,
-  storage: () => storage
+  inferTopic: () => inferTopic,
+  normalizeQuestion: () => normalizeQuestion,
+  storage: () => storage,
+  tokenSimilarity: () => tokenSimilarity
 });
 async function migrate() {
   await sql`CREATE TABLE IF NOT EXISTS team_members (
@@ -637,6 +654,19 @@ async function migrate() {
     expires_at TEXT NOT NULL,
     used_at TEXT
   )`;
+  await sql`CREATE TABLE IF NOT EXISTS jarvis_memory (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER,
+    question TEXT NOT NULL,
+    normalized_question TEXT NOT NULL,
+    topic TEXT,
+    answer TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    source TEXT NOT NULL DEFAULT 'user_taught',
+    hit_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT
+  )`;
 }
 function ensureReady() {
   if (!initPromise) {
@@ -648,6 +678,93 @@ function ensureReady() {
     });
   }
   return initPromise;
+}
+function normalizeQuestion(q) {
+  const stopWords = /* @__PURE__ */ new Set([
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "what",
+    "whats",
+    "what's",
+    "where",
+    "wheres",
+    "where's",
+    "how",
+    "do",
+    "does",
+    "can",
+    "could",
+    "would",
+    "should",
+    "i",
+    "you",
+    "me",
+    "we",
+    "they",
+    "it",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "for",
+    "and",
+    "or",
+    "but",
+    "so",
+    "if",
+    "then",
+    "tell",
+    "about",
+    "give",
+    "some",
+    "good",
+    "best",
+    "near",
+    "by",
+    "my",
+    "our",
+    "this",
+    "that",
+    "there",
+    "here",
+    "with",
+    "from",
+    "as",
+    "be",
+    "been",
+    "have",
+    "has"
+  ]);
+  return q.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 1 && !stopWords.has(w)).join(" ").trim();
+}
+function tokenSimilarity(a, b) {
+  const ta = new Set(a.split(/\s+/).filter(Boolean));
+  const tb = new Set(b.split(/\s+/).filter(Boolean));
+  if (!ta.size || !tb.size) return 0;
+  let overlap = 0;
+  ta.forEach((t) => {
+    if (tb.has(t)) overlap++;
+  });
+  return overlap / Math.max(ta.size, tb.size);
+}
+function inferTopic(q) {
+  const lower = q.toLowerCase();
+  if (/lunch|food|eat|restaurant|hungry|dinner|breakfast|coffee/.test(lower)) return "lunch";
+  if (/weather|rain|snow|wind|storm|temperature|forecast/.test(lower)) return "weather";
+  if (/safety|osha|safe|ppe|harness|fall|trench|excavat/.test(lower)) return "safety";
+  if (/supplier|vendor|material|deliver/.test(lower)) return "suppliers";
+  if (/subcontractor|sub|trade|electrician|plumber|hvac/.test(lower)) return "subcontractors";
+  if (/hotel|motel|lodging|stay|accommodation/.test(lower)) return "lodging";
+  if (/hardware|store|supply|home depot|lowes/.test(lower)) return "hardware";
+  if (/dump|disposal|landfill|recycle/.test(lower)) return "disposal";
+  if (/permit|inspection|city|county|jurisdiction/.test(lower)) return "permits";
+  return null;
 }
 var import_neon_http, import_serverless, import_drizzle_orm, import_node_fs, import_node_path, import_node_crypto, RAW_CONN, CONN, sql, db, initPromise, DatabaseStorage, seedDone, storage;
 var init_storage = __esm({
@@ -1354,6 +1471,66 @@ var init_storage = __esm({
         const rows = await db.select().from(accounts);
         return rows.length;
       }
+      /* --------------------------- Jarvis memory --------------------------- */
+      async getJarvisMemories(projectId) {
+        await ensureReady();
+        if (projectId != null) {
+          return await db.select().from(jarvisMemory).where((0, import_drizzle_orm.eq)(jarvisMemory.projectId, projectId));
+        }
+        return await db.select().from(jarvisMemory);
+      }
+      async searchJarvisMemory(query, projectId) {
+        await ensureReady();
+        const normalized = normalizeQuestion(query);
+        const all = await db.select().from(jarvisMemory);
+        const learned = all.filter((m) => m.status === "learned" && m.answer);
+        if (!learned.length) return void 0;
+        const scoped = projectId != null ? learned.filter((m) => m.projectId === projectId || m.projectId === null) : learned;
+        let best = null;
+        for (const m of scoped) {
+          const score = tokenSimilarity(normalized, m.normalizedQuestion);
+          if (!best || score > best.score) best = { memory: m, score };
+        }
+        if (best && best.score > 0.2) {
+          await this.incrementJarvisMemoryHit(best.memory.id);
+          return best.memory;
+        }
+        return void 0;
+      }
+      async createJarvisMemory(data) {
+        await ensureReady();
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        const [row] = await db.insert(jarvisMemory).values({
+          ...data,
+          normalizedQuestion: data.normalizedQuestion || normalizeQuestion(data.question),
+          createdAt: now,
+          updatedAt: now
+        }).returning();
+        return row;
+      }
+      async updateJarvisMemory(id, data) {
+        await ensureReady();
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        const [row] = await db.update(jarvisMemory).set({
+          ...data,
+          updatedAt: now
+        }).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id)).returning();
+        return row;
+      }
+      async incrementJarvisMemoryHit(id) {
+        await ensureReady();
+        const rows = await db.select().from(jarvisMemory).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id));
+        if (rows[0]) {
+          await db.update(jarvisMemory).set({
+            hitCount: (rows[0].hitCount || 0) + 1,
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+          }).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id));
+        }
+      }
+      async deleteJarvisMemory(id) {
+        await ensureReady();
+        await db.delete(jarvisMemory).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id));
+      }
       /* ----------------------------- Seed ------------------------------ */
       async seed() {
         if (seedDone) return;
@@ -1961,6 +2138,62 @@ One thing to stay on top of \u2014 check the Schedule tab for any milestones com
 async function localJarvisChat(projectId, history) {
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   const lower = lastUser.toLowerCase().trim();
+  const teachMatch = lower.match(/^(?:remember|note|store|save|for this site|jarvis[,\s]+remember|jarvis[,\s]+note|jarvis[,\s]+save)[\s:,]+(.+)/i);
+  if (teachMatch) {
+    const fact = teachMatch[1].trim();
+    const topic2 = inferTopic(fact);
+    try {
+      await storage.createJarvisMemory({
+        projectId: projectId ?? null,
+        question: fact,
+        normalizedQuestion: normalizeQuestion(fact),
+        topic: topic2 || void 0,
+        answer: fact,
+        status: "learned",
+        source: "user_taught"
+      });
+      return { reply: `Got it \u2014 I'll remember that for next time${topic2 ? ` (filed under ${topic2})` : ""}. Anything else you want me to keep track of?` };
+    } catch {
+      return { reply: "I tried to save that but ran into an issue. Try again in a moment." };
+    }
+  }
+  const prevAssistant = [...history].reverse().find((m, i, arr) => m.role === "assistant" && i > 0);
+  if (prevAssistant && /teach me|i don'?t have that|if you tell me|note that as|save that|i'?ll remember/i.test(prevAssistant.content)) {
+    const prevUserMsg = [...history].reverse().find((m, i, arr) => m.role === "user" && i > 0);
+    if (prevUserMsg) {
+      const pendingQuestion = prevUserMsg.content;
+      const topic2 = inferTopic(pendingQuestion) || inferTopic(lastUser);
+      try {
+        const memories = await storage.getJarvisMemories(projectId);
+        const existing = memories.find((m) => m.status === "pending" && m.normalizedQuestion === normalizeQuestion(pendingQuestion));
+        if (existing) {
+          await storage.updateJarvisMemory(existing.id, {
+            answer: lastUser,
+            status: "learned"
+          });
+        } else {
+          await storage.createJarvisMemory({
+            projectId: projectId ?? null,
+            question: pendingQuestion,
+            normalizedQuestion: normalizeQuestion(pendingQuestion),
+            topic: topic2 || void 0,
+            answer: lastUser,
+            status: "learned",
+            source: "user_taught"
+          });
+        }
+        return { reply: `Perfect, I've got that saved now${topic2 ? ` under ${topic2}` : ""}. Next time you ask, I'll have it ready. Anything else?` };
+      } catch {
+      }
+    }
+  }
+  try {
+    const learned = await storage.searchJarvisMemory(lastUser, projectId);
+    if (learned && learned.answer) {
+      return { reply: learned.answer };
+    }
+  } catch {
+  }
   if (/\b(broken|health|scan|not work|doesn'?t work|what'?s broken|integrity)\b/i.test(lower)) {
     try {
       const scan = await runHealthScan();
@@ -2030,6 +2263,34 @@ What else would you like to know?` };
     const nav = matchPatterns(lastUser, navMap);
     if (nav) return { reply: nav };
   }
+  const topic = inferTopic(lastUser);
+  try {
+    const memories = await storage.getJarvisMemories(projectId);
+    const alreadyPending = memories.find(
+      (m) => m.status === "pending" && m.normalizedQuestion === normalizeQuestion(lastUser)
+    );
+    if (!alreadyPending) {
+      await storage.createJarvisMemory({
+        projectId: projectId ?? null,
+        question: lastUser,
+        normalizedQuestion: normalizeQuestion(lastUser),
+        topic: topic || void 0,
+        answer: null,
+        status: "pending",
+        source: "user_taught"
+      });
+    }
+  } catch {
+  }
+  if (topic) {
+    return {
+      reply: `I don't have an answer for that one yet${topic === "lunch" ? " \u2014 I can't browse restaurants from here" : ""}. But here's the thing \u2014 if you tell me the answer, I'll remember it for next time.
+
+Just say something like "remember that the best lunch spot near this site is Jimmy's Deli" and I'll file it away. Next time you ask, I'll have it ready.
+
+What would you like to know?`
+    };
+  }
   return {
     reply: `I'm not quite sure I caught that. Here's what I can help with:
 
@@ -2039,13 +2300,14 @@ What else would you like to know?` };
 - Navigation \u2014 "where do I create a task?", "how do I find the Gantt chart?"
 - App health \u2014 "is anything broken?"
 
-What would you like to know?`
+And if there's something I don't know, just tell me the answer and I'll remember it for next time. What would you like to know?`
   };
 }
 var CONSTRUCTION_QA, GREETING_PATTERNS;
 var init_jarvis_local = __esm({
   "server/jarvis-local.ts"() {
     "use strict";
+    init_storage();
     init_jarvis();
     init_health();
     CONSTRUCTION_QA = [
@@ -2127,11 +2389,23 @@ var init_jarvis_local = __esm({
       },
       {
         keywords: ["weather"],
-        answer: "I can't pull live weather yet, but here's what I'd suggest for checking conditions on site:\n\nThe OSHA-NIOSH Heat Safety app gives you the real-time heat index and precautions. For forecasts and severe weather, weather.gov or a NOAA weather radio is your best bet.\n\nA couple of rules of thumb \u2014 crane operations need to stop when sustained winds hit twenty miles per hour or more, though check the manufacturer specs because some are lower. And for lightning, use the thirty/thirty rule: if thunder follows lightning by less than thirty seconds, get to shelter, and wait thirty minutes after the last thunder before going back out.\n\nIf we connect a weather API down the road, I can pull live conditions for you right here. Want me to note that as a feature request?"
+        answer: `I can't pull live weather yet, but here's what I'd suggest for checking conditions on site:
+
+The OSHA-NIOSH Heat Safety app gives you the real-time heat index and precautions. For forecasts and severe weather, weather.gov or a NOAA weather radio is your best bet.
+
+A couple of rules of thumb \u2014 crane operations need to stop when sustained winds hit twenty miles per hour or more, though check the manufacturer specs because some are lower. And for lightning, use the thirty/thirty rule: if thunder follows lightning by less than thirty seconds, get to shelter, and wait thirty minutes after the last thunder before going back out.
+
+If we connect a weather API down the road, I can pull live conditions for you right here. But also \u2014 if you've got a weather tip specific to your area, just say "remember that..." and I'll save it for next time.`
       },
       {
         keywords: ["lunch", "food", "eat", "restaurant", "lunch spots", "where to eat", "hungry"],
-        answer: "I can't browse restaurants yet, but here are some tips for lunch on a job site:\n\nCheck Google Maps or Yelp for spots within ten or fifteen minutes of your site address. Look for places with quick service \u2014 delis, food trucks, fast-casual spots. A lot of sites actually bring a food truck on-site for lunch, which saves everyone a trip. Meal prep with a cooler is another solid option \u2014 saves time and money.\n\nAnd don't forget to stay hydrated, especially in the summer.\n\nIf you give me your project's address, I can keep it on file so a future update could pull nearby options for you."
+        answer: `I can't browse restaurants yet, but here are some tips for lunch on a job site:
+
+Check Google Maps or Yelp for spots within ten or fifteen minutes of your site address. Look for places with quick service \u2014 delis, food trucks, fast-casual spots. A lot of sites actually bring a food truck on-site for lunch, which saves everyone a trip. Meal prep with a cooler is another solid option \u2014 saves time and money.
+
+And don't forget to stay hydrated, especially in the summer.
+
+If you know some good spots near your site, just tell me \u2014 say something like "remember that the best lunch spot near here is Tony's Deli" and I'll save it. Next time you ask, I'll have it ready.`
       },
       {
         keywords: ["joke", "funny", "tell me something"],
