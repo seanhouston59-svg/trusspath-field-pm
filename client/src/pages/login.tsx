@@ -58,9 +58,9 @@ export default function Login() {
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
       {/* Left: brand / value panel */}
       <div className="hidden md:flex flex-col justify-between p-10 bg-gradient-to-br from-primary/10 via-background to-background border-r border-border">
-        <Link href="/" className="inline-flex items-center gap-2" data-testid="link-home">
-          <Logo className="size-10" />
-          <span className="font-display font-bold text-base">TrussPath</span>
+        <Link href="/" className="inline-flex items-center gap-3" data-testid="link-home">
+          <Logo className="size-14" />
+          <span className="font-display font-bold text-lg">TrussPath</span>
         </Link>
         <div className="max-w-md space-y-4">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
@@ -83,9 +83,9 @@ export default function Login() {
       {/* Right: sign-in form */}
       <div className="flex items-center justify-center p-6 md:p-10">
         <div className="w-full max-w-sm space-y-6">
-          <div className="md:hidden flex items-center gap-2">
-            <Logo className="size-10" />
-            <span className="font-display font-bold text-base">TrussPath</span>
+          <div className="md:hidden flex items-center gap-3">
+            <Logo className="size-14" />
+            <span className="font-display font-bold text-lg">TrussPath</span>
           </div>
           <div className="space-y-1.5">
             <h2 className="font-display text-xl font-bold flex items-center gap-2">
