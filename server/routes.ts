@@ -204,6 +204,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     ".pplx.app",
     ".vercel.app",
     ".perplexity.ai",
+    "trusspath.com",
   ];
   app.use((req, res, next) => {
     const origin = req.headers.origin as string | undefined;
@@ -807,7 +808,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     enterprise: { monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY, annual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL },
   };
 
-  const APP_URL = process.env.VITE_API_BASE || "https://trusspath-field-pm.vercel.app";
+  const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
 
   // Stripe webhook — must come BEFORE auth middleware (raw body, no session)
   app.post("/api/stripe/webhook", async (req, res) => {

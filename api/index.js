@@ -2028,7 +2028,8 @@ async function registerRoutes(_httpServer, app2) {
   const ALLOWED_ORIGIN_SUFFIXES = [
     ".pplx.app",
     ".vercel.app",
-    ".perplexity.ai"
+    ".perplexity.ai",
+    "trusspath.com"
   ];
   app2.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -2556,7 +2557,7 @@ async function registerRoutes(_httpServer, app2) {
     pro: { monthly: process.env.STRIPE_PRICE_PRO_MONTHLY, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
     enterprise: { monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY, annual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL }
   };
-  const APP_URL = process.env.VITE_API_BASE || "https://trusspath-field-pm.vercel.app";
+  const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
   app2.post("/api/stripe/webhook", async (req, res) => {
     if (!stripe || !webhookSecret) return res.status(503).json({ error: "Stripe not configured" });
     const sig = req.headers["stripe-signature"];
