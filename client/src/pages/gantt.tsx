@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Flag, Milestone, Layers, AlertTriangle, CalendarDays, Maximize2, Minimize2, Workflow, ChevronRight, BarChart3, X, FileText, ClipboardList, HelpCircle, Network } from "lucide-react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
+import { GhostGantt } from "@/components/ghost-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProjects, useTasks, useChangeOrders, useSubmittals, useRfis, useSettings, useMilestones } from "@/hooks/use-data";
 import { cn } from "@/lib/utils";
@@ -487,7 +488,21 @@ export default function SchedulePage() {
           <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
         )
       ) : !project ? (
-        <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
+        <div>
+          <GhostGantt />
+          <div className="mt-4 flex flex-col items-center justify-center py-8 text-center">
+            <div className="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-muted text-muted-foreground">
+              <BarChart3 className="size-6" />
+            </div>
+            <h3 className="font-display text-lg font-bold">No project selected</h3>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">The sample Gantt above shows what your project schedule will look like. Create a project with start and end dates to populate the chart.</p>
+            <Link href="/projects?new=1">
+              <button className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+                Create project
+              </button>
+            </Link>
+          </div>
+        </div>
       ) : (
         <div className={cn("rounded-xl border border-border bg-card shadow-sm", fs ? "fixed inset-0 z-[80] flex flex-col overflow-auto bg-background p-3 sm:p-4" : "pb-20 sm:pb-0")}>
           {fs && (

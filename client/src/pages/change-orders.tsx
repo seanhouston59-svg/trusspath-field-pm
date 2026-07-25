@@ -52,7 +52,7 @@ export default function ChangeOrdersPage() {
   const fields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
     { name: "number", label: "CO Number", type: "text", placeholder: "CO-001", required: true, half: true },
-    { name: "title", label: "Title", type: "text", required: true },
+    { name: "title", label: "Title", type: "text", required: true, placeholder: "Upgrade slab reinforcement to epoxy coating" },
     { name: "status", label: "Status", type: "select", options: ["Draft", "Pending", "Approved", "Rejected", "Executed"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "amount", label: "Amount ($)", type: "number", required: true, half: true },
     { name: "scheduleImpact", label: "Schedule Impact (days)", type: "number", required: true, half: true },

@@ -51,7 +51,7 @@ export default function TasksPage() {
 
   const fields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
-    { name: "title", label: "Task Title", type: "text", required: true },
+    { name: "title", label: "Task Title", type: "text", required: true, placeholder: "Install HVAC ductwork on floor 3" },
     { name: "trade", label: "Trade", type: "text", placeholder: "Electrical", required: true, half: true },
     { name: "status", label: "Status", type: "select", options: ["Not Started", "In Progress", "Blocked", "Complete"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "priority", label: "Priority", type: "select", options: ["Low", "Medium", "High", "Critical"].map((v) => ({ value: v, label: v })), required: true, half: true },

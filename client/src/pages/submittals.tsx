@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, FileEdit, Send, Search, CheckCircle2, XCircle } from "lucide-react";
 import { Layout } from "@/components/layout";
+import { GhostState, GhostSubmittalRows } from "@/components/ghost-state";
 import { SubmittalTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
@@ -63,7 +64,7 @@ export default function SubmittalsPage() {
   const fields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
     { name: "number", label: "Submittal #", type: "text", placeholder: "SUB-001", required: true, half: true },
-    { name: "subject", label: "Subject", type: "text", required: true },
+    { name: "subject", label: "Subject", type: "text", required: true, placeholder: "HVAC equipment cut sheets — rooftop units" },
     { name: "type", label: "Type", type: "select", options: ["Shop Drawings", "Product Data", "Samples", "Calculations", "Other"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "status", label: "Status", type: "select", options: ["Draft", "Submitted", "In Review", "Approved", "Rejected"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "assigneeId", label: "Assignee", type: "select", options: teamOptions, half: true },
@@ -124,6 +125,24 @@ export default function SubmittalsPage() {
 
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
+      ) : filtered.length === 0 && items.length === 0 ? (
+        <div>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr><th className="px-4 py-2.5 font-medium">#</th><th className="px-4 py-2.5 font-medium">Subject</th><th className="px-4 py-2.5 font-medium">Type</th><th className="px-4 py-2.5 font-medium">Assignee</th><th className="px-4 py-2.5 font-medium">Submitted</th><th className="px-4 py-2.5 font-medium">Due</th><th className="px-4 py-2.5 font-medium">Status</th></tr>
+              </thead>
+              <GhostSubmittalRows />
+            </table>
+          </div>
+          <div className="mt-4">
+            <GhostState
+              title="No submittals yet"
+              description="The sample rows above show what submittals will look like. They appear here once your team submits shop drawings, product data, or samples."
+              icon={FileEdit}
+            />
+          </div>
+        </div>
       ) : view === "board" ? (
         <GenericBoard<Submittal, Status>
           items={filtered}

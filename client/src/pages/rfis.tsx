@@ -63,7 +63,7 @@ export default function RfisPage() {
   const fields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
     { name: "number", label: "RFI #", type: "text", placeholder: "RFI-001", required: true, half: true },
-    { name: "subject", label: "Subject", type: "text", required: true },
+    { name: "subject", label: "Subject", type: "text", required: true, placeholder: "Clarify structural steel connection detail at grid C-4" },
     { name: "status", label: "Status", type: "select", options: ["Open", "In Review", "Answered", "Closed"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "assigneeId", label: "Assignee", type: "select", options: teamOptions, half: true },
     { name: "dateCreated", label: "Date Created", type: "date", required: true, half: true },
