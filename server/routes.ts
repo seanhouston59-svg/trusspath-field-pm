@@ -284,6 +284,21 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ account: s.account });
   });
 
+  app.patch("/api/auth/profile", async (req: any, res) => {
+    const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") || "";
+    const cookies = parseCookies(req.headers?.cookie);
+    const token = bearer || cookies[SESSION_COOKIE];
+    const s = token ? await storage.getSession(token) : null;
+    if (!s) return res.status(401).json({ message: "Not authenticated" });
+    const body = req.body || {};
+    const displayName = typeof body.displayName === "string" ? body.displayName.trim() : undefined;
+    const position = typeof body.position === "string" ? body.position.trim() : undefined;
+    if (displayName === "") return res.status(400).json({ message: "Display name cannot be empty" });
+    const updated = await storage.updateAccountProfile(s.account.id, { displayName, position });
+    if (!updated) return res.status(404).json({ message: "Account not found" });
+    res.json({ account: updated });
+  });
+
   // Team
   app.get("/api/team", async (_req, res) => res.json(await storage.getTeam()));
   app.post("/api/team", async (req, res) => {

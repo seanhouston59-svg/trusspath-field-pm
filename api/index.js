@@ -297,6 +297,7 @@ var init_schema = __esm({
       email: (0, import_pg_core.text)("email").notNull().unique(),
       passwordHash: (0, import_pg_core.text)("password_hash").notNull(),
       displayName: (0, import_pg_core.text)("display_name").notNull(),
+      position: (0, import_pg_core.text)("position"),
       role: (0, import_pg_core.text)("role").notNull().default("member"),
       company: (0, import_pg_core.text)("company"),
       createdAt: (0, import_pg_core.text)("created_at").notNull()
@@ -538,10 +539,12 @@ async function migrate() {
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     display_name TEXT NOT NULL,
+    position TEXT,
     role TEXT NOT NULL DEFAULT 'member',
     company TEXT,
     created_at TEXT NOT NULL
   )`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS position TEXT`;
   await sql`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     account_id INTEGER NOT NULL,
@@ -1071,6 +1074,15 @@ var init_storage = __esm({
         const rows = await db.select().from(accounts).where((0, import_drizzle_orm.eq)(accounts.id, id));
         const a = rows[0];
         return a ? this.toPublic(a) : void 0;
+      }
+      async updateAccountProfile(id, data) {
+        await ensureReady();
+        const updateData = {};
+        if (data.displayName !== void 0) updateData.displayName = data.displayName;
+        if (data.position !== void 0) updateData.position = data.position;
+        if (Object.keys(updateData).length === 0) return this.getAccount(id);
+        const [row] = await db.update(accounts).set(updateData).where((0, import_drizzle_orm.eq)(accounts.id, id)).returning();
+        return row ? this.toPublic(row) : void 0;
       }
       async verifyPassword(email, password) {
         const acc = await this.getAccountByEmail(email);
@@ -1918,6 +1930,20 @@ async function registerRoutes(_httpServer, app2) {
     const s = token ? await storage.getSession(token) : null;
     if (!s) return res.status(401).json({ account: null });
     res.json({ account: s.account });
+  });
+  app2.patch("/api/auth/profile", async (req, res) => {
+    const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") || "";
+    const cookies = parseCookies(req.headers?.cookie);
+    const token = bearer || cookies[SESSION_COOKIE];
+    const s = token ? await storage.getSession(token) : null;
+    if (!s) return res.status(401).json({ message: "Not authenticated" });
+    const body = req.body || {};
+    const displayName = typeof body.displayName === "string" ? body.displayName.trim() : void 0;
+    const position = typeof body.position === "string" ? body.position.trim() : void 0;
+    if (displayName === "") return res.status(400).json({ message: "Display name cannot be empty" });
+    const updated = await storage.updateAccountProfile(s.account.id, { displayName, position });
+    if (!updated) return res.status(404).json({ message: "Account not found" });
+    res.json({ account: updated });
   });
   app2.get("/api/team", async (_req, res) => res.json(await storage.getTeam()));
   app2.post("/api/team", async (req, res) => {

@@ -2,11 +2,11 @@ import { useState, useEffect, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
-  CheckSquare, Users, Sun, Moon, Search, Menu, X, HardHat, CalendarRange,
+  CheckSquare, Users, Sun, Moon, Search, Menu, X, CalendarRange,
   FileStack, GitPullRequestArrow, StickyNote, Wrench, Image, FileText,
   Contact as ContactIcon, MessageSquare, Building2,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
-  LogOut, ChevronLeft, Network, MoreVertical,
+  LogOut, ChevronLeft, Network, MoreVertical, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -17,7 +17,12 @@ import { useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
 import type { AccessLevel } from "@shared/access-levels";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { CommandPalette } from "@/components/command-palette";
+import { useToast } from "@/hooks/use-toast";
 
 const ICONS: Record<string, any> = {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
@@ -84,10 +89,81 @@ function SidebarBrand() {
   );
 }
 
+/* ---- Edit Profile dialog (shared) ---- */
+function EditProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const { account, updateProfile } = useAuth();
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [position, setPosition] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Sync form when dialog opens
+  useEffect(() => {
+    if (open && account) {
+      setName(account.displayName || "");
+      setPosition(account.position || "");
+    }
+  }, [open, account]);
+
+  const handleSave = async () => {
+    if (!name.trim()) { toast({ title: "Name cannot be empty", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      await updateProfile({ displayName: name.trim(), position: position.trim() || undefined });
+      toast({ title: "Profile updated" });
+      onOpenChange(false);
+    } catch {
+      toast({ title: "Failed to update profile", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Profile</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your full name"
+              className="mt-1.5"
+              data-testid="input-profile-name"
+            />
+          </div>
+          <div>
+            <Label>Position / Title</Label>
+            <Input
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              placeholder="e.g. Project Executive, Site Superintendent"
+              className="mt-1.5"
+              data-testid="input-profile-position"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving} data-testid="button-profile-save">
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SidebarFooter() {
   const { def } = useAccess();
   const { account, logout } = useAuth();
+  const [editOpen, setEditOpen] = useState(false);
   const displayName = account?.displayName || "Marcus Reyes";
+  const position = account?.position || def.label;
   const initials = displayName
     .split(/\s+/)
     .map((s) => s[0])
@@ -101,14 +177,18 @@ function SidebarFooter() {
   };
   return (
     <div className="mt-2 space-y-2">
-      <div className="flex items-center gap-3 rounded-md bg-sidebar-accent/50 p-3">
+      <button
+        onClick={() => setEditOpen(true)}
+        data-testid="button-edit-profile"
+        className="flex w-full items-center gap-3 rounded-md bg-sidebar-accent/50 p-3 text-left transition hover:bg-sidebar-accent"
+      >
         <Avatar initials={initials} color="amber" size={36} />
-        <div className="min-w-0 leading-tight">
+        <div className="min-w-0 flex-1 leading-tight">
           <div className="truncate text-sm font-medium text-sidebar-accent-foreground" data-testid="text-user-name">{displayName}</div>
-          <div className="ff-kicker truncate text-sidebar-foreground/50" style={{ fontSize: "0.6rem" }}>{def.label}</div>
+          <div className="ff-kicker truncate text-sidebar-foreground/50" style={{ fontSize: "0.6rem" }} data-testid="text-user-position">{position}</div>
         </div>
-        <HardHat className="ml-auto size-4 text-sidebar-foreground/40" />
-      </div>
+        <Pencil className="size-3.5 text-sidebar-foreground/40" />
+      </button>
       <button
         onClick={doLogout}
         data-testid="button-logout"
@@ -117,6 +197,7 @@ function SidebarFooter() {
         <LogOut className="size-4" />
         Sign out
       </button>
+      <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }
@@ -164,6 +245,7 @@ function RoleSwitcher() {
 
 function TopbarUser() {
   const { account, logout } = useAuth();
+  const [editOpen, setEditOpen] = useState(false);
   const displayName = account?.displayName || "Marcus Reyes";
   const initials = displayName
     .split(/\s+/)
@@ -178,7 +260,15 @@ function TopbarUser() {
   };
   return (
     <div className="flex items-center gap-2">
-      <Avatar initials={initials} color="amber" size={36} />
+      <button
+        onClick={() => setEditOpen(true)}
+        aria-label="Edit profile"
+        title="Edit profile"
+        data-testid="button-edit-profile-topbar"
+        className="inline-flex items-center justify-center rounded-full transition hover:ring-2 hover:ring-primary/30"
+      >
+        <Avatar initials={initials} color="amber" size={36} />
+      </button>
       <button
         onClick={doLogout}
         aria-label="Sign out"
@@ -188,6 +278,7 @@ function TopbarUser() {
       >
         <LogOut className="size-4" />
       </button>
+      <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }
@@ -197,7 +288,9 @@ function MobileOverflowMenu() {
   const { theme, toggle } = useTheme();
   const { level, setLevel } = useAccess();
   const { account, logout } = useAuth();
+  const [editOpen, setEditOpen] = useState(false);
   const displayName = account?.displayName || "Marcus Reyes";
+  const position = account?.position || "";
   const initials = displayName
     .split(/\s+/)
     .map((s) => s[0])
@@ -241,10 +334,13 @@ function MobileOverflowMenu() {
           >
             <div className="flex items-center gap-3 border-b border-border px-3 py-3">
               <Avatar initials={initials} color="amber" size={36} />
-              <div className="min-w-0 leading-tight">
+              <div className="min-w-0 flex-1 leading-tight">
                 <div className="truncate text-sm font-medium">{displayName}</div>
-                <div className="truncate text-[11px] text-muted-foreground">{account?.email ?? ""}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{position || (account?.email ?? "")}</div>
               </div>
+              <button onClick={() => { setOpen(false); setEditOpen(true); }} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" data-testid="button-edit-profile-mobile">
+                <Pencil className="size-3.5" />
+              </button>
             </div>
             <div className="px-3 pt-3 pb-2">
               <div className="pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Access level</div>
@@ -281,6 +377,7 @@ function MobileOverflowMenu() {
           </div>
         </>
       )}
+      <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }

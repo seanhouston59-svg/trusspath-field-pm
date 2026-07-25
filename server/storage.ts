@@ -218,10 +218,12 @@ async function migrate() {
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     display_name TEXT NOT NULL,
+    position TEXT,
     role TEXT NOT NULL DEFAULT 'member',
     company TEXT,
     created_at TEXT NOT NULL
   )`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS position TEXT`;
   await sql`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     account_id INTEGER NOT NULL,
@@ -345,6 +347,7 @@ export interface IStorage {
   createAccount(email: string, password: string, displayName: string, company?: string, role?: string): Promise<AccountPublic>;
   getAccountByEmail(email: string): Promise<Account | undefined>;
   getAccount(id: number): Promise<AccountPublic | undefined>;
+  updateAccountProfile(id: number, data: { displayName?: string; position?: string }): Promise<AccountPublic | undefined>;
   verifyPassword(email: string, password: string): Promise<AccountPublic | null>;
   createSession(accountId: number): Session;
   getSession(token: string): Promise<{ session: Session; account: AccountPublic } | null>;
@@ -849,6 +852,15 @@ class DatabaseStorage implements IStorage {
     const rows = await db.select().from(accounts).where(eq(accounts.id, id));
     const a = rows[0];
     return a ? this.toPublic(a) : undefined;
+  }
+  async updateAccountProfile(id: number, data: { displayName?: string; position?: string }): Promise<AccountPublic | undefined> {
+    await ensureReady();
+    const updateData: Record<string, unknown> = {};
+    if (data.displayName !== undefined) updateData.displayName = data.displayName;
+    if (data.position !== undefined) updateData.position = data.position;
+    if (Object.keys(updateData).length === 0) return this.getAccount(id);
+    const [row] = await db.update(accounts).set(updateData).where(eq(accounts.id, id)).returning();
+    return row ? this.toPublic(row) : undefined;
   }
   async verifyPassword(email: string, password: string): Promise<AccountPublic | null> {
     const acc = await this.getAccountByEmail(email);

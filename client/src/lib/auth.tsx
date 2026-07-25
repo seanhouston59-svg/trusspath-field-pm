@@ -13,6 +13,7 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<AccountPublic>;
   signup: (data: { email: string; password: string; displayName: string; company?: string }) => Promise<AccountPublic>;
   logout: () => Promise<void>;
+  updateProfile: (data: { displayName?: string; position?: string }) => Promise<AccountPublic>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -78,6 +79,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const profileMut = useMutation({
+    mutationFn: async (data: { displayName?: string; position?: string }) => {
+      const res = await apiRequest("PATCH", "/api/auth/profile", data);
+      const json = (await res.json()) as { account: AccountPublic };
+      return json.account;
+    },
+    onSuccess: (account) => {
+      queryClient.setQueryData<MeResponse>(["/api/auth/me"], { account });
+    },
+  });
+
   const value = useMemo<AuthContextValue>(
     () => ({
       account: meQuery.data?.account ?? null,
@@ -88,8 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout: async () => {
         await logoutMut.mutateAsync();
       },
+      updateProfile: (data) => profileMut.mutateAsync(data),
     }),
-    [meQuery.data, meQuery.isLoading, loginMut, signupMut, logoutMut]
+    [meQuery.data, meQuery.isLoading, loginMut, signupMut, logoutMut, profileMut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

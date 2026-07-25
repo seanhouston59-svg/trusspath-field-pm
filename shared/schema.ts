@@ -305,6 +305,7 @@ export const accounts = pgTable("accounts", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
+  position: text("position"),
   role: text("role").notNull().default("member"),
   company: text("company"),
   createdAt: text("created_at").notNull(),
