@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { CalendarPlus, Download, Upload, Calendar as CalIcon, ChevronLeft, ChevronRight, ExternalLink, Network, Plus, Pencil, Trash2, X } from "lucide-react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
-import { useProjects, useTasks, useRfis, useSubmittals, useChangeOrders, useMilestones, useCreateMilestone, useUpdateMilestone, useDeleteMilestone } from "@/hooks/use-data";
+import { useProjects, useTasks, useRfis, useSubmittals, useChangeOrders, useMilestones, useDailyLogs, useCreateMilestone, useUpdateMilestone, useDeleteMilestone } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +56,7 @@ export default function SchedulePage() {
   const { data: subs = [] } = useSubmittals(projectId);
   const { data: cos = [] } = useChangeOrders(projectId);
   const { data: milestones = [] } = useMilestones(projectId);
+  const { data: dailyLogs = [] } = useDailyLogs(projectId);
 
   const createMilestone = useCreateMilestone();
   const updateMilestone = useUpdateMilestone();
@@ -102,8 +103,10 @@ export default function SchedulePage() {
 
     // When a single project is selected, use its dates as fallback; otherwise require item dates
     tasks.forEach((t) => {
-      const s = clamp(t.startDate ?? project?.startDate ?? ""); const e = clamp(t.endDate ?? t.dueDate ?? "");
-      if (s && e) evs.push({ id: `task-${t.id}`, title: `${pName(t.projectId)}${t.title}`, type: "Task", source: "TrussPath", start: s, end: e, description: `${t.trade} · ${t.status}` });
+      // If task has explicit start/end, use those; otherwise use dueDate as a single-day event
+      const ts = t.startDate ?? t.endDate ?? t.dueDate;
+      const te = t.endDate ?? t.startDate ?? t.dueDate;
+      if (ts && te) evs.push({ id: `task-${t.id}`, title: `${pName(t.projectId)}${t.title}`, type: "Task", source: "TrussPath", start: ts, end: te, description: `${t.trade} · ${t.status}` });
     });
     rfis.forEach((r) => {
       const s = clamp(r.dateCreated); const e = clamp(r.dueDate);
@@ -129,8 +132,13 @@ export default function SchedulePage() {
       const d = clamp(m.date);
       if (d) evs.push({ id: `milestone-${m.id}`, title: `${showAll ? `${projectMap.get(m.projectId) ?? ""} · ` : ""}${m.title}`, type: "Milestone", source: "TrussPath", start: d, end: d, description: m.notes || m.kind });
     });
+    // Daily logs show as single-day events
+    dailyLogs.forEach((l) => {
+      const d = clamp(l.date);
+      if (d) evs.push({ id: `log-${l.id}`, title: `${showAll ? `${projectMap.get(l.projectId) ?? ""} · ` : ""}Daily Log`, type: "Log", source: "TrussPath", start: d, end: d, description: `${l.weather ?? ""} ${l.temp ?? ""}°F · ${l.crewCount ?? 0} crew` });
+    });
     return evs;
-  }, [project, projects, showAll, projectMap, tasks, rfis, subs, cos, milestones]);
+  }, [project, projects, showAll, projectMap, tasks, rfis, subs, cos, milestones, dailyLogs]);
 
   const allEvents = useMemo(() => [...fieldEvents, ...imported], [fieldEvents, imported]);
 

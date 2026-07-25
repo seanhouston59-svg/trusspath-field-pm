@@ -57,6 +57,8 @@ export default function TasksPage() {
     { name: "priority", label: "Priority", type: "select", options: ["Low", "Medium", "High", "Critical"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "assigneeId", label: "Assignee", type: "select", options: teamOptions, half: true },
     { name: "dueDate", label: "Due Date", type: "date", required: true, half: true },
+    { name: "startDate", label: "Start Date", type: "date", half: true },
+    { name: "endDate", label: "End Date", type: "date", half: true },
   ];
 
   return (
