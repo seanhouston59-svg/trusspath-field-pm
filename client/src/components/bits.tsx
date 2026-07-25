@@ -1,17 +1,10 @@
 import { cn } from "@/lib/utils";
 
 /* ----------------------------- Brand logo ----------------------------- */
-/* Hex tile + ascending truss-path mark: triangulated truss nodes rising
-   along a forward path (structure + momentum). */
+/* TrussPath app icon — 3D T-mark with truss crown. */
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      <path d="M32 3 L57 17.5 L57 46.5 L32 61 L7 46.5 L7 17.5 Z" fill="currentColor" />
-      <path d="M16 45 L25 45 L20.5 33 Z" fill="hsl(var(--sidebar))" />
-      <path d="M28 36 L37 36 L32.5 24 Z" fill="hsl(var(--sidebar))" />
-      <path d="M40 27 L49 27 L44.5 15 Z" fill="hsl(var(--sidebar))" />
-      <path d="M20.5 33 L32.5 24 L44.5 15" stroke="hsl(var(--sidebar))" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
-    </svg>
+    <img src="/trusspath-logo.jpg" alt="TrussPath" className={cn("object-contain rounded-lg", className)} />
   );
 }
 

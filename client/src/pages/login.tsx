@@ -59,7 +59,7 @@ export default function Login() {
       {/* Left: brand / value panel */}
       <div className="hidden md:flex flex-col justify-between p-10 bg-gradient-to-br from-primary/10 via-background to-background border-r border-border">
         <Link href="/" className="inline-flex items-center gap-2" data-testid="link-home">
-          <Logo className="text-primary" />
+          <Logo className="size-10" />
           <span className="font-display font-bold text-base">TrussPath</span>
         </Link>
         <div className="max-w-md space-y-4">
@@ -84,7 +84,7 @@ export default function Login() {
       <div className="flex items-center justify-center p-6 md:p-10">
         <div className="w-full max-w-sm space-y-6">
           <div className="md:hidden flex items-center gap-2">
-            <Logo className="text-primary" />
+            <Logo className="size-10" />
             <span className="font-display font-bold text-base">TrussPath</span>
           </div>
           <div className="space-y-1.5">
