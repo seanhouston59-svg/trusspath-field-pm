@@ -54,6 +54,7 @@ const R = {
   notes: "/notes",
   deletedItems: "/deleted-items",
   settings: "/settings",
+  adminSignups: "/admin/signups",
 };
 
 const ALL = Object.values(R);
@@ -75,7 +76,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     order: 2,
     canManageTeam: true, canManageSettings: false, canManageIntegrations: true,
     canViewFinancials: true, canDelete: true, canCreateEdit: true, canResetData: false,
-    allowedRoutes: ALL.filter((r) => r !== R.settings),
+    allowedRoutes: ALL.filter((r) => r !== R.settings && r !== R.adminSignups),
   },
   {
     slug: "superintendent",
