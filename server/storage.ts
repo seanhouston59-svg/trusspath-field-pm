@@ -304,6 +304,7 @@ export interface IStorage {
   getProjects(): Promise<Project[]>;
   getProject(id: number): Promise<Project | undefined>;
   createProject(data: InsertProject): Promise<Project>;
+  updateProject(id: number, data: Partial<InsertProject>): Promise<Project | undefined>;
   getTasks(projectId?: number): Promise<Task[]>;
   createTask(data: InsertTask): Promise<Task>;
   updateTaskStatus(id: number, status: string): Promise<Task | undefined>;
@@ -464,6 +465,11 @@ class DatabaseStorage implements IStorage {
     const nextNum = existing.length + 1;
     const projectNumber = `PRJ-${String(nextNum).padStart(3, "0")}`;
     const [row] = await db.insert(projects).values({ ...data, number: projectNumber }).returning();
+    return row;
+  }
+  async updateProject(id: number, data: Partial<InsertProject>): Promise<Project | undefined> {
+    await ensureReady();
+    const [row] = await db.update(projects).set(data).where(eq(projects.id, id)).returning();
     return row;
   }
 

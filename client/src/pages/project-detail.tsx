@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import {
   MapPin, Calendar, Building2, DollarSign, ListChecks, HelpCircle, ClipboardList, CheckSquare,
-  ExternalLink,
+  ExternalLink, Pencil, X,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
 import { TaskTable, RfiTable, DailyLogList, PunchList } from "@/components/tables";
 import {
-  useProject, useTasks, useRfis, useDailyLogs, usePunchItems, useTeamMap,
+  useProject, useTasks, useRfis, useDailyLogs, usePunchItems, useTeamMap, useUpdateProject,
 } from "@/hooks/use-data";
 import { formatCurrency, shortDate, formatDate } from "@/lib/format";
 import { googleMapsUrl } from "@/lib/maps";
@@ -42,6 +42,45 @@ export default function ProjectDetail() {
   const { data: logs = [] } = useDailyLogs(projectId);
   const { data: punch = [] } = usePunchItems(projectId);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("overview");
+  const updateProject = useUpdateProject();
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (project) {
+      setForm({
+        name: project.name,
+        client: project.client,
+        type: project.type,
+        status: project.status,
+        address: project.address,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        budget: String(project.budget),
+        spent: String(project.spent),
+        progress: String(project.progress),
+      });
+    }
+  }, [project]);
+
+  function saveEdit() {
+    if (!project) return;
+    updateProject.mutate({
+      id: project.id,
+      data: {
+        name: form.name,
+        client: form.client,
+        type: form.type,
+        status: form.status,
+        address: form.address,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        budget: parseFloat(form.budget) || 0,
+        spent: parseFloat(form.spent) || 0,
+        progress: parseInt(form.progress) || 0,
+      },
+    }, { onSuccess: () => setEditing(false) });
+  }
 
   if (isLoading || !project) {
     return (
@@ -72,6 +111,13 @@ export default function ProjectDetail() {
             <div className="mt-1 text-sm text-muted-foreground">{project.client} · {project.type}</div>
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <button
+              onClick={() => setEditing(true)}
+              data-testid="button-edit-project"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:bg-muted"
+            >
+              <Pencil className="size-3.5" /> Edit Project
+            </button>
             {googleMapsUrl(project.address) ? (
               <a
                 href={googleMapsUrl(project.address)!}
@@ -163,6 +209,86 @@ export default function ProjectDetail() {
         {tab === "logs" && <DailyLogList logs={logs} team={team} />}
         {tab === "punch" && <PunchList items={punch} team={team} />}
       </div>
+
+      {/* Edit Dialog */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditing(false)}>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-display text-lg font-bold">Edit Project</h3>
+              <button onClick={() => setEditing(false)} className="rounded-md p-1 text-muted-foreground hover:bg-muted"><X className="size-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Project Name</label>
+                <input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-name" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Client</label>
+                  <input value={form.client ?? ""} onChange={(e) => setForm({ ...form, client: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-client" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Type</label>
+                  <select value={form.type ?? ""} onChange={(e) => setForm({ ...form, type: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-type">
+                    <option value="Commercial">Commercial</option>
+                    <option value="Residential">Residential</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Education">Education</option>
+                    <option value="Industrial">Industrial</option>
+                    <option value="Civil">Civil</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</label>
+                  <select value={form.status ?? ""} onChange={(e) => setForm({ ...form, status: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-status">
+                    <option value="Planning">Planning</option>
+                    <option value="Active">Active</option>
+                    <option value="On Hold">On Hold</option>
+                    <option value="Complete">Complete</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Progress (%)</label>
+                  <input type="number" value={form.progress ?? "0"} onChange={(e) => setForm({ ...form, progress: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-progress" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Address</label>
+                <input value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-address" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Start Date</label>
+                  <input type="date" value={form.startDate ?? ""} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-start-date" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">End Date</label>
+                  <input type="date" value={form.endDate ?? ""} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-end-date" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Budget ($)</label>
+                  <input type="number" value={form.budget ?? "0"} onChange={(e) => setForm({ ...form, budget: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-budget" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Spent ($)</label>
+                  <input type="number" value={form.spent ?? "0"} onChange={(e) => setForm({ ...form, spent: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-spent" />
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setEditing(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">Cancel</button>
+              <button onClick={saveEdit} disabled={updateProject.isPending} data-testid="button-save-project" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                {updateProject.isPending ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

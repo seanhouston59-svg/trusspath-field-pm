@@ -710,6 +710,11 @@ var init_storage = __esm({
         const [row] = await db.insert(projects).values({ ...data, number: projectNumber }).returning();
         return row;
       }
+      async updateProject(id, data) {
+        await ensureReady();
+        const [row] = await db.update(projects).set(data).where((0, import_drizzle_orm.eq)(projects.id, id)).returning();
+        return row;
+      }
       async getTasks(projectId) {
         await ensureReady();
         if (projectId !== void 0) return await db.select().from(tasks).where((0, import_drizzle_orm.eq)(tasks.projectId, projectId));
@@ -2288,6 +2293,12 @@ async function registerRoutes(_httpServer, app2) {
     const parsed = insertProjectSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(await storage.createProject(parsed.data));
+  });
+  app2.patch("/api/projects/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const updated = await storage.updateProject(id, req.body);
+    if (!updated) return res.status(404).json({ message: "Project not found" });
+    res.json(updated);
   });
   app2.get("/api/tasks", async (req, res) => res.json(await storage.getTasks(pid(req))));
   app2.post("/api/tasks", async (req, res) => {

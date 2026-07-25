@@ -397,6 +397,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(await storage.createProject(parsed.data));
   });
+  app.patch("/api/projects/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const updated = await storage.updateProject(id, req.body);
+    if (!updated) return res.status(404).json({ message: "Project not found" });
+    res.json(updated);
+  });
 
   // Tasks
   app.get("/api/tasks", async (req, res) => res.json(await storage.getTasks(pid(req))));

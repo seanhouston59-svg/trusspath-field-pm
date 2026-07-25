@@ -412,6 +412,16 @@ export function useCreateProject() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/projects"] }); },
   });
 }
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
+      const res = await apiRequest("PATCH", `/api/projects/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/projects"] }); },
+  });
+}
 export function useCreateTask() {
   const qc = useQueryClient();
   return useMutation({
