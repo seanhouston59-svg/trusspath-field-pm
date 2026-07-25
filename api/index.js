@@ -2876,7 +2876,7 @@ function renderHtml(n) {
       k
     )}</td><td style="padding:6px 12px;font-size:15px;color:#111;">${escapeHtml(String(v))}</td></tr>`
   ).join("");
-  const kindLabel = n.kind === "subscriber" ? "New TrussPath subscriber" : "New TrussPath demo request";
+  const kindLabel = n.kind === "subscriber" ? "New TrussPath subscriber" : n.kind === "signup" ? "New TrussPath account signup" : "New TrussPath demo request";
   return `<!doctype html>
 <html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
@@ -2992,7 +2992,7 @@ var DEFAULT_TO, DEFAULT_FROM;
 var init_mailer = __esm({
   "server/mailer.ts"() {
     "use strict";
-    DEFAULT_TO = "houston.sean90@gmail.com";
+    DEFAULT_TO = "houston.sean509@gmail.com";
     DEFAULT_FROM = "TrussPath <onboarding@resend.dev>";
   }
 });
@@ -3147,6 +3147,16 @@ async function registerRoutes(_httpServer, app2) {
       const account = await storage.createAccount(email, password, displayName, company);
       const session = await storage.createSession(account.id);
       setSessionCookie(res, session.id);
+      void sendSignupNotification({
+        kind: "signup",
+        subject: `New TrussPath account \u2014 ${displayName} (${email})`,
+        fields: {
+          Name: displayName,
+          Email: email,
+          Company: company,
+          "Signed up": (/* @__PURE__ */ new Date()).toISOString()
+        }
+      });
       res.status(201).json({ account, token: session.id });
     } catch (e) {
       const msg = e?.message || "Signup failed";
@@ -3743,11 +3753,32 @@ async function registerRoutes(_httpServer, app2) {
     }
   });
   app2.post("/api/billing/checkout", async (req, res) => {
-    if (!stripe) return res.status(503).json({ error: "Billing is not configured yet. Please try again later or contact support." });
     const { plan, billing, email, company } = req.body;
     if (!plan || !billing || !email) return res.status(400).json({ error: "Missing plan, billing, or email" });
+    if (!stripe) {
+      try {
+        await storage.createSubscriber({ email, plan, billing, company });
+      } catch {
+      }
+      void sendSignupNotification({
+        kind: "subscriber",
+        subject: `New TrussPath subscriber \u2014 ${email}`,
+        fields: {
+          Email: email,
+          Company: company,
+          Plan: plan,
+          Billing: billing,
+          "Note": "Stripe not yet configured \u2014 captured as lead",
+          "Signed up": (/* @__PURE__ */ new Date()).toISOString()
+        }
+      });
+      return res.status(202).json({
+        message: "Billing isn't configured yet, but we've saved your spot. We'll be in touch soon!",
+        captured: true
+      });
+    }
     const priceId = PRICE_MAP[plan]?.[billing];
-    if (!priceId) return res.status(400).json({ error: `No price configured for ${plan} (${billing}). Set STRRIPE_PRICE_* env vars.` });
+    if (!priceId) return res.status(400).json({ error: `No price configured for ${plan} (${billing}). Set STRIPE_PRICE_* env vars.` });
     try {
       const existingAccount = await storage.getAccountByEmail(email);
       let customerId = existingAccount?.stripeCustomerId || void 0;

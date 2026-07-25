@@ -9,11 +9,11 @@
 //
 // If RESEND_API_KEY is not set, sends are skipped silently — signups still persist to the database.
 
-const DEFAULT_TO = "houston.sean90@gmail.com";
+const DEFAULT_TO = "houston.sean509@gmail.com";
 const DEFAULT_FROM = "TrussPath <onboarding@resend.dev>";
 
 export type SignupNotification = {
-  kind: "subscriber" | "demo-request";
+  kind: "subscriber" | "demo-request" | "signup";
   subject: string;
   fields: Record<string, string | number | undefined | null>;
 };
@@ -28,7 +28,7 @@ function renderHtml(n: SignupNotification): string {
         )}</td><td style="padding:6px 12px;font-size:15px;color:#111;">${escapeHtml(String(v))}</td></tr>`
     )
     .join("");
-  const kindLabel = n.kind === "subscriber" ? "New TrussPath subscriber" : "New TrussPath demo request";
+  const kindLabel = n.kind === "subscriber" ? "New TrussPath subscriber" : n.kind === "signup" ? "New TrussPath account signup" : "New TrussPath demo request";
   return `<!doctype html>
 <html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">

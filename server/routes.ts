@@ -282,6 +282,17 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const account = await storage.createAccount(email, password, displayName, company);
       const session = await storage.createSession(account.id);
       setSessionCookie(res, session.id);
+      // Notify owner about new account signup
+      void sendSignupNotification({
+        kind: "signup",
+        subject: `New TrussPath account — ${displayName} (${email})`,
+        fields: {
+          Name: displayName,
+          Email: email,
+          Company: company,
+          "Signed up": new Date().toISOString(),
+        },
+      });
       // Also return token in body for cross-origin clients that can't rely on cookies.
       res.status(201).json({ account, token: session.id });
     } catch (e: any) {
@@ -961,11 +972,34 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   // Create checkout session
   app.post("/api/billing/checkout", async (req, res) => {
-    if (!stripe) return res.status(503).json({ error: "Billing is not configured yet. Please try again later or contact support." });
     const { plan, billing, email, company } = req.body;
     if (!plan || !billing || !email) return res.status(400).json({ error: "Missing plan, billing, or email" });
+
+    // If Stripe isn't configured yet, still capture the lead and notify owner
+    if (!stripe) {
+      try {
+        await storage.createSubscriber({ email, plan, billing, company });
+      } catch {}
+      void sendSignupNotification({
+        kind: "subscriber",
+        subject: `New TrussPath subscriber — ${email}`,
+        fields: {
+          Email: email,
+          Company: company,
+          Plan: plan,
+          Billing: billing,
+          "Note": "Stripe not yet configured — captured as lead",
+          "Signed up": new Date().toISOString(),
+        },
+      });
+      return res.status(202).json({ 
+        message: "Billing isn't configured yet, but we've saved your spot. We'll be in touch soon!",
+        captured: true,
+      });
+    }
+
     const priceId = (PRICE_MAP as any)[plan]?.[billing];
-    if (!priceId) return res.status(400).json({ error: `No price configured for ${plan} (${billing}). Set STRRIPE_PRICE_* env vars.` });
+    if (!priceId) return res.status(400).json({ error: `No price configured for ${plan} (${billing}). Set STRIPE_PRICE_* env vars.` });
 
     try {
       // Check if user already has an account

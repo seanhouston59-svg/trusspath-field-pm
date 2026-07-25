@@ -110,10 +110,15 @@ function SubscribeForm({ defaultPlan, billing }: { defaultPlan: Plan["key"]; bil
   const checkoutMut = useMutation({
     mutationFn: async (v: SubscribeValues) => {
       const res = await apiRequest("POST", "/api/billing/checkout", v);
-      return res.json() as Promise<{ url: string }>;
+      const data = await res.json();
+      return data as { url?: string; captured?: boolean; error?: string };
     },
     onSuccess: (data) => {
-      window.location.href = data.url;
+      if (data.captured) {
+        toast({ title: "You're on the list", description: "We'll reach out as soon as billing is live. Thanks for your interest!" });
+      } else if (data.url) {
+        window.location.href = data.url;
+      }
     },
     onError: (e: any) => {
       const msg = e?.message || "Couldn't start checkout. Please try again.";
