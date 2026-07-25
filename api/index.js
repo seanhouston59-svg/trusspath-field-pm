@@ -2070,6 +2070,26 @@ function clearSessionCookie(res) {
     `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=0${secure}`
   );
 }
+function authRateLimit(req, res, next) {
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown";
+  const now = Date.now();
+  const entry = authAttempts.get(ip);
+  if (entry && now < entry.resetAt) {
+    if (entry.count >= AUTH_RATE_LIMIT) {
+      const mins = Math.ceil((entry.resetAt - now) / 6e4);
+      return res.status(429).json({ message: `Too many attempts. Please try again in ${mins} minute${mins > 1 ? "s" : ""}.` });
+    }
+    entry.count++;
+  } else {
+    authAttempts.set(ip, { count: 1, resetAt: now + AUTH_RATE_WINDOW });
+  }
+  if (authAttempts.size > 500) {
+    authAttempts.forEach((val, key) => {
+      if (now >= val.resetAt) authAttempts.delete(key);
+    });
+  }
+  next();
+}
 async function authMiddleware(req, res, next) {
   const p = req.path || req.url?.split("?")[0] || "";
   if (!p.startsWith("/api")) return next();
@@ -2154,7 +2174,7 @@ async function registerRoutes(_httpServer, app2) {
     next();
   });
   app2.use(authMiddleware);
-  app2.post("/api/auth/signup", async (req, res) => {
+  app2.post("/api/auth/signup", authRateLimit, async (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     const { email, password, displayName, company } = parsed.data;
@@ -2169,7 +2189,7 @@ async function registerRoutes(_httpServer, app2) {
       res.status(status).json({ message: msg });
     }
   });
-  app2.post("/api/auth/login", async (req, res) => {
+  app2.post("/api/auth/login", authRateLimit, async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     const { email, password } = parsed.data;
@@ -2186,7 +2206,7 @@ async function registerRoutes(_httpServer, app2) {
     clearSessionCookie(res);
     res.json({ ok: true });
   });
-  app2.post("/api/auth/forgot-password", async (req, res) => {
+  app2.post("/api/auth/forgot-password", authRateLimit, async (req, res) => {
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     if (email) {
       const account = await storage.getAccountByEmail(email);
@@ -2201,7 +2221,7 @@ async function registerRoutes(_httpServer, app2) {
     }
     res.json({ ok: true, message: "If an account exists with that email, a reset link has been sent." });
   });
-  app2.post("/api/auth/reset-password", async (req, res) => {
+  app2.post("/api/auth/reset-password", authRateLimit, async (req, res) => {
     const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     if (!token || !password) return res.status(400).json({ message: "Token and new password are required" });
@@ -2920,7 +2940,7 @@ async function registerRoutes(_httpServer, app2) {
   });
   return _httpServer;
 }
-var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, PUBLIC_API, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
+var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, authAttempts, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW, PUBLIC_API, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
 var init_routes = __esm({
   "server/routes.ts"() {
     "use strict";
@@ -2934,6 +2954,9 @@ var init_routes = __esm({
     init_schema();
     SESSION_COOKIE = "tp_session";
     SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
+    authAttempts = /* @__PURE__ */ new Map();
+    AUTH_RATE_LIMIT = 10;
+    AUTH_RATE_WINDOW = 15 * 60 * 1e3;
     PUBLIC_API = /* @__PURE__ */ new Set([
       "/api/auth/signup",
       "/api/auth/login",

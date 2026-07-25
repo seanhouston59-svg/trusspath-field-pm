@@ -59,6 +59,35 @@ function clearSessionCookie(res: any) {
   );
 }
 
+// Simple in-memory rate limiter for auth endpoints (brute-force protection)
+const authAttempts = new Map<string, { count: number; resetAt: number }>();
+const AUTH_RATE_LIMIT = 10;
+const AUTH_RATE_WINDOW = 15 * 60 * 1000; // 15 minutes
+
+function authRateLimit(req: any, res: any, next: any) {
+  const ip = (req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown") as string;
+  const now = Date.now();
+  const entry = authAttempts.get(ip);
+
+  if (entry && now < entry.resetAt) {
+    if (entry.count >= AUTH_RATE_LIMIT) {
+      const mins = Math.ceil((entry.resetAt - now) / 60000);
+      return res.status(429).json({ message: `Too many attempts. Please try again in ${mins} minute${mins > 1 ? "s" : ""}.` });
+    }
+    entry.count++;
+  } else {
+    authAttempts.set(ip, { count: 1, resetAt: now + AUTH_RATE_WINDOW });
+  }
+
+  // Clean expired entries periodically
+  if (authAttempts.size > 500) {
+    authAttempts.forEach((val, key) => {
+      if (now >= val.resetAt) authAttempts.delete(key);
+    });
+  }
+  next();
+}
+
 // Public paths that do not require auth. Everything else under /api/* requires a session.
 const PUBLIC_API = new Set<string>([
   "/api/auth/signup",
@@ -243,7 +272,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.use(authMiddleware);
 
   /* ------------------------- Auth ------------------------- */
-  app.post("/api/auth/signup", async (req, res) => {
+  app.post("/api/auth/signup", authRateLimit, async (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     const { email, password, displayName, company } = parsed.data;
@@ -260,7 +289,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", authRateLimit, async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     const { email, password } = parsed.data;
@@ -280,7 +309,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Forgot password — generate reset token and email it
-  app.post("/api/auth/forgot-password", async (req, res) => {
+  app.post("/api/auth/forgot-password", authRateLimit, async (req, res) => {
     const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
     // Always return success — don't leak whether email exists
     if (email) {
@@ -299,7 +328,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Reset password — validate token and set new password
-  app.post("/api/auth/reset-password", async (req, res) => {
+  app.post("/api/auth/reset-password", authRateLimit, async (req, res) => {
     const token = typeof req.body?.token === "string" ? req.body.token.trim() : "";
     const password = typeof req.body?.password === "string" ? req.body.password : "";
     if (!token || !password) return res.status(400).json({ message: "Token and new password are required" });
