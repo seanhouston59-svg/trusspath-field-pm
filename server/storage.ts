@@ -29,7 +29,7 @@ import { existsSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
-const RAW_CONN = process.env.DATABASE_URL;
+const RAW_CONN = process.env.POSTGRES_URL_NON_POOLING || process.env.DATABASE_URL;
 if (!RAW_CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(RAW_CONN)) {
   const msg = !RAW_CONN
     ? "[storage] DATABASE_URL is not set. Set it in Vercel → Project → Settings → Environment Variables to the Neon connection string (postgresql://user:password@host/dbname?sslmode=require)."
@@ -39,7 +39,8 @@ if (!RAW_CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(RAW_CONN)) {
 // The @neondatabase/serverless HTTP driver needs the non-pooled endpoint.
 // The "-pooler" host is for TCP/PgBouncer connections and can cause
 // intermittent fetch failures when used with the HTTP driver.
-// Strip "-pooler" from the hostname and remove TCP-only query params.
+// Prefer POSTGRES_URL_NON_POOLING (set by Vercel Neon integration).
+// Otherwise strip "-pooler" from the hostname and remove TCP-only params.
 const CONN = RAW_CONN
   ? RAW_CONN
       .replace(/-pooler\./, ".")

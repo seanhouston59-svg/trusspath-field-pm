@@ -559,7 +559,7 @@ var init_storage = __esm({
     import_node_fs = require("node:fs");
     import_node_path = require("node:path");
     import_node_crypto = require("node:crypto");
-    RAW_CONN = process.env.DATABASE_URL;
+    RAW_CONN = process.env.POSTGRES_URL_NON_POOLING || process.env.DATABASE_URL;
     if (!RAW_CONN || !/^postgres(ql)?:\/\/[^:]+:[^@]+@[^/]+\/.+/.test(RAW_CONN)) {
       const msg = !RAW_CONN ? "[storage] DATABASE_URL is not set. Set it in Vercel \u2192 Project \u2192 Settings \u2192 Environment Variables to the Neon connection string (postgresql://user:password@host/dbname?sslmode=require)." : "[storage] DATABASE_URL is malformed. Expected postgresql://user:password@host/dbname?sslmode=require. Check for empty strings, extra quotes, or missing credentials in the Vercel env var.";
       console.error(msg);
