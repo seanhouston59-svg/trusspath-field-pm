@@ -1,4 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="14" fill="#1a1a1a"/>
-  <text x="32" y="44" font-family="Arial Black, sans-serif" font-size="38" font-weight="900" fill="#e07412" text-anchor="middle">T</text>
+  <path d="M32 3 L57 17.5 L57 46.5 L32 61 L7 46.5 L7 17.5 Z" fill="#e07412" />
+  <path d="M16 45 L25 45 L20.5 33 Z" fill="#1a1a1a" />
+  <path d="M28 36 L37 36 L32.5 24 Z" fill="#1a1a1a" />
+  <path d="M40 27 L49 27 L44.5 15 Z" fill="#1a1a1a" />
+  <path d="M20.5 33 L32.5 24 L44.5 15" stroke="#1a1a1a" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
