@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, X, ClipboardList } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { GhostState } from "@/components/ghost-state";
+import { GhostState, GhostDailyLogCards } from "@/components/ghost-state";
 import { DailyLogList } from "@/components/tables";
 import { DailyLogForm } from "@/components/daily-log-form";
 import { useDailyLogs, useTeamMap, useProjects, useDeleteDailyLog } from "@/hooks/use-data";
@@ -47,11 +47,16 @@ export default function DailyLogsPage() {
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
       ) : logs.length === 0 ? (
-        <GhostState
-          title="No daily logs yet"
-          description="Daily logs will appear here once your team starts recording field activity."
-          icon={ClipboardList}
-        />
+        <div>
+          <GhostDailyLogCards />
+          <div className="mt-4">
+            <GhostState
+              title="No daily logs yet"
+              description="The sample entries above show what daily logs will look like. Create one to start recording field activity."
+              icon={ClipboardList}
+            />
+          </div>
+        </div>
       ) : (
         <DailyLogList logs={logs} team={team} projects={projectList} onEdit={openEdit} onDelete={handleDelete} />
       )}

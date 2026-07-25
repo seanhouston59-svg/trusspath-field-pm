@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import type { LucideIcon } from "lucide-react";
 import { Plus, Inbox } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
  * GhostState — shown when a page has no data after a wipe or on a fresh account.
@@ -62,6 +63,152 @@ export function GhostRows({ count = 5 }: { count?: number }) {
           key={i}
           className="h-12 animate-pulse rounded-lg border border-border bg-muted/50"
         />
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Ghost Data Rows — sample content showing what to enter ---------- */
+
+const ghostRow = "border-b border-dashed border-border/50 text-muted-foreground/40";
+
+/** Ghost task rows showing example task data */
+export function GhostTaskRows() {
+  const samples = [
+    { task: "Install HVAC ductwork on floor 3", trade: "Mechanical", assignee: "TBD", due: "Mon, Jul 28", priority: "High", status: "Not Started" },
+    { task: "Pour concrete slab — north wing", trade: "Concrete", assignee: "TBD", due: "Wed, Jul 30", priority: "Critical", status: "In Progress" },
+    { task: "Rough-in electrical — rooms 201-210", trade: "Electrical", assignee: "TBD", due: "Fri, Aug 1", priority: "Medium", status: "Not Started" },
+  ];
+  return (
+    <tbody className="divide-y divide-dashed divide-border/40">
+      {samples.map((s, i) => (
+        <tr key={i} className={ghostRow}>
+          <td className="px-4 py-2.5">{s.task}</td>
+          <td className="px-4 py-2.5">{s.trade}</td>
+          <td className="px-4 py-2.5">{s.assignee}</td>
+          <td className="px-4 py-2.5 tabular">{s.due}</td>
+          <td className="px-4 py-2.5">{s.priority}</td>
+          <td className="px-4 py-2.5">{s.status}</td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+/** Ghost RFI rows showing example RFI data */
+export function GhostRfiRows() {
+  const samples = [
+    { num: "RFI-001", subject: "Clarify structural steel connection detail at grid C-4", assignee: "TBD", created: "Jul 22", due: "Jul 29", status: "Open" },
+    { num: "RFI-002", subject: "Confirm door hardware schedule for fire-rated openings", assignee: "TBD", created: "Jul 23", due: "Jul 30", status: "In Review" },
+    { num: "RFI-003", subject: "Verify waterproofing membrane transition at plaza deck", assignee: "TBD", created: "Jul 24", due: "Jul 31", status: "Open" },
+  ];
+  return (
+    <tbody className="divide-y divide-dashed divide-border/40">
+      {samples.map((s, i) => (
+        <tr key={i} className={ghostRow}>
+          <td className="px-4 py-2.5 font-mono text-xs">{s.num}</td>
+          <td className="px-4 py-2.5">{s.subject}</td>
+          <td className="px-4 py-2.5">{s.assignee}</td>
+          <td className="px-4 py-2.5 tabular">{s.created}</td>
+          <td className="px-4 py-2.5 tabular">{s.due}</td>
+          <td className="px-4 py-2.5">{s.status}</td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+/** Ghost punch list rows showing example punch items */
+export function GhostPunchRows() {
+  const samples = [
+    { item: "Touch-up paint — lobby east wall", location: "Lobby", trade: "Painting", assignee: "TBD", status: "Open" },
+    { item: "Replace cracked floor tile — restroom 2", location: "Restroom 2", trade: "Flooring", assignee: "TBD", status: "Open" },
+    { item: "Adjust door closer — unit 101 entry", location: "Unit 101", trade: "Doors", assignee: "TBD", status: "In Progress" },
+  ];
+  return (
+    <tbody className="divide-y divide-dashed divide-border/40">
+      {samples.map((s, i) => (
+        <tr key={i} className={ghostRow}>
+          <td className="px-4 py-2.5">{s.item}</td>
+          <td className="px-4 py-2.5">{s.location}</td>
+          <td className="px-4 py-2.5">{s.trade}</td>
+          <td className="px-4 py-2.5">{s.assignee}</td>
+          <td className="px-4 py-2.5">{s.status}</td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+/** Ghost change order rows showing example CO data */
+export function GhostChangeOrderRows() {
+  const samples = [
+    { num: "CO-001", title: "Upgrade slab reinforcement to epoxy coating", amount: "$24,800", impact: "+3d", issued: "Jul 20", status: "Pending" },
+    { num: "CO-002", title: "Add ADA-compliant door hardware to entries", amount: "$8,400", impact: "—", issued: "Jul 22", status: "Approved" },
+    { num: "CO-003", title: "Revise MEP rough-in for conference room layout", amount: "$15,200", impact: "+1d", issued: "Jul 24", status: "Pending" },
+  ];
+  return (
+    <tbody className="divide-y divide-dashed divide-border/40">
+      {samples.map((s, i) => (
+        <tr key={i} className={ghostRow}>
+          <td className="px-4 py-2.5 font-mono text-xs">{s.num}</td>
+          <td className="px-4 py-2.5">{s.title}</td>
+          <td className="px-4 py-2.5 text-right tabular">{s.amount}</td>
+          <td className="px-4 py-2.5 text-right tabular">{s.impact}</td>
+          <td className="px-4 py-2.5 tabular">{s.issued}</td>
+          <td className="px-4 py-2.5">{s.status}</td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+/** Ghost daily log entries showing example log data */
+export function GhostDailyLogCards() {
+  const samples = [
+    { date: "Jul 25, 2026", weather: "88°F Sunny", crew: "8 on site", notes: "Poured slab in north wing. Framing crew started on floor 2 walls." },
+    { date: "Jul 24, 2026", weather: "85°F Partly Cloudy", crew: "6 on site", notes: "MEP rough-in inspection passed. Electrical continuing on floor 3." },
+  ];
+  return (
+    <div className="space-y-3">
+      {samples.map((s, i) => (
+        <div key={i} className={cn("rounded-lg border border-dashed border-border/40 p-4 text-muted-foreground/40")}>
+          <div className="flex items-center justify-between">
+            <span className="font-medium">{s.date}</span>
+            <span className="text-xs">{s.weather} · {s.crew}</span>
+          </div>
+          <p className="mt-2 text-sm">{s.notes}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Ghost project cards showing example project data */
+export function GhostProjectCards() {
+  const samples = [
+    { name: "Downtown Office Tower", client: "Meridian Development", type: "Commercial", status: "Active", budget: "$2.4M", progress: 45 },
+    { name: "Riverside Medical Center", client: "HealthFirst", type: "Healthcare", status: "Active", budget: "$5.1M", progress: 28 },
+    { name: "Summit High School Addition", client: "Summit School District", type: "Education", status: "Planning", budget: "$890K", progress: 5 },
+  ];
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {samples.map((s, i) => (
+        <div key={i} className="rounded-lg border border-dashed border-border/40 p-4 text-muted-foreground/40">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-xs font-semibold">PRJ-00{i + 1}</span>
+            <span className="text-xs">{s.status}</span>
+          </div>
+          <h3 className="mt-1 font-medium">{s.name}</h3>
+          <p className="text-xs">{s.client} · {s.type}</p>
+          <div className="mt-3 flex items-center justify-between text-xs">
+            <span>{s.budget}</span>
+            <span>{s.progress}%</span>
+          </div>
+          <div className="mt-1 h-1.5 rounded-full bg-muted">
+            <div className="h-full rounded-full bg-muted-foreground/20" style={{ width: `${s.progress}%` }} />
+          </div>
+        </div>
       ))}
     </div>
   );

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, CheckSquare } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { GhostState } from "@/components/ghost-state";
+import { GhostState, GhostPunchRows } from "@/components/ghost-state";
 import { PunchList } from "@/components/tables";
 import { PunchBoard } from "@/components/punch-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
@@ -97,11 +97,23 @@ export default function PunchPage() {
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
       ) : filtered.length === 0 && items.length === 0 ? (
-        <GhostState
-          title="No punch items yet"
-          description="Punch list items will appear here as your team identifies items needing correction."
-          icon={CheckSquare}
-        />
+        <div>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr><th className="px-4 py-2.5 font-medium">Item</th><th className="px-4 py-2.5 font-medium">Location</th><th className="px-4 py-2.5 font-medium">Trade</th><th className="px-4 py-2.5 font-medium">Assignee</th><th className="px-4 py-2.5 font-medium">Status</th></tr>
+              </thead>
+              <GhostPunchRows />
+            </table>
+          </div>
+          <div className="mt-4">
+            <GhostState
+              title="No punch items yet"
+              description="The sample rows above show what punch list items will look like. They appear here as your team identifies items needing correction."
+              icon={CheckSquare}
+            />
+          </div>
+        </div>
       ) : view === "board" ? (
         <PunchBoard items={filtered} team={team} projects={projectList} onCardClick={(i) => setSelected(i)} />
       ) : (

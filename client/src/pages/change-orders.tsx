@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, FileEdit, Clock, CheckCircle2, XCircle, Zap } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { GhostState } from "@/components/ghost-state";
+import { GhostState, GhostChangeOrderRows } from "@/components/ghost-state";
 import { ChangeOrderTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
@@ -103,11 +103,23 @@ export default function ChangeOrdersPage() {
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
       ) : filtered.length === 0 && items.length === 0 ? (
-        <GhostState
-          title="No change orders yet"
-          description="Change orders will appear here once your team submits modifications to project scope."
-          icon={FileEdit}
-        />
+        <div>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr><th className="px-4 py-2.5 font-medium">#</th><th className="px-4 py-2.5 font-medium">Title</th><th className="px-4 py-2.5 font-medium text-right">Amount</th><th className="px-4 py-2.5 font-medium text-right">Sched. Impact</th><th className="px-4 py-2.5 font-medium">Issued</th><th className="px-4 py-2.5 font-medium">Status</th></tr>
+              </thead>
+              <GhostChangeOrderRows />
+            </table>
+          </div>
+          <div className="mt-4">
+            <GhostState
+              title="No change orders yet"
+              description="The sample rows above show what change orders will look like. They appear here once your team submits modifications to project scope."
+              icon={FileEdit}
+            />
+          </div>
+        </div>
       ) : view === "board" ? (
         <GenericBoard<ChangeOrder, Status>
           items={filtered}

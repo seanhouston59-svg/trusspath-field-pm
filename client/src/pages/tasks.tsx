@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Plus, ListChecks } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { GhostState } from "@/components/ghost-state";
+import { GhostState, GhostTaskRows } from "@/components/ghost-state";
 import { TaskTable } from "@/components/tables";
 import { TaskBoard } from "@/components/task-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
@@ -107,13 +107,25 @@ export default function TasksPage() {
       {isLoading ? (
         <div className="h-64 animate-pulse rounded-lg border border-border bg-muted" />
       ) : filtered.length === 0 && tasks.length === 0 ? (
-        <GhostState
-          title="No tasks yet"
-          description="Create your first task to start tracking work across your projects."
-          icon={ListChecks}
-          ctaLabel="Create task"
-          ctaHref="/tasks?new=1"
-        />
+        <div>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr><th className="px-4 py-2.5 font-medium">Task</th><th className="px-4 py-2.5 font-medium">Trade</th><th className="px-4 py-2.5 font-medium">Assignee</th><th className="px-4 py-2.5 font-medium">Due</th><th className="px-4 py-2.5 font-medium">Priority</th><th className="px-4 py-2.5 font-medium">Status</th></tr>
+              </thead>
+              <GhostTaskRows />
+            </table>
+          </div>
+          <div className="mt-4">
+            <GhostState
+              title="No tasks yet"
+              description="The sample rows above show what your tasks will look like. Create your first task to get started."
+              icon={ListChecks}
+              ctaLabel="Create task"
+              ctaHref="/tasks?new=1"
+            />
+          </div>
+        </div>
       ) : view === "board" ? (
         <TaskBoard tasks={filtered} team={team} projects={projectList} onCardClick={(t) => setSelected(t)} />
       ) : (
