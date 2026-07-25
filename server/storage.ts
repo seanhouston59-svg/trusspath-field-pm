@@ -405,7 +405,8 @@ export interface IStorage {
   countAccounts(): Promise<number>;
 }
 
-// Ensure schema + seed are ready before any query. Idempotent + memoized.
+// Ensure schema is ready before any query. Idempotent + memoized.
+// Seeding is NOT automatic — only happens via explicit resetAllData() call.
 // On failure the cached promise is cleared so the next request retries — a
 // transient fetch error to Neon during cold-start init must not poison the
 // warm function instance forever.
@@ -414,7 +415,6 @@ export function ensureReady(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       await migrate();
-      await (storage as DatabaseStorage).seed();
     })().catch((e) => {
       initPromise = null;
       throw e;
@@ -981,7 +981,6 @@ class DatabaseStorage implements IStorage {
     for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, companyDocuments, deletedItems, subscribers, demoRequests]) {
       await db.delete(t);
     }
-    seedDone = true; // prevent auto-seed from repopulating
   }
 
   /* ---------------------- Auth helpers ---------------------- */

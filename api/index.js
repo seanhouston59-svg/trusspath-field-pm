@@ -642,7 +642,6 @@ function ensureReady() {
   if (!initPromise) {
     initPromise = (async () => {
       await migrate();
-      await storage.seed();
     })().catch((e) => {
       initPromise = null;
       throw e;
@@ -1196,7 +1195,6 @@ var init_storage = __esm({
         for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, companyDocuments, deletedItems, subscribers, demoRequests]) {
           await db.delete(t);
         }
-        seedDone = true;
       }
       /* ---------------------- Auth helpers ---------------------- */
       hashPassword(password) {
