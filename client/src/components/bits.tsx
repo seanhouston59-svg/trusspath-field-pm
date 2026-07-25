@@ -1,27 +1,24 @@
 import { cn } from "@/lib/utils";
 
 /* ----------------------------- Brand logo ----------------------------- */
-/* TrussPath roof truss mark: orange triangular truss with internal W bracing.
-   Matches the official TrussPath brand identity. */
+/* TrussPath King Post truss mark — matches official brand identity.
+   Orange roof truss with king post, intermediate verticals, and
+   diagonal struts forming a W bracing pattern. */
 export function Logo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      {/* Outer triangle */}
-      <path d="M32 6 L58 54 L6 54 Z" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" />
-      {/* Horizontal base */}
-      <path d="M14 54 L50 54" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
-      {/* Vertical center post */}
-      <path d="M32 23 L32 54" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-      {/* Left diagonal strut */}
-      <path d="M32 54 L18 54" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-      <path d="M32 37 L20 54" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-      {/* Right diagonal strut */}
-      <path d="M32 37 L44 54" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-      {/* Apex node */}
-      <circle cx="32" cy="6" r="3" fill="currentColor" />
-      {/* Base nodes */}
-      <circle cx="6" cy="54" r="3" fill="currentColor" />
-      <circle cx="58" cy="54" r="3" fill="currentColor" />
+      {/* Outer triangle — rafters + base */}
+      <path d="M32 12 L56 52 L8 52 Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+      {/* King post — center vertical from peak to base */}
+      <line x1="32" y1="12" x2="32" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+      {/* Left intermediate vertical — 1/4 mark, base to rafter */}
+      <line x1="20" y1="52" x2="20" y2="33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+      {/* Right intermediate vertical — 3/4 mark, base to rafter */}
+      <line x1="44" y1="52" x2="44" y2="33" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+      {/* Left diagonal strut — peak to 1/4 base */}
+      <line x1="32" y1="12" x2="20" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+      {/* Right diagonal strut — peak to 3/4 base */}
+      <line x1="32" y1="12" x2="44" y2="52" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
     </svg>
   );
 }
