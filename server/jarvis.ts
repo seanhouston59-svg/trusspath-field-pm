@@ -19,10 +19,11 @@ You have live read-only access to the project's data (tasks, RFIs, submittals, c
 You cannot write data yourself. When the user asks to create or change something, tell them what to do and which tab to use, and offer to help draft the wording.
 You can run an APP HEALTH SCAN to find broken links or non-working modules. When the user asks about broken links, app health, what's broken, or what doesn't work, use the supplied scan results to answer concretely.
 You're also a knowledgeable general assistant. Answer everyday questions helpfully:
-- Weather — give practical advice on checking conditions, heat stress, lightning safety, wind limits for cranes. If you don't have live data, say so and suggest resources.
-- Lunch/restaurants — suggest checking Google Maps or Yelp near the site, mention food trucks and meal prep tips. Be practical.
+- Weather — you have LIVE weather data when the project has an address set. Give current temperature, conditions, wind, humidity, and a 3-day forecast. Include construction-relevant safety notes for heat, wind, storms, or precipitation when applicable. If no weather data is available, suggest weather.gov or the OSHA-NIOSH Heat Safety app.
+- Lunch/restaurants — when Google Maps is connected, you can find real nearby restaurants, coffee shops, and other places. When it's not connected, suggest checking Google Maps or Yelp near the site, mention food trucks and meal prep tips. Be practical.
 - Construction safety — provide thorough OSHA-compliant guidance on PPE, fall protection, excavation, electrical safety, heat stress, toolbox talks, etc.
 - General knowledge — answer questions on any topic. Be helpful, concise, and accurate.
+You can LEARN from the user. When you don't know something, ask the user to tell you the answer and say you'll remember it. If the user says "remember that...", acknowledge that you've saved it.
 When you don't know something, just say so — don't guess.
 ${length}`;
 }
@@ -105,11 +106,31 @@ export async function jarvisChat(projectId: number | undefined, history: Msg[]):
   const client = new OpenAI();
 
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
+  const lowerUser = lastUser.toLowerCase();
   const scanBlock = HEALTH_INTENT.test(lastUser) ? `\n\n--- APP HEALTH SCAN (live) ---\n${formatScan(await runHealthScan())}` : "";
+
+  // Fetch live weather/places data when relevant to the question
+  let liveApiBlock = "";
+  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  const address = project?.address;
+  if (address) {
+    if (/\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lowerUser)) {
+      const { getWeather } = await import("./apis");
+      const weather = await getWeather(address);
+      if (weather) liveApiBlock += `\n\n--- LIVE WEATHER DATA ---\n${weather}`;
+    }
+    if (/\b(lunch|food|eat|restaurant|hungry|dinner|breakfast|coffee|hardware|supplies|hotel|gas)\b/i.test(lowerUser)) {
+      const { getNearbyPlaces, hasPlacesApi } = await import("./apis");
+      if (hasPlacesApi()) {
+        const places = await getNearbyPlaces(address, lowerUser);
+        if (places) liveApiBlock += `\n\n--- LIVE NEARBY PLACES ---\n${places}`;
+      }
+    }
+  }
 
   const resp = await client.responses.create({
     model: MODEL,
-    instructions: `${persona}\n\n--- LIVE PROJECT DATA ---\n${compact}${scanBlock}`,
+    instructions: `${persona}\n\n--- LIVE PROJECT DATA ---\n${compact}${scanBlock}${liveApiBlock}`,
     input: history.map((m) => ({ role: m.role, content: m.content })),
   });
   return { reply: resp.output_text ?? "" };

@@ -1,6 +1,7 @@
 import { storage, normalizeQuestion, inferTopic } from "./storage";
 import { buildContext, type ContextBundle } from "./jarvis";
 import { runHealthScan } from "./health";
+import { getWeather, getNearbyPlaces, hasPlacesApi } from "./apis";
 
 // When no LLM API key is available, Jarvis uses this local response engine.
 // Responses are written to sound natural and conversational, the way a real
@@ -85,11 +86,11 @@ const CONSTRUCTION_QA: { keywords: string[]; answer: string }[] = [
   },
   {
     keywords: ["weather"],
-    answer: "I can't pull live weather yet, but here's what I'd suggest for checking conditions on site:\n\nThe OSHA-NIOSH Heat Safety app gives you the real-time heat index and precautions. For forecasts and severe weather, weather.gov or a NOAA weather radio is your best bet.\n\nA couple of rules of thumb — crane operations need to stop when sustained winds hit twenty miles per hour or more, though check the manufacturer specs because some are lower. And for lightning, use the thirty/thirty rule: if thunder follows lightning by less than thirty seconds, get to shelter, and wait thirty minutes after the last thunder before going back out.\n\nIf we connect a weather API down the road, I can pull live conditions for you right here. But also — if you've got a weather tip specific to your area, just say \"remember that...\" and I'll save it for next time.",
+    answer: "I'm trying to pull live weather for your project, but it looks like I couldn't get it. Here's what I'd suggest for checking conditions on site:\n\nThe OSHA-NIOSH Heat Safety app gives you the real-time heat index and precautions. For forecasts and severe weather, weather.gov or a NOAA weather radio is your best bet.\n\nA couple of rules of thumb — crane operations need to stop when sustained winds hit twenty miles per hour or more, though check the manufacturer specs because some are lower. And for lightning, use the thirty/thirty rule: if thunder follows lightning by less than thirty seconds, get to shelter, and wait thirty minutes after the last thunder before going back out.\n\nMake sure your project has an address set and I can fetch live conditions for you. Or if you've got a weather tip specific to your area, just say \"remember that...\" and I'll save it for next time.",
   },
   {
     keywords: ["lunch", "food", "eat", "restaurant", "lunch spots", "where to eat", "hungry"],
-    answer: "I can't browse restaurants yet, but here are some tips for lunch on a job site:\n\nCheck Google Maps or Yelp for spots within ten or fifteen minutes of your site address. Look for places with quick service — delis, food trucks, fast-casual spots. A lot of sites actually bring a food truck on-site for lunch, which saves everyone a trip. Meal prep with a cooler is another solid option — saves time and money.\n\nAnd don't forget to stay hydrated, especially in the summer.\n\nIf you know some good spots near your site, just tell me — say something like \"remember that the best lunch spot near here is Tony's Deli\" and I'll save it. Next time you ask, I'll have it ready.",
+    answer: "I'd love to pull up nearby lunch spots for you, but I need a Google Maps API key set up first. Once that's connected, I can find restaurants, coffee shops, hardware stores, gas stations — anything near your project site automatically.\n\nIn the meantime, check Google Maps or Yelp for spots within ten or fifteen minutes of your site address. Look for places with quick service — delis, food trucks, fast-casual spots. A lot of sites actually bring a food truck on-site for lunch, which saves everyone a trip.\n\nIf you know some good spots near your site, just tell me — say something like \"remember that the best lunch spot near here is Tony's Deli\" and I'll save it. Next time you ask, I'll have it ready.",
   },
   {
     keywords: ["joke", "funny", "tell me something"],
@@ -223,6 +224,38 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
     }
   } catch {
     // Memory search failed, continue with built-in responses
+  }
+
+  // --- Live weather API (Open-Meteo, no key needed) ---
+  if (/\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lower)) {
+    try {
+      const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+      const address = project?.address;
+      if (address) {
+        const weather = await getWeather(address);
+        if (weather) return { reply: weather };
+      }
+      // Fallback if no project address or API failed
+      return {
+        reply: "I couldn't pull live weather for your project. Make sure the project has an address set, and I'll fetch conditions automatically. In the meantime, check weather.gov or the OSHA-NIOSH Heat Safety app for real-time conditions on site.\n\nIf you've got a weather tip specific to your area, just say \"remember that...\" and I'll save it for next time."
+      };
+    } catch {
+      // Fall through to static answer
+    }
+  }
+
+  // --- Live Google Maps Places API ---
+  if (hasPlacesApi() && /\b(lunch|food|eat|restaurant|hungry|dinner|breakfast|coffee|hardware|supplies|hotel|motel|gas|fuel)\b/i.test(lower)) {
+    try {
+      const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+      const address = project?.address;
+      if (address) {
+        const places = await getNearbyPlaces(address, lower);
+        if (places) return { reply: places };
+      }
+    } catch {
+      // Fall through to static answer
+    }
   }
 
   // Check for health scan intent

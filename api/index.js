@@ -1975,6 +1975,213 @@ var init_health = __esm({
   }
 });
 
+// server/apis.ts
+var apis_exports = {};
+__export(apis_exports, {
+  getNearbyPlaces: () => getNearbyPlaces,
+  getWeather: () => getWeather,
+  hasPlacesApi: () => hasPlacesApi,
+  hasWeatherApi: () => hasWeatherApi
+});
+async function geocodeOpenMeteo(address) {
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(address)}&count=1&language=en&format=json`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const hit = data?.results?.[0];
+    if (!hit) return null;
+    return { lat: hit.latitude, lon: hit.longitude, name: hit.name };
+  } catch {
+    return null;
+  }
+}
+async function geocodeGoogle(address) {
+  if (!GOOGLE_MAPS_KEY) return null;
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const hit = data?.results?.[0];
+    if (!hit) return null;
+    return {
+      lat: hit.geometry.location.lat,
+      lon: hit.geometry.location.lng,
+      name: hit.formatted_address || address
+    };
+  } catch {
+    return null;
+  }
+}
+async function geocode(address) {
+  return await geocodeGoogle(address) || await geocodeOpenMeteo(address);
+}
+async function getWeather(address) {
+  const geo = await geocode(address);
+  if (!geo) return null;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&current=temperature_2m,apparent_temperature,wind_speed_10m,precipitation,weather_code,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&timezone=auto&forecast_days=3`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const cur = data?.current;
+    const daily = data?.daily;
+    if (!cur) return null;
+    const temp = Math.round(cur.temperature_2m);
+    const feelsLike = Math.round(cur.apparent_temperature);
+    const wind = Math.round(cur.wind_speed_10m);
+    const precip = cur.precipitation;
+    const humidity = Math.round(cur.relative_humidity_2m);
+    const desc2 = WEATHER_CODES[cur.weather_code] || "current conditions";
+    const locationName = geo.name;
+    let response = `Here's the weather at ${locationName} right now:
+
+`;
+    response += `It's ${temp} degrees and ${desc2}, feels like ${feelsLike} degrees. `;
+    response += `Wind's at ${wind} miles per hour`;
+    if (precip > 0) response += `, with ${precip} inches of precipitation`;
+    response += `. Humidity is at ${humidity} percent.
+
+`;
+    const safetyNotes = [];
+    if (temp >= 90) {
+      safetyNotes.push("That's hot \u2014 make sure everyone's hydrating, taking shade breaks, and watching for signs of heat illness. Schedule the heavy work for early morning if you can.");
+    } else if (temp >= 80) {
+      safetyNotes.push("It's warm out there \u2014 keep water on site and remind the crew to stay hydrated.");
+    }
+    if (wind >= 20) {
+      safetyNotes.push("Wind's picking up \u2014 be careful with crane operations and anything at height. Most manufacturers say to stop lifts at twenty miles per hour sustained, some lower.");
+    }
+    if (cur.weather_code >= 95) {
+      safetyNotes.push("Thunderstorms in the area \u2014 use the thirty/thirty rule. If you hear thunder within thirty seconds of lightning, get to shelter, and wait thirty minutes after the last thunder before going back out.");
+    }
+    if (precip > 0.1) {
+      safetyNotes.push("There's active precipitation \u2014 watch for slippery surfaces, mud, and trench stability issues.");
+    }
+    if (safetyNotes.length) {
+      response += "Heads up for the crew:\n";
+      response += safetyNotes.map((n) => `- ${n}`).join("\n");
+      response += "\n\n";
+    }
+    if (daily && daily.time && daily.time.length > 1) {
+      response += "Next couple of days:\n";
+      for (let i = 1; i < Math.min(3, daily.time.length); i++) {
+        const dayName = new Date(daily.time[i]).toLocaleDateString("en-US", { weekday: "short" });
+        const hi = Math.round(daily.temperature_2m_max[i]);
+        const lo = Math.round(daily.temperature_2m_min[i]);
+        const rainChance = daily.precipitation_probability_max?.[i] ?? 0;
+        const dayDesc = WEATHER_CODES[daily.weather_code?.[i] ?? 0] || "variable";
+        response += `- ${dayName}: ${lo} to ${hi} degrees, ${dayDesc}, ${rainChance}% chance of rain
+`;
+      }
+    }
+    return response;
+  } catch {
+    return null;
+  }
+}
+async function getNearbyPlaces(address, query) {
+  if (!GOOGLE_MAPS_KEY) return null;
+  const lower = query.toLowerCase();
+  let placeType = "restaurant";
+  for (const [keyword, type] of Object.entries(PLACE_TYPES)) {
+    if (lower.includes(keyword)) {
+      placeType = type;
+      break;
+    }
+  }
+  const geo = await geocodeGoogle(address);
+  if (!geo) return null;
+  try {
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${geo.lat},${geo.lon}&radius=5000&type=${placeType}&key=${GOOGLE_MAPS_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const results = data?.results;
+    if (!results || results.length === 0) return null;
+    const top = results.slice(0, 5);
+    const typeLabel = placeType === "restaurant" ? "lunch spots" : placeType.replace(/_/g, " ");
+    let response = `Here are some ${typeLabel} near ${geo.name}:
+
+`;
+    for (let i = 0; i < top.length; i++) {
+      const place = top[i];
+      const name = place.name;
+      const rating = place.rating ? `${place.rating} stars` : "no rating";
+      const vicinity = place.vicinity || "";
+      const open = place.opening_hours?.open_now === true ? "open now" : place.opening_hours?.open_now === false ? "closed" : "";
+      const priceStr = place.price_level ? "$".repeat(place.price_level) : "";
+      response += `${i + 1}. ${name} \u2014 ${rating}${priceStr ? `, ${priceStr}` : ""}${open ? `, ${open}` : ""}
+   ${vicinity}
+`;
+    }
+    response += "\nThese are within about three miles of your site. For directions, maps.google.com has you covered.";
+    return response;
+  } catch {
+    return null;
+  }
+}
+function hasWeatherApi() {
+  return true;
+}
+function hasPlacesApi() {
+  return !!GOOGLE_MAPS_KEY;
+}
+var GOOGLE_MAPS_KEY, WEATHER_CODES, PLACE_TYPES;
+var init_apis = __esm({
+  "server/apis.ts"() {
+    "use strict";
+    GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
+    WEATHER_CODES = {
+      0: "clear skies",
+      1: "mostly clear",
+      2: "partly cloudy",
+      3: "overcast",
+      45: "foggy",
+      48: "freezing fog",
+      51: "light drizzle",
+      53: "drizzle",
+      55: "heavy drizzle",
+      61: "light rain",
+      63: "rain",
+      65: "heavy rain",
+      66: "freezing rain",
+      67: "heavy freezing rain",
+      71: "light snow",
+      73: "snow",
+      75: "heavy snow",
+      77: "snow grains",
+      80: "light rain showers",
+      81: "rain showers",
+      82: "heavy rain showers",
+      85: "snow showers",
+      86: "heavy snow showers",
+      95: "thunderstorms",
+      96: "thunderstorms with hail",
+      99: "severe thunderstorms with hail"
+    };
+    PLACE_TYPES = {
+      lunch: "restaurant",
+      food: "restaurant",
+      eat: "restaurant",
+      restaurant: "restaurant",
+      hungry: "restaurant",
+      dinner: "restaurant",
+      breakfast: "restaurant",
+      coffee: "cafe",
+      hardware: "hardware_store",
+      supplies: "hardware_store",
+      material: "hardware_store",
+      hotel: "lodging",
+      motel: "lodging",
+      lodging: "lodging",
+      gas: "gas_station",
+      fuel: "gas_station"
+    };
+  }
+});
+
 // server/jarvis.ts
 function buildPersona(s = {}) {
   const term = s.addressTerm?.trim() || "sir";
@@ -1988,10 +2195,11 @@ You have live read-only access to the project's data (tasks, RFIs, submittals, c
 You cannot write data yourself. When the user asks to create or change something, tell them what to do and which tab to use, and offer to help draft the wording.
 You can run an APP HEALTH SCAN to find broken links or non-working modules. When the user asks about broken links, app health, what's broken, or what doesn't work, use the supplied scan results to answer concretely.
 You're also a knowledgeable general assistant. Answer everyday questions helpfully:
-- Weather \u2014 give practical advice on checking conditions, heat stress, lightning safety, wind limits for cranes. If you don't have live data, say so and suggest resources.
-- Lunch/restaurants \u2014 suggest checking Google Maps or Yelp near the site, mention food trucks and meal prep tips. Be practical.
+- Weather \u2014 you have LIVE weather data when the project has an address set. Give current temperature, conditions, wind, humidity, and a 3-day forecast. Include construction-relevant safety notes for heat, wind, storms, or precipitation when applicable. If no weather data is available, suggest weather.gov or the OSHA-NIOSH Heat Safety app.
+- Lunch/restaurants \u2014 when Google Maps is connected, you can find real nearby restaurants, coffee shops, and other places. When it's not connected, suggest checking Google Maps or Yelp near the site, mention food trucks and meal prep tips. Be practical.
 - Construction safety \u2014 provide thorough OSHA-compliant guidance on PPE, fall protection, excavation, electrical safety, heat stress, toolbox talks, etc.
 - General knowledge \u2014 answer questions on any topic. Be helpful, concise, and accurate.
+You can LEARN from the user. When you don't know something, ask the user to tell you the answer and say you'll remember it. If the user says "remember that...", acknowledge that you've saved it.
 When you don't know something, just say so \u2014 don't guess.
 ${length}`;
 }
@@ -2058,16 +2266,40 @@ async function jarvisChat(projectId, history) {
   const persona = buildPersona(settings);
   const client = new import_openai.default();
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
+  const lowerUser = lastUser.toLowerCase();
   const scanBlock = HEALTH_INTENT.test(lastUser) ? `
 
 --- APP HEALTH SCAN (live) ---
 ${formatScan(await runHealthScan())}` : "";
+  let liveApiBlock = "";
+  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  const address = project?.address;
+  if (address) {
+    if (/\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lowerUser)) {
+      const { getWeather: getWeather2 } = await Promise.resolve().then(() => (init_apis(), apis_exports));
+      const weather = await getWeather2(address);
+      if (weather) liveApiBlock += `
+
+--- LIVE WEATHER DATA ---
+${weather}`;
+    }
+    if (/\b(lunch|food|eat|restaurant|hungry|dinner|breakfast|coffee|hardware|supplies|hotel|gas)\b/i.test(lowerUser)) {
+      const { getNearbyPlaces: getNearbyPlaces2, hasPlacesApi: hasPlacesApi2 } = await Promise.resolve().then(() => (init_apis(), apis_exports));
+      if (hasPlacesApi2()) {
+        const places = await getNearbyPlaces2(address, lowerUser);
+        if (places) liveApiBlock += `
+
+--- LIVE NEARBY PLACES ---
+${places}`;
+      }
+    }
+  }
   const resp = await client.responses.create({
     model: MODEL,
     instructions: `${persona}
 
 --- LIVE PROJECT DATA ---
-${compact}${scanBlock}`,
+${compact}${scanBlock}${liveApiBlock}`,
     input: history.map((m) => ({ role: m.role, content: m.content }))
   });
   return { reply: resp.output_text ?? "" };
@@ -2194,6 +2426,33 @@ async function localJarvisChat(projectId, history) {
     }
   } catch {
   }
+  if (/\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lower)) {
+    try {
+      const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+      const address = project?.address;
+      if (address) {
+        const weather = await getWeather(address);
+        if (weather) return { reply: weather };
+      }
+      return {
+        reply: `I couldn't pull live weather for your project. Make sure the project has an address set, and I'll fetch conditions automatically. In the meantime, check weather.gov or the OSHA-NIOSH Heat Safety app for real-time conditions on site.
+
+If you've got a weather tip specific to your area, just say "remember that..." and I'll save it for next time.`
+      };
+    } catch {
+    }
+  }
+  if (hasPlacesApi() && /\b(lunch|food|eat|restaurant|hungry|dinner|breakfast|coffee|hardware|supplies|hotel|motel|gas|fuel)\b/i.test(lower)) {
+    try {
+      const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+      const address = project?.address;
+      if (address) {
+        const places = await getNearbyPlaces(address, lower);
+        if (places) return { reply: places };
+      }
+    } catch {
+    }
+  }
   if (/\b(broken|health|scan|not work|doesn'?t work|what'?s broken|integrity)\b/i.test(lower)) {
     try {
       const scan = await runHealthScan();
@@ -2310,6 +2569,7 @@ var init_jarvis_local = __esm({
     init_storage();
     init_jarvis();
     init_health();
+    init_apis();
     CONSTRUCTION_QA = [
       {
         keywords: ["what is rfi", "what's an rfi", "what is a rfi", "rfi mean", "define rfi"],
@@ -2389,21 +2649,19 @@ var init_jarvis_local = __esm({
       },
       {
         keywords: ["weather"],
-        answer: `I can't pull live weather yet, but here's what I'd suggest for checking conditions on site:
+        answer: `I'm trying to pull live weather for your project, but it looks like I couldn't get it. Here's what I'd suggest for checking conditions on site:
 
 The OSHA-NIOSH Heat Safety app gives you the real-time heat index and precautions. For forecasts and severe weather, weather.gov or a NOAA weather radio is your best bet.
 
 A couple of rules of thumb \u2014 crane operations need to stop when sustained winds hit twenty miles per hour or more, though check the manufacturer specs because some are lower. And for lightning, use the thirty/thirty rule: if thunder follows lightning by less than thirty seconds, get to shelter, and wait thirty minutes after the last thunder before going back out.
 
-If we connect a weather API down the road, I can pull live conditions for you right here. But also \u2014 if you've got a weather tip specific to your area, just say "remember that..." and I'll save it for next time.`
+Make sure your project has an address set and I can fetch live conditions for you. Or if you've got a weather tip specific to your area, just say "remember that..." and I'll save it for next time.`
       },
       {
         keywords: ["lunch", "food", "eat", "restaurant", "lunch spots", "where to eat", "hungry"],
-        answer: `I can't browse restaurants yet, but here are some tips for lunch on a job site:
+        answer: `I'd love to pull up nearby lunch spots for you, but I need a Google Maps API key set up first. Once that's connected, I can find restaurants, coffee shops, hardware stores, gas stations \u2014 anything near your project site automatically.
 
-Check Google Maps or Yelp for spots within ten or fifteen minutes of your site address. Look for places with quick service \u2014 delis, food trucks, fast-casual spots. A lot of sites actually bring a food truck on-site for lunch, which saves everyone a trip. Meal prep with a cooler is another solid option \u2014 saves time and money.
-
-And don't forget to stay hydrated, especially in the summer.
+In the meantime, check Google Maps or Yelp for spots within ten or fifteen minutes of your site address. Look for places with quick service \u2014 delis, food trucks, fast-casual spots. A lot of sites actually bring a food truck on-site for lunch, which saves everyone a trip.
 
 If you know some good spots near your site, just tell me \u2014 say something like "remember that the best lunch spot near here is Tony's Deli" and I'll save it. Next time you ask, I'll have it ready.`
       },
