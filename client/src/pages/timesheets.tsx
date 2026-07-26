@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react";
-import { Plus, Clock, Trash2, Pencil, Check, X, ChevronLeft, FileText, Printer, Send, FolderCheck } from "lucide-react";
+import { Plus, Clock, Trash2, Pencil, Check, X, ChevronLeft, FileText, Printer, Send, FolderCheck, Calendar, ChevronRight } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState } from "@/components/ghost-state";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import timesheetLogoUrl from "@/../public/timesheet-logo.jpeg";
 /* ---------- helpers ---------- */
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function getWeekRange(dateStr: string): { start: Date; end: Date; dates: Date[] } {
@@ -55,6 +56,10 @@ function statusColor(status: string): string {
     case "rejected": return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
     default: return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
   }
+}
+
+function dayKey(dateStr: string): string {
+  return dateStr || "";
 }
 
 /* ---------- data hooks ---------- */
@@ -134,7 +139,7 @@ export default function Timesheets() {
       ) : timesheets.length === 0 ? (
         <GhostState
           title="No timesheets yet"
-          description="Create a weekly timesheet to start tracking time. The grid mirrors your paper timesheet — day by day, with client, project, hours, and activities."
+          description="Create a weekly timesheet to start tracking time. Log hours daily, and the week builds up automatically."
           icon={Clock}
         />
       ) : (
@@ -214,7 +219,6 @@ function CreateTimesheetDialog({
   const today = new Date().toISOString().slice(0, 10);
   const weekInfo = getWeekRange(today);
   const weekStart = weekInfo.start.toISOString().slice(0, 10);
-  const weekEnd = weekInfo.end.toISOString().slice(0, 10);
 
   const [employeeName, setEmployeeName] = useState("");
   const [projectId, setProjectId] = useState<string>(projects[0]?.id?.toString() ?? "");
@@ -296,7 +300,7 @@ function CreateTimesheetDialog({
   );
 }
 
-/* ---------- timesheet editor (matches paper layout) ---------- */
+/* ---------- entry draft type ---------- */
 
 type EntryDraft = {
   id?: number;
@@ -306,8 +310,9 @@ type EntryDraft = {
   projectName: string;
   hoursWorked: string;
   activities: string;
-  isExtra: boolean;
 };
+
+/* ---------- timesheet editor with daily + weekly views ---------- */
 
 function TimesheetEditor({
   id, projects, onBack, onDelete,
@@ -326,94 +331,112 @@ function TimesheetEditor({
   const [showSend, setShowSend] = useState(false);
   const [sendEmail, setSendEmail] = useState("");
   const [employeeName, setEmployeeName] = useState("");
+  const [selectedDay, setSelectedDay] = useState(0); // 0=Sun ... 6=Sat
+  const [newEntry, setNewEntry] = useState({ clientName: "", projectName: "", hoursWorked: "", activities: "" });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editEntry, setEditEntry] = useState<EntryDraft | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const companyName = settings?.companyName?.trim() || "TrussPath";
 
-  // Initialize entries from loaded data — 7 day rows + extra rows from existing entries
+  // Initialize entries from loaded data
   if (ts && !loaded) {
     const weekInfo = getWeekRange(ts.weekStart);
     const drafts: EntryDraft[] = [];
 
-    // First 7 rows: one per day of the week
-    for (let i = 0; i < 7; i++) {
-      const date = weekInfo.dates[i];
-      const dateStr = date.toISOString().slice(0, 10);
-      const existing = ts.entries?.find((e) => e.entryDate === dateStr);
-      drafts.push({
-        id: existing?.id,
-        entryDate: dateStr,
-        dayOfWeek: DAYS[i],
-        clientName: existing?.clientName ?? "",
-        projectName: existing?.projectName ?? "",
-        hoursWorked: existing?.hoursWorked ?? "",
-        activities: existing?.activities ?? "",
-        isExtra: false,
-      });
-    }
-
-    // Add extra rows for any entries that didn't match the 7 days
     for (const entry of ts.entries ?? []) {
-      const matched = drafts.some((d) => d.id === entry.id);
-      if (!matched) {
-        drafts.push({
-          id: entry.id,
-          entryDate: entry.entryDate,
-          dayOfWeek: entry.dayOfWeek || "",
-          clientName: entry.clientName ?? "",
-          projectName: entry.projectName ?? "",
-          hoursWorked: entry.hoursWorked ?? "",
-          activities: entry.activities ?? "",
-          isExtra: true,
-        });
-      }
-    }
-
-    // Add 5 blank extra rows for new entries
-    for (let i = 0; i < 5; i++) {
+      const dayIdx = weekInfo.dates.findIndex(
+        (d) => d.toISOString().slice(0, 10) === entry.entryDate
+      );
       drafts.push({
-        entryDate: "",
-        dayOfWeek: "",
-        clientName: "",
-        projectName: "",
-        hoursWorked: "",
-        activities: "",
-        isExtra: true,
+        id: entry.id,
+        entryDate: entry.entryDate,
+        dayOfWeek: dayIdx >= 0 ? DAYS[dayIdx] : entry.dayOfWeek || "",
+        clientName: entry.clientName ?? "",
+        projectName: entry.projectName ?? "",
+        hoursWorked: entry.hoursWorked ?? "",
+        activities: entry.activities ?? "",
       });
     }
+
+    // Default selected day to today if in this week, else Monday
+    const today = new Date().toISOString().slice(0, 10);
+    const todayIdx = weekInfo.dates.findIndex((d) => d.toISOString().slice(0, 10) === today);
+    setSelectedDay(todayIdx >= 0 ? todayIdx : 1);
 
     setEntries(drafts);
     setEmployeeName(ts.employeeName);
     setLoaded(true);
   }
 
-  // Reset loaded state when switching timesheets
+  // Reset when switching timesheets
   if (ts && loaded && ts.id !== id) {
     setLoaded(false);
   }
+
+  const weekInfo = ts ? getWeekRange(ts.weekStart) : null;
+  const weekDates = weekInfo?.dates ?? [];
+
+  // Group entries by day
+  const entriesByDay = useMemo(() => {
+    const groups: EntryDraft[][] = [[], [], [], [], [], [], []];
+    for (const entry of entries) {
+      if (!weekInfo) continue;
+      const idx = weekInfo.dates.findIndex(
+        (d) => d.toISOString().slice(0, 10) === entry.entryDate
+      );
+      if (idx >= 0) groups[idx].push(entry);
+      else groups[1].push(entry); // fallback to Monday
+    }
+    return groups;
+  }, [entries, weekInfo]);
+
+  const dayTotals = useMemo(() => {
+    return entriesByDay.map((dayEntries) =>
+      dayEntries.reduce((sum, e) => sum + (parseFloat(e.hoursWorked) || 0), 0).toFixed(2)
+    );
+  }, [entriesByDay]);
 
   const totalHours = useMemo(() => {
     return entries.reduce((sum, e) => sum + (parseFloat(e.hoursWorked) || 0), 0).toFixed(2);
   }, [entries]);
 
-  const updateEntry = (idx: number, field: keyof EntryDraft, value: string) => {
+  // Add entry for selected day
+  const addEntryForDay = () => {
+    if (!newEntry.hoursWorked && !newEntry.clientName && !newEntry.activities) return;
+    const dateStr = weekDates[selectedDay]?.toISOString().slice(0, 10) ?? ts!.weekStart;
+    const draft: EntryDraft = {
+      entryDate: dateStr,
+      dayOfWeek: DAYS[selectedDay],
+      clientName: newEntry.clientName,
+      projectName: newEntry.projectName,
+      hoursWorked: newEntry.hoursWorked || "0",
+      activities: newEntry.activities,
+    };
+    setEntries((prev) => [...prev, draft]);
+    setNewEntry({ clientName: "", projectName: "", hoursWorked: "", activities: "" });
+    toast({ title: `Added entry for ${DAYS[selectedDay]}` });
+  };
+
+  const updateEntryInline = (idx: number, field: keyof EntryDraft, value: string) => {
     setEntries((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
   };
 
-  const addRow = () => {
-    setEntries((prev) => [...prev, {
-      entryDate: "",
-      dayOfWeek: "",
-      clientName: "",
-      projectName: "",
-      hoursWorked: "",
-      activities: "",
-      isExtra: true,
-    }]);
+  const removeEntry = (idx: number) => {
+    setEntries((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const removeRow = (idx: number) => {
-    setEntries((prev) => prev.filter((_, i) => i !== idx));
+  const startEdit = (entry: EntryDraft, globalIdx: number) => {
+    setEditingId(globalIdx);
+    setEditEntry({ ...entry });
+  };
+
+  const commitEdit = () => {
+    if (editingId !== null && editEntry) {
+      setEntries((prev) => prev.map((e, i) => i === editingId ? { ...editEntry } : e));
+      setEditingId(null);
+      setEditEntry(null);
+    }
   };
 
   const saveMut = useMutation({
@@ -451,7 +474,6 @@ function TimesheetEditor({
     },
   });
 
-  // Auto-save to company documents
   const saveToDocsMut = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/timesheets/${id}/save-to-docs`);
@@ -459,11 +481,10 @@ function TimesheetEditor({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/company-documents"] });
-      toast({ title: data.updated ? "Timesheet updated in Company Documents" : "Timesheet saved to Company Documents" });
+      toast({ title: data.updated ? "Updated in Company Documents" : "Saved to Company Documents" });
     },
   });
 
-  // Send timesheet via email
   const sendMut = useMutation({
     mutationFn: async ({ email }: { email: string }) => {
       const res = await apiRequest("POST", `/api/timesheets/${id}/send`, { email });
@@ -476,38 +497,86 @@ function TimesheetEditor({
     },
   });
 
-  // Print timesheet
-  const handlePrint = () => {
+  // Save as PDF (print to PDF)
+  const handleSavePDF = () => {
     const printContent = printRef.current;
-    if (!printContent) return;
+    if (!printContent || !ts) return;
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
+
+    // Build a clean PDF-friendly layout
+    const weekDatesHtml = weekDates.map((d, i) => {
+      const dayEntries = entriesByDay[i] || [];
+      const rows = dayEntries.length > 0
+        ? dayEntries.map((e: EntryDraft) => `<tr>
+            <td>${e.clientName || "&mdash;"}</td>
+            <td>${e.projectName || "&mdash;"}</td>
+            <td style="text-align:right">${e.hoursWorked || "0"}</td>
+            <td>${e.activities || "&mdash;"}</td>
+          </tr>`).join("")
+        : `<tr><td colspan="4" style="color:#999;text-align:center">No hours logged</td></tr>`;
+      return `
+        <div style="margin-bottom:12px">
+          <div style="font-weight:bold;border-bottom:1px solid #ccc;padding:4px 0;margin-bottom:4px">
+            ${DAYS[i]}, ${fmtDateShort(d)}
+            <span style="float:right">${dayTotals[i]}h</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 8px;border:1px solid #ddd;background:#f5f5f5">Client</th>
+              <th style="text-align:left;padding:4px 8px;border:1px solid #ddd;background:#f5f5f5">Project</th>
+              <th style="text-align:right;padding:4px 8px;border:1px solid #ddd;background:#f5f5f5">Hours</th>
+              <th style="text-align:left;padding:4px 8px;border:1px solid #ddd;background:#f5f5f5">Activities</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }).join("");
+
     win.document.write(`
-      <html><head><title>Timesheet — ${ts?.employeeName ?? "Employee"}</title>
+      <html><head><title>Timesheet — ${ts.employeeName}</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 24px; color: #1a1a1a; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th { background: #f0f0f0; padding: 8px 12px; text-align: left; font-weight: 600; border: 1px solid #ddd; }
-        td { padding: 6px 12px; border: 1px solid #ddd; }
-        tr:nth-child(even) { background: #fafafa; }
-        .header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-        .header img { width: 48px; height: 48px; }
-        .header h1 { font-size: 18px; margin: 0; }
-        .info { display: flex; gap: 32px; margin: 12px 0; }
-        .info-label { font-weight: 600; color: #666; }
-        .sig { margin-top: 32px; display: flex; gap: 48px; }
-        .sig-line { border-bottom: 1px solid #333; min-width: 200px; padding-bottom: 2px; font-style: italic; }
-        .sig-label { font-size: 12px; color: #666; margin-bottom: 4px; }
-        .total { font-weight: bold; }
+        @page { margin: 0.5in; }
+        body { font-family: Arial, sans-serif; padding: 20px; color: #1a1a1a; }
+        .ts-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; border-bottom: 2px solid #333; padding-bottom: 12px; }
+        .ts-header img { width: 50px; height: 50px; }
+        .ts-header h1 { font-size: 20px; margin: 0; }
+        .ts-info { display: flex; gap: 32px; margin-bottom: 16px; }
+        .ts-info b { color: #555; }
+        .ts-total { font-size: 16px; font-weight: bold; margin: 12px 0; padding: 8px; background: #f0f0f0; border-radius: 4px; text-align: right; }
+        .ts-sig { margin-top: 32px; display: flex; gap: 64px; }
+        .ts-sig div { flex: 1; }
+        .ts-sig-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+        .ts-sig-line { border-bottom: 1px solid #333; min-height: 24px; font-style: italic; font-size: 16px; }
       </style></head><body>
-      ${printContent.innerHTML}
+      <div class="ts-header">
+        <img src="${timesheetLogoUrl}" alt="Logo" />
+        <h1>${companyName}</h1>
+        <span style="margin-left:auto;text-transform:capitalize;background:#e0e0e0;padding:2px 8px;border-radius:4px;font-size:12px">${ts.status}</span>
+      </div>
+      <div class="ts-info">
+        <div><b>Name:</b> ${ts.employeeName}</div>
+        <div><b>Week of:</b> ${weekInfo ? fmtWeekRange(weekInfo.start, weekInfo.end) : ""}</div>
+      </div>
+      ${weekDatesHtml}
+      <div class="ts-total">Total Hours: ${totalHours}</div>
+      <div class="ts-sig">
+        <div>
+          <div class="ts-sig-label">Employee Signature</div>
+          <div class="ts-sig-line">${ts.employeeSignature || "&nbsp;"}</div>
+        </div>
+        <div>
+          <div class="ts-sig-label">Manager Signature</div>
+          <div class="ts-sig-line">${ts.managerSignature || "&nbsp;"}</div>
+        </div>
+      </div>
       </body></html>
     `);
     win.document.close();
     setTimeout(() => { win.print(); }, 500);
   };
 
-  if (isLoading || !ts) {
+  if (isLoading || !ts || !weekInfo) {
     return (
       <Layout title="Time Tracking">
         <div className="text-muted-foreground">Loading timesheet...</div>
@@ -515,15 +584,10 @@ function TimesheetEditor({
     );
   }
 
-  const weekInfo = getWeekRange(ts.weekStart);
   const isSubmitted = ts.status === "submitted";
   const isApproved = ts.status === "approved";
   const isRejected = ts.status === "rejected";
 
-  // Save name change with debounce
-  const saveNameChange = (val: string) => {
-    setEmployeeName(val);
-  };
   const commitNameChange = () => {
     if (employeeName.trim() && employeeName !== ts.employeeName) {
       statusMut.mutate({ employeeName: employeeName.trim() });
@@ -538,302 +602,270 @@ function TimesheetEditor({
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ChevronLeft className="size-4" /> Back
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrint}
-            data-testid="button-print-timesheet"
-          >
-            <Printer className="size-4" /> Print
+          <Button variant="outline" size="sm" onClick={handleSavePDF} data-testid="button-save-pdf">
+            <FileText className="size-4" /> Save PDF
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSend(true)}
-            data-testid="button-send-timesheet"
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowSend(true)} data-testid="button-send-timesheet">
             <Send className="size-4" /> Send
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => saveToDocsMut.mutate()}
-            disabled={saveToDocsMut.isPending}
-            data-testid="button-save-to-docs"
-          >
+          <Button variant="outline" size="sm" onClick={() => saveToDocsMut.mutate()} disabled={saveToDocsMut.isPending} data-testid="button-save-to-docs">
             <FolderCheck className="size-4" /> Docs
           </Button>
-          <Button
-            size="sm"
-            onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending}
-            data-testid="button-save-timesheet"
-          >
+          <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending} data-testid="button-save-timesheet">
             {saveMut.isPending ? "Saving..." : "Save"}
           </Button>
         </div>
       }
     >
-      {/* ===== Timesheet Card — matches paper layout ===== */}
-      <div ref={printRef} className="rounded-xl border-2 border-border bg-card shadow-sm overflow-hidden" data-testid="timesheet-card">
+      {/* ===== Print-only container (hidden on screen) ===== */}
+      <div ref={printRef} className="hidden print:block" />
 
-        {/* --- Header band: logo + company name --- */}
+      {/* ===== Header card ===== */}
+      <div className="rounded-xl border-2 border-border bg-card shadow-sm overflow-hidden">
+        {/* Header band */}
         <div className="flex items-center gap-2 border-b-2 border-border bg-muted/40 px-3 py-3 md:px-6 md:py-4">
           <img src={timesheetLogoUrl} alt="Company Logo" className="size-10 shrink-0 rounded-lg object-contain md:size-12" />
           <div className="font-display text-base font-bold tracking-tight md:text-lg">{companyName}</div>
           <div className="ml-auto">
-            <Badge className={cn("text-xs capitalize", statusColor(ts.status))} variant="secondary">
-              {ts.status}
-            </Badge>
+            <Badge className={cn("text-xs capitalize", statusColor(ts.status))} variant="secondary">{ts.status}</Badge>
           </div>
         </div>
 
-        {/* --- Employee + Week info --- */}
+        {/* Employee + Week info */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-3 py-2 md:px-6 md:py-3 md:gap-x-8 md:gap-y-2">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-semibold text-muted-foreground md:text-sm">Name:</span>
             <Input
               value={employeeName}
-              onChange={(e) => saveNameChange(e.target.value)}
+              onChange={(e) => setEmployeeName(e.target.value)}
               onBlur={commitNameChange}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              className="h-8 w-32 border-b-1 border-input px-1 text-sm font-medium md:w-48 md:text-sm"
+              className="h-8 w-32 border-b-1 border-input px-1 text-sm font-medium md:w-48"
               data-testid="input-employee-header"
             />
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground md:text-sm">Weeks of:</span>
-            <span className="text-sm font-medium text-primary md:text-sm">{fmtWeekRange(weekInfo.start, weekInfo.end)}</span>
+            <span className="text-xs font-semibold text-muted-foreground md:text-sm">Week of:</span>
+            <span className="text-sm font-medium text-primary">{fmtWeekRange(weekInfo.start, weekInfo.end)}</span>
           </div>
         </div>
 
-        {/* --- Desktop table (hidden on mobile) --- */}
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-sm" data-testid="table-timesheet-grid">
-            <thead>
-              <tr className="border-b-2 border-border bg-muted/60">
-                <th className="text-left px-3 py-2.5 font-semibold w-28">Day of the Week</th>
-                <th className="text-left px-3 py-2.5 font-semibold w-32">Date</th>
-                <th className="text-left px-3 py-2.5 font-semibold w-32">Client</th>
-                <th className="text-left px-3 py-2.5 font-semibold w-40">Project</th>
-                <th className="text-right px-3 py-2.5 font-semibold w-20">Hour worked</th>
-                <th className="text-left px-3 py-2.5 font-semibold">Activities</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry, idx) => {
-                const isWeekend = !entry.isExtra && (idx === 0 || idx === 6);
-                return (
-                  <tr
-                    key={idx}
-                    className={cn(
-                      "border-b border-border/40",
-                      isWeekend && "bg-muted/20",
-                      !isWeekend && idx % 2 === 1 && "bg-muted/10",
-                      entry.isExtra && "bg-transparent",
-                    )}
-                  >
-                    <td className="px-3 py-1.5">
-                      <Input
-                        value={entry.dayOfWeek}
-                        onChange={(e) => updateEntry(idx, "dayOfWeek", e.target.value)}
-                        placeholder="—"
-                        className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
-                        data-testid={`input-day-${idx}`}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <Input
-                        type="date"
-                        value={entry.entryDate}
-                        onChange={(e) => updateEntry(idx, "entryDate", e.target.value)}
-                        className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
-                        data-testid={`input-date-${idx}`}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <Input
-                        value={entry.clientName}
-                        onChange={(e) => updateEntry(idx, "clientName", e.target.value)}
-                        placeholder="—"
-                        className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
-                        data-testid={`input-client-${idx}`}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <Input
-                        value={entry.projectName}
-                        onChange={(e) => updateEntry(idx, "projectName", e.target.value)}
-                        placeholder="—"
-                        className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
-                        data-testid={`input-project-${idx}`}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <Input
-                        type="number"
-                        step="0.25"
-                        min="0"
-                        value={entry.hoursWorked}
-                        onChange={(e) => updateEntry(idx, "hoursWorked", e.target.value)}
-                        placeholder="0"
-                        className="border-0 bg-transparent px-1 h-8 text-right font-mono focus-visible:ring-1 w-16"
-                        data-testid={`input-hours-${idx}`}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <Textarea
-                        value={entry.activities}
-                        onChange={(e) => updateEntry(idx, "activities", e.target.value)}
-                        placeholder="—"
-                        className="border-0 bg-transparent px-1 py-1 h-8 min-h-0 resize-none focus-visible:ring-1"
-                        data-testid={`input-activities-${idx}`}
-                      />
-                    </td>
-                    <td className="px-1 py-1.5">
-                      <button
-                        onClick={() => removeRow(idx)}
-                        className="text-muted-foreground/40 hover:text-destructive transition p-1"
-                        data-testid={`button-remove-row-${idx}`}
-                        aria-label="Delete row"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-border bg-muted/50">
-                <td colSpan={3} className="px-3 py-2.5" />
-                <td className="px-3 py-2.5 text-right font-bold uppercase tracking-wide" data-testid="text-total-label">
-                  Total
-                </td>
-                <td className="px-3 py-2.5 text-right font-mono font-bold text-base" data-testid="text-total-hours">
-                  {totalHours}
-                </td>
-                <td colSpan={2} />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        {/* --- Mobile card layout (hidden on desktop + print) --- */}
-        <div className="md:hidden print:hidden space-y-2 p-3" data-testid="mobile-timesheet-rows">
-          {entries.map((entry, idx) => {
-            const isWeekend = !entry.isExtra && (idx === 0 || idx === 6);
-            const hasData = entry.clientName || entry.projectName || entry.hoursWorked || entry.activities;
+        {/* ===== Day selector tabs ===== */}
+        <div className="flex overflow-x-auto border-b border-border bg-muted/20">
+          {DAYS_SHORT.map((day, i) => {
+            const hasEntries = entriesByDay[i].length > 0;
+            const dayTotal = parseFloat(dayTotals[i]) > 0;
             return (
-              <div
-                key={idx}
+              <button
+                key={i}
+                onClick={() => setSelectedDay(i)}
                 className={cn(
-                  "rounded-lg border border-border/60 p-2.5",
-                  isWeekend && "bg-muted/20",
-                  !isWeekend && hasData && "bg-muted/5",
-                  entry.isExtra && !hasData && "border-dashed border-border/30",
+                  "flex flex-col items-center gap-0.5 px-3 py-2.5 text-xs font-medium transition shrink-0 relative",
+                  i === selectedDay
+                    ? "bg-card text-foreground border-b-2 border-primary"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
+                data-testid={`tab-day-${i}`}
               >
-                {/* Row header: day + date + hours badge + delete */}
-                <div className="flex items-center gap-2 mb-2">
-                  <Input
-                    value={entry.dayOfWeek}
-                    onChange={(e) => updateEntry(idx, "dayOfWeek", e.target.value)}
-                    placeholder="Day"
-                    className="h-9 flex-1 border-0 bg-transparent px-1 font-semibold text-sm focus-visible:ring-1"
-                    data-testid={`m-input-day-${idx}`}
-                  />
-                  <Input
-                    type="date"
-                    value={entry.entryDate}
-                    onChange={(e) => updateEntry(idx, "entryDate", e.target.value)}
-                    className="h-9 w-36 border-0 bg-transparent px-1 text-xs text-muted-foreground focus-visible:ring-1"
-                    data-testid={`m-input-date-${idx}`}
-                  />
-                  {entry.hoursWorked && (
-                    <span className="font-mono font-bold text-sm shrink-0 px-2 py-0.5 rounded bg-primary/10 text-primary">
-                      {entry.hoursWorked}h
-                    </span>
-                  )}
-                  <button
-                    onClick={() => removeRow(idx)}
-                    className="text-muted-foreground/40 hover:text-destructive transition p-1.5 shrink-0"
-                    data-testid={`m-button-remove-row-${idx}`}
-                    aria-label="Delete row"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-                {/* Stacked fields */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-14 shrink-0">Client</span>
-                    <Input
-                      value={entry.clientName}
-                      onChange={(e) => updateEntry(idx, "clientName", e.target.value)}
-                      placeholder="Client name"
-                      className="h-9 flex-1 text-sm focus-visible:ring-1"
-                      data-testid={`m-input-client-${idx}`}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-14 shrink-0">Project</span>
-                    <Input
-                      value={entry.projectName}
-                      onChange={(e) => updateEntry(idx, "projectName", e.target.value)}
-                      placeholder="Project / task"
-                      className="h-9 flex-1 text-sm focus-visible:ring-1"
-                      data-testid={`m-input-project-${idx}`}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-14 shrink-0">Hours</span>
-                    <Input
-                      type="number"
-                      step="0.25"
-                      min="0"
-                      value={entry.hoursWorked}
-                      onChange={(e) => updateEntry(idx, "hoursWorked", e.target.value)}
-                      placeholder="0"
-                      className="h-9 w-20 text-sm font-mono text-center focus-visible:ring-1"
-                      data-testid={`m-input-hours-${idx}`}
-                    />
-                    <span className="text-xs text-muted-foreground">hrs</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs text-muted-foreground w-14 shrink-0 pt-2.5">Activity</span>
-                    <Textarea
-                      value={entry.activities}
-                      onChange={(e) => updateEntry(idx, "activities", e.target.value)}
-                      placeholder="What did you work on?"
-                      className="min-h-[36px] flex-1 text-sm resize-y focus-visible:ring-1"
-                      data-testid={`m-input-activities-${idx}`}
-                    />
-                  </div>
-                </div>
-              </div>
+                <span>{day}</span>
+                <span className="text-[10px] text-muted-foreground">{weekDates[i]?.getDate() ?? ""}</span>
+                {hasEntries && dayTotal && (
+                  <span className="absolute right-1 top-1 size-1.5 rounded-full bg-green-500" />
+                )}
+              </button>
             );
           })}
-          {/* Mobile total bar */}
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 px-3 py-2.5">
-            <span className="font-bold uppercase tracking-wide text-sm">Total Hours</span>
-            <span className="font-mono font-bold text-base" data-testid="m-text-total-hours">{totalHours}</span>
+        </div>
+
+        {/* ===== Daily entry form ===== */}
+        <div className="border-b border-border p-3 md:p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Calendar className="size-4 text-muted-foreground" />
+            <span className="text-sm font-semibold">{DAYS[selectedDay]}, {fmtDateShort(weekDates[selectedDay])}</span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {entriesByDay[selectedDay].length} {entriesByDay[selectedDay].length === 1 ? "entry" : "entries"} · {dayTotals[selectedDay]}h
+            </span>
           </div>
-          {/* Mobile add row */}
-          <Button variant="outline" size="sm" onClick={addRow} className="w-full" data-testid="m-button-add-row">
-            <Plus className="size-4" /> Add Row
-          </Button>
+
+          {/* New entry form */}
+          <div className="space-y-2 rounded-lg border border-border/60 p-2.5 md:p-3 bg-muted/10">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              <Input
+                value={newEntry.clientName}
+                onChange={(e) => setNewEntry({ ...newEntry, clientName: e.target.value })}
+                placeholder="Client"
+                className="h-9 text-sm"
+                data-testid="input-new-client"
+              />
+              <Input
+                value={newEntry.projectName}
+                onChange={(e) => setNewEntry({ ...newEntry, projectName: e.target.value })}
+                placeholder="Project / Task"
+                className="h-9 text-sm"
+                data-testid="input-new-project"
+              />
+              <Input
+                type="number"
+                step="0.25"
+                min="0"
+                value={newEntry.hoursWorked}
+                onChange={(e) => setNewEntry({ ...newEntry, hoursWorked: e.target.value })}
+                placeholder="Hours"
+                className="h-9 text-sm font-mono"
+                data-testid="input-new-hours"
+              />
+              <Button size="sm" onClick={addEntryForDay} className="h-9" data-testid="button-add-entry">
+                <Plus className="size-4" /> Add
+              </Button>
+            </div>
+            <Textarea
+              value={newEntry.activities}
+              onChange={(e) => setNewEntry({ ...newEntry, activities: e.target.value })}
+              placeholder="Activities — what did you work on?"
+              className="min-h-[40px] text-sm resize-y"
+              data-testid="input-new-activities"
+            />
+          </div>
+
+          {/* Entries for selected day */}
+          {entriesByDay[selectedDay].length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {entriesByDay[selectedDay].map((entry) => {
+                const globalIdx = entries.indexOf(entry);
+                const isEditing = editingId === globalIdx;
+                return (
+                  <div key={globalIdx} className="rounded-lg border border-border/60 p-2.5 bg-card">
+                    {isEditing && editEntry ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <Input
+                            value={editEntry.clientName}
+                            onChange={(e) => setEditEntry({ ...editEntry, clientName: e.target.value })}
+                            placeholder="Client"
+                            className="h-9 text-sm"
+                          />
+                          <Input
+                            value={editEntry.projectName}
+                            onChange={(e) => setEditEntry({ ...editEntry, projectName: e.target.value })}
+                            placeholder="Project"
+                            className="h-9 text-sm"
+                          />
+                          <Input
+                            type="number"
+                            step="0.25"
+                            value={editEntry.hoursWorked}
+                            onChange={(e) => setEditEntry({ ...editEntry, hoursWorked: e.target.value })}
+                            placeholder="Hours"
+                            className="h-9 text-sm font-mono"
+                          />
+                        </div>
+                        <Textarea
+                          value={editEntry.activities}
+                          onChange={(e) => setEditEntry({ ...editEntry, activities: e.target.value })}
+                          placeholder="Activities"
+                          className="min-h-[36px] text-sm resize-y"
+                        />
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={commitEdit} data-testid="button-commit-edit">
+                            <Check className="size-4" /> Done
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => { setEditingId(null); setEditEntry(null); }}>
+                            <X className="size-4" /> Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{entry.clientName || "—"}</span>
+                          <span className="text-xs text-muted-foreground">{entry.projectName}</span>
+                          <span className="ml-auto font-mono font-bold text-sm px-2 py-0.5 rounded bg-primary/10 text-primary">
+                            {entry.hoursWorked || "0"}h
+                          </span>
+                          <button
+                            onClick={() => startEdit(entry, globalIdx)}
+                            className="text-muted-foreground/50 hover:text-foreground p-1"
+                            aria-label="Edit entry"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button
+                            onClick={() => removeEntry(globalIdx)}
+                            className="text-muted-foreground/50 hover:text-destructive p-1"
+                            aria-label="Delete entry"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                        {entry.activities && (
+                          <p className="mt-1 text-xs text-muted-foreground">{entry.activities}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-3 text-center text-sm text-muted-foreground py-4">
+              No entries for {DAYS[selectedDay]} yet. Add one above.
+            </div>
+          )}
         </div>
 
-        {/* --- Desktop add row + total (hidden on mobile) --- */}
-        <div className="hidden md:block">
-          <Button variant="ghost" size="sm" onClick={addRow} data-testid="button-add-row">
-            <Plus className="size-4" /> Add Row
-          </Button>
+        {/* ===== Weekly calendar overview ===== */}
+        <div className="p-3 md:p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-semibold">Weekly Summary</span>
+            <span className="text-sm font-mono font-bold">Total: {totalHours}h</span>
+          </div>
+          {/* Desktop: 7-column grid */}
+          <div className="hidden md:grid md:grid-cols-7 gap-2">
+            {DAYS_SHORT.map((day, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "rounded-lg border p-2 text-center cursor-pointer transition",
+                  i === selectedDay ? "border-primary bg-primary/5" : "border-border/60 hover:border-foreground/20",
+                )}
+                onClick={() => setSelectedDay(i)}
+              >
+                <div className="text-xs font-semibold text-muted-foreground">{day}</div>
+                <div className="text-lg font-bold mt-1">{weekDates[i]?.getDate() ?? ""}</div>
+                <div className="text-xs font-mono mt-1">{dayTotals[i]}h</div>
+                <div className="mt-1 space-y-0.5">
+                  {entriesByDay[i].slice(0, 2).map((e, j) => (
+                    <div key={j} className="text-[10px] text-muted-foreground truncate">
+                      {e.clientName || e.projectName || "—"}
+                    </div>
+                  ))}
+                  {entriesByDay[i].length > 2 && (
+                    <div className="text-[10px] text-muted-foreground">+{entriesByDay[i].length - 2} more</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Mobile: horizontal scroll */}
+          <div className="flex gap-2 overflow-x-auto md:hidden pb-1">
+            {DAYS_SHORT.map((day, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "rounded-lg border p-2 text-center cursor-pointer transition shrink-0 w-16",
+                  i === selectedDay ? "border-primary bg-primary/5" : "border-border/60",
+                )}
+                onClick={() => setSelectedDay(i)}
+              >
+                <div className="text-xs font-semibold text-muted-foreground">{day}</div>
+                <div className="text-base font-bold mt-0.5">{weekDates[i]?.getDate() ?? ""}</div>
+                <div className="text-xs font-mono mt-0.5">{dayTotals[i]}h</div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* --- Signature section --- */}
+        {/* ===== Signature section ===== */}
         <div className="border-t-2 border-border bg-muted/20 px-3 py-4 md:px-6 md:py-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Employee signature */}
@@ -854,10 +886,7 @@ function TimesheetEditor({
                         if (e.key === "Enter") {
                           const val = (e.target as HTMLInputElement).value;
                           if (val.trim()) {
-                            statusMut.mutate({
-                              employeeSignature: val.trim(),
-                              status: "submitted",
-                            });
+                            statusMut.mutate({ employeeSignature: val.trim(), status: "submitted" });
                           }
                         }
                       }}
@@ -865,19 +894,12 @@ function TimesheetEditor({
                       className="border-0 bg-transparent px-0 h-7 text-lg"
                     />
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const input = document.getElementById("emp-sig") as HTMLInputElement;
-                      if (input?.value.trim()) {
-                        statusMut.mutate({
-                          employeeSignature: input.value.trim(),
-                          status: "submitted",
-                        });
-                      }
-                    }}
-                    data-testid="button-sign-submit"
-                  >
+                  <Button size="sm" onClick={() => {
+                    const input = document.getElementById("emp-sig") as HTMLInputElement;
+                    if (input?.value.trim()) {
+                      statusMut.mutate({ employeeSignature: input.value.trim(), status: "submitted" });
+                    }
+                  }} data-testid="button-sign-submit">
                     Sign & Submit
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setSigning(null)}>
@@ -885,17 +907,11 @@ function TimesheetEditor({
                   </Button>
                 </div>
               ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSigning("employee")}
-                  data-testid="button-sign-employee"
-                >
+                <Button variant="outline" size="sm" onClick={() => setSigning("employee")} data-testid="button-sign-employee">
                   <FileText className="size-4" /> Sign
                 </Button>
               )}
             </div>
-
             {/* Manager signature */}
             <div>
               <div className="text-sm font-semibold text-muted-foreground mb-2">Manager Signature</div>
@@ -914,10 +930,7 @@ function TimesheetEditor({
                         if (e.key === "Enter") {
                           const val = (e.target as HTMLInputElement).value;
                           if (val.trim()) {
-                            statusMut.mutate({
-                              managerSignature: val.trim(),
-                              status: "approved",
-                            });
+                            statusMut.mutate({ managerSignature: val.trim(), status: "approved" });
                           }
                         }
                       }}
@@ -925,28 +938,15 @@ function TimesheetEditor({
                       className="border-0 bg-transparent px-0 h-7 text-lg"
                     />
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const input = document.getElementById("mgr-sig") as HTMLInputElement;
-                      if (input?.value.trim()) {
-                        statusMut.mutate({
-                          managerSignature: input.value.trim(),
-                          status: "approved",
-                        });
-                      }
-                    }}
-                    data-testid="button-approve"
-                  >
+                  <Button size="sm" onClick={() => {
+                    const input = document.getElementById("mgr-sig") as HTMLInputElement;
+                    if (input?.value.trim()) {
+                      statusMut.mutate({ managerSignature: input.value.trim(), status: "approved" });
+                    }
+                  }} data-testid="button-approve">
                     Approve
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      statusMut.mutate({ status: "rejected" });
-                    }}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => statusMut.mutate({ status: "rejected" })}>
                     <X className="size-4" /> Reject
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setSigning(null)}>
@@ -954,12 +954,7 @@ function TimesheetEditor({
                   </Button>
                 </div>
               ) : isSubmitted ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSigning("manager")}
-                  data-testid="button-sign-manager"
-                >
+                <Button variant="outline" size="sm" onClick={() => setSigning("manager")} data-testid="button-sign-manager">
                   <FileText className="size-4" /> Sign to Approve
                 </Button>
               ) : (
@@ -971,51 +966,25 @@ function TimesheetEditor({
           </div>
         </div>
 
-        {/* --- Notes --- */}
-        {ts.notes && (
-          <div className="border-t border-border px-6 py-3 bg-muted/30">
-            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Notes</div>
-            <div className="text-sm">{ts.notes}</div>
-          </div>
-        )}
-
-        {/* --- Delete timesheet (always available) --- */}
+        {/* Delete timesheet */}
         <div className="flex justify-end px-3 py-3 border-t border-border/40 md:px-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            className="text-destructive"
-            data-testid="button-delete-timesheet"
-          >
+          <Button variant="outline" size="sm" onClick={onDelete} className="text-destructive" data-testid="button-delete-timesheet">
             <Trash2 className="size-4" /> Delete Timesheet
           </Button>
         </div>
       </div>
 
-      {/* --- Mobile sticky action bar --- */}
+      {/* Mobile sticky action bar */}
       <div className="sticky bottom-0 z-10 mt-2 flex items-center gap-2 rounded-lg border border-border bg-background/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={addRow}
-          className="flex-1"
-          data-testid="m-sticky-add-row"
-        >
-          <Plus className="size-4" /> Add Row
+        <Button variant="outline" size="sm" onClick={handleSavePDF} className="flex-1" data-testid="m-sticky-pdf">
+          <FileText className="size-4" /> Save PDF
         </Button>
-        <Button
-          size="sm"
-          onClick={() => saveMut.mutate()}
-          disabled={saveMut.isPending}
-          className="flex-1"
-          data-testid="m-sticky-save"
-        >
+        <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="flex-1" data-testid="m-sticky-save">
           {saveMut.isPending ? "Saving..." : "Save"}
         </Button>
       </div>
 
-      {/* --- Send dialog --- */}
+      {/* Send dialog */}
       <Dialog open={showSend} onOpenChange={(o) => !o && setShowSend(false)}>
         <DialogContent>
           <DialogHeader>
