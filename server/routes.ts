@@ -320,15 +320,25 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const account = await storage.createAccount(email, password, displayName, company);
       const session = await storage.createSession(account.id);
       setSessionCookie(res, session.id);
-      // Notify owner about new account signup
+      // Notify owner about new account signup — flagged as pending approval so it's obvious action is required.
+      const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
       void sendSignupNotification({
         kind: "signup",
-        subject: `New TrussPath account — ${displayName} (${email})`,
+        subject: `[Action needed] Approve TrussPath account — ${displayName} (${email})`,
+        banner: {
+          label: "Awaiting your approval — this account is locked out until you approve it.",
+          tone: "warning",
+        },
         fields: {
           Name: displayName,
           Email: email,
           Company: company,
           "Signed up": new Date().toISOString(),
+          Status: "pending approval",
+        },
+        cta: {
+          label: "Review in admin console",
+          url: `${APP_URL}/#/admin/signups`,
         },
       });
       // Also return token in body for cross-origin clients that can't rely on cookies.

@@ -3037,21 +3037,31 @@ function renderHtml(n) {
       k
     )}</td><td style="padding:6px 12px;font-size:15px;color:#111;">${escapeHtml(String(v))}</td></tr>`
   ).join("");
-  const kindLabel = n.kind === "subscriber" ? "New TrussPath subscriber" : n.kind === "signup" ? "New TrussPath account signup" : "New TrussPath demo request";
+  const kindLabel = n.kind === "subscriber" ? "New TrussPath subscriber" : n.kind === "signup" ? "New TrussPath account \u2014 needs approval" : "New TrussPath demo request";
+  const bannerHtml = n.banner ? `<div style="margin:16px 20px 0;padding:12px 14px;border-radius:8px;background:${n.banner.tone === "warning" ? "#fef3c7" : "#dbeafe"};color:${n.banner.tone === "warning" ? "#92400e" : "#1e40af"};font-size:14px;font-weight:600;">${escapeHtml(n.banner.label)}</div>` : "";
+  const ctaHtml = n.cta ? `<div style="padding:8px 20px 20px;"><a href="${escapeHtml(n.cta.url)}" style="display:inline-block;padding:10px 22px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">${escapeHtml(n.cta.label)}</a></div>` : "";
   return `<!doctype html>
 <html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
     <div style="padding:16px 20px;background:#111;color:#fff;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(kindLabel)}</div>
+    ${bannerHtml}
     <table style="width:100%;border-collapse:collapse;margin:12px 0;">${rows}</table>
+    ${ctaHtml}
     <div style="padding:12px 20px;color:#888;font-size:12px;border-top:1px solid #eee;">Sent by trusspath-field-pm.vercel.app</div>
   </div>
 </body></html>`;
 }
 function renderText(n) {
   const rows = Object.entries(n.fields).filter(([, v]) => v !== void 0 && v !== null && String(v).trim() !== "").map(([k, v]) => `${k}: ${v}`).join("\n");
+  const bannerText = n.banner ? `${n.banner.label}
+
+` : "";
+  const ctaText = n.cta ? `
+
+${n.cta.label}: ${n.cta.url}` : "";
   return `${n.subject}
 
-${rows}
+${bannerText}${rows}${ctaText}
 `;
 }
 function escapeHtml(s) {
@@ -3153,7 +3163,7 @@ var DEFAULT_TO, DEFAULT_FROM;
 var init_mailer = __esm({
   "server/mailer.ts"() {
     "use strict";
-    DEFAULT_TO = "houston.sean509@gmail.com";
+    DEFAULT_TO = "houston.sean90@gmail.com";
     DEFAULT_FROM = "TrussPath <onboarding@resend.dev>";
   }
 });
@@ -3326,14 +3336,24 @@ async function registerRoutes(_httpServer, app2) {
       const account = await storage.createAccount(email, password, displayName, company);
       const session = await storage.createSession(account.id);
       setSessionCookie(res, session.id);
+      const APP_URL2 = process.env.VITE_API_BASE || "https://trusspath.com";
       void sendSignupNotification({
         kind: "signup",
-        subject: `New TrussPath account \u2014 ${displayName} (${email})`,
+        subject: `[Action needed] Approve TrussPath account \u2014 ${displayName} (${email})`,
+        banner: {
+          label: "Awaiting your approval \u2014 this account is locked out until you approve it.",
+          tone: "warning"
+        },
         fields: {
           Name: displayName,
           Email: email,
           Company: company,
-          "Signed up": (/* @__PURE__ */ new Date()).toISOString()
+          "Signed up": (/* @__PURE__ */ new Date()).toISOString(),
+          Status: "pending approval"
+        },
+        cta: {
+          label: "Review in admin console",
+          url: `${APP_URL2}/#/admin/signups`
         }
       });
       res.status(201).json({ account, token: session.id });
