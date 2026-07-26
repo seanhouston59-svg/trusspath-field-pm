@@ -8,7 +8,13 @@ import { jarvisChat, jarvisBrief } from "./jarvis";
 import { localJarvisChat, buildLocalBrief, buildSafetyBrief } from "./jarvis-local";
 import { buildContext } from "./jarvis";
 import { runHealthScan } from "./health";
-import { sendSignupNotification, sendPasswordResetEmail } from "./mailer";
+import { sendSignupNotification, sendPasswordResetEmail, sendTimesheetApprovalRequest } from "./mailer";
+import * as docusign from "./docusign";
+import {
+  WorkflowError, signAsEmployee, sendToManager, signAsManager, rejectAsManager,
+  applyEnvelopeStatus, findEmployeeProfile,
+  type ApprovalDeps,
+} from "./timesheet-approval";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
@@ -21,6 +27,54 @@ import {
 
 function pid(req: any): number | undefined {
   return req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
+}
+
+/* ---------------- Timesheet approval workflow wiring ---------------- */
+
+// Signed timesheet PDFs are filed as Company Documents, so they live in the same
+// upload dir the /api/company-documents/:id/file route serves from.
+const COMPANY_UPLOAD_DIR = process.env.NODE_ENV === "production"
+  ? "/tmp/uploads/company-documents"
+  : path.resolve(process.cwd(), "uploads/company-documents");
+
+function appBaseUrl(): string {
+  const explicit = process.env.APP_BASE_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return `http://localhost:${process.env.PORT || "5000"}`;
+}
+
+const approvalDeps: ApprovalDeps = {
+  storage,
+  docusign: {
+    isConfigured: docusign.isDocusignConfigured,
+    createEnvelope: docusign.createEnvelope,
+    downloadCombinedPdf: docusign.downloadCombinedPdf,
+    envelopeViewUrl: docusign.envelopeViewUrl,
+  },
+  async notifyManager(n) {
+    await sendTimesheetApprovalRequest(n);
+  },
+  async storeSignedPdf(envelopeId, pdf) {
+    fs.mkdirSync(COMPANY_UPLOAD_DIR, { recursive: true });
+    const storedFileName = `timesheet-${envelopeId}-${Date.now()}.pdf`;
+    fs.writeFileSync(path.join(COMPANY_UPLOAD_DIR, storedFileName), pdf);
+    return { storedFileName, fileSizeBytes: pdf.length };
+  },
+  now: () => new Date().toISOString(),
+  get appBaseUrl() {
+    return appBaseUrl();
+  },
+};
+
+/** Translate a WorkflowError into its HTTP response; rethrow anything else. */
+function sendWorkflowError(res: any, err: unknown, fallback: string): void {
+  if (err instanceof WorkflowError) {
+    res.status(err.httpStatus).json({ message: err.message, code: err.code, ...err.details });
+    return;
+  }
+  console.error(`[timesheets] ${fallback}:`, err);
+  res.status(500).json({ message: fallback });
 }
 
 /* -------------------- Auth middleware -------------------- */
@@ -99,6 +153,9 @@ const PUBLIC_API = new Set<string>([
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
   "/api/stripe/webhook",
+  // DocuSign Connect posts envelope status callbacks with no session; the payload
+  // is authenticated by HMAC instead (DOCUSIGN_CONNECT_HMAC_KEY).
+  "/api/docusign/webhook",
   "/api/billing/checkout",
   // marketing / landing page endpoints — safe to leave public
   "/api/subscribe",
@@ -669,9 +726,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // ---- Company Documents (DocuSign workflow) ----
-  const companyUploadDir = process.env.NODE_ENV === "production"
-    ? "/tmp/uploads/company-documents"
-    : path.resolve(process.cwd(), "uploads/company-documents");
+  const companyUploadDir = COMPANY_UPLOAD_DIR;
   const companyUpload = multer({ storage: multer.diskStorage({
     destination: (req, _file, cb) => { fs.mkdirSync(companyUploadDir, { recursive: true }); cb(null, companyUploadDir); },
     filename: (_req, file, cb) => { const ext = path.extname(file.originalname); cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`); },
@@ -1202,6 +1257,31 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
+  // Timesheets waiting on the signed-in user's signature as designated manager.
+  // Registered before /:id so "pending" isn't swallowed by the id param.
+  app.get("/api/timesheets/pending", async (req: any, res) => {
+    try {
+      const account = req.account;
+      const team = await storage.getTeam();
+      const me = team.find((m) => account?.email && m.email?.toLowerCase() === String(account.email).toLowerCase())
+        ?? findEmployeeProfile(team, account?.displayName ?? "");
+      if (!me) return res.json({ managerMemberId: null, timesheets: [] });
+
+      const rows = await storage.getTimesheetsAwaitingManager(me.id);
+      res.json({
+        managerMemberId: me.id,
+        timesheets: rows.map((t) => ({
+          ...t,
+          docusignUrl: t.docusignEnvelopeId ? docusign.envelopeViewUrl(t.docusignEnvelopeId) : null,
+          employeeMember: findEmployeeProfile(team, t.employeeName) ?? null,
+        })),
+      });
+    } catch (err) {
+      console.error("[timesheets] pending list error:", err);
+      res.status(500).json({ message: "Failed to list pending timesheets" });
+    }
+  });
+
   // Get single timesheet with its entries
   app.get("/api/timesheets/:id", async (req, res) => {
     try {
@@ -1256,125 +1336,88 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
-  // Auto-save timesheet as a company document under employee name
-  app.post("/api/timesheets/:id/save-to-docs", async (req, res) => {
+  // Employee signs. Never gated — the employee can always sign their own portion.
+  app.post("/api/timesheets/:id/employee-sign", async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      const ts = await storage.getTimesheet(id);
-      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
-      const entries = await storage.getTimeEntries(id);
-
-      // Build a plain-text representation of the timesheet
-      const weekInfo = `${ts.weekStart} to ${ts.weekEnd}`;
-      const lines: string[] = [
-        `TIMESHEET`,
-        `Employee: ${ts.employeeName}`,
-        `Week: ${weekInfo}`,
-        `Total Hours: ${ts.totalHours}`,
-        `Status: ${ts.status}`,
-        ``,
-        `Day | Date | Client | Project | Hours | Activities`,
-        `--- | --- | --- | --- | --- | ---`,
-      ];
-      for (const e of entries) {
-        lines.push(`${e.dayOfWeek} | ${e.entryDate} | ${e.clientName ?? ""} | ${e.projectName ?? ""} | ${e.hoursWorked} | ${e.activities ?? ""}`);
-      }
-      if (ts.employeeSignature) lines.push(``, `Employee Signature: ${ts.employeeSignature}`);
-      if (ts.managerSignature) lines.push(`Manager Signature: ${ts.managerSignature}`);
-      const content = lines.join("\n");
-
-      // Check if a company doc already exists for this timesheet
-      const existingDocs = await storage.getCompanyDocuments();
-      const existing = existingDocs.find((d) => d.title === `Timesheet — ${ts.employeeName} — Week of ${ts.weekStart}`);
-
-      const docData = {
-        title: `Timesheet — ${ts.employeeName} — Week of ${ts.weekStart}`,
-        category: "HR",
-        status: "Active",
-        signatureRequired: false,
-        signatureStatus: ts.employeeSignature ? "Signed" : "Not Required",
-        signerName: ts.employeeName,
-        signerEmail: null,
-        dueDate: null,
-        notes: content,
-        uploadedById: null,
-        date: new Date().toISOString().slice(0, 10),
-        storedFileName: null,
-        originalFileName: null,
-        mimeType: null,
-        fileSizeBytes: null,
-      };
-
-      if (existing) {
-        const updated = await storage.updateCompanyDocument(existing.id, { notes: content, date: new Date().toISOString().slice(0, 10) });
-        res.json({ documentId: existing.id, updated: true, document: updated });
-      } else {
-        const created = await storage.createCompanyDocument(docData);
-        res.status(201).json({ documentId: created.id, updated: false, document: created });
-      }
+      const updated = await signAsEmployee(approvalDeps, Number(req.params.id), String(req.body?.signature ?? ""));
+      res.json(updated);
     } catch (err) {
-      console.error("[timesheets] save-to-docs error:", err);
-      res.status(500).json({ message: "Failed to save timesheet to company documents" });
+      sendWorkflowError(res, err, "Failed to record employee signature");
     }
   });
 
-  // Send timesheet via email (saves to docs + sends email if RESEND_API_KEY is set)
-  app.post("/api/timesheets/:id/send", async (req, res) => {
+  // Save & Send to Manager: routes to the employee's designated manager, opens the
+  // DocuSign envelope, and emails them. Does NOT file to Company Documents.
+  app.post("/api/timesheets/:id/send-to-manager", async (req, res) => {
     try {
-      const id = Number(req.params.id);
-      const { email } = req.body;
-      if (!email) return res.status(400).json({ message: "Email is required" });
-      const ts = await storage.getTimesheet(id);
-      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
-      const entries = await storage.getTimeEntries(id);
-
-      // Build email body
-      const weekInfo = `${ts.weekStart} to ${ts.weekEnd}`;
-      const rows = entries.map((e: any) =>
-        `${e.dayOfWeek} | ${e.entryDate} | ${e.clientName ?? "-"} | ${e.projectName ?? "-"} | ${e.hoursWorked}h | ${e.activities ?? "-"}`
-      ).join("\n");
-      const emailBody = [
-        `TIMESHEET`,
-        `Employee: ${ts.employeeName}`,
-        `Week: ${weekInfo}`,
-        `Total Hours: ${ts.totalHours}`,
-        `Status: ${ts.status}`,
-        ``,
-        `Day | Date | Client | Project | Hours | Activities`,
-        `${rows}`,
-        ``,
-        ts.employeeSignature ? `Employee Signature: ${ts.employeeSignature}` : ``,
-        ts.managerSignature ? `Manager Signature: ${ts.managerSignature}` : ``,
-      ].filter(Boolean).join("\n");
-
-      // Send email if RESEND_API_KEY is available
-      if (process.env.RESEND_API_KEY) {
-        try {
-          const resp = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              from: "TrussPath <noreply@trusspath.com>",
-              to: email,
-              subject: `Timesheet — ${ts.employeeName} — Week of ${ts.weekStart}`,
-              text: emailBody,
-            }),
-          });
-          if (!resp.ok) {
-            console.error("[timesheets] email send failed:", await resp.text());
-          }
-        } catch (emailErr) {
-          console.error("[timesheets] email error:", emailErr);
-        }
-      }
-
-      res.json({ sent: true, email, message: "Timesheet saved to docs and sent" });
+      const result = await sendToManager(approvalDeps, Number(req.params.id));
+      res.json({
+        timesheet: result.timesheet,
+        managerName: result.manager.name,
+        managerEmail: result.manager.email,
+        docusignEnvelopeId: result.docusignEnvelopeId,
+        docusignStatus: result.docusignStatus,
+        docusignUrl: result.docusignEnvelopeId ? docusign.envelopeViewUrl(result.docusignEnvelopeId) : null,
+        emailAttempted: result.emailAttempted,
+      });
     } catch (err) {
-      console.error("[timesheets] send error:", err);
-      res.status(500).json({ message: "Failed to send timesheet" });
+      sendWorkflowError(res, err, "Failed to send timesheet to manager");
+    }
+  });
+
+  // Manager signs in-app instead of via DocuSign. Completes the workflow, which
+  // files the record into Company Documents.
+  app.post("/api/timesheets/:id/manager-sign", async (req, res) => {
+    try {
+      const updated = await signAsManager(approvalDeps, Number(req.params.id), String(req.body?.signature ?? ""));
+      res.json(updated);
+    } catch (err) {
+      sendWorkflowError(res, err, "Failed to record manager signature");
+    }
+  });
+
+  app.post("/api/timesheets/:id/manager-reject", async (req, res) => {
+    try {
+      const updated = await rejectAsManager(approvalDeps, Number(req.params.id), req.body?.reason ? String(req.body.reason) : undefined);
+      res.json(updated);
+    } catch (err) {
+      sendWorkflowError(res, err, "Failed to reject timesheet");
+    }
+  });
+
+  // DocuSign Connect callback. Only an envelope-completed event files the record.
+  app.post("/api/docusign/webhook", async (req: any, res) => {
+    const raw = req.rawBody ?? JSON.stringify(req.body ?? {});
+    if (!docusign.verifyConnectSignature(raw, req.headers?.["x-docusign-signature-1"])) {
+      return res.status(401).json({ message: "Invalid DocuSign signature" });
+    }
+    const event = docusign.parseConnectWebhook(req.body);
+    if (!event) return res.status(400).json({ message: "Unrecognized DocuSign payload" });
+    try {
+      const updated = await applyEnvelopeStatus(approvalDeps, event.envelopeId, event.status);
+      if (!updated) {
+        // Envelopes for other documents also hit this endpoint; acknowledge them.
+        console.log(`[docusign] no timesheet for envelope ${event.envelopeId} — ignoring`);
+        return res.json({ handled: false });
+      }
+      res.json({ handled: true, timesheetId: updated.id, status: updated.status, companyDocId: updated.companyDocId });
+    } catch (err) {
+      console.error("[docusign] webhook processing failed:", err);
+      res.status(500).json({ message: "Failed to process DocuSign event" });
+    }
+  });
+
+  // Reconcile a single envelope on demand — useful when a webhook was missed.
+  app.post("/api/timesheets/:id/refresh-envelope", async (req, res) => {
+    try {
+      const ts = await storage.getTimesheet(Number(req.params.id));
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      if (!ts.docusignEnvelopeId) return res.status(400).json({ message: "No DocuSign envelope on this timesheet" });
+      const status = await docusign.getEnvelopeStatus(ts.docusignEnvelopeId);
+      const updated = await applyEnvelopeStatus(approvalDeps, ts.docusignEnvelopeId, docusign.normalizeStatus(status));
+      res.json(updated ?? ts);
+    } catch (err) {
+      sendWorkflowError(res, err, "Failed to refresh DocuSign envelope status");
     }
   });
 

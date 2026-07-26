@@ -53,6 +53,7 @@ const R = {
   messages: "/messages",
   notes: "/notes",
   timesheets: "/timesheets",
+  timesheetsPending: "/timesheets/pending",
   deletedItems: "/deleted-items",
   settings: "/settings",
   adminSignups: "/admin/signups",
@@ -90,7 +91,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
-      R.contacts, R.messages, R.notes, R.timesheets,
+      R.contacts, R.messages, R.notes, R.timesheets, R.timesheetsPending,
     ],
   },
   {
@@ -103,7 +104,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     allowedRoutes: [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.punch, R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints,
-      R.messages, R.notes, R.timesheets,
+      R.messages, R.notes, R.timesheets, R.timesheetsPending,
     ],
   },
   {
@@ -115,7 +116,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
-      R.rfis, R.submittals, R.photos, R.documents, R.companyDocuments, R.blueprints, R.messages, R.timesheets,
+      R.rfis, R.submittals, R.photos, R.documents, R.companyDocuments, R.blueprints, R.messages, R.timesheets, R.timesheetsPending,
     ],
   },
   {
@@ -129,7 +130,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
-      R.contacts, R.messages, R.notes, R.timesheets,
+      R.contacts, R.messages, R.notes, R.timesheets, R.timesheetsPending,
     ],
   },
 ];

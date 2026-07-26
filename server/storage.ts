@@ -10,6 +10,7 @@ import {
   jarvisMemory,
   timesheets, timeEntries,
   DEFAULT_SETTINGS,
+  TIMESHEET_STATUS,
 } from '@shared/schema';
 import type {
   Project, Task, Rfi, Submittal, ChangeOrder, ActionItem,
@@ -274,6 +275,8 @@ async function migrate() {
   await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS original_file_name TEXT`;
   await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS mime_type TEXT`;
   await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER`;
+  await sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS designated_manager_id INTEGER`;
+  await sql`ALTER TABLE company_documents ADD COLUMN IF NOT EXISTS type TEXT`;
 
   // Heal access_level for seed rows still at the default 'project_manager'.
   await sql`UPDATE team_members SET access_level = CASE
@@ -336,6 +339,18 @@ async function migrate() {
     activities TEXT,
     created_at TEXT NOT NULL
   )`;
+
+  // Timesheet approval workflow (employee sign -> manager DocuSign -> filed).
+  await sql`ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS employee_signed_at TEXT`;
+  await sql`ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS sent_to_manager_at TEXT`;
+  await sql`ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS manager_signed_at TEXT`;
+  await sql`ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS manager_user_id INTEGER`;
+  await sql`ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS docusign_envelope_id TEXT`;
+  await sql`ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS docusign_status TEXT`;
+  await sql`ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS signed_pdf_url TEXT`;
+  await sql`ALTER TABLE timesheets ADD COLUMN IF NOT EXISTS company_doc_id INTEGER`;
+  await sql`CREATE INDEX IF NOT EXISTS timesheets_manager_user_id_idx ON timesheets (manager_user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS timesheets_docusign_envelope_id_idx ON timesheets (docusign_envelope_id)`;
 }
 
 export interface IStorage {
@@ -457,6 +472,8 @@ export interface IStorage {
   // Timesheets
   getTimesheets(projectId?: number): Promise<Timesheet[]>;
   getTimesheet(id: number): Promise<Timesheet | undefined>;
+  getTimesheetsAwaitingManager(managerUserId: number): Promise<Timesheet[]>;
+  getTimesheetByEnvelopeId(envelopeId: string): Promise<Timesheet | undefined>;
   createTimesheet(data: InsertTimesheet): Promise<Timesheet>;
   updateTimesheet(id: number, data: Partial<InsertTimesheet>): Promise<Timesheet | undefined>;
   deleteTimesheet(id: number): Promise<void>;
@@ -1308,6 +1325,19 @@ class DatabaseStorage implements IStorage {
     return rows[0];
   }
 
+  async getTimesheetsAwaitingManager(managerUserId: number): Promise<Timesheet[]> {
+    await ensureReady();
+    return await db.select().from(timesheets).where(
+      and(eq(timesheets.managerUserId, managerUserId), eq(timesheets.status, TIMESHEET_STATUS.sentToManager)),
+    );
+  }
+
+  async getTimesheetByEnvelopeId(envelopeId: string): Promise<Timesheet | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(timesheets).where(eq(timesheets.docusignEnvelopeId, envelopeId));
+    return rows[0];
+  }
+
   async createTimesheet(data: InsertTimesheet): Promise<Timesheet> {
     await ensureReady();
     const now = new Date().toISOString();
@@ -1364,7 +1394,7 @@ class DatabaseStorage implements IStorage {
     const existing = await db.select().from(teamMembers);
     if (existing.length > 0) { seedDone = true; return; }
 
-    const team: Omit<TeamMember, "id">[] = [
+    const team: Omit<TeamMember, "id" | "designatedManagerId">[] = [
       { name: "Marcus Reyes", role: "Project Executive", trade: "Management", company: "Meridian Builders", initials: "MR", color: "amber", email: "m.reyes@meridian.co", phone: "(303) 555-0142", companyPhoto: "", accessLevel: "project_executive" },
       { name: "Dana Whitfield", role: "Superintendent", trade: "Self-perform", company: "Meridian Builders", initials: "DW", color: "blue", email: "d.whitfield@meridian.co", phone: "(303) 555-0188", companyPhoto: "", accessLevel: "superintendent" },
       { name: "Priya Anand", role: "Project Manager", trade: "Management", company: "Meridian Builders", initials: "PA", color: "emerald", email: "p.anand@meridian.co", phone: "(303) 555-0173", companyPhoto: "", accessLevel: "project_manager" },
