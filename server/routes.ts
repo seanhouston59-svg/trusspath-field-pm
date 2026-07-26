@@ -931,7 +931,11 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // ============================ STRIPE BILLING ============================
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  const stripe = stripeKey ? new (require("stripe")(stripeKey)) : null;
+  // Stripe SDK: v14+ exports the class as the default export. Older buggy shape
+  // `new (require("stripe")(key))` throws "is not a constructor" because it calls
+  // Stripe as a function first, then tries to `new` the returned instance.
+  const StripeCtor = stripeKey ? require("stripe") : null;
+  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2024-06-20" }) : null;
 
   const PRICE_MAP: Record<string, { monthly?: string; annual?: string }> = {
     starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },
