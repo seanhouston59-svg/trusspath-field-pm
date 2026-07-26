@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Clock, Trash2, Pencil, FileText, Check, X, ChevronLeft } from "lucide-react";
+import { Plus, Clock, Trash2, Pencil, Check, X, ChevronLeft, FileText, GripVertical } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState } from "@/components/ghost-state";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/bits";
 import type { Timesheet, TimeEntry, Project } from "@shared/schema";
 
 /* ---------- helpers ---------- */
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function getWeekRange(dateStr: string): { start: Date; end: Date; dates: Date[] } {
   const d = new Date(dateStr + "T00:00:00");
@@ -37,12 +39,12 @@ function getWeekRange(dateStr: string): { start: Date; end: Date; dates: Date[] 
   return { start, end, dates };
 }
 
-function fmtDate(d: Date): string {
-  return d.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" });
+function fmtDateShort(d: Date): string {
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}/${d.getFullYear()}`;
 }
 
 function fmtWeekRange(start: Date, end: Date): string {
-  return `${start.toLocaleDateString("en-US", { month: "numeric", day: "numeric" })}–${end.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" })}`;
+  return `${start.getMonth() + 1}/${start.getDate()}/${start.getFullYear()}-${end.getMonth() + 1}/${end.getDate()}/${end.getFullYear()}`;
 }
 
 function statusColor(status: string): string {
@@ -70,6 +72,10 @@ function useTimesheet(id: number | null) {
 
 function useProjects() {
   return useQuery<Project[]>({ queryKey: ["/api/projects"] });
+}
+
+function useSettings() {
+  return useQuery<{ companyName?: string }>({ queryKey: ["/api/settings"] });
 }
 
 /* ---------- main page ---------- */
@@ -214,7 +220,6 @@ function CreateTimesheetDialog({
   const [projectId, setProjectId] = useState<string>(projects[0]?.id?.toString() ?? "");
   const [weekStartVal, setWeekStartVal] = useState(weekStart);
 
-  // Recalculate weekEnd when weekStart changes
   const computedWeekEnd = useMemo(() => {
     const d = new Date(weekStartVal + "T00:00:00");
     const end = new Date(d);
@@ -291,7 +296,7 @@ function CreateTimesheetDialog({
   );
 }
 
-/* ---------- timesheet editor (weekly grid) ---------- */
+/* ---------- timesheet editor (matches paper layout) ---------- */
 
 type EntryDraft = {
   id?: number;
@@ -301,6 +306,7 @@ type EntryDraft = {
   projectName: string;
   hoursWorked: string;
   activities: string;
+  isExtra: boolean;
 };
 
 function TimesheetEditor({
@@ -312,15 +318,20 @@ function TimesheetEditor({
   onDelete: () => void;
 }) {
   const { data: ts, isLoading } = useTimesheet(id);
+  const { data: settings } = useSettings();
   const { toast } = useToast();
   const [entries, setEntries] = useState<EntryDraft[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [signing, setSigning] = useState(false);
+  const [signing, setSigning] = useState<"employee" | "manager" | null>(null);
 
-  // Initialize entries from loaded data
+  const companyName = settings?.companyName?.trim() || "TrussPath";
+
+  // Initialize entries from loaded data — 7 day rows + extra rows from existing entries
   if (ts && !loaded) {
     const weekInfo = getWeekRange(ts.weekStart);
     const drafts: EntryDraft[] = [];
+
+    // First 7 rows: one per day of the week
     for (let i = 0; i < 7; i++) {
       const date = weekInfo.dates[i];
       const dateStr = date.toISOString().slice(0, 10);
@@ -333,8 +344,40 @@ function TimesheetEditor({
         projectName: existing?.projectName ?? "",
         hoursWorked: existing?.hoursWorked ?? "",
         activities: existing?.activities ?? "",
+        isExtra: false,
       });
     }
+
+    // Add extra rows for any entries that didn't match the 7 days
+    for (const entry of ts.entries ?? []) {
+      const matched = drafts.some((d) => d.id === entry.id);
+      if (!matched) {
+        drafts.push({
+          id: entry.id,
+          entryDate: entry.entryDate,
+          dayOfWeek: entry.dayOfWeek || "",
+          clientName: entry.clientName ?? "",
+          projectName: entry.projectName ?? "",
+          hoursWorked: entry.hoursWorked ?? "",
+          activities: entry.activities ?? "",
+          isExtra: true,
+        });
+      }
+    }
+
+    // Add 5 blank extra rows for new entries
+    for (let i = 0; i < 5; i++) {
+      drafts.push({
+        entryDate: "",
+        dayOfWeek: "",
+        clientName: "",
+        projectName: "",
+        hoursWorked: "",
+        activities: "",
+        isExtra: true,
+      });
+    }
+
     setEntries(drafts);
     setLoaded(true);
   }
@@ -347,13 +390,29 @@ function TimesheetEditor({
     setEntries((prev) => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
   };
 
+  const addRow = () => {
+    setEntries((prev) => [...prev, {
+      entryDate: "",
+      dayOfWeek: "",
+      clientName: "",
+      projectName: "",
+      hoursWorked: "",
+      activities: "",
+      isExtra: true,
+    }]);
+  };
+
+  const removeRow = (idx: number) => {
+    setEntries((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const saveMut = useMutation({
     mutationFn: async () => {
       const payload = entries
-        .filter((e) => e.hoursWorked || e.clientName || e.activities)
+        .filter((e) => e.hoursWorked || e.clientName || e.activities || e.projectName)
         .map((e) => ({
-          entryDate: e.entryDate,
-          dayOfWeek: e.dayOfWeek,
+          entryDate: e.entryDate || ts!.weekStart,
+          dayOfWeek: e.dayOfWeek || "",
           clientName: e.clientName || null,
           projectName: e.projectName || null,
           hoursWorked: e.hoursWorked || "0",
@@ -377,7 +436,7 @@ function TimesheetEditor({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/timesheets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/timesheets", id] });
-      setSigning(false);
+      setSigning(null);
       toast({ title: "Timesheet updated" });
     },
   });
@@ -394,6 +453,7 @@ function TimesheetEditor({
   const isDraft = ts.status === "draft";
   const isSubmitted = ts.status === "submitted";
   const isApproved = ts.status === "approved";
+  const isRejected = ts.status === "rejected";
 
   return (
     <Layout
@@ -414,253 +474,347 @@ function TimesheetEditor({
         </div>
       }
     >
-      {/* Header info */}
-      <div className="mb-6 rounded-lg border border-border bg-card p-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide">Employee</div>
-            <div className="font-medium mt-1">{ts.employeeName}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide">Week Of</div>
-            <div className="font-medium mt-1">{fmtWeekRange(weekInfo.start, weekInfo.end)}</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide">Total Hours</div>
-            <div className="font-mono font-semibold mt-1 text-lg">{totalHours}h</div>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide">Status</div>
-            <Badge className={cn("mt-1", statusColor(ts.status))} variant="secondary">
+      {/* ===== Timesheet Card — matches paper layout ===== */}
+      <div className="rounded-xl border-2 border-border bg-card shadow-sm overflow-hidden" data-testid="timesheet-card">
+
+        {/* --- Header band: logo + company name --- */}
+        <div className="flex items-center gap-3 border-b-2 border-border bg-muted/40 px-6 py-4">
+          <Logo className="size-10 shrink-0" />
+          <div className="font-display text-lg font-bold tracking-tight">{companyName}</div>
+          <div className="ml-auto">
+            <Badge className={cn("text-xs capitalize", statusColor(ts.status))} variant="secondary">
               {ts.status}
             </Badge>
           </div>
         </div>
-      </div>
 
-      {/* Weekly grid */}
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm" data-testid="table-timesheet-grid">
-          <thead>
-            <tr className="border-b border-border bg-muted/50">
-              <th className="text-left px-3 py-2 font-medium w-24">Day</th>
-              <th className="text-left px-3 py-2 font-medium w-28">Date</th>
-              <th className="text-left px-3 py-2 font-medium">Client</th>
-              <th className="text-left px-3 py-2 font-medium">Project / Task</th>
-              <th className="text-right px-3 py-2 font-medium w-20">Hours</th>
-              <th className="text-left px-3 py-2 font-medium">Activities</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry, idx) => {
-              const date = new Date(entry.entryDate + "T00:00:00");
-              const isWeekend = idx === 0 || idx === 6;
-              return (
-                <tr
-                  key={idx}
-                  className={cn(
-                    "border-b border-border/50",
-                    isWeekend && "bg-muted/20",
-                    !isDraft && "opacity-80"
-                  )}
-                >
-                  <td className="px-3 py-2 font-medium">{entry.dayOfWeek.slice(0, 3)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{fmtDate(date)}</td>
-                  <td className="px-3 py-2">
-                    <Input
-                      value={entry.clientName}
-                      onChange={(e) => updateEntry(idx, "clientName", e.target.value)}
-                      placeholder="—"
-                      disabled={!isDraft}
-                      className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
-                      data-testid={`input-client-${idx}`}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input
-                      value={entry.projectName}
-                      onChange={(e) => updateEntry(idx, "projectName", e.target.value)}
-                      placeholder="—"
-                      disabled={!isDraft}
-                      className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
-                      data-testid={`input-project-${idx}`}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input
-                      type="number"
-                      step="0.25"
-                      min="0"
-                      value={entry.hoursWorked}
-                      onChange={(e) => updateEntry(idx, "hoursWorked", e.target.value)}
-                      placeholder="0"
-                      disabled={!isDraft}
-                      className="border-0 bg-transparent px-1 h-8 text-right font-mono focus-visible:ring-1 w-16"
-                      data-testid={`input-hours-${idx}`}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Textarea
-                      value={entry.activities}
-                      onChange={(e) => updateEntry(idx, "activities", e.target.value)}
-                      placeholder="—"
-                      disabled={!isDraft}
-                      className="border-0 bg-transparent px-1 py-1 h-8 min-h-0 resize-none focus-visible:ring-1"
-                      data-testid={`input-activities-${idx}`}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-border bg-muted/50">
-              <td colSpan={4} className="px-3 py-2 font-medium text-right">TOTAL</td>
-              <td className="px-3 py-2 text-right font-mono font-bold" data-testid="text-total-hours">
-                {totalHours}
-              </td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      {/* Signatures + status workflow */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-border bg-card p-4">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Employee Signature</div>
-          {ts.employeeSignature ? (
-            <div className="flex items-center gap-2">
-              <span className="font-medium italic">{ts.employeeSignature}</span>
-              <Check className="size-4 text-green-600" />
-            </div>
-          ) : signing ? (
-            <div className="flex gap-2">
+        {/* --- Employee + Week info --- */}
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-2 border-b border-border px-6 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Name:</span>
+            {isDraft ? (
               <Input
-                id="emp-sig"
-                placeholder="Type your full name to sign"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const val = (e.target as HTMLInputElement).value;
-                    if (val.trim()) {
-                      statusMut.mutate({
-                        employeeSignature: val.trim(),
-                        status: "submitted",
-                      });
-                    }
-                  }
+                value={ts.employeeName}
+                onChange={(e) => {
+                  // Update employee name inline via status mutation
+                  statusMut.mutate({ employeeName: e.target.value });
                 }}
-                data-testid="input-employee-signature"
+                className="h-8 w-48 border-b-1 border-input px-1 font-medium"
+                data-testid="input-employee-header"
               />
-              <Button
-                size="sm"
-                onClick={() => {
-                  const input = document.getElementById("emp-sig") as HTMLInputElement;
-                  if (input?.value.trim()) {
-                    statusMut.mutate({
-                      employeeSignature: input.value.trim(),
-                      status: "submitted",
-                    });
-                  }
-                }}
-                data-testid="button-sign-submit"
-              >
-                Sign & Submit
-              </Button>
+            ) : (
+              <span className="font-medium">{ts.employeeName}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-muted-foreground">Weeks of:</span>
+            <span className="font-medium text-primary">{fmtWeekRange(weekInfo.start, weekInfo.end)}</span>
+          </div>
+        </div>
+
+        {/* --- Main table --- */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="table-timesheet-grid">
+            <thead>
+              <tr className="border-b-2 border-border bg-muted/60">
+                <th className="text-left px-3 py-2.5 font-semibold w-28">Day of the Week</th>
+                <th className="text-left px-3 py-2.5 font-semibold w-32">Date</th>
+                <th className="text-left px-3 py-2.5 font-semibold w-32">Client</th>
+                <th className="text-left px-3 py-2.5 font-semibold w-40">Project</th>
+                <th className="text-right px-3 py-2.5 font-semibold w-20">Hour worked</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Activities</th>
+                {isDraft && <th className="w-10" />}
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry, idx) => {
+                const isWeekend = !entry.isExtra && (idx === 0 || idx === 6);
+                return (
+                  <tr
+                    key={idx}
+                    className={cn(
+                      "border-b border-border/40",
+                      isWeekend && "bg-muted/20",
+                      !isWeekend && idx % 2 === 1 && "bg-muted/10",
+                      entry.isExtra && "bg-transparent",
+                    )}
+                  >
+                    <td className="px-3 py-1.5">
+                      {entry.isExtra && isDraft ? (
+                        <Input
+                          value={entry.dayOfWeek}
+                          onChange={(e) => updateEntry(idx, "dayOfWeek", e.target.value)}
+                          placeholder="—"
+                          className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
+                          data-testid={`input-day-${idx}`}
+                        />
+                      ) : (
+                        <span className={cn("font-medium", !entry.dayOfWeek && "text-transparent")}>
+                          {entry.dayOfWeek}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      {entry.isExtra && isDraft ? (
+                        <Input
+                          type="date"
+                          value={entry.entryDate}
+                          onChange={(e) => updateEntry(idx, "entryDate", e.target.value)}
+                          className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
+                          data-testid={`input-date-${idx}`}
+                        />
+                      ) : (
+                        <span className={cn("text-muted-foreground", !entry.entryDate && "text-transparent")}>
+                          {entry.entryDate ? fmtDateShort(new Date(entry.entryDate + "T00:00:00")) : "—"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <Input
+                        value={entry.clientName}
+                        onChange={(e) => updateEntry(idx, "clientName", e.target.value)}
+                        placeholder="—"
+                        disabled={!isDraft}
+                        className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
+                        data-testid={`input-client-${idx}`}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <Input
+                        value={entry.projectName}
+                        onChange={(e) => updateEntry(idx, "projectName", e.target.value)}
+                        placeholder="—"
+                        disabled={!isDraft}
+                        className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
+                        data-testid={`input-project-${idx}`}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <Input
+                        type="number"
+                        step="0.25"
+                        min="0"
+                        value={entry.hoursWorked}
+                        onChange={(e) => updateEntry(idx, "hoursWorked", e.target.value)}
+                        placeholder="0"
+                        disabled={!isDraft}
+                        className="border-0 bg-transparent px-1 h-8 text-right font-mono focus-visible:ring-1 w-16"
+                        data-testid={`input-hours-${idx}`}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <Textarea
+                        value={entry.activities}
+                        onChange={(e) => updateEntry(idx, "activities", e.target.value)}
+                        placeholder="—"
+                        disabled={!isDraft}
+                        className="border-0 bg-transparent px-1 py-1 h-8 min-h-0 resize-none focus-visible:ring-1"
+                        data-testid={`input-activities-${idx}`}
+                      />
+                    </td>
+                    {isDraft && (
+                      <td className="px-1 py-1.5">
+                        {entry.isExtra && (
+                          <button
+                            onClick={() => removeRow(idx)}
+                            className="text-muted-foreground/40 hover:text-destructive transition"
+                            data-testid={`button-remove-row-${idx}`}
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border bg-muted/50">
+                <td colSpan={3} className="px-3 py-2.5" />
+                <td className="px-3 py-2.5 text-right font-bold uppercase tracking-wide" data-testid="text-total-label">
+                  Total
+                </td>
+                <td className="px-3 py-2.5 text-right font-mono font-bold text-base" data-testid="text-total-hours">
+                  {totalHours}
+                </td>
+                <td colSpan={isDraft ? 2 : 1} />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* --- Add row button (draft only) --- */}
+        {isDraft && (
+          <div className="px-6 py-2 border-t border-border/40">
+            <Button variant="ghost" size="sm" onClick={addRow} data-testid="button-add-row">
+              <Plus className="size-4" /> Add Row
+            </Button>
+          </div>
+        )}
+
+        {/* --- Signature section --- */}
+        <div className="border-t-2 border-border bg-muted/20 px-6 py-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Employee signature */}
+            <div>
+              <div className="text-sm font-semibold text-muted-foreground mb-2">Employee Signature</div>
+              {ts.employeeSignature ? (
+                <div className="flex items-center gap-2 border-b border-border pb-1">
+                  <span className="font-medium italic text-lg">{ts.employeeSignature}</span>
+                  <Check className="size-4 text-green-600" />
+                </div>
+              ) : signing === "employee" ? (
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 border-b border-border pb-1">
+                    <Input
+                      id="emp-sig"
+                      placeholder="Type your full name to sign"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const val = (e.target as HTMLInputElement).value;
+                          if (val.trim()) {
+                            statusMut.mutate({
+                              employeeSignature: val.trim(),
+                              status: "submitted",
+                            });
+                          }
+                        }
+                      }}
+                      data-testid="input-employee-signature"
+                      className="border-0 bg-transparent px-0 h-7 text-lg"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const input = document.getElementById("emp-sig") as HTMLInputElement;
+                      if (input?.value.trim()) {
+                        statusMut.mutate({
+                          employeeSignature: input.value.trim(),
+                          status: "submitted",
+                        });
+                      }
+                    }}
+                    data-testid="button-sign-submit"
+                  >
+                    Sign & Submit
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setSigning(null)}>
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!isDraft}
+                  onClick={() => setSigning("employee")}
+                  data-testid="button-sign-employee"
+                >
+                  <FileText className="size-4" /> Sign
+                </Button>
+              )}
             </div>
-          ) : (
+
+            {/* Manager signature */}
+            <div>
+              <div className="text-sm font-semibold text-muted-foreground mb-2">Manager Signature</div>
+              {ts.managerSignature ? (
+                <div className="flex items-center gap-2 border-b border-border pb-1">
+                  <span className="font-medium italic text-lg">{ts.managerSignature}</span>
+                  <Check className="size-4 text-green-600" />
+                </div>
+              ) : signing === "manager" ? (
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1 border-b border-border pb-1">
+                    <Input
+                      id="mgr-sig"
+                      placeholder="Type name to approve"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const val = (e.target as HTMLInputElement).value;
+                          if (val.trim()) {
+                            statusMut.mutate({
+                              managerSignature: val.trim(),
+                              status: "approved",
+                            });
+                          }
+                        }
+                      }}
+                      data-testid="input-manager-signature"
+                      className="border-0 bg-transparent px-0 h-7 text-lg"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const input = document.getElementById("mgr-sig") as HTMLInputElement;
+                      if (input?.value.trim()) {
+                        statusMut.mutate({
+                          managerSignature: input.value.trim(),
+                          status: "approved",
+                        });
+                      }
+                    }}
+                    data-testid="button-approve"
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      statusMut.mutate({ status: "rejected" });
+                    }}
+                  >
+                    <X className="size-4" /> Reject
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setSigning(null)}>
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              ) : isSubmitted ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSigning("manager")}
+                  data-testid="button-sign-manager"
+                >
+                  <FileText className="size-4" /> Sign to Approve
+                </Button>
+              ) : (
+                <div className="text-sm text-muted-foreground border-b border-border/40 pb-1">
+                  {isApproved ? "Approved" : isRejected ? "Rejected" : "Awaiting employee submission"}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* --- Notes --- */}
+        {ts.notes && (
+          <div className="border-t border-border px-6 py-3 bg-muted/30">
+            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Notes</div>
+            <div className="text-sm">{ts.notes}</div>
+          </div>
+        )}
+
+        {/* --- Delete (draft only) --- */}
+        {isDraft && (
+          <div className="flex justify-end px-6 py-3 border-t border-border/40">
             <Button
               variant="outline"
               size="sm"
-              disabled={!isDraft}
-              onClick={() => setSigning(true)}
-              data-testid="button-sign-employee"
+              onClick={onDelete}
+              className="text-destructive"
+              data-testid="button-delete-timesheet"
             >
-              <FileText className="size-4" /> Sign
+              <Trash2 className="size-4" /> Delete Timesheet
             </Button>
-          )}
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-4">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Manager Signature</div>
-          {ts.managerSignature ? (
-            <div className="flex items-center gap-2">
-              <span className="font-medium italic">{ts.managerSignature}</span>
-              <Check className="size-4 text-green-600" />
-            </div>
-          ) : isSubmitted ? (
-            <div className="flex gap-2">
-              <Input
-                id="mgr-sig"
-                placeholder="Type name to approve"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const val = (e.target as HTMLInputElement).value;
-                    if (val.trim()) {
-                      statusMut.mutate({
-                        managerSignature: val.trim(),
-                        status: "approved",
-                      });
-                    }
-                  }
-                }}
-                data-testid="input-manager-signature"
-              />
-              <Button
-                size="sm"
-                onClick={() => {
-                  const input = document.getElementById("mgr-sig") as HTMLInputElement;
-                  if (input?.value.trim()) {
-                    statusMut.mutate({
-                      managerSignature: input.value.trim(),
-                      status: "approved",
-                    });
-                  }
-                }}
-                data-testid="button-approve"
-              >
-                Approve
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  statusMut.mutate({ status: "rejected" });
-                }}
-              >
-                <X className="size-4" /> Reject
-              </Button>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              {isApproved ? "Approved" : "Awaiting employee submission"}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-
-      {/* Notes */}
-      {ts.notes && (
-        <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Notes</div>
-          <div className="text-sm">{ts.notes}</div>
-        </div>
-      )}
-
-      {/* Delete */}
-      {isDraft && (
-        <div className="mt-6 flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            className="text-destructive"
-            data-testid="button-delete-timesheet"
-          >
-            <Trash2 className="size-4" /> Delete Timesheet
-          </Button>
-        </div>
-      )}
     </Layout>
   );
 }
