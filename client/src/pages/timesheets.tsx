@@ -534,7 +534,7 @@ function TimesheetEditor({
     <Layout
       title="Time Tracking"
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ChevronLeft className="size-4" /> Back
           </Button>
@@ -561,7 +561,7 @@ function TimesheetEditor({
             disabled={saveToDocsMut.isPending}
             data-testid="button-save-to-docs"
           >
-            <FolderCheck className="size-4" /> Save to Docs
+            <FolderCheck className="size-4" /> Docs
           </Button>
           <Button
             size="sm"
