@@ -1950,7 +1950,8 @@ var init_app_manifest = __esm({
         title: "Overview",
         items: [
           { href: "/app", label: "Dashboard", icon: "LayoutDashboard" },
-          { href: "/notes", label: "Sticky Board", icon: "StickyNote" }
+          { href: "/notes", label: "Sticky Board", icon: "StickyNote" },
+          { href: "/timesheets", label: "Time Tracking", icon: "Clock" }
         ]
       },
       {
@@ -1994,7 +1995,6 @@ var init_app_manifest = __esm({
         title: "People",
         items: [
           { href: "/team", label: "Team", icon: "Users" },
-          { href: "/timesheets", label: "Time Tracking", icon: "Clock" },
           { href: "/contacts", label: "Contacts", icon: "Contact" },
           { href: "/messages", label: "Messages", icon: "MessageSquare" }
         ]

@@ -28,6 +28,7 @@ export const APP_NAV: NavGroup[] = [
     items: [
       { href: "/app", label: "Dashboard", icon: "LayoutDashboard" },
       { href: "/notes", label: "Sticky Board", icon: "StickyNote" },
+      { href: "/timesheets", label: "Time Tracking", icon: "Clock" },
     ],
   },
   {
@@ -71,7 +72,6 @@ export const APP_NAV: NavGroup[] = [
     title: "People",
     items: [
       { href: "/team", label: "Team", icon: "Users" },
-      { href: "/timesheets", label: "Time Tracking", icon: "Clock" },
       { href: "/contacts", label: "Contacts", icon: "Contact" },
       { href: "/messages", label: "Messages", icon: "MessageSquare" },
     ],

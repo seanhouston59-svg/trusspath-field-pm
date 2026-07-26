@@ -52,6 +52,7 @@ const R = {
   contacts: "/contacts",
   messages: "/messages",
   notes: "/notes",
+  timesheets: "/timesheets",
   deletedItems: "/deleted-items",
   settings: "/settings",
   adminSignups: "/admin/signups",
@@ -89,7 +90,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
-      R.contacts, R.messages, R.notes,
+      R.contacts, R.messages, R.notes, R.timesheets,
     ],
   },
   {
@@ -102,7 +103,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     allowedRoutes: [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.punch, R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints,
-      R.messages, R.notes,
+      R.messages, R.notes, R.timesheets,
     ],
   },
   {
@@ -114,7 +115,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
-      R.rfis, R.submittals, R.photos, R.documents, R.companyDocuments, R.blueprints, R.messages,
+      R.rfis, R.submittals, R.photos, R.documents, R.companyDocuments, R.blueprints, R.messages, R.timesheets,
     ],
   },
   {
@@ -128,7 +129,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
-      R.contacts, R.messages, R.notes,
+      R.contacts, R.messages, R.notes, R.timesheets,
     ],
   },
 ];
