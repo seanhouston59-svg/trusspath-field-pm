@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Plus, Clock, Trash2, Pencil, Check, X, ChevronLeft, FileText, GripVertical } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { Plus, Clock, Trash2, Pencil, Check, X, ChevronLeft, FileText, Printer, Send, FolderCheck } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState } from "@/components/ghost-state";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/bits";
 import type { Timesheet, TimeEntry, Project } from "@shared/schema";
+import timesheetLogoUrl from "@/../public/timesheet-logo.jpeg";
 
 /* ---------- helpers ---------- */
 
@@ -323,6 +323,9 @@ function TimesheetEditor({
   const [entries, setEntries] = useState<EntryDraft[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [signing, setSigning] = useState<"employee" | "manager" | null>(null);
+  const [showSend, setShowSend] = useState(false);
+  const [sendEmail, setSendEmail] = useState("");
+  const printRef = useRef<HTMLDivElement>(null);
 
   const companyName = settings?.companyName?.trim() || "TrussPath";
 
@@ -441,6 +444,62 @@ function TimesheetEditor({
     },
   });
 
+  // Auto-save to company documents
+  const saveToDocsMut = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/timesheets/${id}/save-to-docs`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company-documents"] });
+      toast({ title: data.updated ? "Timesheet updated in Company Documents" : "Timesheet saved to Company Documents" });
+    },
+  });
+
+  // Send timesheet via email
+  const sendMut = useMutation({
+    mutationFn: async ({ email }: { email: string }) => {
+      const res = await apiRequest("POST", `/api/timesheets/${id}/send`, { email });
+      return res.json();
+    },
+    onSuccess: () => {
+      setShowSend(false);
+      setSendEmail("");
+      toast({ title: "Timesheet sent" });
+    },
+  });
+
+  // Print timesheet
+  const handlePrint = () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Timesheet — ${ts?.employeeName ?? "Employee"}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 24px; color: #1a1a1a; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th { background: #f0f0f0; padding: 8px 12px; text-align: left; font-weight: 600; border: 1px solid #ddd; }
+        td { padding: 6px 12px; border: 1px solid #ddd; }
+        tr:nth-child(even) { background: #fafafa; }
+        .header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+        .header img { width: 48px; height: 48px; }
+        .header h1 { font-size: 18px; margin: 0; }
+        .info { display: flex; gap: 32px; margin: 12px 0; }
+        .info-label { font-weight: 600; color: #666; }
+        .sig { margin-top: 32px; display: flex; gap: 48px; }
+        .sig-line { border-bottom: 1px solid #333; min-width: 200px; padding-bottom: 2px; font-style: italic; }
+        .sig-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+        .total { font-weight: bold; }
+      </style></head><body>
+      ${printContent.innerHTML}
+      </body></html>
+    `);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 500);
+  };
+
   if (isLoading || !ts) {
     return (
       <Layout title="Time Tracking">
@@ -464,6 +523,31 @@ function TimesheetEditor({
             <ChevronLeft className="size-4" /> Back
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrint}
+            data-testid="button-print-timesheet"
+          >
+            <Printer className="size-4" /> Print
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSend(true)}
+            data-testid="button-send-timesheet"
+          >
+            <Send className="size-4" /> Send
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => saveToDocsMut.mutate()}
+            disabled={saveToDocsMut.isPending}
+            data-testid="button-save-to-docs"
+          >
+            <FolderCheck className="size-4" /> Save to Docs
+          </Button>
+          <Button
             size="sm"
             onClick={() => saveMut.mutate()}
             disabled={saveMut.isPending || !isDraft}
@@ -475,11 +559,11 @@ function TimesheetEditor({
       }
     >
       {/* ===== Timesheet Card — matches paper layout ===== */}
-      <div className="rounded-xl border-2 border-border bg-card shadow-sm overflow-hidden" data-testid="timesheet-card">
+      <div ref={printRef} className="rounded-xl border-2 border-border bg-card shadow-sm overflow-hidden" data-testid="timesheet-card">
 
         {/* --- Header band: logo + company name --- */}
         <div className="flex items-center gap-3 border-b-2 border-border bg-muted/40 px-6 py-4">
-          <Logo className="size-10 shrink-0" />
+          <img src={timesheetLogoUrl} alt="Company Logo" className="size-12 shrink-0 rounded-lg object-contain" />
           <div className="font-display text-lg font-bold tracking-tight">{companyName}</div>
           <div className="ml-auto">
             <Badge className={cn("text-xs capitalize", statusColor(ts.status))} variant="secondary">
@@ -815,6 +899,43 @@ function TimesheetEditor({
           </div>
         )}
       </div>
+
+      {/* --- Send dialog --- */}
+      <Dialog open={showSend} onOpenChange={(o) => !o && setShowSend(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Timesheet</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              The timesheet for {ts.employeeName} (Week of {fmtWeekRange(weekInfo.start, weekInfo.end)}) will be saved to Company Documents and emailed.
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Recipient Email</label>
+              <Input
+                type="email"
+                value={sendEmail}
+                onChange={(e) => setSendEmail(e.target.value)}
+                placeholder="manager@company.com"
+                data-testid="input-send-email"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSend(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                saveToDocsMut.mutate();
+                sendMut.mutate({ email: sendEmail });
+              }}
+              disabled={!sendEmail.trim() || sendMut.isPending || saveToDocsMut.isPending}
+              data-testid="button-send-confirm"
+            >
+              {sendMut.isPending || saveToDocsMut.isPending ? "Sending..." : "Save & Send"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

@@ -1256,6 +1256,128 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
+  // Auto-save timesheet as a company document under employee name
+  app.post("/api/timesheets/:id/save-to-docs", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      const entries = await storage.getTimeEntries(id);
+
+      // Build a plain-text representation of the timesheet
+      const weekInfo = `${ts.weekStart} to ${ts.weekEnd}`;
+      const lines: string[] = [
+        `TIMESHEET`,
+        `Employee: ${ts.employeeName}`,
+        `Week: ${weekInfo}`,
+        `Total Hours: ${ts.totalHours}`,
+        `Status: ${ts.status}`,
+        ``,
+        `Day | Date | Client | Project | Hours | Activities`,
+        `--- | --- | --- | --- | --- | ---`,
+      ];
+      for (const e of entries) {
+        lines.push(`${e.dayOfWeek} | ${e.entryDate} | ${e.clientName ?? ""} | ${e.projectName ?? ""} | ${e.hoursWorked} | ${e.activities ?? ""}`);
+      }
+      if (ts.employeeSignature) lines.push(``, `Employee Signature: ${ts.employeeSignature}`);
+      if (ts.managerSignature) lines.push(`Manager Signature: ${ts.managerSignature}`);
+      const content = lines.join("\n");
+
+      // Check if a company doc already exists for this timesheet
+      const existingDocs = await storage.getCompanyDocuments();
+      const existing = existingDocs.find((d) => d.title === `Timesheet — ${ts.employeeName} — Week of ${ts.weekStart}`);
+
+      const docData = {
+        title: `Timesheet — ${ts.employeeName} — Week of ${ts.weekStart}`,
+        category: "HR",
+        status: "Active",
+        signatureRequired: false,
+        signatureStatus: ts.employeeSignature ? "Signed" : "Not Required",
+        signerName: ts.employeeName,
+        signerEmail: null,
+        dueDate: null,
+        notes: content,
+        uploadedById: null,
+        date: new Date().toISOString().slice(0, 10),
+        storedFileName: null,
+        originalFileName: null,
+        mimeType: null,
+        fileSizeBytes: null,
+      };
+
+      if (existing) {
+        const updated = await storage.updateCompanyDocument(existing.id, { notes: content, date: new Date().toISOString().slice(0, 10) });
+        res.json({ documentId: existing.id, updated: true, document: updated });
+      } else {
+        const created = await storage.createCompanyDocument(docData);
+        res.status(201).json({ documentId: created.id, updated: false, document: created });
+      }
+    } catch (err) {
+      console.error("[timesheets] save-to-docs error:", err);
+      res.status(500).json({ message: "Failed to save timesheet to company documents" });
+    }
+  });
+
+  // Send timesheet via email (saves to docs + sends email if RESEND_API_KEY is set)
+  app.post("/api/timesheets/:id/send", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email is required" });
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      const entries = await storage.getTimeEntries(id);
+
+      // Build email body
+      const weekInfo = `${ts.weekStart} to ${ts.weekEnd}`;
+      const rows = entries.map((e: any) =>
+        `${e.dayOfWeek} | ${e.entryDate} | ${e.clientName ?? "-"} | ${e.projectName ?? "-"} | ${e.hoursWorked}h | ${e.activities ?? "-"}`
+      ).join("\n");
+      const emailBody = [
+        `TIMESHEET`,
+        `Employee: ${ts.employeeName}`,
+        `Week: ${weekInfo}`,
+        `Total Hours: ${ts.totalHours}`,
+        `Status: ${ts.status}`,
+        ``,
+        `Day | Date | Client | Project | Hours | Activities`,
+        `${rows}`,
+        ``,
+        ts.employeeSignature ? `Employee Signature: ${ts.employeeSignature}` : ``,
+        ts.managerSignature ? `Manager Signature: ${ts.managerSignature}` : ``,
+      ].filter(Boolean).join("\n");
+
+      // Send email if RESEND_API_KEY is available
+      if (process.env.RESEND_API_KEY) {
+        try {
+          const resp = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: "TrussPath <noreply@trusspath.com>",
+              to: email,
+              subject: `Timesheet — ${ts.employeeName} — Week of ${ts.weekStart}`,
+              text: emailBody,
+            }),
+          });
+          if (!resp.ok) {
+            console.error("[timesheets] email send failed:", await resp.text());
+          }
+        } catch (emailErr) {
+          console.error("[timesheets] email error:", emailErr);
+        }
+      }
+
+      res.json({ sent: true, email, message: "Timesheet saved to docs and sent" });
+    } catch (err) {
+      console.error("[timesheets] send error:", err);
+      res.status(500).json({ message: "Failed to send timesheet" });
+    }
+  });
+
   // Delete timesheet
   app.delete("/api/timesheets/:id", async (req, res) => {
     try {
