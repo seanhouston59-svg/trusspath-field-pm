@@ -248,6 +248,11 @@ async function migrate() {
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_plan TEXT`;
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_billing TEXT`;
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_current_period_end TEXT`;
+  // Access-control columns (approval gate). Default new accounts to 'pending';
+  // the owner-bootstrap block later in this file will flip the configured owner to 'approved'.
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending'`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_at TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
   await sql`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     account_id INTEGER NOT NULL,
@@ -336,6 +341,23 @@ async function migrate() {
     activities TEXT,
     created_at TEXT NOT NULL
   )`;
+
+  // Owner bootstrap — configured owner email is always the app admin: role='owner',
+  // approval_status='approved', and (best-effort) subscription_status='active' so they
+  // aren't locked out of their own app. Everyone else stays in the state they were in.
+  const ownerEmail = (process.env.OWNER_EMAIL || "houston.sean90@gmail.com").trim().toLowerCase();
+  if (ownerEmail) {
+    try {
+      await sql`UPDATE accounts
+        SET role = 'owner',
+            approval_status = 'approved',
+            approved_at = COALESCE(approved_at, ${new Date().toISOString()}),
+            subscription_status = COALESCE(subscription_status, 'active')
+        WHERE lower(email) = ${ownerEmail}`;
+    } catch (e) {
+      console.error("[migrate] owner bootstrap failed:", e);
+    }
+  }
 }
 
 export interface IStorage {
@@ -447,6 +469,9 @@ export interface IStorage {
   getSession(token: string): Promise<{ session: Session; account: AccountPublic } | null>;
   destroySession(token: string): void;
   countAccounts(): Promise<number>;
+  // ----- Admin / access control -----
+  listAccountsForAdmin(): Promise<AccountPublic[]>;
+  setAccountApproval(id: number, status: "pending" | "approved" | "denied", approverId: number): Promise<AccountPublic | undefined>;
   // Jarvis memory
   getJarvisMemories(projectId?: number): Promise<JarvisMemory[]>;
   searchJarvisMemory(query: string, projectId?: number): Promise<JarvisMemory | undefined>;
@@ -1221,6 +1246,34 @@ class DatabaseStorage implements IStorage {
     await ensureReady();
     const rows = await db.select().from(accounts);
     return rows.length;
+  }
+
+  async listAccountsForAdmin(): Promise<AccountPublic[]> {
+    await ensureReady();
+    const rows = await db.select().from(accounts);
+    return rows
+      .map((a) => this.toPublic(a))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+
+  async setAccountApproval(
+    id: number,
+    status: "pending" | "approved" | "denied",
+    approverId: number,
+  ): Promise<AccountPublic | undefined> {
+    await ensureReady();
+    const patch: Record<string, unknown> = {
+      approvalStatus: status,
+    };
+    if (status === "approved") {
+      patch.approvedAt = new Date().toISOString();
+      patch.approvedBy = approverId;
+    } else {
+      patch.approvedAt = null;
+      patch.approvedBy = null;
+    }
+    const [row] = await db.update(accounts).set(patch).where(eq(accounts.id, id)).returning();
+    return row ? this.toPublic(row) : undefined;
   }
 
   /* --------------------------- Jarvis memory --------------------------- */

@@ -17,6 +17,7 @@ import {
   insertTeamSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
+  isAccountInGoodStanding, isSubscriptionActive,
 } from "@shared/schema";
 
 function pid(req: any): number | undefined {
@@ -105,6 +106,18 @@ const PUBLIC_API = new Set<string>([
   "/api/demo-request",
 ]);
 
+// Paths that require a session but bypass the paywall (approval + subscription) check.
+// These are the paths a not-yet-in-good-standing user needs to reach: their own account,
+// billing checkout/portal, and billing status. Everything else under /api/* is paywalled.
+const PAYWALL_EXEMPT_API_PREFIXES = [
+  "/api/auth/",
+  "/api/billing/",
+  "/api/stripe/",
+];
+function isPaywallExempt(p: string): boolean {
+  return PAYWALL_EXEMPT_API_PREFIXES.some((prefix) => p.startsWith(prefix));
+}
+
 async function authMiddleware(req: any, res: any, next: any) {
   const p = req.path || req.url?.split("?")[0] || "";
   if (!p.startsWith("/api")) return next();
@@ -119,6 +132,31 @@ async function authMiddleware(req: any, res: any, next: any) {
   if (!s) return res.status(401).json({ message: "Unauthorized" });
   req.account = s.account;
   req.sessionToken = token;
+
+  // Paywall gate — after auth, before any protected route runs. Owner bypasses.
+  // Approved + active subscription = in good standing. Everyone else gets 402.
+  if (!isPaywallExempt(p) && !isAccountInGoodStanding(s.account as any)) {
+    const reason =
+      s.account.approvalStatus !== "approved" ? "pending_approval" : "subscription_inactive";
+    return res.status(402).json({
+      message:
+        reason === "pending_approval"
+          ? "Your account is awaiting admin approval."
+          : "An active subscription is required to use TrussPath.",
+      reason,
+      approvalStatus: s.account.approvalStatus,
+      subscriptionStatus: s.account.subscriptionStatus || null,
+    });
+  }
+
+  next();
+}
+
+// Owner-only gate for /api/admin/* endpoints. Must run after authMiddleware.
+function requireOwner(req: any, res: any, next: any) {
+  const acc = req.account;
+  if (!acc) return res.status(401).json({ message: "Unauthorized" });
+  if (acc.role !== "owner") return res.status(403).json({ message: "Owner access required" });
   next();
 }
 
@@ -1023,8 +1061,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         customer: customerId,
         mode: "subscription",
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${APP_URL}/#/signup?checkout=success`,
-        cancel_url: `${APP_URL}/?checkout=cancelled`,
+        success_url: `${APP_URL}/#/paywall?checkout=success`,
+        cancel_url: `${APP_URL}/#/paywall?checkout=cancelled`,
         metadata: { plan, billing, email },
         subscription_data: { metadata: { plan, billing } },
       });
@@ -1134,12 +1172,34 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(saved);
   });
 
-  // ADMIN — list signups (used by /#/admin/signups)
-  app.get("/api/admin/signups", async (_req, res) => {
+  // ADMIN — list signups (used by /#/admin/signups). Owner only.
+  app.get("/api/admin/signups", requireOwner, async (_req, res) => {
     res.json({
       subscribers: await storage.listSubscribers(),
       demoRequests: await storage.listDemoRequests(),
     });
+  });
+
+  // ADMIN — list all accounts with approval + subscription state. Owner only.
+  app.get("/api/admin/accounts", requireOwner, async (_req, res) => {
+    const rows = await storage.listAccountsForAdmin();
+    res.json({ accounts: rows });
+  });
+
+  // ADMIN — approve / deny / reset an account. Owner only. Owners cannot demote themselves.
+  app.post("/api/admin/accounts/:id/approval", requireOwner, async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid account id" });
+    const status = String(req.body?.status || "").toLowerCase();
+    if (status !== "pending" && status !== "approved" && status !== "denied") {
+      return res.status(400).json({ message: "status must be pending, approved, or denied" });
+    }
+    if (id === req.account.id && status !== "approved") {
+      return res.status(400).json({ message: "You can't remove your own access from here." });
+    }
+    const updated = await storage.setAccountApproval(id, status as any, req.account.id);
+    if (!updated) return res.status(404).json({ message: "Account not found" });
+    res.json({ account: updated });
   });
 
   // JARVIS — AI assistant

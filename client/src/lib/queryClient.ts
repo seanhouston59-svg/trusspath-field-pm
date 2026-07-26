@@ -44,6 +44,8 @@ const FETCH_CREDS: RequestCredentials = IS_CROSS_ORIGIN ? "omit" : "include";
 
 /** Public paths that should NOT redirect to /login on 401. */
 const PUBLIC_HASH_PATHS = new Set<string>(["", "/", "/login", "/signup"]);
+/** Hash paths that shouldn't be redirected on 402 (they are the paywall itself or auth flows). */
+const PAYWALL_HASH_PATHS = new Set<string>(["", "/", "/login", "/signup", "/paywall"]);
 
 /** Where to send the user after they sign in. Set by handleUnauthorized(). */
 let pendingRedirect: string | null = null;
@@ -73,9 +75,17 @@ function handleUnauthorized() {
   window.location.hash = `/login`;
 }
 
+function handlePaywall() {
+  if (typeof window === "undefined") return;
+  const p = currentHashPath();
+  if (PAYWALL_HASH_PATHS.has(p)) return;
+  window.location.hash = `/paywall`;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     if (res.status === 401) handleUnauthorized();
+    else if (res.status === 402) handlePaywall();
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
@@ -136,6 +146,7 @@ export const getQueryFn: <T>(options: {
       if (unauthorizedBehavior === "returnNull") return null;
       handleUnauthorized();
     }
+    if (res.status === 402) handlePaywall();
 
     await throwIfResNotOk(res);
     return await res.json();

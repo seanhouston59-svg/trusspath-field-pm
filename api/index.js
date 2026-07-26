@@ -31,7 +31,15 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // shared/schema.ts
-var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, sessions, passwordResetTokens, jarvisMemory, timesheets, timeEntries, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertJarvisMemorySchema, insertTimesheetSchema, insertTimeEntrySchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
+function isSubscriptionActive(status) {
+  return !!status && ACTIVE_SUB_STATUSES.has(status);
+}
+function isAccountInGoodStanding(a) {
+  if (!a) return false;
+  if (a.role === "owner") return true;
+  return a.approvalStatus === "approved" && isSubscriptionActive(a.subscriptionStatus);
+}
+var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, ACTIVE_SUB_STATUSES, sessions, passwordResetTokens, jarvisMemory, timesheets, timeEntries, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertJarvisMemorySchema, insertTimesheetSchema, insertTimeEntrySchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -312,8 +320,15 @@ var init_schema = __esm({
       displayName: (0, import_pg_core.text)("display_name").notNull(),
       position: (0, import_pg_core.text)("position"),
       role: (0, import_pg_core.text)("role").notNull().default("member"),
+      // member | owner
       company: (0, import_pg_core.text)("company"),
       createdAt: (0, import_pg_core.text)("created_at").notNull(),
+      // Access control — admin must approve new accounts before they can use the app.
+      approvalStatus: (0, import_pg_core.text)("approval_status").notNull().default("pending"),
+      // pending | approved | denied
+      approvedAt: (0, import_pg_core.text)("approved_at"),
+      approvedBy: (0, import_pg_core.integer)("approved_by"),
+      // accountId of the approver
       // Stripe billing
       stripeCustomerId: (0, import_pg_core.text)("stripe_customer_id"),
       stripeSubscriptionId: (0, import_pg_core.text)("stripe_subscription_id"),
@@ -325,6 +340,7 @@ var init_schema = __esm({
       // monthly, annual
       subscriptionCurrentPeriodEnd: (0, import_pg_core.text)("subscription_current_period_end")
     });
+    ACTIVE_SUB_STATUSES = /* @__PURE__ */ new Set(["active", "trialing"]);
     sessions = (0, import_pg_core.pgTable)("sessions", {
       id: (0, import_pg_core.text)("id").primaryKey(),
       accountId: (0, import_pg_core.integer)("account_id").notNull(),
@@ -639,6 +655,9 @@ async function migrate() {
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_plan TEXT`;
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_billing TEXT`;
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_current_period_end TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending'`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_at TEXT`;
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
   await sql`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     account_id INTEGER NOT NULL,
@@ -719,6 +738,19 @@ async function migrate() {
     activities TEXT,
     created_at TEXT NOT NULL
   )`;
+  const ownerEmail = (process.env.OWNER_EMAIL || "houston.sean90@gmail.com").trim().toLowerCase();
+  if (ownerEmail) {
+    try {
+      await sql`UPDATE accounts
+        SET role = 'owner',
+            approval_status = 'approved',
+            approved_at = COALESCE(approved_at, ${(/* @__PURE__ */ new Date()).toISOString()}),
+            subscription_status = COALESCE(subscription_status, 'active')
+        WHERE lower(email) = ${ownerEmail}`;
+    } catch (e) {
+      console.error("[migrate] owner bootstrap failed:", e);
+    }
+  }
 }
 function ensureReady() {
   if (!initPromise) {
@@ -1522,6 +1554,26 @@ var init_storage = __esm({
         await ensureReady();
         const rows = await db.select().from(accounts);
         return rows.length;
+      }
+      async listAccountsForAdmin() {
+        await ensureReady();
+        const rows = await db.select().from(accounts);
+        return rows.map((a) => this.toPublic(a)).sort((a, b) => a.createdAt < b.createdAt ? 1 : -1);
+      }
+      async setAccountApproval(id, status, approverId) {
+        await ensureReady();
+        const patch = {
+          approvalStatus: status
+        };
+        if (status === "approved") {
+          patch.approvedAt = (/* @__PURE__ */ new Date()).toISOString();
+          patch.approvedBy = approverId;
+        } else {
+          patch.approvedAt = null;
+          patch.approvedBy = null;
+        }
+        const [row] = await db.update(accounts).set(patch).where((0, import_drizzle_orm.eq)(accounts.id, id)).returning();
+        return row ? this.toPublic(row) : void 0;
       }
       /* --------------------------- Jarvis memory --------------------------- */
       async getJarvisMemories(projectId) {
@@ -3164,6 +3216,9 @@ function authRateLimit(req, res, next) {
   }
   next();
 }
+function isPaywallExempt(p) {
+  return PAYWALL_EXEMPT_API_PREFIXES.some((prefix) => p.startsWith(prefix));
+}
 async function authMiddleware(req, res, next) {
   const p = req.path || req.url?.split("?")[0] || "";
   if (!p.startsWith("/api")) return next();
@@ -3176,6 +3231,21 @@ async function authMiddleware(req, res, next) {
   if (!s) return res.status(401).json({ message: "Unauthorized" });
   req.account = s.account;
   req.sessionToken = token;
+  if (!isPaywallExempt(p) && !isAccountInGoodStanding(s.account)) {
+    const reason = s.account.approvalStatus !== "approved" ? "pending_approval" : "subscription_inactive";
+    return res.status(402).json({
+      message: reason === "pending_approval" ? "Your account is awaiting admin approval." : "An active subscription is required to use TrussPath.",
+      reason,
+      approvalStatus: s.account.approvalStatus,
+      subscriptionStatus: s.account.subscriptionStatus || null
+    });
+  }
+  next();
+}
+function requireOwner(req, res, next) {
+  const acc = req.account;
+  if (!acc) return res.status(401).json({ message: "Unauthorized" });
+  if (acc.role !== "owner") return res.status(403).json({ message: "Owner access required" });
   next();
 }
 function hydrateSeedPhotos() {
@@ -3905,8 +3975,8 @@ async function registerRoutes(_httpServer, app2) {
         customer: customerId,
         mode: "subscription",
         line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${APP_URL}/#/signup?checkout=success`,
-        cancel_url: `${APP_URL}/?checkout=cancelled`,
+        success_url: `${APP_URL}/#/paywall?checkout=success`,
+        cancel_url: `${APP_URL}/#/paywall?checkout=cancelled`,
         metadata: { plan, billing, email },
         subscription_data: { metadata: { plan, billing } }
       });
@@ -4002,11 +4072,29 @@ async function registerRoutes(_httpServer, app2) {
     });
     res.json(saved);
   });
-  app2.get("/api/admin/signups", async (_req, res) => {
+  app2.get("/api/admin/signups", requireOwner, async (_req, res) => {
     res.json({
       subscribers: await storage.listSubscribers(),
       demoRequests: await storage.listDemoRequests()
     });
+  });
+  app2.get("/api/admin/accounts", requireOwner, async (_req, res) => {
+    const rows = await storage.listAccountsForAdmin();
+    res.json({ accounts: rows });
+  });
+  app2.post("/api/admin/accounts/:id/approval", requireOwner, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid account id" });
+    const status = String(req.body?.status || "").toLowerCase();
+    if (status !== "pending" && status !== "approved" && status !== "denied") {
+      return res.status(400).json({ message: "status must be pending, approved, or denied" });
+    }
+    if (id === req.account.id && status !== "approved") {
+      return res.status(400).json({ message: "You can't remove your own access from here." });
+    }
+    const updated = await storage.setAccountApproval(id, status, req.account.id);
+    if (!updated) return res.status(404).json({ message: "Account not found" });
+    res.json({ account: updated });
   });
   app2.get("/api/jarvis/brief", async (req, res) => {
     try {
@@ -4251,7 +4339,7 @@ async function registerRoutes(_httpServer, app2) {
   });
   return _httpServer;
 }
-var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, authAttempts, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW, PUBLIC_API, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
+var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, authAttempts, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW, PUBLIC_API, PAYWALL_EXEMPT_API_PREFIXES, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
 var init_routes = __esm({
   "server/routes.ts"() {
     "use strict";
@@ -4283,6 +4371,11 @@ var init_routes = __esm({
       "/api/subscribe",
       "/api/demo-request"
     ]);
+    PAYWALL_EXEMPT_API_PREFIXES = [
+      "/api/auth/",
+      "/api/billing/",
+      "/api/stripe/"
+    ];
     UPLOAD_DIR = process.env.VERCEL ? "/tmp/uploads/documents" : import_node_path2.default.resolve(process.cwd(), "uploads/documents");
     try {
       import_node_fs2.default.mkdirSync(UPLOAD_DIR, { recursive: true });

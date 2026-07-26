@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/form";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { isAccountInGoodStanding } from "@shared/schema";
 
 const schema = z.object({
   displayName: z.string().min(1, "Name is required"),
@@ -27,7 +28,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function Signup() {
-  const { signup, isAuthenticated } = useAuth();
+  const { signup, isAuthenticated, account } = useAuth();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,14 +38,16 @@ export default function Signup() {
   });
 
   useEffect(() => {
-    if (isAuthenticated) window.location.hash = "/app";
-  }, [isAuthenticated]);
+    if (!isAuthenticated) return;
+    window.location.hash = isAccountInGoodStanding(account as any) ? "/app" : "/paywall";
+  }, [isAuthenticated, account]);
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
     try {
-      await signup(values);
-      window.location.hash = "/app";
+      const acc = await signup(values);
+      // New signups are 'pending' by default — send them straight to the paywall.
+      window.location.hash = isAccountInGoodStanding(acc as any) ? "/app" : "/paywall";
     } catch (err: any) {
       const msg = /409/.test(err?.message) ? "That email is already registered" : err?.message || "Signup failed";
       toast({ title: "Sign up failed", description: msg, variant: "destructive" });

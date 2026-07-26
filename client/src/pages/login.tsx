@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { consumePendingRedirect } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { isAccountInGoodStanding } from "@shared/schema";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -26,7 +27,7 @@ function getNextParam(): string {
 }
 
 export default function Login() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, account } = useAuth();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,16 +36,19 @@ export default function Login() {
     defaultValues: { email: "", password: "" },
   });
 
-  // If already logged in, bounce straight to /app
+  const resolveNext = (acc: unknown) =>
+    isAccountInGoodStanding(acc as any) ? consumePendingRedirect() : "/paywall";
+
+  // If already logged in, bounce straight to the right place.
   useEffect(() => {
-    if (isAuthenticated) window.location.hash = consumePendingRedirect();
-  }, [isAuthenticated]);
+    if (isAuthenticated) window.location.hash = resolveNext(account);
+  }, [isAuthenticated, account]);
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
     try {
-      await login(values.email, values.password);
-      const next = consumePendingRedirect();
+      const acc = await login(values.email, values.password);
+      const next = resolveNext(acc);
       window.location.hash = next.startsWith("/") ? next : `/${next}`;
     } catch (err: any) {
       const msg = /401/.test(err?.message) ? "Invalid email or password" : err?.message || "Login failed";

@@ -319,9 +319,13 @@ export const accounts = pgTable("accounts", {
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
   position: text("position"),
-  role: text("role").notNull().default("member"),
+  role: text("role").notNull().default("member"), // member | owner
   company: text("company"),
   createdAt: text("created_at").notNull(),
+  // Access control — admin must approve new accounts before they can use the app.
+  approvalStatus: text("approval_status").notNull().default("pending"), // pending | approved | denied
+  approvedAt: text("approved_at"),
+  approvedBy: integer("approved_by"), // accountId of the approver
   // Stripe billing
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
@@ -330,6 +334,17 @@ export const accounts = pgTable("accounts", {
   subscriptionBilling: text("subscription_billing"), // monthly, annual
   subscriptionCurrentPeriodEnd: text("subscription_current_period_end"),
 });
+
+// Access helpers — shared between server and client so both agree on what "in good standing" means.
+export const ACTIVE_SUB_STATUSES = new Set(["active", "trialing"]);
+export function isSubscriptionActive(status: string | null | undefined): boolean {
+  return !!status && ACTIVE_SUB_STATUSES.has(status);
+}
+export function isAccountInGoodStanding(a: Pick<Account, "role" | "approvalStatus" | "subscriptionStatus"> | null | undefined): boolean {
+  if (!a) return false;
+  if (a.role === "owner") return true; // Owner bypasses paywall.
+  return a.approvalStatus === "approved" && isSubscriptionActive(a.subscriptionStatus);
+}
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),

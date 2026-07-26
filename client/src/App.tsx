@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { APP_ROUTES } from "@shared/app-manifest";
 import { AccessProvider, useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { isAccountInGoodStanding } from "@shared/schema";
 import { setPendingRedirect } from "@/lib/queryClient";
 import type { AccessLevel } from "@shared/access-levels";
 import { Layout } from "@/components/layout";
@@ -50,6 +51,7 @@ import { TermsOfService, PrivacyPolicy } from "@/pages/legal";
 import { ForgotPassword, ResetPassword } from "@/pages/password-reset";
 import AdminSignups from "@/pages/admin-signups";
 import Cpm from "@/pages/cpm";
+import Paywall from "@/pages/paywall";
 
 // Single source of truth for routes lives in shared/app-manifest.ts (APP_ROUTES).
 // Map each manifest route pattern to its page component here.
@@ -135,19 +137,26 @@ function AccessGate() {
   return <AppRouter />;
 }
 
-/** Renders children only if the user is authenticated. While the auth check is
- *  in flight, shows a splash. If unauthenticated, redirects to /login and shows
- *  a splash until the redirect takes effect. */
+/** Renders children only if the user is authenticated AND in good standing
+ *  (admin-approved + active subscription, or an owner). While the auth check is
+ *  in flight, shows a splash. If unauthenticated, redirects to /login; if not
+ *  in good standing, redirects to /paywall. */
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, account } = useAuth();
   const [loc] = useLocation();
+  const inGoodStanding = isAccountInGoodStanding(account as any);
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isLoading) return;
+    if (!isAuthenticated) {
       setPendingRedirect(loc || "/app");
       window.location.hash = `/login`;
+      return;
     }
-  }, [isLoading, isAuthenticated, loc]);
-  if (isLoading || !isAuthenticated) {
+    if (!inGoodStanding) {
+      window.location.hash = `/paywall`;
+    }
+  }, [isLoading, isAuthenticated, inGoodStanding, loc]);
+  if (isLoading || !isAuthenticated || !inGoodStanding) {
     return (
       <div className="min-h-screen grid place-items-center bg-background">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -160,12 +169,33 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Wrapper for /paywall: only reachable when authenticated. */
+function PaywallGate() {
+  const { isAuthenticated, isLoading } = useAuth();
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      window.location.hash = `/login`;
+    }
+  }, [isLoading, isAuthenticated]);
+  if (isLoading || !isAuthenticated) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-background">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading…
+        </div>
+      </div>
+    );
+  }
+  return <Paywall />;
+}
+
 function AppChrome() {
   const [loc] = useLocation();
   const { isAuthenticated } = useAuth();
   // Jarvis is only useful once you’re inside the app.
   if (!isAuthenticated) return null;
-  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup") return null;
+  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup" || loc === "/paywall") return null;
   return <JarvisPanel />;
 }
 
@@ -180,6 +210,8 @@ function RootRouter() {
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      {/* Paywall lives outside RequireAuth so pending/unpaid users can reach it. */}
+      <Route path="/paywall" component={PaywallGate} />
       {/* Everything else is a protected app route. */}
       <Route>
         <RequireAuth>
