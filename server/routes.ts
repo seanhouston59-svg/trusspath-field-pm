@@ -935,7 +935,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // `new (require("stripe")(key))` throws "is not a constructor" because it calls
   // Stripe as a function first, then tries to `new` the returned instance.
   const StripeCtor = stripeKey ? require("stripe") : null;
-  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2024-06-20" }) : null;
+  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2025-03-31.basil" }) : null;
 
   const PRICE_MAP: Record<string, { monthly?: string; annual?: string }> = {
     starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },

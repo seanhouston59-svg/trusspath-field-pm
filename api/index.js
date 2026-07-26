@@ -3872,7 +3872,7 @@ async function registerRoutes(_httpServer, app2) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   const StripeCtor = stripeKey ? require("stripe") : null;
-  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2024-06-20" }) : null;
+  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2025-03-31.basil" }) : null;
   const PRICE_MAP = {
     starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },
     pro: { monthly: process.env.STRIPE_PRICE_PRO_MONTHLY, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
