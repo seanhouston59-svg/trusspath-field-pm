@@ -9,6 +9,7 @@
     "vercel-build": "vite build && tsx script/build-api.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "test": "tsx --test client/src/lib/*.test.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
