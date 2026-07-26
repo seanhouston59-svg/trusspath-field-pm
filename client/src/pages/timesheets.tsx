@@ -578,9 +578,9 @@ function TimesheetEditor({
       <div ref={printRef} className="rounded-xl border-2 border-border bg-card shadow-sm overflow-hidden" data-testid="timesheet-card">
 
         {/* --- Header band: logo + company name --- */}
-        <div className="flex items-center gap-3 border-b-2 border-border bg-muted/40 px-6 py-4">
-          <img src={timesheetLogoUrl} alt="Company Logo" className="size-12 shrink-0 rounded-lg object-contain" />
-          <div className="font-display text-lg font-bold tracking-tight">{companyName}</div>
+        <div className="flex items-center gap-2 border-b-2 border-border bg-muted/40 px-3 py-3 md:px-6 md:py-4">
+          <img src={timesheetLogoUrl} alt="Company Logo" className="size-10 shrink-0 rounded-lg object-contain md:size-12" />
+          <div className="font-display text-base font-bold tracking-tight md:text-lg">{companyName}</div>
           <div className="ml-auto">
             <Badge className={cn("text-xs capitalize", statusColor(ts.status))} variant="secondary">
               {ts.status}
@@ -589,26 +589,26 @@ function TimesheetEditor({
         </div>
 
         {/* --- Employee + Week info --- */}
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-2 border-b border-border px-6 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-muted-foreground">Name:</span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-3 py-2 md:px-6 md:py-3 md:gap-x-8 md:gap-y-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-muted-foreground md:text-sm">Name:</span>
             <Input
               value={employeeName}
               onChange={(e) => saveNameChange(e.target.value)}
               onBlur={commitNameChange}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              className="h-8 w-48 border-b-1 border-input px-1 font-medium"
+              className="h-8 w-32 border-b-1 border-input px-1 text-sm font-medium md:w-48 md:text-sm"
               data-testid="input-employee-header"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-muted-foreground">Weeks of:</span>
-            <span className="font-medium text-primary">{fmtWeekRange(weekInfo.start, weekInfo.end)}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-muted-foreground md:text-sm">Weeks of:</span>
+            <span className="text-sm font-medium text-primary md:text-sm">{fmtWeekRange(weekInfo.start, weekInfo.end)}</span>
           </div>
         </div>
 
-        {/* --- Main table --- */}
-        <div className="overflow-x-auto">
+        {/* --- Desktop table (hidden on mobile) --- */}
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm" data-testid="table-timesheet-grid">
             <thead>
               <tr className="border-b-2 border-border bg-muted/60">
@@ -720,15 +720,121 @@ function TimesheetEditor({
           </table>
         </div>
 
-        {/* --- Add row button --- */}
-        <div className="px-6 py-2 border-t border-border/40">
+        {/* --- Mobile card layout (hidden on desktop + print) --- */}
+        <div className="md:hidden print:hidden space-y-2 p-3" data-testid="mobile-timesheet-rows">
+          {entries.map((entry, idx) => {
+            const isWeekend = !entry.isExtra && (idx === 0 || idx === 6);
+            const hasData = entry.clientName || entry.projectName || entry.hoursWorked || entry.activities;
+            return (
+              <div
+                key={idx}
+                className={cn(
+                  "rounded-lg border border-border/60 p-2.5",
+                  isWeekend && "bg-muted/20",
+                  !isWeekend && hasData && "bg-muted/5",
+                  entry.isExtra && !hasData && "border-dashed border-border/30",
+                )}
+              >
+                {/* Row header: day + date + hours badge + delete */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Input
+                    value={entry.dayOfWeek}
+                    onChange={(e) => updateEntry(idx, "dayOfWeek", e.target.value)}
+                    placeholder="Day"
+                    className="h-9 flex-1 border-0 bg-transparent px-1 font-semibold text-sm focus-visible:ring-1"
+                    data-testid={`m-input-day-${idx}`}
+                  />
+                  <Input
+                    type="date"
+                    value={entry.entryDate}
+                    onChange={(e) => updateEntry(idx, "entryDate", e.target.value)}
+                    className="h-9 w-36 border-0 bg-transparent px-1 text-xs text-muted-foreground focus-visible:ring-1"
+                    data-testid={`m-input-date-${idx}`}
+                  />
+                  {entry.hoursWorked && (
+                    <span className="font-mono font-bold text-sm shrink-0 px-2 py-0.5 rounded bg-primary/10 text-primary">
+                      {entry.hoursWorked}h
+                    </span>
+                  )}
+                  <button
+                    onClick={() => removeRow(idx)}
+                    className="text-muted-foreground/40 hover:text-destructive transition p-1.5 shrink-0"
+                    data-testid={`m-button-remove-row-${idx}`}
+                    aria-label="Delete row"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+                {/* Stacked fields */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-14 shrink-0">Client</span>
+                    <Input
+                      value={entry.clientName}
+                      onChange={(e) => updateEntry(idx, "clientName", e.target.value)}
+                      placeholder="Client name"
+                      className="h-9 flex-1 text-sm focus-visible:ring-1"
+                      data-testid={`m-input-client-${idx}`}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-14 shrink-0">Project</span>
+                    <Input
+                      value={entry.projectName}
+                      onChange={(e) => updateEntry(idx, "projectName", e.target.value)}
+                      placeholder="Project / task"
+                      className="h-9 flex-1 text-sm focus-visible:ring-1"
+                      data-testid={`m-input-project-${idx}`}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-14 shrink-0">Hours</span>
+                    <Input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      value={entry.hoursWorked}
+                      onChange={(e) => updateEntry(idx, "hoursWorked", e.target.value)}
+                      placeholder="0"
+                      className="h-9 w-20 text-sm font-mono text-center focus-visible:ring-1"
+                      data-testid={`m-input-hours-${idx}`}
+                    />
+                    <span className="text-xs text-muted-foreground">hrs</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs text-muted-foreground w-14 shrink-0 pt-2.5">Activity</span>
+                    <Textarea
+                      value={entry.activities}
+                      onChange={(e) => updateEntry(idx, "activities", e.target.value)}
+                      placeholder="What did you work on?"
+                      className="min-h-[36px] flex-1 text-sm resize-y focus-visible:ring-1"
+                      data-testid={`m-input-activities-${idx}`}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {/* Mobile total bar */}
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+            <span className="font-bold uppercase tracking-wide text-sm">Total Hours</span>
+            <span className="font-mono font-bold text-base" data-testid="m-text-total-hours">{totalHours}</span>
+          </div>
+          {/* Mobile add row */}
+          <Button variant="outline" size="sm" onClick={addRow} className="w-full" data-testid="m-button-add-row">
+            <Plus className="size-4" /> Add Row
+          </Button>
+        </div>
+
+        {/* --- Desktop add row + total (hidden on mobile) --- */}
+        <div className="hidden md:block">
           <Button variant="ghost" size="sm" onClick={addRow} data-testid="button-add-row">
             <Plus className="size-4" /> Add Row
           </Button>
         </div>
 
         {/* --- Signature section --- */}
-        <div className="border-t-2 border-border bg-muted/20 px-6 py-5">
+        <div className="border-t-2 border-border bg-muted/20 px-3 py-4 md:px-6 md:py-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Employee signature */}
             <div>
@@ -874,7 +980,7 @@ function TimesheetEditor({
         )}
 
         {/* --- Delete timesheet (always available) --- */}
-        <div className="flex justify-end px-6 py-3 border-t border-border/40">
+        <div className="flex justify-end px-3 py-3 border-t border-border/40 md:px-6">
           <Button
             variant="outline"
             size="sm"
@@ -885,6 +991,28 @@ function TimesheetEditor({
             <Trash2 className="size-4" /> Delete Timesheet
           </Button>
         </div>
+      </div>
+
+      {/* --- Mobile sticky action bar --- */}
+      <div className="sticky bottom-0 z-10 mt-2 flex items-center gap-2 rounded-lg border border-border bg-background/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={addRow}
+          className="flex-1"
+          data-testid="m-sticky-add-row"
+        >
+          <Plus className="size-4" /> Add Row
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => saveMut.mutate()}
+          disabled={saveMut.isPending}
+          className="flex-1"
+          data-testid="m-sticky-save"
+        >
+          {saveMut.isPending ? "Saving..." : "Save"}
+        </Button>
       </div>
 
       {/* --- Send dialog --- */}
