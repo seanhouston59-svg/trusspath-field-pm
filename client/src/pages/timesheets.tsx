@@ -325,6 +325,7 @@ function TimesheetEditor({
   const [signing, setSigning] = useState<"employee" | "manager" | null>(null);
   const [showSend, setShowSend] = useState(false);
   const [sendEmail, setSendEmail] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
   const printRef = useRef<HTMLDivElement>(null);
 
   const companyName = settings?.companyName?.trim() || "TrussPath";
@@ -382,7 +383,13 @@ function TimesheetEditor({
     }
 
     setEntries(drafts);
+    setEmployeeName(ts.employeeName);
     setLoaded(true);
+  }
+
+  // Reset loaded state when switching timesheets
+  if (ts && loaded && ts.id !== id) {
+    setLoaded(false);
   }
 
   const totalHours = useMemo(() => {
@@ -509,10 +516,19 @@ function TimesheetEditor({
   }
 
   const weekInfo = getWeekRange(ts.weekStart);
-  const isDraft = ts.status === "draft";
   const isSubmitted = ts.status === "submitted";
   const isApproved = ts.status === "approved";
   const isRejected = ts.status === "rejected";
+
+  // Save name change with debounce
+  const saveNameChange = (val: string) => {
+    setEmployeeName(val);
+  };
+  const commitNameChange = () => {
+    if (employeeName.trim() && employeeName !== ts.employeeName) {
+      statusMut.mutate({ employeeName: employeeName.trim() });
+    }
+  };
 
   return (
     <Layout
@@ -550,7 +566,7 @@ function TimesheetEditor({
           <Button
             size="sm"
             onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending || !isDraft}
+            disabled={saveMut.isPending}
             data-testid="button-save-timesheet"
           >
             {saveMut.isPending ? "Saving..." : "Save"}
@@ -576,19 +592,14 @@ function TimesheetEditor({
         <div className="flex flex-wrap items-center gap-x-8 gap-y-2 border-b border-border px-6 py-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">Name:</span>
-            {isDraft ? (
-              <Input
-                value={ts.employeeName}
-                onChange={(e) => {
-                  // Update employee name inline via status mutation
-                  statusMut.mutate({ employeeName: e.target.value });
-                }}
-                className="h-8 w-48 border-b-1 border-input px-1 font-medium"
-                data-testid="input-employee-header"
-              />
-            ) : (
-              <span className="font-medium">{ts.employeeName}</span>
-            )}
+            <Input
+              value={employeeName}
+              onChange={(e) => saveNameChange(e.target.value)}
+              onBlur={commitNameChange}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              className="h-8 w-48 border-b-1 border-input px-1 font-medium"
+              data-testid="input-employee-header"
+            />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-muted-foreground">Weeks of:</span>
@@ -607,7 +618,7 @@ function TimesheetEditor({
                 <th className="text-left px-3 py-2.5 font-semibold w-40">Project</th>
                 <th className="text-right px-3 py-2.5 font-semibold w-20">Hour worked</th>
                 <th className="text-left px-3 py-2.5 font-semibold">Activities</th>
-                {isDraft && <th className="w-10" />}
+                <th className="w-10" />
               </tr>
             </thead>
             <tbody>
@@ -624,41 +635,28 @@ function TimesheetEditor({
                     )}
                   >
                     <td className="px-3 py-1.5">
-                      {entry.isExtra && isDraft ? (
-                        <Input
-                          value={entry.dayOfWeek}
-                          onChange={(e) => updateEntry(idx, "dayOfWeek", e.target.value)}
-                          placeholder="—"
-                          className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
-                          data-testid={`input-day-${idx}`}
-                        />
-                      ) : (
-                        <span className={cn("font-medium", !entry.dayOfWeek && "text-transparent")}>
-                          {entry.dayOfWeek}
-                        </span>
-                      )}
+                      <Input
+                        value={entry.dayOfWeek}
+                        onChange={(e) => updateEntry(idx, "dayOfWeek", e.target.value)}
+                        placeholder="—"
+                        className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
+                        data-testid={`input-day-${idx}`}
+                      />
                     </td>
                     <td className="px-3 py-1.5">
-                      {entry.isExtra && isDraft ? (
-                        <Input
-                          type="date"
-                          value={entry.entryDate}
-                          onChange={(e) => updateEntry(idx, "entryDate", e.target.value)}
-                          className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
-                          data-testid={`input-date-${idx}`}
-                        />
-                      ) : (
-                        <span className={cn("text-muted-foreground", !entry.entryDate && "text-transparent")}>
-                          {entry.entryDate ? fmtDateShort(new Date(entry.entryDate + "T00:00:00")) : "—"}
-                        </span>
-                      )}
+                      <Input
+                        type="date"
+                        value={entry.entryDate}
+                        onChange={(e) => updateEntry(idx, "entryDate", e.target.value)}
+                        className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
+                        data-testid={`input-date-${idx}`}
+                      />
                     </td>
                     <td className="px-3 py-1.5">
                       <Input
                         value={entry.clientName}
                         onChange={(e) => updateEntry(idx, "clientName", e.target.value)}
                         placeholder="—"
-                        disabled={!isDraft}
                         className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
                         data-testid={`input-client-${idx}`}
                       />
@@ -668,7 +666,6 @@ function TimesheetEditor({
                         value={entry.projectName}
                         onChange={(e) => updateEntry(idx, "projectName", e.target.value)}
                         placeholder="—"
-                        disabled={!isDraft}
                         className="border-0 bg-transparent px-1 h-8 focus-visible:ring-1"
                         data-testid={`input-project-${idx}`}
                       />
@@ -681,7 +678,6 @@ function TimesheetEditor({
                         value={entry.hoursWorked}
                         onChange={(e) => updateEntry(idx, "hoursWorked", e.target.value)}
                         placeholder="0"
-                        disabled={!isDraft}
                         className="border-0 bg-transparent px-1 h-8 text-right font-mono focus-visible:ring-1 w-16"
                         data-testid={`input-hours-${idx}`}
                       />
@@ -691,24 +687,20 @@ function TimesheetEditor({
                         value={entry.activities}
                         onChange={(e) => updateEntry(idx, "activities", e.target.value)}
                         placeholder="—"
-                        disabled={!isDraft}
                         className="border-0 bg-transparent px-1 py-1 h-8 min-h-0 resize-none focus-visible:ring-1"
                         data-testid={`input-activities-${idx}`}
                       />
                     </td>
-                    {isDraft && (
-                      <td className="px-1 py-1.5">
-                        {entry.isExtra && (
-                          <button
-                            onClick={() => removeRow(idx)}
-                            className="text-muted-foreground/40 hover:text-destructive transition"
-                            data-testid={`button-remove-row-${idx}`}
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        )}
-                      </td>
-                    )}
+                    <td className="px-1 py-1.5">
+                      <button
+                        onClick={() => removeRow(idx)}
+                        className="text-muted-foreground/40 hover:text-destructive transition p-1"
+                        data-testid={`button-remove-row-${idx}`}
+                        aria-label="Delete row"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -722,20 +714,18 @@ function TimesheetEditor({
                 <td className="px-3 py-2.5 text-right font-mono font-bold text-base" data-testid="text-total-hours">
                   {totalHours}
                 </td>
-                <td colSpan={isDraft ? 2 : 1} />
+                <td colSpan={2} />
               </tr>
             </tfoot>
           </table>
         </div>
 
-        {/* --- Add row button (draft only) --- */}
-        {isDraft && (
-          <div className="px-6 py-2 border-t border-border/40">
-            <Button variant="ghost" size="sm" onClick={addRow} data-testid="button-add-row">
-              <Plus className="size-4" /> Add Row
-            </Button>
-          </div>
-        )}
+        {/* --- Add row button --- */}
+        <div className="px-6 py-2 border-t border-border/40">
+          <Button variant="ghost" size="sm" onClick={addRow} data-testid="button-add-row">
+            <Plus className="size-4" /> Add Row
+          </Button>
+        </div>
 
         {/* --- Signature section --- */}
         <div className="border-t-2 border-border bg-muted/20 px-6 py-5">
@@ -792,7 +782,6 @@ function TimesheetEditor({
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={!isDraft}
                   onClick={() => setSigning("employee")}
                   data-testid="button-sign-employee"
                 >
@@ -884,20 +873,18 @@ function TimesheetEditor({
           </div>
         )}
 
-        {/* --- Delete (draft only) --- */}
-        {isDraft && (
-          <div className="flex justify-end px-6 py-3 border-t border-border/40">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onDelete}
-              className="text-destructive"
-              data-testid="button-delete-timesheet"
-            >
-              <Trash2 className="size-4" /> Delete Timesheet
-            </Button>
-          </div>
-        )}
+        {/* --- Delete timesheet (always available) --- */}
+        <div className="flex justify-end px-6 py-3 border-t border-border/40">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDelete}
+            className="text-destructive"
+            data-testid="button-delete-timesheet"
+          >
+            <Trash2 className="size-4" /> Delete Timesheet
+          </Button>
+        </div>
       </div>
 
       {/* --- Send dialog --- */}
