@@ -6,7 +6,7 @@ import {
   FileStack, GitPullRequestArrow, StickyNote, Wrench, Image, FileText,
   Contact as ContactIcon, MessageSquare, Building2, Clock,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
-  LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2,
+  LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2, FileSignature,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -23,17 +23,33 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CommandPalette } from "@/components/command-palette";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 const ICONS: Record<string, any> = {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
   CheckSquare, Users, CalendarRange, FileStack, GitPullRequestArrow,
   StickyNote, Wrench, Image, FileText, Contact: ContactIcon, MessageSquare, Building2, Clock,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings: SettingsIcon, Trash2, Network,
+  FileSignature,
 };
+
+const NAV_HREFS = APP_NAV.flatMap((g) => g.items.map((i) => i.href));
+
+/** The most specific nav href the location falls under, so /timesheets/pending
+ *  doesn't also light up /timesheets. */
+function activeNavHref(location: string): string | null {
+  const matches = NAV_HREFS.filter((h) => (h === "/" ? location === "/" : location.startsWith(h)));
+  return matches.sort((a, b) => b.length - a.length)[0] ?? null;
+}
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   const { isAllowed } = useAccess();
+  const currentHref = activeNavHref(location);
+  const { data: pendingApprovals } = useQuery<{ timesheets: unknown[] }>({
+    queryKey: ["/api/timesheets/pending"],
+  });
+  const pendingCount = pendingApprovals?.timesheets.length ?? 0;
   return (
     <nav className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1" style={{ WebkitOverflowScrolling: "touch" }} aria-label="Primary">
       {APP_NAV.map((group) => {
@@ -44,8 +60,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           <div className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">{group.title}</div>
           <div className="flex flex-col gap-0">
             {items.map(({ href, label, icon }) => {
-              const active = href === "/" ? location === "/" : location.startsWith(href);
+              const active = href === currentHref;
               const Icon = ICONS[icon] ?? LayoutDashboard;
+              const badge = href === "/timesheets/pending" && pendingCount > 0 ? pendingCount : null;
               return (
                 <Link
                   key={href}
@@ -61,6 +78,11 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 >
                   <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-sidebar-foreground/60 group-hover:text-primary")} />
                   {label}
+                  {badge !== null && (
+                    <span className="ml-auto grid min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground" data-testid="badge-pending-approvals">
+                      {badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}

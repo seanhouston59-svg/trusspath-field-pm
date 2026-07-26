@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Phone, Building2, Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
+import { Mail, Phone, Building2, Plus, Pencil, Trash2, ShieldCheck, UserCheck } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Avatar } from "@/components/bits";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
@@ -39,6 +39,15 @@ export default function Team() {
   const LEVEL_OPTIONS = (Object.values(ACCESS_BY_SLUG)).map((l) => ({ value: l.slug, label: l.label }));
   const levelLabel = (slug: string) => (ACCESS_BY_SLUG as Record<string, { label: string }>)[slug]?.label ?? slug;
 
+  // Radix Select can't hold an empty-string value, so "none" stands in for null.
+  const NO_MANAGER = "none";
+  const managerOptions = [
+    { value: NO_MANAGER, label: "— None —" },
+    ...team
+      .filter((m) => m.id !== editing?.id)
+      .map((m) => ({ value: String(m.id), label: `${m.name} — ${m.role}` })),
+  ];
+
   const fields: FieldDef[] = [
     { name: "name", label: "Full Name", type: "text", required: true, half: true },
     { name: "role", label: "Job Title", type: "text", placeholder: "Superintendent", required: true, half: true },
@@ -48,15 +57,18 @@ export default function Team() {
     { name: "email", label: "Email", type: "text", placeholder: "name@company.com", half: true },
     { name: "phone", label: "Phone", type: "text", placeholder: "(303) 555-0000", half: true },
     { name: "color", label: "Avatar Color", type: "select", options: COLOR_OPTIONS.map((c) => ({ value: c, label: c[0].toUpperCase() + c.slice(1) })), required: true, half: true },
+    { name: "designatedManagerId", label: "Designated Manager (approves their timesheets)", type: "select", options: managerOptions },
     { name: "companyPhoto", label: "Company Photo", type: "photo" },
   ];
+
+  const managerNameFor = (m: TeamMember) => team.find((x) => x.id === m.designatedManagerId)?.name ?? null;
 
   const openNew = () => { setEditing(null); setOpen(true); };
   const openEdit = (m: TeamMember) => { setEditing(m); setOpen(true); };
 
   const defaults: Record<string, string | number> = editing
-    ? { name: editing.name, role: editing.role, accessLevel: editing.accessLevel ?? "project_manager", trade: editing.trade, company: editing.company, email: editing.email ?? "", phone: editing.phone ?? "", color: editing.color, companyPhoto: editing.companyPhoto ?? "" }
-    : { color: "blue", accessLevel: "project_manager", email: "", phone: "", companyPhoto: "" };
+    ? { name: editing.name, role: editing.role, accessLevel: editing.accessLevel ?? "project_manager", trade: editing.trade, company: editing.company, email: editing.email ?? "", phone: editing.phone ?? "", color: editing.color, companyPhoto: editing.companyPhoto ?? "", designatedManagerId: editing.designatedManagerId ? String(editing.designatedManagerId) : NO_MANAGER }
+    : { color: "blue", accessLevel: "project_manager", email: "", phone: "", companyPhoto: "", designatedManagerId: NO_MANAGER };
 
   const handleSubmit = (v: Record<string, string | number>) => {
     const payload = {
@@ -70,6 +82,7 @@ export default function Team() {
       companyPhoto: String(v.companyPhoto ?? ""),
       color: String(v.color),
       initials: deriveInitials(String(v.name)),
+      designatedManagerId: v.designatedManagerId && v.designatedManagerId !== NO_MANAGER ? Number(v.designatedManagerId) : null,
     };
     if (editing) return update.mutateAsync({ id: editing.id, data: payload });
     return create.mutateAsync(payload);
@@ -130,6 +143,10 @@ export default function Team() {
                 <div className="flex items-center gap-2"><span className="size-4 text-center text-[10px]">🔧</span> {m.trade}</div>
                 <div className="flex items-center gap-2"><Mail className="size-4" /> {m.email || <span className="italic text-muted-foreground/60">No email</span>}</div>
                 <div className="flex items-center gap-2"><Phone className="size-4" /> {m.phone || <span className="italic text-muted-foreground/60">No phone</span>}</div>
+                <div className="flex items-center gap-2" data-testid={`text-manager-${m.id}`}>
+                  <UserCheck className="size-4" />
+                  {managerNameFor(m) || <span className="italic text-muted-foreground/60">No designated manager</span>}
+                </div>
               </div>
             </div>
           ))}

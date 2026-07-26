@@ -95,6 +95,82 @@ export async function sendSignupNotification(n: SignupNotification): Promise<{ o
   }
 }
 
+export type TimesheetApprovalRequest = {
+  to: string;
+  managerName: string;
+  employeeName: string;
+  weekStart: string;
+  weekEnd: string;
+  totalHours: string;
+  /** Deep link into the manager's in-app pending queue. */
+  timesheetUrl: string;
+  /** DocuSign envelope link, when the integration is configured. */
+  docusignUrl: string | null;
+};
+
+/** Asks a manager to review and sign an employee's submitted timesheet. */
+export async function sendTimesheetApprovalRequest(r: TimesheetApprovalRequest): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;
+  const subject = `Timesheet approval needed — ${r.employeeName} — Week of ${r.weekStart}`;
+
+  if (!apiKey) {
+    console.log(`[mailer] RESEND_API_KEY not set — skipping timesheet approval email to ${r.to}. Review at: ${r.timesheetUrl}`);
+    return { ok: true, skipped: true };
+  }
+
+  const docusignBlock = r.docusignUrl
+    ? `<p style="margin:0 0 16px;"><a href="${escapeHtml(r.docusignUrl)}" style="display:inline-block;padding:12px 28px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Sign in DocuSign</a></p>`
+    : "";
+
+  const html = `<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
+    <div style="padding:16px 20px;background:#111;color:#fff;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;">TrussPath — Timesheet Approval</div>
+    <div style="padding:24px 20px;">
+      <p style="font-size:15px;color:#111;margin:0 0 16px;">Hi ${escapeHtml(r.managerName)},</p>
+      <p style="font-size:15px;color:#111;margin:0 0 16px;"><b>${escapeHtml(r.employeeName)}</b> signed and submitted a timesheet for your approval.</p>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 20px;">
+        <tr><td style="padding:6px 0;color:#666;font-size:13px;">Week</td><td style="padding:6px 0;font-size:14px;color:#111;">${escapeHtml(r.weekStart)} – ${escapeHtml(r.weekEnd)}</td></tr>
+        <tr><td style="padding:6px 0;color:#666;font-size:13px;">Total hours</td><td style="padding:6px 0;font-size:14px;color:#111;">${escapeHtml(r.totalHours)}</td></tr>
+      </table>
+      ${docusignBlock}
+      <p style="margin:0 0 16px;"><a href="${escapeHtml(r.timesheetUrl)}" style="display:inline-block;padding:12px 28px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Review in TrussPath</a></p>
+      <p style="font-size:13px;color:#999;margin:16px 0 0;">The timesheet is filed into Company Documents automatically once both signatures are complete.</p>
+    </div>
+    <div style="padding:12px 20px;color:#888;font-size:12px;border-top:1px solid #eee;">TrussPath — Field Project Management</div>
+  </div>
+</body></html>`;
+
+  const text = [
+    `${r.employeeName} signed and submitted a timesheet for your approval.`,
+    ``,
+    `Week: ${r.weekStart} - ${r.weekEnd}`,
+    `Total hours: ${r.totalHours}`,
+    ``,
+    r.docusignUrl ? `Sign in DocuSign: ${r.docusignUrl}` : ``,
+    `Review in TrussPath: ${r.timesheetUrl}`,
+  ].filter(Boolean).join("\n");
+
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [r.to], subject, html, text }),
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`[mailer] Resend ${resp.status}: ${body}`);
+      return { ok: false, error: `Resend ${resp.status}` };
+    }
+    console.log(`[mailer] Sent timesheet approval request to ${r.to}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[mailer] Timesheet approval send failed:", err);
+    return { ok: false, error: String(err) };
+  }
+}
+
 export async function sendPasswordResetEmail(toEmail: string, resetUrl: string): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;

@@ -16,6 +16,8 @@ export const teamMembers = pgTable("team_members", {
   phone: text("phone"),
   companyPhoto: text("company_photo"),
   accessLevel: text("access_level").notNull().default("project_manager"),
+  // The manager every one of this member's timesheets routes to for approval.
+  designatedManagerId: integer("designated_manager_id"),
 });
 
 /* ------------------------------- Projects ------------------------------- */
@@ -195,6 +197,8 @@ export const companyDocuments = pgTable("company_documents", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   category: text("category").notNull(), // New Hire, Contract, HR, Safety, Vendor, Legal, Insurance, Other
+  // Machine-readable tag for auto-filed records (e.g. "timesheet"). Null for manual uploads.
+  type: text("type"),
   status: text("status").notNull().default("Draft"), // Draft, Active, Archived
   signatureRequired: boolean("signature_required").notNull().default(false),
   signatureStatus: text("signature_status").notNull().default("Not Required"), // Not Required, Needs Signature, Sent, Signed, Expired
@@ -375,7 +379,27 @@ export const timesheets = pgTable("timesheets", {
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at"),
+  /* ---- Approval workflow ---- */
+  employeeSignedAt: text("employee_signed_at"),
+  sentToManagerAt: text("sent_to_manager_at"),
+  managerSignedAt: text("manager_signed_at"),
+  managerUserId: integer("manager_user_id"),
+  docusignEnvelopeId: text("docusign_envelope_id"),
+  docusignStatus: text("docusign_status"),
+  signedPdfUrl: text("signed_pdf_url"),
+  // Set only once the envelope completes and the record is filed.
+  companyDocId: integer("company_doc_id"),
 });
+
+/** Timesheet approval states, in order. `status` holds one of these. */
+export const TIMESHEET_STATUS = {
+  draft: "draft",
+  employeeSigned: "employee_signed",
+  sentToManager: "sent_to_manager",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+export type TimesheetStatus = (typeof TIMESHEET_STATUS)[keyof typeof TIMESHEET_STATUS];
 
 export const timeEntries = pgTable("time_entries", {
   id: serial("id").primaryKey(),

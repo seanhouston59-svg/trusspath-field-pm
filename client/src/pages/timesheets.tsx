@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { Timesheet, TimeEntry, Project } from "@shared/schema";
+import { TIMESHEET_STATUS } from "@shared/schema";
+import type { Timesheet, TimeEntry, Project, TeamMember } from "@shared/schema";
 import timesheetLogoUrl from "@/../public/timesheet-logo.jpeg";
 
 /* ---------- helpers ---------- */
@@ -51,15 +52,47 @@ function fmtWeekRange(start: Date, end: Date): string {
 function statusColor(status: string): string {
   switch (status) {
     case "draft": return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
-    case "submitted": return "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
+    case "employee_signed": return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
+    case "submitted":
+    case "sent_to_manager": return "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
     case "approved": return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
     case "rejected": return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
     default: return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
   }
 }
 
+function statusLabel(status: string): string {
+  return status.replace(/_/g, " ");
+}
+
 function dayKey(dateStr: string): string {
   return dateStr || "";
+}
+
+function docusignLabel(status: string | null | undefined): string {
+  switch (status) {
+    case null:
+    case undefined:
+    case "": return "not sent";
+    case "not_configured": return "not configured";
+    case "error": return "unavailable — sign in app";
+    default: return status.replace(/_/g, " ");
+  }
+}
+
+type ApiError = { message: string; code?: string; profileHref?: string };
+
+/** apiRequest throws `Error("<status>: <body>")`; recover the JSON body when there is one. */
+function parseApiError(err: unknown): ApiError {
+  const raw = err instanceof Error ? err.message : String(err);
+  const body = raw.replace(/^\d+:\s*/, "");
+  try {
+    const parsed = JSON.parse(body);
+    if (parsed && typeof parsed.message === "string") return parsed;
+  } catch {
+    // Not JSON — fall through to the raw text.
+  }
+  return { message: body || "Something went wrong" };
 }
 
 /* ---------- data hooks ---------- */
@@ -81,6 +114,10 @@ function useProjects() {
 
 function useSettings() {
   return useQuery<{ companyName?: string }>({ queryKey: ["/api/settings"] });
+}
+
+function useTeam() {
+  return useQuery<TeamMember[]>({ queryKey: ["/api/team"] });
 }
 
 /* ---------- main page ---------- */
@@ -157,8 +194,8 @@ export default function Timesheets() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3">
                     <span className="font-medium truncate">{ts.employeeName}</span>
-                    <Badge className={cn("text-xs", statusColor(ts.status))} variant="secondary">
-                      {ts.status}
+                    <Badge className={cn("text-xs capitalize", statusColor(ts.status))} variant="secondary">
+                      {statusLabel(ts.status)}
                     </Badge>
                   </div>
                   <div className="text-sm text-muted-foreground mt-0.5">
@@ -324,12 +361,12 @@ function TimesheetEditor({
 }) {
   const { data: ts, isLoading } = useTimesheet(id);
   const { data: settings } = useSettings();
+  const { data: team = [] } = useTeam();
   const { toast } = useToast();
   const [entries, setEntries] = useState<EntryDraft[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [signing, setSigning] = useState<"employee" | "manager" | null>(null);
-  const [showSend, setShowSend] = useState(false);
-  const [sendEmail, setSendEmail] = useState("");
+  const [sendError, setSendError] = useState<ApiError | null>(null);
   const [employeeName, setEmployeeName] = useState("");
   const [selectedDay, setSelectedDay] = useState(0); // 0=Sun ... 6=Sat
   const [newEntry, setNewEntry] = useState({ clientName: "", projectName: "", hoursWorked: "", activities: "" });
@@ -474,26 +511,79 @@ function TimesheetEditor({
     },
   });
 
-  const saveToDocsMut = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/timesheets/${id}/save-to-docs`);
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/company-documents"] });
-      toast({ title: data.updated ? "Updated in Company Documents" : "Saved to Company Documents" });
-    },
-  });
+  const invalidateTimesheet = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/timesheets"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/timesheets", id] });
+    queryClient.invalidateQueries({ queryKey: ["/api/timesheets/pending"] });
+  };
 
-  const sendMut = useMutation({
-    mutationFn: async ({ email }: { email: string }) => {
-      const res = await apiRequest("POST", `/api/timesheets/${id}/send`, { email });
+  const employeeSignMut = useMutation({
+    mutationFn: async (signature: string) => {
+      const res = await apiRequest("POST", `/api/timesheets/${id}/employee-sign`, { signature });
       return res.json();
     },
     onSuccess: () => {
-      setShowSend(false);
-      setSendEmail("");
-      toast({ title: "Timesheet sent" });
+      invalidateTimesheet();
+      setSigning(null);
+      toast({ title: "Signed", description: "Next: send it to your manager for approval." });
+    },
+    onError: (err) => toast({ title: "Could not sign", description: parseApiError(err).message, variant: "destructive" }),
+  });
+
+  const sendToManagerMut = useMutation({
+    mutationFn: async () => {
+      // Persist the grid first so the manager reviews what's on screen.
+      await saveMut.mutateAsync();
+      const res = await apiRequest("POST", `/api/timesheets/${id}/send-to-manager`);
+      return res.json();
+    },
+    onSuccess: (data: { managerName?: string; emailAttempted?: boolean }) => {
+      setSendError(null);
+      invalidateTimesheet();
+      toast({
+        title: `Sent to ${data.managerName ?? "your manager"}`,
+        description: data.emailAttempted ? "They've been emailed a request to sign." : "Awaiting their signature.",
+      });
+    },
+    onError: (err) => setSendError(parseApiError(err)),
+  });
+
+  const managerSignMut = useMutation({
+    mutationFn: async (signature: string) => {
+      const res = await apiRequest("POST", `/api/timesheets/${id}/manager-sign`, { signature });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateTimesheet();
+      queryClient.invalidateQueries({ queryKey: ["/api/company-documents"] });
+      setSigning(null);
+      toast({ title: "Approved", description: "Filed into Company Documents." });
+    },
+    onError: (err) => toast({ title: "Could not approve", description: parseApiError(err).message, variant: "destructive" }),
+  });
+
+  const refreshEnvelopeMut = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/timesheets/${id}/refresh-envelope`);
+      return res.json();
+    },
+    onSuccess: (data: { docusignStatus?: string }) => {
+      invalidateTimesheet();
+      queryClient.invalidateQueries({ queryKey: ["/api/company-documents"] });
+      toast({ title: `DocuSign status: ${docusignLabel(data.docusignStatus)}` });
+    },
+    onError: (err) => toast({ title: "Could not check status", description: parseApiError(err).message, variant: "destructive" }),
+  });
+
+  const managerRejectMut = useMutation({
+    mutationFn: async (reason?: string) => {
+      const res = await apiRequest("POST", `/api/timesheets/${id}/manager-reject`, { reason });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateTimesheet();
+      setSigning(null);
+      toast({ title: "Timesheet rejected" });
     },
   });
 
@@ -552,7 +642,7 @@ function TimesheetEditor({
       <div class="ts-header">
         <img src="${timesheetLogoUrl}" alt="Logo" />
         <h1>${companyName}</h1>
-        <span style="margin-left:auto;text-transform:capitalize;background:#e0e0e0;padding:2px 8px;border-radius:4px;font-size:12px">${ts.status}</span>
+        <span style="margin-left:auto;text-transform:capitalize;background:#e0e0e0;padding:2px 8px;border-radius:4px;font-size:12px">${statusLabel(ts.status)}</span>
       </div>
       <div class="ts-info">
         <div><b>Name:</b> ${ts.employeeName}</div>
@@ -584,9 +674,12 @@ function TimesheetEditor({
     );
   }
 
-  const isSubmitted = ts.status === "submitted";
-  const isApproved = ts.status === "approved";
-  const isRejected = ts.status === "rejected";
+  const isApproved = ts.status === TIMESHEET_STATUS.approved;
+  const isRejected = ts.status === TIMESHEET_STATUS.rejected;
+  const isSentToManager = ts.status === TIMESHEET_STATUS.sentToManager;
+  // `submitted` is the pre-workflow status still present on older rows.
+  const canSendToManager = !!ts.employeeSignature && !isSentToManager && !isApproved;
+  const managerName = team.find((m) => m.id === ts.managerUserId)?.name ?? null;
 
   const commitNameChange = () => {
     if (employeeName.trim() && employeeName !== ts.employeeName) {
@@ -605,12 +698,16 @@ function TimesheetEditor({
           <Button variant="outline" size="sm" onClick={handleSavePDF} data-testid="button-save-pdf">
             <FileText className="size-4" /> Save PDF
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowSend(true)} data-testid="button-send-timesheet">
-            <Send className="size-4" /> Send
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => saveToDocsMut.mutate()} disabled={saveToDocsMut.isPending} data-testid="button-save-to-docs">
-            <FolderCheck className="size-4" /> Docs
-          </Button>
+          {canSendToManager && (
+            <Button variant="outline" size="sm" onClick={() => sendToManagerMut.mutate()} disabled={sendToManagerMut.isPending} data-testid="button-send-to-manager">
+              <Send className="size-4" /> {sendToManagerMut.isPending ? "Sending..." : "Save & Send to Manager"}
+            </Button>
+          )}
+          {ts.companyDocId && (
+            <Badge variant="secondary" className="gap-1 text-xs">
+              <FolderCheck className="size-3" /> Filed in Docs
+            </Badge>
+          )}
           <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending} data-testid="button-save-timesheet">
             {saveMut.isPending ? "Saving..." : "Save"}
           </Button>
@@ -627,7 +724,7 @@ function TimesheetEditor({
           <img src={timesheetLogoUrl} alt="Company Logo" className="size-10 shrink-0 rounded-lg object-contain md:size-12" />
           <div className="font-display text-base font-bold tracking-tight md:text-lg">{companyName}</div>
           <div className="ml-auto">
-            <Badge className={cn("text-xs capitalize", statusColor(ts.status))} variant="secondary">{ts.status}</Badge>
+            <Badge className={cn("text-xs capitalize", statusColor(ts.status))} variant="secondary">{statusLabel(ts.status)}</Badge>
           </div>
         </div>
 
@@ -885,9 +982,7 @@ function TimesheetEditor({
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           const val = (e.target as HTMLInputElement).value;
-                          if (val.trim()) {
-                            statusMut.mutate({ employeeSignature: val.trim(), status: "submitted" });
-                          }
+                          if (val.trim()) employeeSignMut.mutate(val.trim());
                         }
                       }}
                       data-testid="input-employee-signature"
@@ -896,11 +991,9 @@ function TimesheetEditor({
                   </div>
                   <Button size="sm" onClick={() => {
                     const input = document.getElementById("emp-sig") as HTMLInputElement;
-                    if (input?.value.trim()) {
-                      statusMut.mutate({ employeeSignature: input.value.trim(), status: "submitted" });
-                    }
-                  }} data-testid="button-sign-submit">
-                    Sign & Submit
+                    if (input?.value.trim()) employeeSignMut.mutate(input.value.trim());
+                  }} disabled={employeeSignMut.isPending} data-testid="button-sign-submit">
+                    Sign
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setSigning(null)}>
                     <X className="size-4" />
@@ -910,6 +1003,23 @@ function TimesheetEditor({
                 <Button variant="outline" size="sm" onClick={() => setSigning("employee")} data-testid="button-sign-employee">
                   <FileText className="size-4" /> Sign
                 </Button>
+              )}
+              {canSendToManager && (
+                <div className="mt-3">
+                  <Button size="sm" onClick={() => sendToManagerMut.mutate()} disabled={sendToManagerMut.isPending} data-testid="button-send-to-manager-inline">
+                    <Send className="size-4" /> {sendToManagerMut.isPending ? "Sending..." : "Save & Send to Manager"}
+                  </Button>
+                  {sendError && (
+                    <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive" data-testid="text-send-error">
+                      {sendError.message}
+                      {sendError.profileHref && (
+                        <a href={`#${sendError.profileHref}`} className="ml-1 font-semibold underline">
+                          Open Team page
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             {/* Manager signature */}
@@ -929,9 +1039,7 @@ function TimesheetEditor({
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           const val = (e.target as HTMLInputElement).value;
-                          if (val.trim()) {
-                            statusMut.mutate({ managerSignature: val.trim(), status: "approved" });
-                          }
+                          if (val.trim()) managerSignMut.mutate(val.trim());
                         }
                       }}
                       data-testid="input-manager-signature"
@@ -940,26 +1048,39 @@ function TimesheetEditor({
                   </div>
                   <Button size="sm" onClick={() => {
                     const input = document.getElementById("mgr-sig") as HTMLInputElement;
-                    if (input?.value.trim()) {
-                      statusMut.mutate({ managerSignature: input.value.trim(), status: "approved" });
-                    }
-                  }} data-testid="button-approve">
+                    if (input?.value.trim()) managerSignMut.mutate(input.value.trim());
+                  }} disabled={managerSignMut.isPending} data-testid="button-approve">
                     Approve
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => statusMut.mutate({ status: "rejected" })}>
+                  <Button variant="outline" size="sm" onClick={() => managerRejectMut.mutate(undefined)} disabled={managerRejectMut.isPending}>
                     <X className="size-4" /> Reject
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setSigning(null)}>
                     <X className="size-4" />
                   </Button>
                 </div>
-              ) : isSubmitted ? (
-                <Button variant="outline" size="sm" onClick={() => setSigning("manager")} data-testid="button-sign-manager">
-                  <FileText className="size-4" /> Sign to Approve
-                </Button>
+              ) : isSentToManager ? (
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground border-b border-border/40 pb-1" data-testid="text-manager-pending">
+                    Sent to {managerName ?? "manager"} — awaiting signature
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      DocuSign: {docusignLabel(ts.docusignStatus)}
+                    </Badge>
+                    {ts.docusignEnvelopeId && (
+                      <Button variant="ghost" size="sm" onClick={() => refreshEnvelopeMut.mutate()} disabled={refreshEnvelopeMut.isPending}>
+                        {refreshEnvelopeMut.isPending ? "Checking..." : "Check status"}
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => setSigning("manager")} data-testid="button-sign-manager">
+                      <FileText className="size-4" /> Sign in app
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="text-sm text-muted-foreground border-b border-border/40 pb-1">
-                  {isApproved ? "Approved" : isRejected ? "Rejected" : "Awaiting employee submission"}
+                  {isApproved ? "Approved" : isRejected ? "Rejected" : "Awaiting employee signature"}
                 </div>
               )}
             </div>
@@ -983,43 +1104,6 @@ function TimesheetEditor({
           {saveMut.isPending ? "Saving..." : "Save"}
         </Button>
       </div>
-
-      {/* Send dialog */}
-      <Dialog open={showSend} onOpenChange={(o) => !o && setShowSend(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Timesheet</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              The timesheet for {ts.employeeName} (Week of {fmtWeekRange(weekInfo.start, weekInfo.end)}) will be saved to Company Documents and emailed.
-            </p>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Recipient Email</label>
-              <Input
-                type="email"
-                value={sendEmail}
-                onChange={(e) => setSendEmail(e.target.value)}
-                placeholder="manager@company.com"
-                data-testid="input-send-email"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSend(false)}>Cancel</Button>
-            <Button
-              onClick={() => {
-                saveToDocsMut.mutate();
-                sendMut.mutate({ email: sendEmail });
-              }}
-              disabled={!sendEmail.trim() || sendMut.isPending || saveToDocsMut.isPending}
-              data-testid="button-send-confirm"
-            >
-              {sendMut.isPending || saveToDocsMut.isPending ? "Sending..." : "Save & Send"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Layout>
   );
 }
