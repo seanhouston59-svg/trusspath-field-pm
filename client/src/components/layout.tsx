@@ -35,7 +35,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   const { isAllowed } = useAccess();
   return (
-    <nav className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1" aria-label="Primary">
+    <nav className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1" style={{ WebkitOverflowScrolling: "touch" }} aria-label="Primary">
       {APP_NAV.map((group) => {
         const items = group.items.filter(({ href }) => isAllowed(href));
         if (items.length === 0) return null;
@@ -438,22 +438,24 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
     <div className="flex h-dvh overflow-hidden bg-background">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 bg-sidebar md:block">
-        <SidebarInner />
+        <div className="flex h-dvh flex-col">
+          <SidebarInner />
+        </div>
       </aside>
 
       {/* Mobile sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-72 bg-sidebar shadow-xl">
+          <aside className="absolute left-0 top-0 flex h-full w-72 flex-col bg-sidebar shadow-xl">
             <button
               onClick={() => setMobileOpen(false)}
               aria-label="Close menu"
-              className="absolute right-3 top-3 text-sidebar-foreground/60 hover:text-sidebar-foreground"
+              className="absolute right-3 top-3 z-10 text-sidebar-foreground/60 hover:text-sidebar-foreground"
             >
               <X className="size-5" />
             </button>
-            <div className="pt-4">
+            <div className="min-h-0 flex-1 overflow-hidden pt-4">
               <SidebarInner onNavigate={() => setMobileOpen(false)} />
             </div>
           </aside>
