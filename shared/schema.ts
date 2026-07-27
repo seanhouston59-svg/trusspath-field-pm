@@ -456,6 +456,26 @@ export const smsLog = pgTable("sms_log", {
   createdAt: text("created_at").notNull().default(sql`NOW()`),
 });
 
+// Field punches - lightweight clock in/out records captured from the mobile
+// foreman flow. Distinct from timesheets (which are week-based); this table
+// is a stream of raw events. A later job can roll them into timesheet rows.
+// client_id is used for offline-queue idempotency so retried submits from
+// the offline queue don't create duplicates.
+export const fieldPunches = pgTable("field_punches", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").notNull(),
+  organizationId: integer("organization_id"),
+  projectId: integer("project_id").notNull(),
+  kind: text("kind").notNull(), // "in" | "out" | "break_start" | "break_end"
+  occurredAt: text("occurred_at").notNull().default(sql`NOW()`),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  accuracyM: doublePrecision("accuracy_m"),
+  note: text("note"),
+  clientId: text("client_id"),
+  createdAt: text("created_at").notNull().default(sql`NOW()`),
+});
+
 // Access helpers — shared between server and client so both agree on what "in good standing" means.
 
 // True if this account is a demo login whose 48h window has passed.
@@ -602,6 +622,8 @@ export type Timesheet = typeof timesheets.$inferSelect;
 export type InsertTimesheet = z.infer<typeof insertTimesheetSchema>;
 export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
+export type FieldPunch = typeof fieldPunches.$inferSelect;
+export type InsertFieldPunch = typeof fieldPunches.$inferInsert;
 
 /** Default app settings (single source for server + client). */
 export const DEFAULT_SETTINGS = {

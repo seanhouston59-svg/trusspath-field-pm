@@ -27,7 +27,6 @@ export function FieldComingSoon({ title, blurb }: { title: string; blurb: string
   );
 }
 
-export const FieldTimecard = () => <FieldComingSoon title="Timecard" blurb="Clock in/out with location. Landing in the next update." />;
 export const FieldPhoto = () => <FieldComingSoon title="Take photo" blurb="Camera capture with geo + timestamp burn-in. Landing in the next update." />;
 export const FieldObservation = () => <FieldComingSoon title="Observation" blurb="Quick safety, RFI, or issue capture. Landing in the next update." />;
 export const FieldPunch = () => <FieldComingSoon title="Punch item" blurb="Add or close a punch item from the field. Landing in the next update." />;

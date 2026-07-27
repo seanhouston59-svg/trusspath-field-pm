@@ -9,6 +9,7 @@ import {
   accounts, sessions, passwordResetTokens,
   jarvisMemory,
   timesheets, timeEntries,
+  fieldPunches,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -26,6 +27,7 @@ import type {
   JarvisMemory, InsertJarvisMemory,
   Timesheet, InsertTimesheet,
   TimeEntry, InsertTimeEntry,
+  FieldPunch, InsertFieldPunch,
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -458,6 +460,11 @@ export interface IStorage {
     smsVerificationCode?: string | null;
     smsVerificationExpiresAt?: string | null;
   }): Promise<AccountPublic | undefined>;
+  // ----- Field punches (mobile clock in/out) -----
+  createFieldPunch(data: InsertFieldPunch): Promise<FieldPunch>;
+  getRecentFieldPunches(accountId: number, limit?: number): Promise<FieldPunch[]>;
+  getOpenFieldPunch(accountId: number): Promise<FieldPunch | undefined>;
+  getFieldPunchByClientId(accountId: number, clientId: string): Promise<FieldPunch | undefined>;
   updateAccountBilling(id: number, data: {
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
@@ -1198,6 +1205,32 @@ class DatabaseStorage implements IStorage {
     if (Object.keys(updateData).length === 0) return this.getAccount(id);
     const [row] = await db.update(accounts).set(updateData).where(eq(accounts.id, id)).returning();
     return row ? this.toPublic(row) : undefined;
+  }
+  // Field punches (mobile clock in/out). Kept dead simple: append-only stream
+  // of events. Rollup into weekly timesheets is a separate concern.
+  async createFieldPunch(data: InsertFieldPunch): Promise<FieldPunch> {
+    await ensureReady();
+    const [row] = await db.insert(fieldPunches).values(data).returning();
+    return row;
+  }
+  async getRecentFieldPunches(accountId: number, limit = 20): Promise<FieldPunch[]> {
+    await ensureReady();
+    const rows = await db.select().from(fieldPunches).where(eq(fieldPunches.accountId, accountId)).orderBy(desc(fieldPunches.createdAt)).limit(limit);
+    return rows;
+  }
+  async getOpenFieldPunch(accountId: number): Promise<FieldPunch | undefined> {
+    // "Open" means the most recent punch is a clock-in (or break_start). We
+    // return it so the UI can show "You're clocked in since 7:14 AM".
+    const rows = await this.getRecentFieldPunches(accountId, 1);
+    if (rows.length === 0) return undefined;
+    const latest = rows[0];
+    if (latest.kind === "in" || latest.kind === "break_start") return latest;
+    return undefined;
+  }
+  async getFieldPunchByClientId(accountId: number, clientId: string): Promise<FieldPunch | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(fieldPunches).where(and(eq(fieldPunches.accountId, accountId), eq(fieldPunches.clientId, clientId))).limit(1);
+    return rows[0];
   }
   async getAccountByStripeCustomerId(customerId: string): Promise<Account | undefined> {
     await ensureReady();

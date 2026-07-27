@@ -725,6 +725,54 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ ok: r.ok, status: r.status, providerSid: r.providerSid, error: r.error });
   });
 
+  // ============================ FIELD PUNCHES ============================
+  // Mobile foreman clock in/out. Append-only stream, one row per event.
+  // client_id makes offline-queue submits idempotent so a retried offline
+  // request never creates a duplicate row.
+  app.get("/api/field/punches", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const limit = Math.max(1, Math.min(50, Number(req.query?.limit) || 20));
+    const rows = await storage.getRecentFieldPunches(req.account.id, limit);
+    const open = await storage.getOpenFieldPunch(req.account.id);
+    res.json({ punches: rows, open: open ?? null });
+  });
+
+  app.post("/api/field/punches", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const kind = String(req.body?.kind || "");
+    if (!/^(in|out|break_start|break_end)$/.test(kind)) {
+      return res.status(400).json({ error: "kind must be one of in | out | break_start | break_end" });
+    }
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+    const clientId = req.body?.clientId ? String(req.body.clientId).slice(0, 64) : null;
+    // Idempotency: if we've seen this clientId before for this account, return
+    // the existing row instead of creating a duplicate. Offline queue retries
+    // depend on this to keep the timeline clean.
+    if (clientId) {
+      const existing = await storage.getFieldPunchByClientId(req.account.id, clientId);
+      if (existing) return res.status(200).json({ punch: existing, deduped: true });
+    }
+    const lat = req.body?.lat != null ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null ? Number(req.body.lng) : null;
+    const accuracyM = req.body?.accuracyM != null ? Number(req.body.accuracyM) : null;
+    const note = req.body?.note ? String(req.body.note).slice(0, 500) : null;
+    const occurredAt = req.body?.occurredAt ? String(req.body.occurredAt) : new Date().toISOString();
+    const punch = await storage.createFieldPunch({
+      accountId: req.account.id,
+      organizationId: req.organizationId ?? null,
+      projectId,
+      kind,
+      occurredAt,
+      lat: Number.isFinite(lat as number) ? (lat as number) : null,
+      lng: Number.isFinite(lng as number) ? (lng as number) : null,
+      accuracyM: Number.isFinite(accuracyM as number) ? (accuracyM as number) : null,
+      note,
+      clientId,
+    });
+    res.status(201).json({ punch });
+  });
+
   // Team
   app.get("/api/team", async (req: any, res) => res.json(await storage.getTeam(req.organizationId)));
   app.post("/api/team", async (req: any, res) => {
