@@ -7,7 +7,7 @@ import { useTeam, useCreateTeamMember, useUpdateTeamMember, useDeleteTeamMember 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAccess } from "@/lib/access";
-import { ACCESS_BY_SLUG } from "@shared/access-levels";
+import { ACCESS_LEVELS, ACCESS_BY_SLUG } from "@shared/access-levels";
 import type { AccessLevel } from "@shared/access-levels";
 import type { TeamMember } from "@shared/schema";
 
@@ -115,12 +115,26 @@ export default function Team() {
     ...POSITIONS.map((p) => ({ value: p.value, label: p.label })),
     ...(legacyRole ? [{ value: legacyRole, label: `${legacyRole} (custom)` }] : []),
   ];
+  // Access-level options are the canonical roles from @shared/access-levels, ordered
+  // by their `order` field (Executive → Viewer). Label doubles as the human-friendly
+  // name so the Select surfaces "Project Executive" etc.
+  const ACCESS_OPTIONS = [...ACCESS_LEVELS]
+    .sort((a, b) => a.order - b.order)
+    .map((l) => ({ value: l.slug, label: l.label }));
   // Same legacy-fallback pattern for Trade: preserve any old free-text value on edit.
   const legacyTrade = editing?.trade && !TRADE_SET.has(editing.trade) ? editing.trade : null;
   const TRADE_OPTIONS = [
     ...TRADES.map((t) => ({ value: t, label: t })),
     ...(legacyTrade ? [{ value: legacyTrade, label: `${legacyTrade} (custom)` }] : []),
   ];
+
+  // Blurb for the currently selected access level — surfaced beneath the Select via
+  // the "info" field, updated live through onFieldChange below. Defaults to the level
+  // the form starts on (editing.accessLevel or project_manager for new members).
+  const initialAccessLevel: AccessLevel = (editing?.accessLevel ?? "project_manager") as AccessLevel;
+  const [accessBlurb, setAccessBlurb] = useState<string>(
+    ACCESS_BY_SLUG[initialAccessLevel]?.blurb ?? "",
+  );
 
   const fields: FieldDef[] = [
     { name: "name", label: "Full Name", type: "text", required: true, half: true },
@@ -129,7 +143,9 @@ export default function Team() {
     { name: "company", label: "Company", type: "text", required: true, half: true },
     { name: "email", label: "Email", type: "text", placeholder: "name@company.com", half: true },
     { name: "phone", label: "Phone", type: "text", placeholder: "(303) 555-0000", half: true },
+    { name: "accessLevel", label: "Access Level", type: "select", options: ACCESS_OPTIONS, required: true, half: true },
     { name: "color", label: "Avatar Color", type: "select", options: COLOR_OPTIONS.map((c) => ({ value: c, label: c[0].toUpperCase() + c.slice(1) })), required: true, half: true },
+    { name: "accessBlurb", label: "", type: "info", info: accessBlurb },
     { name: "companyPhoto", label: "Company Photo", type: "photo" },
   ];
 
@@ -137,17 +153,25 @@ export default function Team() {
   const openEdit = (m: TeamMember) => { setEditing(m); setOpen(true); };
 
   const defaults: Record<string, string | number> = editing
-    ? { name: editing.name, role: editing.role, trade: editing.trade, company: editing.company, email: editing.email ?? "", phone: editing.phone ?? "", color: editing.color, companyPhoto: editing.companyPhoto ?? "" }
-    : { color: "blue", email: "", phone: "", companyPhoto: "" };
+    ? { name: editing.name, role: editing.role, trade: editing.trade, company: editing.company, email: editing.email ?? "", phone: editing.phone ?? "", accessLevel: editing.accessLevel ?? "project_manager", color: editing.color, companyPhoto: editing.companyPhoto ?? "" }
+    : { color: "blue", email: "", phone: "", accessLevel: "project_manager", companyPhoto: "" };
+
+  // Keep the inline blurb in sync as the user picks a level.
+  const handleFieldChange = (name: string, value: string | number) => {
+    if (name === "accessLevel") {
+      const slug = String(value) as AccessLevel;
+      setAccessBlurb(ACCESS_BY_SLUG[slug]?.blurb ?? "");
+    }
+  };
 
   const handleSubmit = (v: Record<string, string | number>) => {
-    // Access level is intentionally not in the form — it's granted at signup/invite
-    // via Settings → Team & Access. On this project roster we preserve any existing
-    // access tag (edit) or default to "project_manager" (new).
+    // Access level is now user-editable in the form (owners / managers with
+    // canManageTeam). Server storage.updateTeamMember enforces persistence and the
+    // /timesheets/:id/send route reads accessLevel to gate approval routing.
     const payload = {
       name: String(v.name),
       role: String(v.role),
-      accessLevel: (editing?.accessLevel ?? "project_manager") as AccessLevel,
+      accessLevel: String(v.accessLevel ?? "project_manager") as AccessLevel,
       trade: String(v.trade),
       company: String(v.company),
       email: String(v.email ?? ""),
@@ -179,6 +203,7 @@ export default function Team() {
         submitLabel={editing ? "Save Changes" : "Add Member"}
         isPending={create.isPending || update.isPending}
         onSubmit={handleSubmit}
+        onFieldChange={handleFieldChange}
       />
       )}
       {isLoading ? (
