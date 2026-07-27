@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTeam } from "@/hooks/use-data";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -542,10 +543,16 @@ function TimesheetEditor({
       const res = await apiRequest("POST", `/api/timesheets/${id}/send`, { email });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setShowSend(false);
       setSendEmail("");
-      toast({ title: "Timesheet sent" });
+      // The server now stamps sentAt/sentTo and returns the updated timesheet.
+      queryClient.invalidateQueries({ queryKey: ["/api/timesheets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/timesheets", id] });
+      toast({ title: data?.recipientName ? `Sent to ${data.recipientName}` : "Timesheet sent" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Send failed", description: err?.message || "Please try again." });
     },
   });
 
@@ -1005,13 +1012,27 @@ function TimesheetEditor({
                     <X className="size-4" />
                   </Button>
                 </div>
-              ) : isSubmitted ? (
+              ) : isSubmitted && ts.sentAt ? (
                 <Button variant="outline" size="sm" onClick={() => setSigning("manager")} data-testid="button-sign-manager">
                   <FileText className="size-4" /> Sign to Approve
                 </Button>
+              ) : isSubmitted && !ts.sentAt ? (
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground border-b border-border/40 pb-1">
+                    Send to a Project Executive to unlock approval
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setShowSend(true)} data-testid="button-send-for-approval">
+                    <Send className="size-4" /> Send for Approval
+                  </Button>
+                </div>
               ) : (
                 <div className="text-sm text-muted-foreground border-b border-border/40 pb-1">
                   {isApproved ? "Approved" : isRejected ? "Rejected" : "Awaiting employee submission"}
+                </div>
+              )}
+              {ts.sentAt && ts.sentTo && !ts.managerSignature && (
+                <div className="mt-2 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-medium text-primary" data-testid="chip-timesheet-sent">
+                  Sent to {ts.sentTo} · {new Date(ts.sentAt).toLocaleDateString()}
                 </div>
               )}
             </div>
@@ -1037,41 +1058,89 @@ function TimesheetEditor({
       </div>
 
       {/* Send dialog */}
-      <Dialog open={showSend} onOpenChange={(o) => !o && setShowSend(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Timesheet</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <p className="text-sm text-muted-foreground">
-              The timesheet for {ts.employeeName} (Week of {fmtWeekRange(weekInfo.start, weekInfo.end)}) will be saved to Company Documents and emailed.
-            </p>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Recipient Email</label>
-              <Input
-                type="email"
-                value={sendEmail}
-                onChange={(e) => setSendEmail(e.target.value)}
-                placeholder="manager@company.com"
-                data-testid="input-send-email"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSend(false)}>Cancel</Button>
-            <Button
-              onClick={() => {
-                saveToDocsMut.mutate();
-                sendMut.mutate({ email: sendEmail });
-              }}
-              disabled={!sendEmail.trim() || sendMut.isPending || saveToDocsMut.isPending}
-              data-testid="button-send-confirm"
-            >
-              {sendMut.isPending || saveToDocsMut.isPending ? "Sending..." : "Save & Send"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SendDialog
+        open={showSend}
+        onOpenChange={setShowSend}
+        ts={ts}
+        weekLabel={fmtWeekRange(weekInfo.start, weekInfo.end)}
+        sendEmail={sendEmail}
+        setSendEmail={setSendEmail}
+        onSend={(email) => {
+          saveToDocsMut.mutate();
+          sendMut.mutate({ email });
+        }}
+        isPending={sendMut.isPending || saveToDocsMut.isPending}
+      />
     </Layout>
+  );
+}
+
+/* ---------- Send-to-Project-Executive dialog ---------- */
+
+function SendDialog({
+  open, onOpenChange, ts, weekLabel, sendEmail, setSendEmail, onSend, isPending,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  ts: Timesheet;
+  weekLabel: string;
+  sendEmail: string;
+  setSendEmail: (v: string) => void;
+  onSend: (email: string) => void;
+  isPending: boolean;
+}) {
+  const { data: team = [] } = useTeam();
+  const executives = useMemo(
+    () => team.filter((t: any) => (t.accessLevel === "project_executive") && !!t.email),
+    [team]
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onOpenChange(false)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Send Timesheet for Approval</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-muted-foreground">
+            The timesheet for {ts.employeeName} (Week of {weekLabel}) will be sent to a Project Executive
+            for review and approval. Manager signature is only recorded after a Project Executive receives it.
+          </p>
+
+          {executives.length === 0 ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+              No Project Executives on your team roster. Add one under Team &rarr; set access level to
+              &ldquo;Project Executive&rdquo; to enable timesheet approvals.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Project Executive</label>
+              <Select value={sendEmail} onValueChange={setSendEmail}>
+                <SelectTrigger data-testid="select-project-executive">
+                  <SelectValue placeholder="Select a Project Executive…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {executives.map((e: any) => (
+                    <SelectItem key={e.id} value={e.email}>
+                      {e.name} — {e.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={() => onSend(sendEmail)}
+            disabled={!sendEmail.trim() || isPending || executives.length === 0}
+            data-testid="button-send-confirm"
+          >
+            {isPending ? "Sending..." : "Save & Send"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

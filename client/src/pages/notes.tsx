@@ -260,10 +260,14 @@ export default function NotesPage() {
               <div className="flex items-center justify-between px-3 py-1.5" style={{ background: c.bar }}>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-white">Note</span>
                 <button
+                  // Stop the pointerdown on the note itself — otherwise the
+                  // parent captures the pointer for dragging and the button's
+                  // click never fires.
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); del.mutate(n.id); toast({ title: "Note deleted" }); }}
                   aria-label="Delete note"
                   data-testid={`button-delete-note-${n.id}`}
-                  className="text-white/80 hover:text-white"
+                  className="rounded p-0.5 text-white/80 hover:bg-white/20 hover:text-white"
                 >
                   <X className="size-4" />
                 </button>

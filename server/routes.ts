@@ -2141,6 +2141,21 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.patch("/api/timesheets/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
+
+      // Gate manager signature on the timesheet having been sent to a Project
+      // Executive first. Without a sentAt timestamp, no manager approval can be
+      // recorded — this prevents self-approval and enforces the review flow.
+      if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "managerSignature") && req.body.managerSignature) {
+        const existing = await storage.getTimesheet(id);
+        if (!existing) return res.status(404).json({ message: "Timesheet not found" });
+        if (!existing.sentAt) {
+          return res.status(400).json({
+            message: "Timesheet must be sent to a Project Executive before a manager signature can be recorded.",
+            code: "MANAGER_SIGNATURE_REQUIRES_SEND",
+          });
+        }
+      }
+
       const updated = await storage.updateTimesheet(id, req.body);
       if (!updated) return res.status(404).json({ message: "Timesheet not found" });
       res.json(updated);
@@ -2229,11 +2244,32 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Send timesheet via email (saves to docs + sends email if RESEND_API_KEY is set)
+  //
+  // The recipient MUST be a team member whose access_level = "project_executive".
+  // On success we stamp sentAt / sentTo on the timesheet, which unlocks the
+  // manager-signature gate in PATCH above.
   app.post("/api/timesheets/:id/send", async (req, res) => {
     try {
       const id = Number(req.params.id);
       const { email } = req.body;
       if (!email) return res.status(400).json({ message: "Email is required" });
+
+      // Validate recipient is a Project Executive on this team.
+      const team = await storage.getTeam();
+      const recipient = team.find((t) => (t.email ?? "").toLowerCase() === String(email).toLowerCase());
+      if (!recipient) {
+        return res.status(400).json({
+          message: "Recipient is not on your team. Timesheets can only be sent to a Project Executive listed in your team roster.",
+          code: "RECIPIENT_NOT_FOUND",
+        });
+      }
+      if (recipient.accessLevel !== "project_executive") {
+        return res.status(400).json({
+          message: `${recipient.name} is not a Project Executive. Only Project Executives can approve timesheets.`,
+          code: "RECIPIENT_NOT_PROJECT_EXECUTIVE",
+        });
+      }
+
       const ts = await storage.getTimesheet(id);
       if (!ts) return res.status(404).json({ message: "Timesheet not found" });
       const entries = await storage.getTimeEntries(id);
@@ -2281,7 +2317,19 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         }
       }
 
-      res.json({ sent: true, email, message: "Timesheet saved to docs and sent" });
+      // Stamp the timesheet so the manager-signature gate opens.
+      const stamped = await storage.updateTimesheet(id, {
+        sentAt: new Date().toISOString(),
+        sentTo: recipient.email ?? email,
+      });
+
+      res.json({
+        sent: true,
+        email,
+        recipientName: recipient.name,
+        timesheet: stamped,
+        message: `Timesheet saved to docs and sent to ${recipient.name}`,
+      });
     } catch (err) {
       console.error("[timesheets] send error:", err);
       res.status(500).json({ message: "Failed to send timesheet" });
