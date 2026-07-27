@@ -160,6 +160,14 @@ function requireOwner(req: any, res: any, next: any) {
   next();
 }
 
+// Primary owner is the founder account — protected from being modified by any other owner.
+// Set PRIMARY_OWNER_ID env to enforce; defaults to id=1 for local/dev.
+function getPrimaryOwnerId(): number {
+  const raw = process.env.PRIMARY_OWNER_ID;
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) ? n : 0; // 0 = disabled
+}
+
 const UPLOAD_DIR = process.env.VERCEL
   ? "/tmp/uploads/documents"
   : path.resolve(process.cwd(), "uploads/documents");
@@ -1210,6 +1218,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
     if (id === req.account.id && status !== "approved") {
       return res.status(400).json({ message: "You can't remove your own access from here." });
+    }
+    const primaryOwnerId = getPrimaryOwnerId();
+    if (primaryOwnerId && id === primaryOwnerId && req.account.id !== primaryOwnerId) {
+      return res.status(403).json({ message: "You can't modify the primary owner account." });
     }
     const updated = await storage.setAccountApproval(id, status as any, req.account.id);
     if (!updated) return res.status(404).json({ message: "Account not found" });
