@@ -406,12 +406,6 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   const StripeCtor = stripeKey ? require("stripe") : null;
   const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2025-03-31.basil" }) : null;
-  // Legacy price map — old flat prices kept via env vars for backward compat with old checkout endpoint.
-  const PRICE_MAP: Record<string, { monthly?: string; annual?: string }> = {
-    starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },
-    pro: { monthly: process.env.STRIPE_PRICE_PRO_MONTHLY, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
-    enterprise: { monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY, annual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL },
-  };
   const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
 
   /* ------------------------- Auth ------------------------- */
@@ -1430,69 +1424,18 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Create checkout session
-  app.post("/api/billing/checkout", async (req, res) => {
-    const { plan, billing, email, company } = req.body;
-    if (!plan || !billing || !email) return res.status(400).json({ error: "Missing plan, billing, or email" });
-
-    // If Stripe isn't configured yet, still capture the lead and notify owner
-    if (!stripe) {
-      try {
-        await storage.createSubscriber({ email, plan, billing, company });
-      } catch {}
-      void sendSignupNotification({
-        kind: "subscriber",
-        subject: `New TrussPath subscriber — ${email}`,
-        fields: {
-          Email: email,
-          Company: company,
-          Plan: plan,
-          Billing: billing,
-          "Note": "Stripe not yet configured — captured as lead",
-          "Signed up": new Date().toISOString(),
-        },
-      });
-      return res.status(202).json({ 
-        message: "Billing isn't configured yet, but we've saved your spot. We'll be in touch soon!",
-        captured: true,
-      });
-    }
-
-    const priceId = (PRICE_MAP as any)[plan]?.[billing];
-    if (!priceId) return res.status(400).json({ error: `No price configured for ${plan} (${billing}). Set STRIPE_PRICE_* env vars.` });
-
-    try {
-      // Check if user already has an account
-      const existingAccount = await storage.getAccountByEmail(email);
-      let customerId = existingAccount?.stripeCustomerId || undefined;
-
-      // Create or reuse customer
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email,
-          metadata: { plan, billing, company: company || "" },
-        });
-        customerId = customer.id;
-        // Link customer to account if one exists
-        if (existingAccount) {
-          await storage.updateAccountBilling(existingAccount.id, { stripeCustomerId: customerId });
-        }
-      }
-
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        mode: "subscription",
-        line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${APP_URL}/#/paywall?checkout=success`,
-        cancel_url: `${APP_URL}/#/paywall?checkout=cancelled`,
-        metadata: { plan, billing, email },
-        subscription_data: { metadata: { plan, billing } },
-      });
-
-      res.json({ url: session.url });
-    } catch (e: any) {
-      console.error("[stripe checkout] error:", e);
-      res.status(500).json({ error: e?.message || "Failed to create checkout session" });
-    }
+  // DEPRECATED: this endpoint used stale STRIPE_PRICE_* env vars from an
+  // earlier flat-price generation ($29/$49/$79) that no longer match the
+  // current base+overage plans in server/lib/plans.ts ($79/$149/$299).
+  // The only historical caller was the landing page's inline SubscribeForm,
+  // which was rewritten to redirect to /signup#/signup?plan=X&billing=Y.
+  // Kept as a hard-fail 410 so any cached client bookmark surfaces a real
+  // error instead of silently charging the wrong amount.
+  app.post("/api/billing/checkout", async (_req, res) => {
+    res.status(410).json({
+      error: "This checkout endpoint has been retired. Please sign up at /signup.",
+      redirect: "/signup",
+    });
   });
 
   // Customer portal — manage subscription (cancel, update payment, swap plan).

@@ -101,46 +101,13 @@ const PLANS: Plan[] = [
   },
 ];
 
-/* ============================ Subscribe form ============================ */
-const subscribeSchema = z.object({
-  email: z.string().email("Enter a valid email"),
-  company: z.string().optional(),
-  plan: z.enum(["starter", "pro", "enterprise"]),
-  billing: z.enum(["monthly", "annual"]),
-});
-type SubscribeValues = z.infer<typeof subscribeSchema>;
-
+/* ============================ Subscribe CTA ============================ */
+// The landing subscribe CTA hands off to /signup which is the single source
+// of truth for pricing + Stripe checkout (see server/lib/plans.ts).
+// Do NOT call /api/billing/checkout here — that path uses stale STRIPE_PRICE_*
+// env vars from an older pricing generation.
 function SubscribeForm({ defaultPlan, billing }: { defaultPlan: Plan["key"]; billing: "monthly" | "annual" }) {
-  const { toast } = useToast();
-  const form = useForm<SubscribeValues>({
-    resolver: zodResolver(subscribeSchema),
-    defaultValues: { email: "", company: "", plan: defaultPlan, billing },
-  });
-  // sync default when user toggles billing/plan
-  if (form.getValues("billing") !== billing) form.setValue("billing", billing);
-  if (form.getValues("plan") !== defaultPlan) form.setValue("plan", defaultPlan);
-
-  const isEnterprise = form.watch("plan") === "enterprise";
-
-  const checkoutMut = useMutation({
-    mutationFn: async (v: SubscribeValues) => {
-      const res = await apiRequest("POST", "/api/billing/checkout", v);
-      const data = await res.json();
-      return data as { url?: string; captured?: boolean; error?: string };
-    },
-    onSuccess: (data) => {
-      if (data.captured) {
-        toast({ title: "You're on the list", description: "We'll reach out as soon as billing is live. Thanks for your interest!" });
-      } else if (data.url) {
-        window.location.href = data.url;
-      }
-    },
-    onError: (e: any) => {
-      const msg = e?.message || "Couldn't start checkout. Please try again.";
-      toast({ title: "Checkout failed", description: msg, variant: "destructive" });
-    },
-  });
-
+  const isEnterprise = defaultPlan === "enterprise";
   if (isEnterprise) {
     return (
       <a
@@ -152,41 +119,20 @@ function SubscribeForm({ defaultPlan, billing }: { defaultPlan: Plan["key"]; bil
       </a>
     );
   }
-
+  const signupHref = `/signup#/signup?plan=${defaultPlan}&billing=${billing}`;
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit((v) => checkoutMut.mutate(v))} className="space-y-3" data-testid="form-subscribe">
-        <FormField control={form.control} name="email" render={({ field }) => (
-          <FormItem>
-            <FormLabel className="text-xs">Work email</FormLabel>
-            <FormControl>
-              <Input placeholder="you@yourcompany.com" data-testid="input-subscribe-email" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
-        <FormField control={form.control} name="company" render={({ field }) => (
-          <FormItem>
-            <FormLabel className="text-xs">Company (optional)</FormLabel>
-            <FormControl>
-              <Input placeholder="Acme Construction" data-testid="input-subscribe-company" {...field} />
-            </FormControl>
-          </FormItem>
-        )} />
-        <Button
-          type="submit"
-          disabled={checkoutMut.isPending}
-          className="w-full"
-          data-testid="button-subscribe-submit"
-        >
-          {checkoutMut.isPending ? "Redirecting to checkout…" : "Start subscription"}
-          <ArrowRight className="ml-1 size-4" />
-        </Button>
-        <p className="text-center text-[11px] text-muted-foreground">
-          Secure payment via Stripe. Cancel anytime.
-        </p>
-      </form>
-    </Form>
+    <div className="space-y-3" data-testid="form-subscribe">
+      <a
+        href={signupHref}
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        data-testid="button-subscribe-submit"
+      >
+        Continue to signup <ArrowRight className="size-4" />
+      </a>
+      <p className="text-center text-[11px] text-muted-foreground">
+        14-day free trial. Secure payment via Stripe. Cancel anytime.
+      </p>
+    </div>
   );
 }
 
