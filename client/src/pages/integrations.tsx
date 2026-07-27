@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useProjects, useTasks, useRfis, useSubmittals, useChangeOrders,
   useIntegrations, useConnectIntegration, useDisconnectIntegration, useTestIntegration,
+  useCurrentOrg, useUpdateOrg, useIntegrationEnabled, type IntegrationKey,
 } from "@/hooks/use-data";
 import type { Integration } from "@shared/schema";
 
@@ -39,6 +40,9 @@ interface CatalogItem {
   href?: string;
   native?: boolean;
   setupUrl?: string;
+  // When set, the org owner/admin can turn this native integration off for the
+  // whole org. Reads/writes /api/org/current disabledIntegrations JSONB.
+  orgToggleKey?: IntegrationKey;
 }
 
 const CATALOG: CatalogItem[] = [
@@ -72,7 +76,7 @@ const CATALOG: CatalogItem[] = [
   { key: "outlook", name: "Outlook", category: "Communication", description: "Outlook email and calendar integration.", Icon: Mail, tint: "text-blue-600", action: "toggle", setupUrl: "https://outlook.live.com" },
 
   // Scheduling
-  { key: "google-calendar", name: "Google Calendar", category: "Scheduling", description: "Two-way calendar sync with tasks, RFIs and milestones.", Icon: CalendarRange, tint: "text-blue-600", action: "link", href: "/schedule", native: true },
+  { key: "google-calendar", name: "Google Calendar", category: "Scheduling", description: "Two-way calendar sync with tasks, RFIs and milestones.", Icon: CalendarRange, tint: "text-blue-600", action: "link", href: "/schedule", native: true, orgToggleKey: "googleCalendar" },
   { key: "ms-project", name: "Microsoft Project", category: "Scheduling", description: "Import .mpp schedules into the Gantt view.", Icon: GanttChartSquare, tint: "text-emerald-600", action: "toggle" },
 
   // Design & BIM
@@ -112,6 +116,40 @@ export default function IntegrationsPage() {
   const testMut = useTestIntegration();
   const { toast } = useToast();
 
+  // Org-level org-toggle state. Only owners + admins can hit the PATCH route;
+  // for anyone else the toggle renders as a read-only "ON"/"OFF" pill.
+  const { data: orgData } = useCurrentOrg();
+  const orgRole = orgData?.membership?.role;
+  const canManageOrg = orgRole === "owner" || orgRole === "admin";
+  const updateOrg = useUpdateOrg();
+  const gcalEnabled = useIntegrationEnabled("googleCalendar");
+  const isNativeEnabled = (item: CatalogItem): boolean => {
+    if (!item.orgToggleKey) return true;
+    if (item.orgToggleKey === "googleCalendar") return gcalEnabled;
+    return true;
+  };
+  const toggleNativeIntegration = (item: CatalogItem) => {
+    if (!item.orgToggleKey || !canManageOrg) return;
+    const currentlyEnabled = isNativeEnabled(item);
+    const nextDisabled = currentlyEnabled; // if it was enabled, we're turning it OFF (disabled=true)
+    updateOrg.mutate(
+      { disabledIntegrations: { [item.orgToggleKey]: nextDisabled } },
+      {
+        onSuccess: () => {
+          toast({
+            title: nextDisabled ? `${item.name} turned off` : `${item.name} turned on`,
+            description: nextDisabled
+              ? `Hidden from the Schedule page for everyone in your org.`
+              : `Restored on the Schedule page for everyone in your org.`,
+          });
+        },
+        onError: (e: any) => {
+          toast({ title: "Couldn't update integration", description: String(e?.message ?? e), variant: "destructive" });
+        },
+      },
+    );
+  };
+
   const integrationMap = useMemo(() => {
     const m = new Map<string, Integration>();
     rows.forEach((r) => m.set(r.key, r));
@@ -133,7 +171,12 @@ export default function IntegrationsPage() {
     });
   }, [query, cat]);
 
-  const connectedCount = CATALOG.filter((c) => c.native || integrationMap.get(c.key)?.connected).length;
+  // A native integration counts as "connected" only when the org hasn't turned
+  // it off. A user-connected row counts based on the DB row.
+  const connectedCount = CATALOG.filter((c) => {
+    if (c.native) return isNativeEnabled(c);
+    return !!integrationMap.get(c.key)?.connected;
+  }).length;
 
   const exportCsv = (item: CatalogItem) => {
     const csvRows: string[][] = [["Type", "Number", "Title", "Trade/Category", "Start", "End/Due", "Status", "Amount"]];
@@ -256,10 +299,16 @@ export default function IntegrationsPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {items.map((item) => {
                   const intRow = integrationMap.get(item.key);
-                  const connected = item.native || !!intRow?.connected;
+                  const nativeEnabled = isNativeEnabled(item);
+                  const connected = item.native ? nativeEnabled : !!intRow?.connected;
+                  const showOrgToggle = !!item.orgToggleKey;
                   return (
                     <div key={item.key}
-                      className={cn("flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-colors", connected ? "border-primary/40" : "border-border")}
+                      className={cn(
+                        "flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-colors",
+                        connected ? "border-primary/40" : "border-border",
+                        item.native && !nativeEnabled && "opacity-70",
+                      )}
                       data-testid={`integration-card-${item.key}`}>
                       <div className="flex items-start gap-3">
                         <div className={cn("grid size-10 shrink-0 place-items-center rounded-md bg-muted", item.tint)} data-testid={`integration-icon-${item.key}`}>
@@ -268,7 +317,8 @@ export default function IntegrationsPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <h3 className="truncate font-display text-sm font-bold">{item.name}</h3>
-                            {item.native && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">NATIVE</span>}
+                            {item.native && nativeEnabled && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">NATIVE</span>}
+                            {item.native && !nativeEnabled && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">OFF</span>}
                             {connected && !item.native && <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">CONNECTED</span>}
                           </div>
                           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
@@ -280,7 +330,7 @@ export default function IntegrationsPage() {
 
                       <div className="mt-3 flex items-center justify-between">
                         <span className={cn("inline-flex items-center gap-1 text-xs font-medium", connected ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")} data-testid={`integration-status-${item.key}`}>
-                          {connected ? <><Check className="size-3.5" /> Connected</> : <>Not connected</>}
+                          {connected ? <><Check className="size-3.5" /> {item.native ? "On" : "Connected"}</> : (item.native ? <>Turned off</> : <>Not connected</>)}
                         </span>
                         <div className="flex items-center gap-1.5">
                           {item.action === "export-csv" && (
@@ -288,11 +338,34 @@ export default function IntegrationsPage() {
                               <Download className="size-3.5" /> Export
                             </Button>
                           )}
-                          {item.action === "link" ? (
+                          {showOrgToggle && (
+                            canManageOrg ? (
+                              <Button
+                                size="sm"
+                                variant={nativeEnabled ? "outline" : "default"}
+                                onClick={() => toggleNativeIntegration(item)}
+                                disabled={updateOrg.isPending}
+                                data-testid={`integration-org-toggle-${item.key}`}
+                              >
+                                {updateOrg.isPending ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : nativeEnabled ? (
+                                  <><Unplug className="size-3.5" /> Turn off</>
+                                ) : (
+                                  <><Plug className="size-3.5" /> Turn on</>
+                                )}
+                              </Button>
+                            ) : (
+                              <span className="text-[11px] italic text-muted-foreground" data-testid={`integration-org-toggle-readonly-${item.key}`}>
+                                Owner-only
+                              </span>
+                            )
+                          )}
+                          {item.action === "link" && nativeEnabled ? (
                             <Button size="sm" onClick={() => navigate(item.href!)} data-testid={`integration-open-${item.key}`}>
                               Open <ArrowRight className="size-3.5" />
                             </Button>
-                          ) : connected && !item.native ? (
+                          ) : item.action === "link" ? null : connected && !item.native ? (
                             <>
                               <Button size="sm" variant="outline" onClick={() => handleTest(item)} disabled={testing} data-testid={`integration-test-${item.key}`}>
                                 {testing ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}

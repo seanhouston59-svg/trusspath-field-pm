@@ -28,7 +28,7 @@ import {
   createMembership, getMembership, getMembershipForAccount, listMembershipsForOrg, updateMembershipRole, removeMembership,
   syncSeatsForOrg,
   getOrganization, updateOrgBilling, getOrgByStripeCustomerId,
-  updateOrgTimezone, isValidTimezone,
+  updateOrgTimezone, isValidTimezone, updateOrgDisabledIntegrations, isIntegrationKey,
   countActiveSeats,
 } from "./lib/orgs";
 import { resolveMembership, requireCap, requireRole } from "./lib/mt-middleware";
@@ -2073,21 +2073,33 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // PATCH /api/org/current — update org-level settings (owners+admins).
-  // Currently supports: timezone. Extend the whitelist as more settings land.
+  // Supported fields:
+  //   - timezone: IANA tz string
+  //   - disabledIntegrations: partial patch { key: boolean } merged into the
+  //     org's JSONB; only keys in INTEGRATION_KEYS are accepted, unknown keys
+  //     are silently dropped. `true` = turn OFF, `false` = clear (default-on).
   app.patch("/api/org/current", requireCap("manageMembers"), async (req: any, res) => {
     if (!req.organizationId) return res.status(404).json({ message: "No active organization" });
     const body = req.body || {};
-    const patch: { timezone?: string } = {};
+    const patch: { timezone?: string; disabledIntegrations?: Record<string, boolean> } = {};
     if (typeof body.timezone === "string") {
       if (!isValidTimezone(body.timezone)) {
         return res.status(400).json({ message: "Invalid timezone. Use an IANA name like 'America/Denver'." });
       }
       patch.timezone = body.timezone;
     }
+    if (body.disabledIntegrations && typeof body.disabledIntegrations === "object") {
+      const clean: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(body.disabledIntegrations)) {
+        if (isIntegrationKey(k) && typeof v === "boolean") clean[k] = v;
+      }
+      if (Object.keys(clean).length > 0) patch.disabledIntegrations = clean;
+    }
     if (Object.keys(patch).length === 0) return res.status(400).json({ message: "No supported fields to update" });
 
     let updated = await getOrganization(req.organizationId);
     if (patch.timezone) updated = await updateOrgTimezone(req.organizationId, patch.timezone);
+    if (patch.disabledIntegrations) updated = await updateOrgDisabledIntegrations(req.organizationId, patch.disabledIntegrations);
     if (!updated) return res.status(404).json({ message: "Organization not found" });
     res.json({ organization: updated });
   });

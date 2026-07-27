@@ -732,7 +732,24 @@ export function useUpcomingInvoice() {
 /* ----------------------- Organization / Team ----------------------- */
 export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string };
 export type Invite = { id: number; token: string; organizationId: number; email: string; role: string; createdAt: string; expiresAt: string; acceptedAt: string | null };
-export type OrgSummary = { id: number; name: string; slug: string; ownerAccountId: number; subscriptionStatus: string | null; subscriptionPlan: string | null; subscriptionBilling: string | null; trialEndsAt: string | null; timezone: string; };
+export type OrgSummary = { id: number; name: string; slug: string; ownerAccountId: number; subscriptionStatus: string | null; subscriptionPlan: string | null; subscriptionBilling: string | null; trialEndsAt: string | null; timezone: string; disabledIntegrations?: Record<string, boolean> | null; };
+
+// Integration keys the client understands. Must stay in sync with
+// INTEGRATION_KEYS in server/lib/orgs.ts.
+export type IntegrationKey = "googleCalendar";
+
+/**
+ * Read: is an integration enabled for the current org?
+ * Defaults to true (enabled) when the org row hasn't loaded yet or the
+ * key hasn't been explicitly turned off. Callers should treat a missing
+ * org (during initial load) as enabled to avoid a flash of hidden UI.
+ */
+export function useIntegrationEnabled(key: IntegrationKey): boolean {
+  const { data } = useCurrentOrg();
+  const disabled = data?.organization?.disabledIntegrations ?? null;
+  if (!disabled) return true;
+  return disabled[key] !== true;
+}
 
 export function useCurrentOrg() {
   return useQuery<{ organization: OrgSummary; membership: Membership; seats: { active: number; included: number | null; overage: number | null } }>({
@@ -740,11 +757,11 @@ export function useCurrentOrg() {
     retry: false,
   });
 }
-// Update org-level settings (currently just timezone). Owners + admins only.
+// Update org-level settings. Owners + admins only.
 export function useUpdateOrg() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (patch: { timezone?: string }) => {
+    mutationFn: async (patch: { timezone?: string; disabledIntegrations?: Partial<Record<IntegrationKey, boolean>> }) => {
       const res = await apiRequest("PATCH", "/api/org/current", patch);
       return res.json();
     },

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { CalendarPlus, Download, Upload, Calendar as CalIcon, ChevronLeft, ChevronRight, ChevronDown, ExternalLink, Network, Plus, Pencil, Trash2, X } from "lucide-react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
-import { useProjects, useTasks, useRfis, useSubmittals, useChangeOrders, useMilestones, useDailyLogs, useCreateMilestone, useUpdateMilestone, useDeleteMilestone } from "@/hooks/use-data";
+import { useProjects, useTasks, useRfis, useSubmittals, useChangeOrders, useMilestones, useDailyLogs, useCreateMilestone, useUpdateMilestone, useDeleteMilestone, useIntegrationEnabled } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -133,6 +133,10 @@ type DayEvent = { event: CalEvent; isStart: boolean };
 
 export default function SchedulePage() {
   const { data: projects = [] } = useProjects();
+  // Org-level opt-out. When the owner turns Google Calendar off at
+  // /integrations, the whole GoogleCalendarSection disappears for everyone
+  // in the org and .ics import/export is unreachable from this page.
+  const gcalEnabled = useIntegrationEnabled("googleCalendar");
   const active = projects.filter((p) => p.status !== "Planning");
   const [showAll, setShowAll] = useState(true);
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
@@ -372,15 +376,20 @@ export default function SchedulePage() {
 
       {/* Google Calendar integration — collapsible, positioned below the
           calendar grid so it doesn't steal focus from the main schedule.
-          Persist open/closed state in localStorage. */}
-      <GoogleCalendarSection
-        importedCount={imported.length}
-        onExport={handleExport}
-        onImportClick={() => fileRef.current?.click()}
-        onClearImported={() => setImported([])}
-      />
-      <input ref={fileRef} type="file" accept=".ics,text/calendar" className="hidden" data-testid="input-import-ics"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ""; }} />
+          Persist open/closed state in localStorage. Hidden entirely when
+          the org owner has turned the integration off at /integrations. */}
+      {gcalEnabled && (
+        <>
+          <GoogleCalendarSection
+            importedCount={imported.length}
+            onExport={handleExport}
+            onImportClick={() => fileRef.current?.click()}
+            onClearImported={() => setImported([])}
+          />
+          <input ref={fileRef} type="file" accept=".ics,text/calendar" className="hidden" data-testid="input-import-ics"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ""; }} />
+        </>
+      )}
 
       {/* Selected day detail */}
       <div className="mt-4 rounded-lg border border-border bg-card p-4 shadow-sm">

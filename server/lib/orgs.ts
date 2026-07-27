@@ -76,6 +76,45 @@ export async function updateOrgTimezone(orgId: number, tz: string): Promise<Orga
   return row;
 }
 
+/**
+ * Whitelist of integration keys the UI can toggle. Keeps arbitrary keys from
+ * being written into the JSONB column by a naughty client.
+ */
+export const INTEGRATION_KEYS = [
+  "googleCalendar",
+] as const;
+export type IntegrationKey = typeof INTEGRATION_KEYS[number];
+
+export function isIntegrationKey(k: unknown): k is IntegrationKey {
+  return typeof k === "string" && (INTEGRATION_KEYS as readonly string[]).includes(k);
+}
+
+/**
+ * Merge a partial patch of {integrationKey: boolean} into the org's
+ * disabledIntegrations JSONB. `true` means the integration is turned OFF.
+ * Only whitelisted keys are accepted; unknown keys are silently dropped.
+ */
+export async function updateOrgDisabledIntegrations(
+  orgId: number,
+  patch: Record<string, boolean>,
+): Promise<Organization | undefined> {
+  const current = await getOrganization(orgId);
+  if (!current) return undefined;
+  const existing = (current.disabledIntegrations ?? {}) as Record<string, boolean>;
+  const next: Record<string, boolean> = { ...existing };
+  for (const [k, v] of Object.entries(patch)) {
+    if (!isIntegrationKey(k)) continue;
+    if (v === true) next[k] = true;
+    else delete next[k]; // false / undefined clears the flag (enabled = default)
+  }
+  const [row] = await db
+    .update(organizations)
+    .set({ disabledIntegrations: next })
+    .where(eq(organizations.id, orgId))
+    .returning();
+  return row;
+}
+
 export async function getOrganization(id: number): Promise<Organization | undefined> {
   const rows = await db.select().from(organizations).where(eq(organizations.id, id));
   return rows[0];

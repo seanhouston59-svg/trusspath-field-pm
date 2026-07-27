@@ -1,4 +1,4 @@
-import { pgTable, text, integer, serial, doublePrecision, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, doublePrecision, boolean, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -28,6 +28,11 @@ export const organizations = pgTable("organizations", {
   // IANA timezone name for this org. Used for greetings, "today" calculations,
   // and any user-facing date formatting. Defaults to America/Denver in the DB.
   timezone: text("timezone").notNull().default("America/Denver"),
+  // JSONB of integration keys the org has explicitly turned OFF.
+  // Shape: { "googleCalendar": true, "sheets": true, ... }. Missing key or
+  // false = integration is enabled (default-on). This lets the owner hide
+  // an integration's UI everywhere in the app for the whole org.
+  disabledIntegrations: jsonb("disabled_integrations").$type<Record<string, boolean>>().default({}).notNull(),
 });
 
 /* ------------------------------- Memberships ----------------------------- */
