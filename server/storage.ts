@@ -451,6 +451,13 @@ export interface IStorage {
   getAccountByEmail(email: string): Promise<Account | undefined>;
   getAccount(id: number): Promise<AccountPublic | undefined>;
   updateAccountProfile(id: number, data: { displayName?: string; position?: string }): Promise<AccountPublic | undefined>;
+  updateAccountSmsState(id: number, data: {
+    smsPhone?: string | null;
+    smsVerifiedAt?: string | null;
+    smsOptedOutAt?: string | null;
+    smsVerificationCode?: string | null;
+    smsVerificationExpiresAt?: string | null;
+  }): Promise<AccountPublic | undefined>;
   updateAccountBilling(id: number, data: {
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
@@ -1167,6 +1174,27 @@ class DatabaseStorage implements IStorage {
     if (data.subscriptionPlan !== undefined) updateData.subscriptionPlan = data.subscriptionPlan;
     if (data.subscriptionBilling !== undefined) updateData.subscriptionBilling = data.subscriptionBilling;
     if (data.subscriptionCurrentPeriodEnd !== undefined) updateData.subscriptionCurrentPeriodEnd = data.subscriptionCurrentPeriodEnd;
+    if (Object.keys(updateData).length === 0) return this.getAccount(id);
+    const [row] = await db.update(accounts).set(updateData).where(eq(accounts.id, id)).returning();
+    return row ? this.toPublic(row) : undefined;
+  }
+  // Patch any of the SMS/opt-in fields on an account. Fields left undefined
+  // are preserved; explicit null clears them (used by opt-in-back which
+  // resets smsOptedOutAt=null).
+  async updateAccountSmsState(id: number, data: {
+    smsPhone?: string | null;
+    smsVerifiedAt?: string | null;
+    smsOptedOutAt?: string | null;
+    smsVerificationCode?: string | null;
+    smsVerificationExpiresAt?: string | null;
+  }): Promise<AccountPublic | undefined> {
+    await ensureReady();
+    const updateData: Record<string, unknown> = {};
+    if (data.smsPhone !== undefined) updateData.smsPhone = data.smsPhone;
+    if (data.smsVerifiedAt !== undefined) updateData.smsVerifiedAt = data.smsVerifiedAt;
+    if (data.smsOptedOutAt !== undefined) updateData.smsOptedOutAt = data.smsOptedOutAt;
+    if (data.smsVerificationCode !== undefined) updateData.smsVerificationCode = data.smsVerificationCode;
+    if (data.smsVerificationExpiresAt !== undefined) updateData.smsVerificationExpiresAt = data.smsVerificationExpiresAt;
     if (Object.keys(updateData).length === 0) return this.getAccount(id);
     const [row] = await db.update(accounts).set(updateData).where(eq(accounts.id, id)).returning();
     return row ? this.toPublic(row) : undefined;

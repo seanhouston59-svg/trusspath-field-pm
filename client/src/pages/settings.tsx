@@ -11,6 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useSettings, useUpdateSettings, useProjects, useHealthScan, useReseed, useWipeData, useBillingStatus, useManageBilling, type HealthReport } from "@/hooks/use-data";
+import { SmsAlertsCard } from "@/components/sms-alerts-card";
 import type { AppSettings } from "@shared/schema";
 import { useAccess } from "@/lib/access";
 import { useToast } from "@/hooks/use-toast";
@@ -216,6 +217,9 @@ export default function SettingsPage() {
             </Select>
           </Card>
         </div>
+
+        {/* SMS urgent field alerts */}
+        <SmsAlertsCard />
 
         {/* App Health */}
         <Card icon={Stethoscope} title="App Health Scan" desc="Jarvis checks every in-app link resolves to a registered route and that each data module loads.">

@@ -582,6 +582,149 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ account: updated });
   });
 
+  // ============================ SMS opt-in / verification ============================
+  // The account model has 5 SMS fields (see schema.ts). This flow: user submits
+  // phone number -> we send a 6-digit OTP -> user submits code -> we mark verified.
+  // Feature stays dormant until TWILIO_* env vars are set (sms.ts falls back to dry_run).
+  const { sendRawSms, normalizePhone } = require("./sms") as typeof import("./sms");
+
+  // GET current SMS opt-in state for the signed-in user.
+  app.get("/api/account/sms", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    const acc = req.account;
+    res.json({
+      phone: acc.smsPhone || null,
+      verified: !!acc.smsVerifiedAt,
+      optedOut: !!acc.smsOptedOutAt,
+      pendingVerification: !!(acc.smsPhone && !acc.smsVerifiedAt && acc.smsVerificationExpiresAt),
+    });
+  });
+
+  // Start verification: user submits phone; we generate an OTP + persist +
+  // send. Re-verifies on every phone change so an old number can't linger.
+  app.post("/api/account/sms/start-verification", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    const raw = String(req.body?.phone || "");
+    const phone = normalizePhone(raw);
+    if (!phone) return res.status(400).json({ error: "Enter a valid phone number in international format (e.g. +14155551234)." });
+    // 6-digit numeric OTP with 10-minute expiry.
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await storage.updateAccountSmsState(req.account.id, {
+      smsPhone: phone,
+      smsVerifiedAt: null,
+      smsOptedOutAt: null,
+      smsVerificationCode: code,
+      smsVerificationExpiresAt: expires,
+    });
+    const body = `TrussPath verification code: ${code}. Reply STOP to unsubscribe.`;
+    const result = await sendRawSms(phone, body);
+    // We do NOT return the code in the response body - even in dry_run - to
+    // keep the API contract identical. The dev can read the server log in
+    // dry_run mode. Any real Twilio error is surfaced so the user can retry.
+    if (result.status === "failed") {
+      return res.status(502).json({ error: `Could not send verification SMS: ${result.error || "unknown"}` });
+    }
+    res.json({ ok: true, dryRun: result.status === "dry_run" });
+  });
+
+  // Verify: user submits the OTP code we texted.
+  app.post("/api/account/sms/verify", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    const code = String(req.body?.code || "").trim();
+    if (!/^[0-9]{6}$/.test(code)) return res.status(400).json({ error: "Enter the 6-digit code we texted you." });
+    // Reload the account so we compare against the latest OTP.
+    const acc = await storage.getAccount(req.account.id);
+    if (!acc?.smsVerificationCode || !acc?.smsVerificationExpiresAt) {
+      return res.status(400).json({ error: "No verification is in progress. Request a new code." });
+    }
+    if (new Date(acc.smsVerificationExpiresAt).getTime() < Date.now()) {
+      return res.status(400).json({ error: "This verification code expired. Request a new one." });
+    }
+    if (acc.smsVerificationCode !== code) {
+      return res.status(400).json({ error: "That code doesn't match. Double-check the SMS and try again." });
+    }
+    await storage.updateAccountSmsState(req.account.id, {
+      smsVerifiedAt: new Date().toISOString(),
+      smsVerificationCode: null,
+      smsVerificationExpiresAt: null,
+    });
+    res.json({ ok: true });
+  });
+
+  // Opt out: user asks us to stop texting them.
+  app.post("/api/account/sms/opt-out", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    await storage.updateAccountSmsState(req.account.id, {
+      smsOptedOutAt: new Date().toISOString(),
+    });
+    res.json({ ok: true });
+  });
+
+  // Opt back in (does NOT re-verify - the number is still on file and
+  // already verified). If the user changed devices, they should re-verify
+  // via start-verification.
+  app.post("/api/account/sms/opt-in", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    await storage.updateAccountSmsState(req.account.id, { smsOptedOutAt: null });
+    res.json({ ok: true });
+  });
+
+  // Remove SMS entirely (clears phone + verification).
+  app.delete("/api/account/sms", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    await storage.updateAccountSmsState(req.account.id, {
+      smsPhone: null,
+      smsVerifiedAt: null,
+      smsOptedOutAt: null,
+      smsVerificationCode: null,
+      smsVerificationExpiresAt: null,
+    });
+    res.json({ ok: true });
+  });
+
+  // Project-scoped urgent field alert. Owner/admin/pm can push a message
+  // to everyone on the org (skipping the caller). Body is capped at 300 chars
+  // - Twilio segments at 160 GSM chars, but we allow ~2 segments for real
+  // safety alerts. The event_key ties the send to the project + timestamp so
+  // future retries won't dedupe.
+  const notif = require("./notifications") as typeof import("./notifications");
+  app.post("/api/projects/:id/alerts", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) return res.status(400).json({ error: "No active organization" });
+    const role = req.membership?.role;
+    if (role !== "owner" && role !== "admin" && role !== "pm") {
+      return res.status(403).json({ error: "Only owners, admins, or PMs can send urgent alerts." });
+    }
+    const projectId = Number(req.params.id);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ error: "Invalid project id" });
+    const bodyText = String(req.body?.body || "").trim().slice(0, 300);
+    const category = String(req.body?.category || "field").slice(0, 40); // safety | weather | rfi_blocked | field
+    if (!bodyText) return res.status(400).json({ error: "Message body is required." });
+    const message = `TrussPath alert (${category}): ${bodyText}\nReply STOP to unsubscribe.`;
+    // Truncate at 320 chars total to stay under 2 concatenated SMS segments.
+    const trimmed = message.length > 320 ? message.slice(0, 317) + "..." : message;
+    const eventKey = `alert:${category}:${projectId}:${Date.now()}`;
+    const result = await notif.broadcastSmsToProject({
+      projectId,
+      eventKey,
+      body: trimmed,
+      exceptAccountId: req.account.id,
+    });
+    res.json({ ok: true, ...result });
+  });
+
+  // Owner-only: send a test SMS to yourself to smoke-test Twilio wiring.
+  // Does NOT go through the dedupe/rate-limit gate so it can be run repeatedly.
+  app.post("/api/admin/sms/test", requireOwner, async (req: any, res) => {
+    const to = String(req.body?.to || "").trim();
+    const bodyText = String(req.body?.body || "TrussPath test message.").slice(0, 300);
+    const target = normalizePhone(to || req.account?.smsPhone || "");
+    if (!target) return res.status(400).json({ error: "Target phone is not set or not in E.164 format." });
+    const r = await sendRawSms(target, bodyText);
+    res.json({ ok: r.ok, status: r.status, providerSid: r.providerSid, error: r.error });
+  });
+
   // Team
   app.get("/api/team", async (req: any, res) => res.json(await storage.getTeam(req.organizationId)));
   app.post("/api/team", async (req: any, res) => {
