@@ -455,6 +455,10 @@ export interface IStorage {
   getAccountByEmail(email: string): Promise<Account | undefined>;
   getAccount(id: number): Promise<AccountPublic | undefined>;
   updateAccountProfile(id: number, data: { displayName?: string; position?: string }): Promise<AccountPublic | undefined>;
+  updateDashboardLayout(
+    id: number,
+    layout: { widgets: Array<{ id: string; size: "sm" | "md" | "lg" | "xl"; hidden?: boolean }> } | null,
+  ): Promise<AccountPublic | undefined>;
   // ----- Field punches (mobile clock in/out) -----
   createFieldPunch(data: InsertFieldPunch): Promise<FieldPunch>;
   getRecentFieldPunches(accountId: number, limit?: number): Promise<FieldPunch[]>;
@@ -1166,6 +1170,16 @@ class DatabaseStorage implements IStorage {
     if (data.position !== undefined) updateData.position = data.position;
     if (Object.keys(updateData).length === 0) return this.getAccount(id);
     const [row] = await db.update(accounts).set(updateData).where(eq(accounts.id, id)).returning();
+    return row ? this.toPublic(row) : undefined;
+  }
+  // Persist a user's per-account dashboard customization. Passing `null`
+  // clears the row so the client falls back to role-based defaults.
+  async updateDashboardLayout(
+    id: number,
+    layout: { widgets: Array<{ id: string; size: "sm" | "md" | "lg" | "xl"; hidden?: boolean }> } | null,
+  ): Promise<AccountPublic | undefined> {
+    await ensureReady();
+    const [row] = await db.update(accounts).set({ dashboardLayout: layout as any }).where(eq(accounts.id, id)).returning();
     return row ? this.toPublic(row) : undefined;
   }
   async updateAccountBilling(id: number, data: {

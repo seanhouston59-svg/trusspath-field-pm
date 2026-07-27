@@ -577,6 +577,43 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ account: updated });
   });
 
+  // ============================ DASHBOARD LAYOUT ============================
+  // Per-user drag/drop + show/hide customization. Null layout = fall back to
+  // role-based defaults on the client (see client/src/lib/dashboard-layout.ts).
+  app.get("/api/me/dashboard-layout", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const acc: any = req.account;
+    res.json({ layout: acc.dashboardLayout ?? null });
+  });
+
+  app.put("/api/me/dashboard-layout", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const body = req.body || {};
+    // Explicit reset → clear the column so defaults kick back in.
+    if (body.layout === null) {
+      await storage.updateDashboardLayout(req.account.id, null);
+      return res.json({ layout: null });
+    }
+    const raw = body.layout;
+    if (!raw || !Array.isArray(raw.widgets)) {
+      return res.status(400).json({ error: "layout.widgets[] required" });
+    }
+    const validSizes = new Set(["sm", "md", "lg", "xl"]);
+    const seen = new Set<string>();
+    const widgets = [] as Array<{ id: string; size: "sm" | "md" | "lg" | "xl"; hidden?: boolean }>;
+    for (const w of raw.widgets) {
+      if (!w || typeof w.id !== "string" || w.id.length === 0) continue;
+      if (seen.has(w.id)) continue; // dedupe
+      seen.add(w.id);
+      const size = validSizes.has(w.size) ? (w.size as "sm" | "md" | "lg" | "xl") : "md";
+      widgets.push({ id: w.id, size, hidden: !!w.hidden });
+    }
+    // Cap to a sane size to prevent runaway blobs.
+    const capped = { widgets: widgets.slice(0, 64) };
+    await storage.updateDashboardLayout(req.account.id, capped);
+    res.json({ layout: capped });
+  });
+
   // ============================ FIELD PUNCHES ============================
   // Mobile foreman clock in/out. Append-only stream, one row per event.
   // client_id makes offline-queue submits idempotent so a retried offline

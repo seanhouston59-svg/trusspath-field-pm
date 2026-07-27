@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Bell, CloudSun, StickyNote, ArrowRight, AlertTriangle, HelpCircle, GitPullRequestArrow, ClipboardList, Plus, ChevronDown } from "lucide-react";
 import { Avatar } from "@/components/bits";
 import { useCreateNote, useProjects } from "@/hooks/use-data";
@@ -66,19 +67,131 @@ export function NotificationsBox({ tasks, rfis, changeOrders, projects }: {
 }
 
 /* ------------------------------- Weather ------------------------------- */
-const FORECAST = [
-  { day: "Wed", icon: "☀️", hi: 93, lo: 64 },
-  { day: "Thu", icon: "⛅", hi: 89, lo: 61 },
-  { day: "Fri", icon: "🌦️", hi: 82, lo: 58 },
-];
+// Live 7-day forecast via Open-Meteo (no API key required). We geocode the
+// project's address to lat/lng, then request a 7-day daily forecast. Both
+// endpoints are cached for a day so the dashboard doesn't re-hit them on
+// every render.
+
+// Map Open-Meteo WMO weather codes to an emoji + short label.
+// https://open-meteo.com/en/docs#weathervariables
+function wmoToIconLabel(code: number): { icon: string; label: string } {
+  if (code === 0) return { icon: "☀️", label: "Clear" };
+  if (code === 1) return { icon: "🌤️", label: "Mostly clear" };
+  if (code === 2) return { icon: "⛅", label: "Partly cloudy" };
+  if (code === 3) return { icon: "☁️", label: "Overcast" };
+  if (code === 45 || code === 48) return { icon: "🌫️", label: "Foggy" };
+  if (code >= 51 && code <= 57) return { icon: "🌦️", label: "Drizzle" };
+  if (code >= 61 && code <= 67) return { icon: "🌧️", label: "Rain" };
+  if (code >= 71 && code <= 77) return { icon: "🌨️", label: "Snow" };
+  if (code >= 80 && code <= 82) return { icon: "🌦️", label: "Showers" };
+  if (code >= 85 && code <= 86) return { icon: "🌨️", label: "Snow showers" };
+  if (code === 95) return { icon: "⛈️", label: "Thunderstorm" };
+  if (code === 96 || code === 99) return { icon: "⛈️", label: "Thunder + hail" };
+  return { icon: "🌤️", label: "Fair" };
+}
+
+type Geocode = { lat: number; lng: number; label: string };
+type ForecastDay = { date: string; hi: number; lo: number; code: number; precip: number };
+type WeatherPayload = { geo: Geocode; today: { temp: number; code: number }; days: ForecastDay[] };
+
+async function geocodeAddress(address: string): Promise<Geocode> {
+  // Open-Meteo geocoding takes only a place-name-style query; strip street
+  // numbers so "1234 Main St, Denver, CO" becomes "Denver, CO".
+  const cleaned = address
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => !/^\d+[A-Za-z]?/.test(p)) // drop leading street number tokens
+    .join(", ")
+    .trim();
+  const q = cleaned || address || "Denver, CO";
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`geocode ${res.status}`);
+  const data = await res.json();
+  const hit = data?.results?.[0];
+  if (!hit) {
+    // Fallback to Denver, CO if geocoding turns up nothing.
+    return { lat: 39.7392, lng: -104.9903, label: "Denver, CO" };
+  }
+  const label = [hit.name, hit.admin1, hit.country_code].filter(Boolean).join(", ");
+  return { lat: hit.latitude, lng: hit.longitude, label };
+}
+
+async function fetchForecast(geo: Geocode): Promise<WeatherPayload> {
+  const params = new URLSearchParams({
+    latitude: String(geo.lat),
+    longitude: String(geo.lng),
+    current: "temperature_2m,weather_code",
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+    temperature_unit: "fahrenheit",
+    wind_speed_unit: "mph",
+    precipitation_unit: "inch",
+    timezone: "auto",
+    forecast_days: "7",
+  });
+  const url = `https://api.open-meteo.com/v1/forecast?${params.toString()}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`forecast ${res.status}`);
+  const data = await res.json();
+  const days: ForecastDay[] = (data.daily?.time ?? []).map((date: string, i: number) => ({
+    date,
+    hi: Math.round(data.daily.temperature_2m_max[i]),
+    lo: Math.round(data.daily.temperature_2m_min[i]),
+    code: data.daily.weather_code[i] ?? 0,
+    precip: Math.round(data.daily.precipitation_probability_max?.[i] ?? 0),
+  }));
+  return {
+    geo,
+    today: {
+      temp: Math.round(data.current?.temperature_2m ?? days[0]?.hi ?? 70),
+      code: data.current?.weather_code ?? days[0]?.code ?? 0,
+    },
+    days,
+  };
+}
+
+function useSiteWeather(address: string) {
+  return useQuery({
+    queryKey: ["weather", address],
+    queryFn: async () => {
+      const geo = await geocodeAddress(address);
+      return fetchForecast(geo);
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+}
+
+function dayShort(dateISO: string, i: number): string {
+  if (i === 0) return "Today";
+  // dateISO is YYYY-MM-DD in the site's local timezone; parse as local to
+  // avoid a UTC offset ever landing on the wrong weekday.
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+  return dt.toLocaleDateString(undefined, { weekday: "short" });
+}
 
 export function WeatherBar({ logs, projects }: { logs: DailyLog[]; projects: Project[] }) {
   const [open, setOpen] = useState(false);
   const latest = [...logs].sort((a, b) => b.date.localeCompare(a.date))[0];
   const proj = latest ? projects.find((p) => p.id === latest.projectId) : projects[0];
-  const temp = latest?.temp ?? 88;
-  const cond = latest?.weather ?? "Sunny";
   const site = proj?.name?.split(" ").slice(0, 2).join(" ") ?? "Site";
+  const address = proj?.address?.trim() || "Denver, CO";
+
+  const { data, isLoading, isError } = useSiteWeather(address);
+
+  // Fallback to log-derived numbers if the live fetch fails, so the widget
+  // still looks presentable.
+  const fallbackTemp = latest?.temp ?? 72;
+  const fallbackCond = latest?.weather ?? "Fair";
+
+  const temp = data?.today?.temp ?? fallbackTemp;
+  const cond = data ? wmoToIconLabel(data.today.code).label : fallbackCond;
+  const locLabel = data?.geo?.label ?? address;
+  const days = data?.days ?? [];
+  const previewDays = days.slice(0, 4); // collapsed row shows today + next 3
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm" data-testid="box-weather">
@@ -95,18 +208,22 @@ export function WeatherBar({ logs, projects }: { logs: DailyLog[]; projects: Pro
         <span className="font-display text-2xl font-bold tabular">{temp}°</span>
         <div className="min-w-0">
           <div className="truncate text-sm font-medium leading-tight">{cond}</div>
-          <div className="truncate text-xs text-muted-foreground">Denver, CO · {site}</div>
+          <div className="truncate text-xs text-muted-foreground">{locLabel} · {site}</div>
         </div>
-        {/* inline mini-forecast when collapsed */}
-        {!open && (
+        {/* inline mini-forecast when collapsed — today + next 3 days */}
+        {!open && previewDays.length > 0 && (
           <div className="ml-auto hidden items-center gap-4 sm:flex">
-            {FORECAST.map((f) => (
-              <div key={f.day} className="text-center" data-testid={`forecast-${f.day}`}>
-                <div className="text-[10px] font-medium uppercase text-muted-foreground">{f.day}</div>
-                <div className="text-base leading-tight">{f.icon}</div>
-                <div className="text-[10px] tabular text-muted-foreground"><span className="font-semibold text-foreground">{f.hi}°</span> {f.lo}°</div>
-              </div>
-            ))}
+            {previewDays.map((f, i) => {
+              const w = wmoToIconLabel(f.code);
+              const key = dayShort(f.date, i);
+              return (
+                <div key={f.date} className="text-center" data-testid={`forecast-${key}`}>
+                  <div className="text-[10px] font-medium uppercase text-muted-foreground">{key}</div>
+                  <div className="text-base leading-tight">{w.icon}</div>
+                  <div className="text-[10px] tabular text-muted-foreground"><span className="font-semibold text-foreground">{f.hi}°</span> {f.lo}°</div>
+                </div>
+              );
+            })}
           </div>
         )}
         <ChevronDown className={cn("ml-auto size-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180", !open && "sm:ml-4")} />
@@ -115,19 +232,42 @@ export function WeatherBar({ logs, projects }: { logs: DailyLog[]; projects: Pro
         <div className="border-t border-border p-4" data-testid="weather-expanded">
           <div className="flex items-center gap-4">
             <span className="font-display text-4xl font-bold tabular">{temp}°</span>
-            <div>
+            <div className="min-w-0">
               <div className="text-sm font-medium">{cond}</div>
-              <div className="text-xs text-muted-foreground">Denver, CO · {site}</div>
+              <div className="truncate text-xs text-muted-foreground">{locLabel} · {site}</div>
             </div>
           </div>
-          <div className="mt-3 grid max-w-md grid-cols-3 gap-2">
-            {FORECAST.map((f) => (
-              <div key={f.day} className="rounded-md bg-muted/50 py-1.5 text-center">
-                <div className="text-[10px] font-medium uppercase text-muted-foreground">{f.day}</div>
-                <div className="text-base leading-tight">{f.icon}</div>
-                <div className="text-[10px] tabular text-muted-foreground"><span className="font-semibold text-foreground">{f.hi}°</span> {f.lo}°</div>
-              </div>
-            ))}
+          {isLoading && (
+            <div className="mt-3 text-xs text-muted-foreground">Loading 7-day forecast…</div>
+          )}
+          {isError && !isLoading && (
+            <div className="mt-3 text-xs text-muted-foreground">Couldn't load live forecast. Showing latest log.</div>
+          )}
+          {days.length > 0 && (
+            <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-7">
+              {days.map((f, i) => {
+                const w = wmoToIconLabel(f.code);
+                const key = dayShort(f.date, i);
+                return (
+                  <div
+                    key={f.date}
+                    className="rounded-md bg-muted/50 py-2 text-center"
+                    data-testid={`forecast-expanded-${key}`}
+                    title={`${w.label} · ${f.precip}% precip`}
+                  >
+                    <div className="text-[10px] font-medium uppercase text-muted-foreground">{key}</div>
+                    <div className="text-lg leading-tight">{w.icon}</div>
+                    <div className="text-[10px] tabular text-muted-foreground">
+                      <span className="font-semibold text-foreground">{f.hi}°</span> {f.lo}°
+                    </div>
+                    <div className="text-[10px] text-sky-600 dark:text-sky-400">{f.precip}%</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="mt-3 text-[10px] text-muted-foreground">
+            Forecast by <a href="https://open-meteo.com/" target="_blank" rel="noreferrer" className="underline hover:text-foreground">Open-Meteo</a>
           </div>
         </div>
       )}

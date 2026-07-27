@@ -434,6 +434,14 @@ export const accounts = pgTable("accounts", {
   // account (and any sessions) stop working once now > demoExpiresAt. Real
   // accounts leave this NULL and are unaffected.
   demoExpiresAt: text("demo_expires_at"),
+  // Per-user dashboard customization. Null / missing keys → use role defaults
+  // (see client/src/lib/dashboard-layout.ts). Structure:
+  //   { widgets: [{ id: string, size: "sm"|"md"|"lg"|"xl", hidden?: boolean }] }
+  // The order of the array is the render order. Unknown ids are ignored so
+  // that removing a widget in a future release doesn't strand old prefs.
+  dashboardLayout: jsonb("dashboard_layout").$type<{
+    widgets: Array<{ id: string; size: "sm" | "md" | "lg" | "xl"; hidden?: boolean }>;
+  }>(),
 });
 
 // Field punches - lightweight clock in/out records captured from the mobile
