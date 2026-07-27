@@ -7,7 +7,7 @@ import {
   Contact as ContactIcon, MessageSquare, Building2, Clock,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
   LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2, Smartphone,
-  ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2,
+  ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -34,51 +34,110 @@ const ICONS: Record<string, any> = {
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2,
 };
 
+// Collapse state is persisted per-group in localStorage. Missing entries
+// default to "expanded" so the sidebar isn't a wall of collapsed headers
+// the first time you load. The group containing the active route is force-
+// expanded regardless of persisted state.
+const NAV_COLLAPSE_STORAGE_KEY = "trusspath:nav:collapsed";
+
+function readCollapsedGroups(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(NAV_COLLAPSE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCollapsedGroups(state: Record<string, boolean>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(NAV_COLLAPSE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    /* localStorage might be blocked (private mode etc) — collapse just won't persist */
+  }
+}
+
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   const { isAllowed } = useAccess();
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => readCollapsedGroups());
+
+  const toggleGroup = (title: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [title]: !prev[title] };
+      writeCollapsedGroups(next);
+      return next;
+    });
+  };
+
+  // Precompute active-href logic once per render.
+  const allHrefs = APP_NAV.flatMap((g) => g.items.map((i) => i.href));
+  const isActiveHref = (href: string) => {
+    if (href === "/") return location === "/";
+    if (!location.startsWith(href)) return false;
+    return !allHrefs.some((h) => h !== href && h.startsWith(href) && location.startsWith(h));
+  };
+
   return (
-    <nav className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1" style={{ WebkitOverflowScrolling: "touch" }} aria-label="Primary">
+    <nav className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1" style={{ WebkitOverflowScrolling: "touch" }} aria-label="Primary">
       {APP_NAV.map((group) => {
         const items = group.items.filter(({ href }) => isAllowed(href));
         if (items.length === 0) return null;
-        // For each nav item, mark it active when it prefix-matches the current location,
-        // but only if no *more-specific* sibling href also matches. This prevents parents
-        // like "/settings" from staying active when the user is on "/settings/team".
-        const allHrefs = APP_NAV.flatMap(g => g.items.map(i => i.href));
-        const isActiveHref = (href: string) => {
-          if (href === "/") return location === "/";
-          if (!location.startsWith(href)) return false;
-          // Any longer href that also matches wins over this one.
-          return !allHrefs.some(h => h !== href && h.startsWith(href) && location.startsWith(h));
-        };
+        const groupHasActive = items.some((it) => isActiveHref(it.href));
+        // Force expand if this group contains the active route — you should
+        // always see where you are.
+        const isCollapsed = collapsed[group.title] && !groupHasActive;
         return (
-        <div key={group.title}>
-          <div className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">{group.title}</div>
-          <div className="flex flex-col gap-0">
-            {items.map(({ href, label, icon }) => {
-              const active = isActiveHref(href);
-              const Icon = ICONS[icon] ?? LayoutDashboard;
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={onNavigate}
-                  data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
-                  className={cn(
-                    "group flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-sidebar-foreground/60 group-hover:text-primary")} />
-                  {label}
-                </Link>
-              );
-            })}
+          <div key={group.title}>
+            <button
+              type="button"
+              onClick={() => toggleGroup(group.title)}
+              aria-expanded={!isCollapsed}
+              aria-controls={`nav-group-${group.title.replace(/\s+/g, "-")}`}
+              data-testid={`nav-group-toggle-${group.title.toLowerCase().replace(/\s+/g, "-")}`}
+              className="group flex w-full items-center gap-1 rounded-md px-3 py-1 text-left text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground/80"
+            >
+              <ChevronRight
+                className={cn(
+                  "size-3 shrink-0 transition-transform text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70",
+                  !isCollapsed && "rotate-90",
+                )}
+              />
+              <span className="flex-1">{group.title}</span>
+              {isCollapsed && (
+                <span className="rounded-full bg-sidebar-accent/50 px-1.5 py-0.5 text-[9px] font-bold text-sidebar-foreground/60">
+                  {items.length}
+                </span>
+              )}
+            </button>
+            {!isCollapsed && (
+              <div id={`nav-group-${group.title.replace(/\s+/g, "-")}`} className="mt-0.5 flex flex-col gap-0">
+                {items.map(({ href, label, icon }) => {
+                  const active = isActiveHref(href);
+                  const Icon = ICONS[icon] ?? LayoutDashboard;
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={onNavigate}
+                      data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
+                      className={cn(
+                        "group flex items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                        active
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+                      )}
+                    >
+                      <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-sidebar-foreground/60 group-hover:text-primary")} />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
         );
       })}
     </nav>
