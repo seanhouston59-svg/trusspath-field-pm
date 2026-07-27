@@ -55,6 +55,7 @@ const R = {
   timesheets: "/timesheets",
   deletedItems: "/deleted-items",
   settings: "/settings",
+  settingsTeam: "/settings/team",
   adminSignups: "/admin/signups",
 };
 
@@ -77,7 +78,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     order: 2,
     canManageTeam: true, canManageSettings: false, canManageIntegrations: true,
     canViewFinancials: true, canDelete: true, canCreateEdit: true, canResetData: false,
-    allowedRoutes: ALL.filter((r) => r !== R.settings && r !== R.adminSignups),
+    allowedRoutes: ALL.filter((r) => r !== R.settings && r !== R.settingsTeam && r !== R.adminSignups),
   },
   {
     slug: "superintendent",

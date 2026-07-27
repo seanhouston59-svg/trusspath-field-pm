@@ -136,9 +136,24 @@ export function JarvisPanel() {
   const busy = briefMut.isPending || chatMut.isPending || scanMut.isPending;
   const recRef = useRef<any>(null);
 
-  useEffect(() => { loadVoices(); if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = loadVoices; return () => stopSpeak(); }, []);
-  useEffect(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }), [messages, brief, busy, listening]);
-  useEffect(() => () => { stopListening(); stopSpeak(); }, []);
+  useEffect(() => {
+    loadVoices();
+    if ("speechSynthesis" in window) window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => stopSpeak();
+  }, []);
+  // Scroll-to-bottom effect. IMPORTANT: block body with no implicit return — an
+  // arrow-with-implicit-return here caused React to interpret scrollTo()'s return
+  // value as an effect cleanup, which crashed rendering in some browsers with
+  // "x is not a function" during unmount/re-run. See TrussPath bug 2026-07.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && typeof el.scrollTo === "function") {
+      try { el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); } catch { /* noop */ }
+    }
+  }, [messages, brief, busy, listening]);
+  useEffect(() => {
+    return () => { stopListening(); stopSpeak(); };
+  }, []);
 
   const stopListening = () => {
     try { recRef.current?.stop(); } catch { /* ignore */ }

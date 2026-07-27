@@ -40,6 +40,7 @@ import Schedule from "@/pages/schedule";
 import Gantt from "@/pages/gantt";
 import Integrations from "@/pages/integrations";
 import { JarvisPanel } from "@/components/jarvis-panel";
+import { ErrorBoundary } from "@/components/error-boundary";
 import Messages from "@/pages/messages";
 import Notes from "@/pages/notes";
 import Timesheets from "@/pages/timesheets";
@@ -212,7 +213,13 @@ function AppChrome() {
   // Jarvis is only useful once you’re inside the app.
   if (!isAuthenticated) return null;
   if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup" || loc.startsWith("/signup") || loc === "/paywall" || loc.startsWith("/invite/")) return null;
-  return <JarvisPanel />;
+  // Jarvis lives in a boundary because it drives async voice/speech APIs that
+  // can throw in ways we don't want to blank out the whole app.
+  return (
+    <ErrorBoundary label="Jarvis" silent>
+      <JarvisPanel />
+    </ErrorBoundary>
+  );
 }
 
 /** Top-level router: public shell first, protected app second. */
@@ -248,10 +255,12 @@ function App() {
           <AccessProvider>
             <TooltipProvider>
               <Toaster />
-              <Router hook={useHashLocation}>
-                <RootRouter />
-                <AppChrome />
-              </Router>
+              <ErrorBoundary label="App">
+                <Router hook={useHashLocation}>
+                  <RootRouter />
+                  <AppChrome />
+                </Router>
+              </ErrorBoundary>
             </TooltipProvider>
           </AccessProvider>
         </AuthProvider>
