@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from "react";
-import { useLocation } from "wouter";
 import { Plus, ListChecks } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState, GhostTaskRows } from "@/components/ghost-state";
@@ -25,11 +24,27 @@ export default function TasksPage() {
   const create = useCreateTask();
   const updateStatus = useUpdateTaskStatus();
   const [open, setOpen] = useState(false);
-  const [location] = useLocation();
 
+  // Auto-open create dialog when navigated with ?new=1. The app uses wouter's
+  // useHashLocation which strips the query string from useLocation(), so we
+  // read the raw hash ourselves and listen for hashchange. Mirrors the pattern
+  // in projects.tsx.
   useEffect(() => {
-    if (location.includes("new=1")) setOpen(true);
-  }, [location]);
+    const checkAndOpen = () => {
+      const hash = window.location.hash || "";
+      const qIdx = hash.indexOf("?");
+      if (qIdx === -1) return;
+      const params = new URLSearchParams(hash.slice(qIdx + 1));
+      if (params.get("new") === "1") {
+        setOpen(true);
+        const cleanHash = hash.slice(0, qIdx);
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${cleanHash}`);
+      }
+    };
+    checkAndOpen();
+    window.addEventListener("hashchange", checkAndOpen);
+    return () => window.removeEventListener("hashchange", checkAndOpen);
+  }, []);
   const [selected, setSelected] = useState<Task | null>(null);
   const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 
@@ -128,7 +143,7 @@ export default function TasksPage() {
               description="The sample rows above show what your tasks will look like. Create your first task to get started."
               icon={ListChecks}
               ctaLabel="Create task"
-              ctaHref="/tasks?new=1"
+              ctaOnClick={() => setOpen(true)}
             />
           </div>
         </div>

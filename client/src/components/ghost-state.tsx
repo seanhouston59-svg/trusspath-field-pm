@@ -14,13 +14,22 @@ export function GhostState({
   icon: Icon = Inbox,
   ctaLabel,
   ctaHref,
+  ctaOnClick,
 }: {
   title: string;
   description?: string;
   icon?: LucideIcon;
   ctaLabel?: string;
+  // Provide EITHER ctaHref (navigates via wouter) OR ctaOnClick (fires a
+  // handler on the same page — use this for empty-state buttons that need to
+  // open a dialog on the current page, since query strings on the app's hash
+  // router don't reliably re-trigger effects). If both are provided,
+  // ctaOnClick wins.
   ctaHref?: string;
+  ctaOnClick?: () => void;
 }) {
+  const btnClass =
+    "mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90";
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-muted text-muted-foreground">
@@ -30,13 +39,17 @@ export function GhostState({
       {description && (
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
       )}
-      {ctaLabel && ctaHref && (
+      {ctaLabel && (ctaOnClick ? (
+        <button className={btnClass} onClick={ctaOnClick} data-testid="ghost-state-cta">
+          <Plus className="size-4" /> {ctaLabel}
+        </button>
+      ) : ctaHref ? (
         <Link href={ctaHref}>
-          <button className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+          <button className={btnClass} data-testid="ghost-state-cta">
             <Plus className="size-4" /> {ctaLabel}
           </button>
         </Link>
-      )}
+      ) : null)}
     </div>
   );
 }
