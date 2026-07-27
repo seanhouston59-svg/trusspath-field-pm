@@ -57,6 +57,8 @@ import CompanyDocuments from "@/pages/company-documents";
 import Schedule from "@/pages/schedule";
 import Gantt from "@/pages/gantt";
 import Integrations from "@/pages/integrations";
+import TeamsPage from "@/pages/teams";
+import ExcelPage from "@/pages/excel";
 import { JarvisPanel } from "@/components/jarvis-panel";
 import { BillingBanner } from "@/components/billing-banner";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -92,6 +94,8 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/gantt": Gantt,
   "/cpm": Cpm,
   "/integrations": Integrations,
+  "/teams": TeamsPage,
+  "/excel": ExcelPage,
   "/tasks": Tasks,
   "/action-items": ActionItems,
   "/rfis": Rfis,

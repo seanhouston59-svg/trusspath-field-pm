@@ -16,6 +16,7 @@ export const APP_ROUTES: RoutePattern[] = [
   "/tasks", "/action-items", "/rfis", "/submittals", "/change-orders", "/punch",
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings", "/settings/team",
+  "/teams", "/excel",
   "/field", "/field/daily-log", "/field/timecard", "/field/photo", "/field/observation", "/field/punch",
 ];
 
@@ -86,6 +87,8 @@ export const APP_NAV: NavGroup[] = [
   {
     title: "System",
     items: [
+      { href: "/teams", label: "Microsoft Teams", icon: "Video" },
+      { href: "/excel", label: "Microsoft Excel", icon: "FileSpreadsheet" },
       { href: "/integrations", label: "Integrations", icon: "Plug" },
       { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" },
       { href: "/settings", label: "Settings", icon: "Settings" },
