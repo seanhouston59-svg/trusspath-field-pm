@@ -13,7 +13,6 @@ import {
 import { useAuth } from "@/lib/auth";
 import { consumePendingRedirect } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { isAccountInGoodStanding } from "@shared/schema";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -27,7 +26,7 @@ function getNextParam(): string {
 }
 
 export default function Login() {
-  const { login, isAuthenticated, account } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,19 +35,24 @@ export default function Login() {
     defaultValues: { email: "", password: "" },
   });
 
-  const resolveNext = (acc: unknown) =>
-    isAccountInGoodStanding(acc as any) ? consumePendingRedirect() : "/paywall";
+  // Post-login destination. Always aim for /app (or any explicit pending
+  // redirect). The App-level RequireAuth guard reads /api/billing/status and
+  // will route to /paywall itself if the *org* isn't in good standing. Keeping
+  // that logic in one place — the guard — avoids the legacy per-account
+  // isAccountInGoodStanding() check, which bounces demo accounts to /paywall
+  // even though their demo org is trialing. See TrussPath bug 2026-07 (demo).
+  const resolveNext = () => consumePendingRedirect();
 
   // If already logged in, bounce straight to the right place.
   useEffect(() => {
-    if (isAuthenticated) window.location.hash = resolveNext(account);
-  }, [isAuthenticated, account]);
+    if (isAuthenticated) window.location.hash = resolveNext();
+  }, [isAuthenticated]);
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
     try {
-      const acc = await login(values.email, values.password);
-      const next = resolveNext(acc);
+      await login(values.email, values.password);
+      const next = resolveNext();
       window.location.hash = next.startsWith("/") ? next : `/${next}`;
     } catch (err: any) {
       // Prefer a specific server message when available (e.g. expired demo login),

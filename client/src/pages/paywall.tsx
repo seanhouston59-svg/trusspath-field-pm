@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { isAccountInGoodStanding, isSubscriptionActive } from "@shared/schema";
+import { isSubscriptionActive } from "@shared/schema";
 import { useEffect } from "react";
 
 type BillingStatus = {
@@ -29,13 +29,6 @@ export default function Paywall() {
   const { account, logout, isAuthenticated } = useAuth();
   const { toast } = useToast();
 
-  // If somehow a good-standing user landed here, bounce to the app.
-  useEffect(() => {
-    if (isAccountInGoodStanding(account as any)) {
-      window.location.hash = "/app";
-    }
-  }, [account]);
-
   // Fresh billing status — the /api/auth/me cache may be stale after a checkout.
   const billing = useQuery<BillingStatus>({
     queryKey: ["/api/billing/status"],
@@ -43,6 +36,22 @@ export default function Paywall() {
     refetchInterval: 15_000,
     enabled: isAuthenticated,
   });
+
+  // If somehow a good-standing user landed here, bounce to the app. Key off
+  // the *org* subscription status (multi-tenant model), and give platform
+  // owners — who bypass billing entirely — the same escape hatch. Legacy
+  // per-account isAccountInGoodStanding() would strand demo users here since
+  // their account.subscription_status is null even though the demo org is
+  // trialing. See TrussPath bug 2026-07 (demo).
+  useEffect(() => {
+    if (account?.role === "owner") {
+      window.location.hash = "/app";
+      return;
+    }
+    if (isSubscriptionActive(billing.data?.status)) {
+      window.location.hash = "/app";
+    }
+  }, [account, billing.data?.status]);
 
   const checkoutMut = useMutation({
     mutationFn: async (plan: "starter" | "pro" | "enterprise") => {
