@@ -16,9 +16,12 @@ const COLOR_KEYS = Object.keys(NOTE_COLORS);
 
 export default function NotesPage() {
   const { data: projects = [] } = useProjects();
-  const active = projects.filter((p) => p.status !== "Planning");
+  // Sticky notes are attached to a project. Previously we filtered to non-Planning
+  // projects only, which meant a brand-new org (all projects in Planning) had no
+  // selectable projects and 'Add Note' silently no-op'd. Show every project.
+  const selectable = projects;
   const [projectId, setProjectId] = useState<number | undefined>(undefined);
-  const pid = projectId ?? active[0]?.id;
+  const pid = projectId ?? selectable[0]?.id;
   const { data: notes = [] } = useNotes(pid);
   const create = useCreateNote(pid ?? 0);
   const updatePos = useUpdateNotePosition();
@@ -52,8 +55,19 @@ export default function NotesPage() {
   }, [drag, updatePos]);
 
   const addNote = () => {
-    if (!draft.trim() || pid === undefined) return;
-    create.mutate({ body: draft.trim(), color });
+    if (!draft.trim()) return;
+    if (pid === undefined) {
+      toast({ title: "Pick a project first", description: "Sticky notes attach to a project. Create one under Projects to start jotting." });
+      return;
+    }
+    create.mutate(
+      { body: draft.trim(), color },
+      {
+        onError: (err: any) => {
+          toast({ title: "Couldn't add note", description: err?.message ?? "Unknown error" });
+        },
+      },
+    );
     setDraft("");
   };
 
@@ -62,7 +76,10 @@ export default function NotesPage() {
       {/* project selector + composer */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Project:</span>
-        {active.map((p) => (
+        {selectable.length === 0 && (
+          <span className="text-xs text-muted-foreground">No projects yet — create one first to attach notes.</span>
+        )}
+        {selectable.map((p) => (
           <button
             key={p.id}
             onClick={() => setProjectId(p.id)}
@@ -95,8 +112,13 @@ export default function NotesPage() {
           data-testid="input-note-body"
           className="h-9 flex-1 rounded-md border border-border bg-muted/40 px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-        <button onClick={addNote} disabled={!draft.trim()} data-testid="button-add-note" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">
-          <Plus className="size-4" /> Add Note
+        <button
+          onClick={addNote}
+          disabled={!draft.trim() || create.isPending}
+          data-testid="button-add-note"
+          className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          <Plus className="size-4" /> {create.isPending ? "Adding…" : "Add Note"}
         </button>
         <span className="ml-auto text-xs text-muted-foreground">Drag notes to reposition · {notes.length} notes</span>
       </div>
