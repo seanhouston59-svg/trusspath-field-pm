@@ -56,6 +56,9 @@ import Cpm from "@/pages/cpm";
 import Paywall from "@/pages/paywall";
 import TeamSettingsPage from "@/pages/team-settings";
 import InviteAcceptPage from "@/pages/invite-accept";
+import FieldHub from "@/pages/field/hub";
+import FieldDailyLog from "@/pages/field/daily-log";
+import { FieldTimecard, FieldPhoto, FieldObservation, FieldPunch } from "@/pages/field/coming-soon";
 
 // Single source of truth for routes lives in shared/app-manifest.ts (APP_ROUTES).
 // Map each manifest route pattern to its page component here.
@@ -89,6 +92,12 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/deleted-items": DeletedItemsPage,
   "/settings": SettingsPage,
   "/settings/team": TeamSettingsPage,
+  "/field": FieldHub,
+  "/field/daily-log": FieldDailyLog,
+  "/field/timecard": FieldTimecard,
+  "/field/photo": FieldPhoto,
+  "/field/observation": FieldObservation,
+  "/field/punch": FieldPunch,
 };
 
 function AppRouter() {

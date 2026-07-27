@@ -1,0 +1,52 @@
+{
+  "name": "TrussPath — Field PM",
+  "short_name": "TrussPath",
+  "description": "Field project management for general contractors — daily logs, timecards, RFIs, punch lists, and photos, online or off.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0a0a",
+  "theme_color": "#f59e0b",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Daily log",
+      "short_name": "Log",
+      "url": "/#/field/daily-log",
+      "description": "Capture today's field notes"
+    },
+    {
+      "name": "Timecard",
+      "short_name": "Punch",
+      "url": "/#/field/timecard",
+      "description": "Clock in or out"
+    },
+    {
+      "name": "Take photo",
+      "short_name": "Photo",
+      "url": "/#/field/photo",
+      "description": "Capture a geo-tagged photo"
+    }
+  ]
+}
