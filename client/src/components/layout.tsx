@@ -482,6 +482,11 @@ function MobileOverflowMenu() {
  */
 function FieldModeToggle() {
   const field = useFieldMode();
+  // The hardhat is now the primary discovery point for Field mode (the
+  // big dashboard launcher card was removed). A subtle periodic wiggle
+  // draws the eye without being distracting; hovering pauses it so the
+  // icon is still at the moment of interaction. The `motion-reduce:`
+  // variant disables the animation for users who prefer reduced motion.
   return (
     <button
       type="button"
@@ -489,9 +494,9 @@ function FieldModeToggle() {
       aria-label="Enter Field mode"
       title="Enter Field mode — chromeless on-site view"
       data-testid="button-field-mode-toggle"
-      className="inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate hover:border-amber-500/60 hover:text-amber-600 dark:hover:text-amber-400"
+      className="group inline-flex size-9 items-center justify-center rounded-md border border-amber-500/40 bg-amber-500/5 text-amber-600 hover-elevate hover:border-amber-500/70 hover:bg-amber-500/10 dark:text-amber-400"
     >
-      <HardHat className="size-4" />
+      <HardHat className="size-4 origin-bottom animate-hardhat-wiggle group-hover:[animation-play-state:paused] motion-reduce:animate-none" />
     </button>
   );
 }
@@ -533,8 +538,27 @@ function BackButton() {
 }
 
 export function Layout({ children, title, actions }: { children: ReactNode; title: string; actions?: ReactNode }) {
+  // Nav drawer state — lives on every viewport now (the permanent
+  // desktop rail was removed). The variable name is kept as `mobileOpen`
+  // to minimize churn but semantically it is just "nav drawer open".
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [loc] = useLocation();
+
+  // Close the drawer on route change so nav feels instant.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [loc]);
+
+  // ESC closes the drawer.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
   const field = useFieldMode();
   const { toast } = useToast();
 
@@ -586,16 +610,13 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 bg-sidebar md:block">
-        <div className="flex h-dvh flex-col">
-          <SidebarInner />
-        </div>
-      </aside>
-
-      {/* Mobile sidebar */}
+      {/* Sidebar — always collapsed to an off-canvas drawer on every
+          viewport. Opened by the hamburger button in the topbar. The
+          previous 256px permanent rail was hidden per user request to
+          reclaim horizontal space; keep navigation reachable via a
+          single, consistent gesture on desktop and mobile. */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 flex h-full w-72 flex-col bg-sidebar shadow-xl">
             <button
@@ -619,7 +640,7 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
             data-testid="button-menu"
-            className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate md:hidden"
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate"
           >
             <Menu className="size-5" />
           </button>
@@ -657,9 +678,12 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
             {/* Clock status indicator — visible on both mobile and desktop so
                 users always know their punch state at a glance. */}
             <ClockStatusLight />
-            {/* Desktop: show all controls inline */}
+            {/* Field mode hardhat — shown on every viewport now that the
+                large dashboard launcher card is gone. Its wiggle keeps it
+                discoverable. */}
+            <FieldModeToggle />
+            {/* Desktop: show remaining controls inline */}
             <div className="hidden md:flex items-center gap-2">
-              <FieldModeToggle />
               <RoleSwitcher />
               <ThemeToggle />
               <TopbarUser />

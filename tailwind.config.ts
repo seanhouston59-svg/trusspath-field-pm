@@ -96,10 +96,23 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // Periodic gentle wiggle for the field-mode hardhat button so it
+        // stays discoverable now that the dashboard launcher card is gone.
+        // Most of the timeline is a no-op ("still") so it only visibly
+        // wiggles for the first ~1s of each 6s cycle.
+        "hardhat-wiggle": {
+          "0%, 82%, 100%": { transform: "rotate(0deg)" },
+          "85%":  { transform: "rotate(-12deg)" },
+          "88%":  { transform: "rotate(10deg)" },
+          "91%":  { transform: "rotate(-8deg)" },
+          "94%":  { transform: "rotate(6deg)" },
+          "97%":  { transform: "rotate(-3deg)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "hardhat-wiggle": "hardhat-wiggle 6s ease-in-out infinite",
       },
     },
   },
