@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { CalendarPlus, Download, Upload, Calendar as CalIcon, ChevronLeft, ChevronRight, ExternalLink, Network, Plus, Pencil, Trash2, X } from "lucide-react";
+import { CalendarPlus, Download, Upload, Calendar as CalIcon, ChevronLeft, ChevronRight, ChevronDown, ExternalLink, Network, Plus, Pencil, Trash2, X } from "lucide-react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { useProjects, useTasks, useRfis, useSubmittals, useChangeOrders, useMilestones, useDailyLogs, useCreateMilestone, useUpdateMilestone, useDeleteMilestone } from "@/hooks/use-data";
@@ -25,6 +25,95 @@ const TYPE_STYLE: Record<string, { bar: string; chip: string }> = {
 function styleFor(type: string) { return TYPE_STYLE[type] ?? TYPE_STYLE.Task; }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Local-storage backed collapsible Google Calendar section.
+const GCAL_COLLAPSE_KEY = "trusspath:schedule:gcal:open";
+
+function GoogleCalendarSection({
+  importedCount,
+  onExport,
+  onImportClick,
+  onClearImported,
+}: {
+  importedCount: number;
+  onExport: () => void;
+  onImportClick: () => void;
+  onClearImported: () => void;
+}) {
+  // Default closed — the whole point of the reshuffle is to keep the
+  // schedule visible without this block competing for attention.
+  const [open, setOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const raw = window.localStorage.getItem(GCAL_COLLAPSE_KEY);
+      return raw === null ? false : raw === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      try { window.localStorage.setItem(GCAL_COLLAPSE_KEY, next ? "1" : "0"); } catch {}
+      return next;
+    });
+  };
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-card shadow-sm">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls="gcal-integration-body"
+        data-testid="button-gcal-toggle"
+        className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-muted/40"
+      >
+        <div className="grid size-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+          <CalIcon className="size-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="font-display text-sm font-bold">Google Calendar Integration</h2>
+            {importedCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-600 dark:text-rose-400">
+                <span className="size-1.5 rounded-full bg-rose-500" />
+                {importedCount} imported
+              </span>
+            )}
+          </div>
+          {!open && (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              Export .ics, import from Google Calendar, or add events one at a time.
+            </p>
+          )}
+        </div>
+        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div id="gcal-integration-body" className="border-t border-border px-4 pb-4 pt-3">
+          <p className="max-w-2xl text-xs text-muted-foreground">
+            Export the full schedule as an <span className="font-medium text-foreground">.ics</span> for Google Calendar, add any event with one click, or import a Google Calendar export to overlay here.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={onExport} data-testid="button-export-ics">
+              <Download className="size-4" /> Export .ics
+            </Button>
+            <Button size="sm" variant="outline" onClick={onImportClick} data-testid="button-import-ics">
+              <Upload className="size-4" /> Import .ics
+            </Button>
+          </div>
+          {importedCount > 0 && (
+            <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+              <span className="size-2 rounded-full bg-rose-500" />
+              {importedCount} event{importedCount === 1 ? "" : "s"} loaded from Google Calendar export
+              <button className="ml-1 text-rose-500 hover:underline" onClick={onClearImported} data-testid="button-clear-imported">clear</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -220,34 +309,6 @@ export default function SchedulePage() {
         </Link>
       </div>
 
-      {/* Google Calendar integration card */}
-      <div className="mb-4 rounded-lg border border-border bg-card p-4 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="grid size-9 shrink-0 place-items-center rounded-md bg-primary/10 text-primary"><CalIcon className="size-5" /></div>
-            <div>
-              <h2 className="font-display text-sm font-bold">Google Calendar Integration</h2>
-              <p className="mt-0.5 max-w-xl text-xs text-muted-foreground">
-                Export the full schedule as an <span className="font-medium text-foreground">.ics</span> for Google Calendar, add any event with one click, or import a Google Calendar export to overlay here.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={handleExport} data-testid="button-export-ics"><Download className="size-4" /> Export .ics</Button>
-            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} data-testid="button-import-ics"><Upload className="size-4" /> Import .ics</Button>
-            <input ref={fileRef} type="file" accept=".ics,text/calendar" className="hidden" data-testid="input-import-ics"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ""; }} />
-          </div>
-        </div>
-        {imported.length > 0 && (
-          <div className="mt-3 flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-            <span className="size-2 rounded-full bg-rose-500" />
-            {imported.length} event{imported.length === 1 ? "" : "s"} loaded from Google Calendar export
-            <button className="ml-1 text-rose-500 hover:underline" onClick={() => setImported([])} data-testid="button-clear-imported">clear</button>
-          </div>
-        )}
-      </div>
-
       {/* Month navigation */}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-display text-lg font-extrabold tracking-tight" data-testid="sched-month-label">{monthLabel}</h2>
@@ -308,6 +369,18 @@ export default function SchedulePage() {
           })}
         </div>
       </div>
+
+      {/* Google Calendar integration — collapsible, positioned below the
+          calendar grid so it doesn't steal focus from the main schedule.
+          Persist open/closed state in localStorage. */}
+      <GoogleCalendarSection
+        importedCount={imported.length}
+        onExport={handleExport}
+        onImportClick={() => fileRef.current?.click()}
+        onClearImported={() => setImported([])}
+      />
+      <input ref={fileRef} type="file" accept=".ics,text/calendar" className="hidden" data-testid="input-import-ics"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ""; }} />
 
       {/* Selected day detail */}
       <div className="mt-4 rounded-lg border border-border bg-card p-4 shadow-sm">
