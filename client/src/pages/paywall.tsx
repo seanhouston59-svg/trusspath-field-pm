@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { HardHat, Lock, ShieldCheck, LogOut, Loader2, Mail, RefreshCw, CreditCard } from "lucide-react";
+import { AlertTriangle, HardHat, Lock, ShieldCheck, LogOut, Loader2, Mail, RefreshCw, CreditCard } from "lucide-react";
 import { Logo } from "@/components/bits";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,8 +16,17 @@ type BillingStatus = {
   status: string | null;
   billing: string | null;
   currentPeriodEnd: string | null;
+  trialEndsAt?: string | null;
+  cancelAtPeriodEnd?: boolean;
   hasCustomer: boolean;
 };
+
+function fmtDate(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+}
 
 const PLANS: Array<{ id: "starter" | "pro" | "enterprise"; name: string; price: string; blurb: string }> = [
   { id: "starter", name: "Starter", price: "$49/user/mo", blurb: "Small crews. Core project + field tools." },
@@ -102,6 +111,38 @@ export default function Paywall() {
   const approved = approvalStatus === "approved";
   const subscribed = isSubscriptionActive(subStatus);
 
+  // Dunning banner - shown at the top when the org is in a bad billing state.
+  // 'past_due' / 'unpaid' -> Stripe couldn't collect. Portal is the retry path.
+  // 'incomplete' / 'incomplete_expired' -> checkout never finished paying.
+  // 'canceled' -> subscription is fully gone; user can restart from plans below.
+  const dunning: { tone: "red" | "amber"; title: string; body: string; cta: string | null } | null = (() => {
+    if (subStatus === "past_due" || subStatus === "unpaid") {
+      return {
+        tone: "red",
+        title: "Your last payment didn't go through.",
+        body: "We'll keep trying, but access is paused until it clears. Update your card in the billing portal and Stripe will retry immediately.",
+        cta: "Update payment method",
+      };
+    }
+    if (subStatus === "incomplete" || subStatus === "incomplete_expired") {
+      return {
+        tone: "amber",
+        title: "Your checkout didn't finish.",
+        body: "Stripe never confirmed a successful payment. Reopen billing to finish, or pick a plan again below.",
+        cta: billing.data?.hasCustomer ? "Resume billing" : null,
+      };
+    }
+    if (subStatus === "canceled") {
+      return {
+        tone: "amber",
+        title: "Your subscription is canceled.",
+        body: "Access is paused. Pick a plan below to reactivate - your data is still here.",
+        cta: null,
+      };
+    }
+    return null;
+  })();
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
@@ -122,6 +163,42 @@ export default function Paywall() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-8 p-6 md:p-10" data-testid="page-paywall">
+        {dunning && (
+          <div
+            role="alert"
+            className={
+              dunning.tone === "red"
+                ? "flex items-start gap-3 rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-100"
+                : "flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100"
+            }
+            data-testid="paywall-dunning-banner"
+          >
+            <AlertTriangle className={`mt-0.5 size-5 shrink-0 ${dunning.tone === "red" ? "text-red-400" : "text-amber-400"}`} aria-hidden />
+            <div className="flex-1">
+              <div className="font-semibold">{dunning.title}</div>
+              <p className="mt-0.5 opacity-90">{dunning.body}</p>
+              {billing.data?.currentPeriodEnd && subStatus !== "canceled" && (
+                <p className="mt-0.5 text-xs opacity-70">Current period ends {fmtDate(billing.data.currentPeriodEnd)}.</p>
+              )}
+            </div>
+            {dunning.cta && (
+              <Button
+                size="sm"
+                variant="outline"
+                className={dunning.tone === "red"
+                  ? "border-red-400/60 bg-red-500/20 hover:bg-red-500/30"
+                  : "border-amber-400/60 bg-amber-500/20 hover:bg-amber-500/30"}
+                onClick={() => portalMut.mutate()}
+                disabled={portalMut.isPending}
+                data-testid="paywall-dunning-cta"
+              >
+                {portalMut.isPending ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <CreditCard className="mr-1.5 size-4" />}
+                {dunning.cta}
+              </Button>
+            )}
+          </div>
+        )}
+
         <section className="space-y-3 text-center">
           <div className="mx-auto grid size-14 place-items-center rounded-full bg-primary/10 text-primary">
             <Lock className="size-7" />

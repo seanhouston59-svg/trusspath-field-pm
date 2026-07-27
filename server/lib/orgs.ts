@@ -122,6 +122,7 @@ export async function updateOrgBilling(orgId: number, patch: Partial<{
   subscriptionBilling: string;
   subscriptionCurrentPeriodEnd: string;
   trialEndsAt: string;
+  cancelAtPeriodEnd: boolean;
 }>): Promise<Organization | undefined> {
   const data: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(patch)) if (v !== undefined) data[k] = v;

@@ -21,6 +21,10 @@ export const organizations = pgTable("organizations", {
   subscriptionBilling: text("subscription_billing"), // monthly | annual
   subscriptionCurrentPeriodEnd: text("subscription_current_period_end"),
   trialEndsAt: text("trial_ends_at"),
+  // True once the user schedules a cancel from the Stripe portal; the sub is
+  // still active until subscriptionCurrentPeriodEnd, then Stripe fires
+  // customer.subscription.deleted and we flip subscriptionStatus to 'canceled'.
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
   // IANA timezone name for this org. Used for greetings, "today" calculations,
   // and any user-facing date formatting. Defaults to America/Denver in the DB.
   timezone: text("timezone").notNull().default("America/Denver"),

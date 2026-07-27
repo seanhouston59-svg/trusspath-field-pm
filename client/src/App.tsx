@@ -40,6 +40,7 @@ import Schedule from "@/pages/schedule";
 import Gantt from "@/pages/gantt";
 import Integrations from "@/pages/integrations";
 import { JarvisPanel } from "@/components/jarvis-panel";
+import { BillingBanner } from "@/components/billing-banner";
 import { ErrorBoundary } from "@/components/error-boundary";
 import Messages from "@/pages/messages";
 import Notes from "@/pages/notes";
@@ -183,7 +184,13 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  return <>{children}</>;
+  return (
+    <>
+      {/* Platform-owners bypass billing entirely, so skip the banner for them. */}
+      {!isPlatformOwner && <BillingBanner />}
+      {children}
+    </>
+  );
 }
 
 /** Wrapper for /paywall: only reachable when authenticated. */

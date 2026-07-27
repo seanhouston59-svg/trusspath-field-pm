@@ -679,6 +679,9 @@ export type BillingStatus = {
   billing: string | null;
   currentPeriodEnd: string | null;
   trialEndsAt?: string | null;
+  // True when the user asked Stripe to cancel at period end. Subscription is
+  // still active until currentPeriodEnd, then Stripe deletes it.
+  cancelAtPeriodEnd?: boolean;
   hasCustomer: boolean;
   seats?: { active: number; included: number | null; overage: number | null };
 };

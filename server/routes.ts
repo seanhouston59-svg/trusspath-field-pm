@@ -1189,6 +1189,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
               subscriptionPlan: planTier,
               subscriptionBilling: billingKind,
               trialEndsAt: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : undefined,
+              // True when the user scheduled a cancel from the portal. The sub
+              // stays active until subscriptionCurrentPeriodEnd, then Stripe
+              // fires subscription.deleted and we mark status=canceled.
+              cancelAtPeriodEnd: !!sub.cancel_at_period_end,
             });
           }
           break;
@@ -1197,7 +1201,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
           const sub = event.data.object;
           const { orgId } = await orgFromEvent(sub);
           if (orgId) {
-            await updateOrgBilling(orgId, { subscriptionStatus: "canceled" });
+            // Cancellation is final now - clear the pending flag so future
+            // reactivations start from a clean slate.
+            await updateOrgBilling(orgId, { subscriptionStatus: "canceled", cancelAtPeriodEnd: false });
           }
           break;
         }
@@ -1323,6 +1329,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       billing: org.subscriptionBilling || null,
       currentPeriodEnd: org.subscriptionCurrentPeriodEnd || null,
       trialEndsAt: org.trialEndsAt || null,
+      cancelAtPeriodEnd: !!org.cancelAtPeriodEnd,
       hasCustomer: !!org.stripeCustomerId,
       seats: {
         active: seats,
