@@ -14,6 +14,7 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 
 type OpenPunch = {
   id: number;
@@ -28,13 +29,23 @@ export function ClockStatusLight() {
   const qc = useQueryClient();
   const [, setLocation] = useLocation();
   const { data } = useQuery<PunchesResp>({
-    queryKey: ["/api/field/punches", { limit: 5 }],
-    // Poll every 30s so multi-device use stays in sync. Cheap query.
-    refetchInterval: 30_000,
+    queryKey: ["/api/field/punches"],
+    // Explicit queryFn \u2014 the shared default one joins queryKey with "/",
+    // so an object in the key would produce "/api/field/punches/[object Object]".
+    // We hit the base URL directly with a real query string instead.
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/field/punches?limit=5");
+      return (await res.json()) as PunchesResp;
+    },
+    // Poll every 20s so multi-device use stays in sync. Cheap query.
+    refetchInterval: 20_000,
     // Don't retry hard on 401 \u2014 users hitting nav pre-login shouldn't
     // spam the endpoint.
     retry: false,
-    staleTime: 15_000,
+    staleTime: 10_000,
+    // Also refetch when the tab regains focus \u2014 catches punches made on
+    // another device (mobile field, laptop office).
+    refetchOnWindowFocus: true,
   });
 
   // Listen for local punches (from timecard.tsx) so the light updates
