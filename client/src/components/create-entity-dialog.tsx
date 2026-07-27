@@ -31,6 +31,9 @@ type Props = {
   submitLabel?: string;
   isPending?: boolean;
   onSubmit: (values: Record<string, string | number>) => Promise<void> | void;
+  /** Fires whenever a field value changes. Return a partial update to also patch
+   *  other fields (e.g. selecting a Position also fills Access Level). */
+  onFieldChange?: (name: string, value: string | number, values: Record<string, string | number>) => Record<string, string | number> | void;
 };
 
 function today() {
@@ -39,7 +42,7 @@ function today() {
 }
 
 export function CreateEntityDialog({
-  open, onOpenChange, title, fields, defaults, submitLabel = "Save", isPending = false, onSubmit,
+  open, onOpenChange, title, fields, defaults, submitLabel = "Save", isPending = false, onSubmit, onFieldChange,
 }: Props) {
   const [values, setValues] = useState<Record<string, string | number>>(defaults);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +62,12 @@ export function CreateEntityDialog({
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const set = (name: string, v: string | number) => setValues((s) => ({ ...s, [name]: v }));
+  const set = (name: string, v: string | number) => setValues((s) => {
+    const next = { ...s, [name]: v };
+    // Let the parent inject additional field updates in response to this change.
+    const patch = onFieldChange?.(name, v, next);
+    return patch ? { ...next, ...patch } : next;
+  });
 
   const submit = async () => {
     const missing = fields.filter((f) => f.required && (values[f.name] === "" || values[f.name] === undefined));

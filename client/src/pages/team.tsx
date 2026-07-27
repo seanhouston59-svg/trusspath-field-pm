@@ -11,6 +11,34 @@ import { ACCESS_BY_SLUG } from "@shared/access-levels";
 import type { AccessLevel } from "@shared/access-levels";
 import type { TeamMember } from "@shared/schema";
 
+/**
+ * Position options for the project team roster.
+ * This is a display-only label describing what someone does on this project.
+ * Actual login access (Owner / Admin / PM / Foreman / Viewer) is granted
+ * separately in Settings → Team & Access when an org member is invited.
+ */
+const POSITIONS: { value: string; label: string }[] = [
+  { value: "Project Executive",         label: "Project Executive" },
+  { value: "Project Manager",           label: "Project Manager" },
+  { value: "Assistant Project Manager", label: "Assistant Project Manager" },
+  { value: "Estimator",                 label: "Estimator" },
+  { value: "Superintendent",            label: "Superintendent" },
+  { value: "Site Lead",                 label: "Site Lead" },
+  { value: "Assistant Superintendent",  label: "Assistant Superintendent" },
+  { value: "Foreman",                   label: "Foreman" },
+  { value: "Field Engineer",            label: "Field Engineer" },
+  { value: "Safety Officer",            label: "Safety Officer" },
+  { value: "Quality Control",           label: "Quality Control" },
+  { value: "Subcontractor",             label: "Subcontractor" },
+  { value: "Architect",                 label: "Architect" },
+  { value: "Engineer",                  label: "Engineer" },
+  { value: "Owner Representative",      label: "Owner Representative" },
+  { value: "Inspector",                 label: "Inspector" },
+  { value: "Other",                     label: "Other" },
+];
+
+const POSITION_BY_VALUE = Object.fromEntries(POSITIONS.map((p) => [p.value, p]));
+
 const COLOR_OPTIONS = ["amber", "blue", "emerald", "violet", "rose", "cyan", "orange", "slate"];
 
 const TRADE_TINT: Record<string, string> = {
@@ -36,13 +64,18 @@ export default function Team() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
 
-  const LEVEL_OPTIONS = (Object.values(ACCESS_BY_SLUG)).map((l) => ({ value: l.slug, label: l.label }));
   const levelLabel = (slug: string) => (ACCESS_BY_SLUG as Record<string, { label: string }>)[slug]?.label ?? slug;
+  // If we're editing an existing member whose legacy free-text role isn't in POSITIONS,
+  // surface it as an extra option so the Select still renders their current value.
+  const legacyRole = editing?.role && !POSITION_BY_VALUE[editing.role] ? editing.role : null;
+  const POSITION_OPTIONS = [
+    ...POSITIONS.map((p) => ({ value: p.value, label: p.label })),
+    ...(legacyRole ? [{ value: legacyRole, label: `${legacyRole} (custom)` }] : []),
+  ];
 
   const fields: FieldDef[] = [
     { name: "name", label: "Full Name", type: "text", required: true, half: true },
-    { name: "role", label: "Job Title", type: "text", placeholder: "Superintendent", required: true, half: true },
-    { name: "accessLevel", label: "Access Level", type: "select", options: LEVEL_OPTIONS, required: true, half: true },
+    { name: "role", label: "Position", type: "select", options: POSITION_OPTIONS, placeholder: "Select a position…", required: true, half: true },
     { name: "trade", label: "Trade", type: "text", placeholder: "Electrical", required: true, half: true },
     { name: "company", label: "Company", type: "text", required: true, half: true },
     { name: "email", label: "Email", type: "text", placeholder: "name@company.com", half: true },
@@ -55,14 +88,17 @@ export default function Team() {
   const openEdit = (m: TeamMember) => { setEditing(m); setOpen(true); };
 
   const defaults: Record<string, string | number> = editing
-    ? { name: editing.name, role: editing.role, accessLevel: editing.accessLevel ?? "project_manager", trade: editing.trade, company: editing.company, email: editing.email ?? "", phone: editing.phone ?? "", color: editing.color, companyPhoto: editing.companyPhoto ?? "" }
-    : { color: "blue", accessLevel: "project_manager", email: "", phone: "", companyPhoto: "" };
+    ? { name: editing.name, role: editing.role, trade: editing.trade, company: editing.company, email: editing.email ?? "", phone: editing.phone ?? "", color: editing.color, companyPhoto: editing.companyPhoto ?? "" }
+    : { color: "blue", email: "", phone: "", companyPhoto: "" };
 
   const handleSubmit = (v: Record<string, string | number>) => {
+    // Access level is intentionally not in the form — it's granted at signup/invite
+    // via Settings → Team & Access. On this project roster we preserve any existing
+    // access tag (edit) or default to "project_manager" (new).
     const payload = {
       name: String(v.name),
       role: String(v.role),
-      accessLevel: String(v.accessLevel ?? "project_manager") as AccessLevel,
+      accessLevel: (editing?.accessLevel ?? "project_manager") as AccessLevel,
       trade: String(v.trade),
       company: String(v.company),
       email: String(v.email ?? ""),
@@ -81,7 +117,7 @@ export default function Team() {
   };
 
   return (
-    <Layout title="Team" actions={
+    <Layout title="Project Team" actions={
       canManage ? <Button size="sm" onClick={openNew} data-testid="button-new-member"><Plus className="size-4" /> Add Member</Button> : undefined
     }>
       {canManage && (

@@ -71,7 +71,7 @@ export const APP_NAV: NavGroup[] = [
   {
     title: "People",
     items: [
-      { href: "/team", label: "Team", icon: "Users" },
+      { href: "/team", label: "Project Team", icon: "Users" },
       { href: "/contacts", label: "Contacts", icon: "Contact" },
       { href: "/messages", label: "Messages", icon: "MessageSquare" },
     ],
