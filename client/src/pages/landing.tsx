@@ -21,12 +21,17 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 /* ============================ Pricing config ============================ */
+// Kept in sync with client/src/pages/signup.tsx PLAN_INFO. Any price change
+// here must also change there.
 type Plan = {
   key: "starter" | "pro" | "enterprise";
   name: string;
   tagline: string;
-  monthly: number;
-  annual: number; // per month when billed annually
+  baseMonthly: number;    // $/mo flat when billed monthly
+  baseAnnual: number;     // $/yr flat when billed annually
+  overageMonthly: number; // $/seat over the included count, billed monthly
+  overageAnnual: number;  // $/seat/year over the included count, billed annually
+  includedSeats: number;
   featured?: boolean;
   bullets: string[];
   cta: string;
@@ -36,12 +41,15 @@ const PLANS: Plan[] = [
   {
     key: "starter",
     name: "Starter",
-    tagline: "For small crews getting off spreadsheets.",
-    monthly: 49,
-    annual: 39,
+    tagline: "For a lean crew getting started.",
+    baseMonthly: 79,
+    baseAnnual: 790,
+    overageMonthly: 19,
+    overageAnnual: 190,
+    includedSeats: 3,
     bullets: [
+      "3 seats included",
       "Up to 5 active projects",
-      "10 team members",
       "Daily logs, RFIs, submittals, punch lists",
       "Mobile field kit (PWA, offline)",
       "Photo & document library",
@@ -52,13 +60,16 @@ const PLANS: Plan[] = [
   {
     key: "pro",
     name: "Pro",
-    tagline: "Everything a GC needs to run the job.",
-    monthly: 129,
-    annual: 99,
+    tagline: "Best for growing crews.",
+    baseMonthly: 149,
+    baseAnnual: 1490,
+    overageMonthly: 29,
+    overageAnnual: 290,
+    includedSeats: 5,
     featured: true,
     bullets: [
+      "5 seats included",
       "Unlimited projects",
-      "Unlimited team members",
       "Change orders + cost tracking",
       "Gantt + schedule + Google Calendar",
       "Blueprints + drone-capture add-ons",
@@ -71,10 +82,14 @@ const PLANS: Plan[] = [
   {
     key: "enterprise",
     name: "Enterprise",
-    tagline: "Multi-office GCs and owner reps.",
-    monthly: 299,
-    annual: 249,
+    tagline: "For established general contractors.",
+    baseMonthly: 299,
+    baseAnnual: 2990,
+    overageMonthly: 39,
+    overageAnnual: 390,
+    includedSeats: 10,
     bullets: [
+      "10 seats included",
       "Everything in Pro",
       "SSO / SAML + custom roles",
       "Dedicated success manager",
@@ -310,8 +325,8 @@ const FAQS: { q: string; a: string }[] = [
     a: "Yes. Monthly plans cancel at the end of the current billing cycle. Annual plans can downgrade at renewal. You keep read-only access to your data for 90 days after cancellation.",
   },
   {
-    q: "Do you charge per project?",
-    a: "No. Pricing is strictly per user, per month. Run as many projects as you want on any plan (Starter is capped at 5 active projects; Pro and Enterprise are unlimited).",
+    q: "How does seat pricing work?",
+    a: "Every plan is a flat monthly rate with a fixed number of seats included (3 for Starter, 5 for Pro, 10 for Enterprise). If you add more people, extra seats are billed at the plan's overage rate ($19, $29, or $39/mo). No per-project fees. Starter caps at 5 active projects; Pro and Enterprise are unlimited.",
   },
 ];
 
@@ -678,7 +693,7 @@ export default function Landing() {
           <div className="mx-auto max-w-2xl text-center">
             <div className="ff-kicker text-primary">Pricing</div>
             <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Straight pricing. No "call for quote."</h2>
-            <p className="mt-3 text-muted-foreground">Per user, per month. Cancel anytime. Save 20% annually.</p>
+            <p className="mt-3 text-muted-foreground">Flat monthly rate with seats included. Add more anytime. Save ~17% annually.</p>
           </div>
 
           {/* Billing toggle */}
@@ -697,7 +712,7 @@ export default function Landing() {
                 data-testid="billing-annual"
               >
                 Annual
-                <span className="ml-1.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold text-primary">SAVE 20%</span>
+                <span className="ml-1.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold text-primary">SAVE ~17%</span>
               </button>
             </div>
           </div>
@@ -705,8 +720,9 @@ export default function Landing() {
           {/* Plan cards */}
           <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-3">
             {PLANS.map((p) => {
-              const price = billing === "monthly" ? p.monthly : p.annual;
-              const yearly = billing === "monthly" ? p.monthly * 12 : p.annual * 12;
+              const price = billing === "monthly" ? p.baseMonthly : p.baseAnnual;
+              const overage = billing === "monthly" ? p.overageMonthly : p.overageAnnual;
+              const period = billing === "monthly" ? "/mo" : "/yr";
               const selected = activePlan === p.key;
               return (
                 <button
@@ -727,11 +743,11 @@ export default function Landing() {
                   <div className="ff-kicker text-[10px]">{p.name}</div>
                   <div className="mt-1 text-sm text-muted-foreground">{p.tagline}</div>
                   <div className="mt-5 flex items-baseline gap-1.5">
-                    <span className="font-display text-5xl font-black tracking-tight">${price}</span>
-                    <span className="text-sm text-muted-foreground">/user/mo</span>
+                    <span className="font-display text-5xl font-black tracking-tight">${price.toLocaleString()}</span>
+                    <span className="text-sm text-muted-foreground">{period}</span>
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Billed {billing} · <span className="font-semibold text-foreground">${yearly.toLocaleString()}/user/year</span>
+                    {p.includedSeats} seats included · <span className="font-semibold text-foreground">Extra seats: ${overage}{period}</span>
                   </div>
                   <ul className="mt-6 flex-1 space-y-2.5 text-sm">
                     {p.bullets.map((b) => (
@@ -755,10 +771,19 @@ export default function Landing() {
           {/* Subscribe form beneath pricing */}
           <div id="subscribe" className="mx-auto mt-12 max-w-md rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div className="ff-kicker text-[10px] text-primary">Subscribe</div>
-            <div className="mt-1 font-display text-xl font-bold">
-              Start with {PLANS.find((p) => p.key === activePlan)?.name} — <span className="text-primary">${billing === "monthly" ? PLANS.find((p) => p.key === activePlan)?.monthly : PLANS.find((p) => p.key === activePlan)?.annual}/user/mo</span>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">Billed {billing}. Change plan or cancel anytime.</p>
+            {(() => {
+              const activeP = PLANS.find((p) => p.key === activePlan)!;
+              const activePrice = billing === "monthly" ? activeP.baseMonthly : activeP.baseAnnual;
+              const activePeriod = billing === "monthly" ? "/mo" : "/yr";
+              return (
+                <>
+                  <div className="mt-1 font-display text-xl font-bold">
+                    Start with {activeP.name} — <span className="text-primary">${activePrice.toLocaleString()}{activePeriod}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Includes {activeP.includedSeats} seats. Billed {billing}. Change plan or cancel anytime.</p>
+                </>
+              );
+            })()}
             <div className="mt-5">
               <SubscribeForm defaultPlan={activePlan} billing={billing} />
             </div>
