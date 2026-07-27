@@ -363,6 +363,7 @@ function MobileOverflowMenu() {
   const { level, setLevel } = useAccess();
   const { account, logout } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
+  const field = useFieldMode();
   const displayName = account?.displayName || "User";
   const position = account?.position || "";
   const initials = displayName
@@ -431,6 +432,14 @@ function MobileOverflowMenu() {
               </Select>
             </div>
             <button
+              onClick={() => { setOpen(false); field.enter(); }}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted"
+              data-testid="button-field-mode-mobile"
+            >
+              <HardHat className="size-4 text-amber-600 dark:text-amber-400" />
+              Enter Field mode
+            </button>
+            <button
               onClick={() => { toggle(); }}
               className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted"
               data-testid="button-theme-mobile"
@@ -453,6 +462,28 @@ function MobileOverflowMenu() {
       )}
       <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} />
     </div>
+  );
+}
+
+/**
+ * Topbar toggle for entering field mode from anywhere in the app.
+ * When already in field mode the FieldModeLayout renders instead of the
+ * normal Layout, so this button is only ever shown in the full-chrome view
+ * and always enters (never exits) — the FieldModeLayout has its own Exit.
+ */
+function FieldModeToggle() {
+  const field = useFieldMode();
+  return (
+    <button
+      type="button"
+      onClick={field.enter}
+      aria-label="Enter Field mode"
+      title="Enter Field mode — chromeless on-site view"
+      data-testid="button-field-mode-toggle"
+      className="inline-flex size-9 items-center justify-center rounded-md border border-border text-muted-foreground hover-elevate hover:border-amber-500/60 hover:text-amber-600 dark:hover:text-amber-400"
+    >
+      <HardHat className="size-4" />
+    </button>
   );
 }
 
@@ -586,6 +617,7 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
             {actions && <div className="flex items-center gap-2 [&_button]:h-10 md:[&_button]:h-9">{actions}</div>}
             {/* Desktop: show all controls inline */}
             <div className="hidden md:flex items-center gap-2">
+              <FieldModeToggle />
               <RoleSwitcher />
               <ThemeToggle />
               <TopbarUser />
