@@ -482,17 +482,22 @@ function MobileOverflowMenu() {
  */
 function FieldModeToggle() {
   const field = useFieldMode();
-  // The hardhat is now the primary discovery point for Field mode (the
-  // big dashboard launcher card was removed). A subtle periodic wiggle
-  // draws the eye without being distracting; hovering pauses it so the
-  // icon is still at the moment of interaction. The `motion-reduce:`
-  // variant disables the animation for users who prefer reduced motion.
+  const [, navigate] = useLocation();
+  // The hardhat is the primary discovery point for Field mode. Clicking
+  // it should take the user to the Field Kit *hub* (the on-site launcher
+  // grid: Clock, Punches, Daily log, Photos, Observations) — not just
+  // flip the current page into chromeless mode. Otherwise, from the
+  // dashboard, the hardhat looks like it "does nothing" (the same
+  // dashboard just loses its chrome).
   return (
     <button
       type="button"
-      onClick={field.enter}
-      aria-label="Enter Field mode"
-      title="Enter Field mode — chromeless on-site view"
+      onClick={() => {
+        field.enter();
+        navigate("/field");
+      }}
+      aria-label="Open Field Kit"
+      title="Open Field Kit — on-site launcher"
       data-testid="button-field-mode-toggle"
       className="group inline-flex size-9 items-center justify-center rounded-md border border-amber-500/40 bg-amber-500/5 text-amber-600 hover-elevate hover:border-amber-500/70 hover:bg-amber-500/10 dark:text-amber-400"
     >
