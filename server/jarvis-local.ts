@@ -2,40 +2,7 @@ import { storage, normalizeQuestion, inferTopic } from "./storage";
 import { buildContext, type ContextBundle } from "./jarvis";
 import { runHealthScan } from "./health";
 import { getWeather, getWeatherOneLiner, getNearbyPlaces, hasPlacesApi } from "./apis";
-import { getOrganization, isValidTimezone } from "./lib/orgs";
-
-// Resolve the caller's org timezone — falls back to America/Denver whenever
-// the org can't be looked up or its stored timezone is invalid. Used to keep
-// greetings, "today", and other user-facing dates in local time on Vercel
-// serverless (which runs in UTC).
-async function resolveOrgTimezone(organizationId?: number): Promise<string> {
-  const FALLBACK = "America/Denver";
-  if (!organizationId) return FALLBACK;
-  try {
-    const org = await getOrganization(organizationId);
-    const tz = org?.timezone;
-    return isValidTimezone(tz) ? (tz as string) : FALLBACK;
-  } catch {
-    return FALLBACK;
-  }
-}
-
-// Local YYYY-MM-DD in a specific IANA timezone — so "today" doesn't roll over
-// at 6pm Denver just because it's midnight UTC.
-function todayInTz(timezone: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-    // en-CA yields YYYY-MM-DD already.
-    return parts;
-  } catch {
-    return new Date().toISOString().slice(0, 10);
-  }
-}
+import { resolveOrgTimezone, todayInTz } from "./lib/orgs";
 
 // When no LLM API key is available, Jarvis uses this local response engine.
 // Responses are written to sound natural and conversational, the way a real
@@ -476,8 +443,8 @@ const DAILY_SAFETY_TOPICS = [
   },
 ];
 
-export async function buildSafetyBrief(projectId: number | undefined): Promise<string> {
-  const ctx = await buildContext(projectId);
+export async function buildSafetyBrief(projectId: number | undefined, organizationId?: number): Promise<string> {
+  const ctx = await buildContext(projectId, organizationId);
   const lines = ctx.compact.split("\n");
   const projectLine = lines[0] ?? "No active project found.";
   const todayLine = lines[1] ?? "";
@@ -683,7 +650,7 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
   // Check for safety brief intent
   if (/\b(safety brief|safety briefing|toolbox talk|safety meeting|team safety|give me a safety|generate a safety|safety stand)\b/i.test(lower)) {
     try {
-      const brief = await buildSafetyBrief(projectId);
+      const brief = await buildSafetyBrief(projectId, organizationId);
       return { reply: brief };
     } catch {
       return { reply: "I tried generating a safety brief but ran into an issue. Make sure you have a project selected with an address set, and I'll pull live weather data into it too." };
@@ -697,7 +664,7 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
 
   // Check for "how many" project data queries
   if (/\bhow many\b/i.test(lower)) {
-    const ctx = await buildContext(projectId);
+    const ctx = await buildContext(projectId, organizationId);
     const tasksLine = ctx.compact.split("\n").find((l) => l.startsWith("TASKS:"));
     const rfiLine = ctx.compact.split("\n").find((l) => l.startsWith("RFIS:"));
     const subLine = ctx.compact.split("\n").find((l) => l.startsWith("SUBMITTALS:"));

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { storage } from "./storage";
 import { runHealthScan } from "./health";
+import { resolveOrgTimezone, todayInTz } from "./lib/orgs";
 
 // OpenAI model used for Jarvis. Configurable via env so we can swap without a
 // deploy — defaults to gpt-4o-mini which is cheap ($0.15/1M input, $0.60/1M
@@ -43,27 +44,28 @@ When you don't know something, just say so — don't guess.
 ${length}`;
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
+// All "today" checks now honor the caller's org timezone. Callers pass in the
+// resolved local YYYY-MM-DD so the same iteration sees a consistent "today"
+// even if it straddles midnight during processing.
 function isOpen(status: string): boolean {
   const s = (status || "").toLowerCase();
   return !["complete", "completed", "closed", "approved", "done"].includes(s);
 }
 
-function overdue(arr: any[], field: string): any[] {
-  const t = today();
-  return arr.filter((x) => x[field] && x[field] < t && isOpen(x.status));
+function overdue(arr: any[], field: string, today: string): any[] {
+  return arr.filter((x) => x[field] && x[field] < today && isOpen(x.status));
 }
-function dueToday(arr: any[], field: string): any[] {
-  const t = today();
-  return arr.filter((x) => x[field] === t);
+function dueToday(arr: any[], field: string, today: string): any[] {
+  return arr.filter((x) => x[field] === today);
 }
 
 export type ContextBundle = { compact: string; projectName?: string };
 
-export async function buildContext(projectId?: number): Promise<ContextBundle> {
+// buildContext now accepts the caller's org id so "today", "overdue", and
+// "due today" match what the user sees in the app instead of UTC.
+export async function buildContext(projectId?: number, organizationId?: number): Promise<ContextBundle> {
+  const timezone = await resolveOrgTimezone(organizationId);
+  const today = todayInTz(timezone);
   const p = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
   const pid = p?.id;
   const tasks = await storage.getTasks(pid);
@@ -74,11 +76,11 @@ export async function buildContext(projectId?: number): Promise<ContextBundle> {
   const team = await storage.getTeam();
 
   const L = (arr: any[], label: string, field: string) => {
-    const ov = overdue(arr, field).slice(0, 6);
-    const dt = dueToday(arr, field).slice(0, 6);
+    const ov = overdue(arr, field, today).slice(0, 6);
+    const dt = dueToday(arr, field, today).slice(0, 6);
     const open = arr.filter((x) => isOpen(x.status)).length;
     const lines: string[] = [];
-    lines.push(`${label}: ${arr.length} total, ${open} open, ${overdue(arr, field).length} overdue, ${dueToday(arr, field).length} due today`);
+    lines.push(`${label}: ${arr.length} total, ${open} open, ${overdue(arr, field, today).length} overdue, ${dueToday(arr, field, today).length} due today`);
     if (ov.length) lines.push("  OVERDUE: " + ov.map((x) => `${x.number || ""} ${x.title || x.subject || ""}`.trim()).join(" | "));
     if (dt.length) lines.push("  DUE TODAY: " + dt.map((x) => `${x.number || ""} ${x.title || x.subject || ""}`.trim()).join(" | "));
     return lines.join("\n");
@@ -86,7 +88,7 @@ export async function buildContext(projectId?: number): Promise<ContextBundle> {
 
   const blocks: string[] = [
     `PROJECT: ${p?.name ?? "—"} | status ${p?.status ?? "—"} | ${p?.startDate ?? "?"} → ${p?.endDate ?? "?"}`,
-    `TODAY: ${today()}`,
+    `TODAY: ${today} (${timezone})`,
     L(tasks, "TASKS", "dueDate"),
     L(rfis, "RFIS", "dueDate"),
     L(subs, "SUBMITTALS", "dueDate"),
@@ -115,9 +117,9 @@ function formatScan(r: Awaited<ReturnType<typeof runHealthScan>>): string {
   return lines.join("\n");
 }
 
-export async function jarvisChat(projectId: number | undefined, history: Msg[]): Promise<{ reply: string }> {
+export async function jarvisChat(projectId: number | undefined, history: Msg[], organizationId?: number): Promise<{ reply: string }> {
   assertHasOpenAIKey();
-  const { compact } = await buildContext(projectId);
+  const { compact } = await buildContext(projectId, organizationId);
   const settings = await storage.getSettings();
   const persona = buildPersona(settings);
   const client = new OpenAI();
@@ -162,9 +164,9 @@ export async function jarvisChat(projectId: number | undefined, history: Msg[]):
   return { reply: resp.output_text ?? "" };
 }
 
-export async function jarvisBrief(projectId: number | undefined): Promise<{ brief: string; context: ContextBundle }> {
+export async function jarvisBrief(projectId: number | undefined, organizationId?: number): Promise<{ brief: string; context: ContextBundle }> {
   assertHasOpenAIKey();
-  const context = await buildContext(projectId);
+  const context = await buildContext(projectId, organizationId);
   const settings = await storage.getSettings();
   const persona = buildPersona(settings);
   const client = new OpenAI();

@@ -81,6 +81,39 @@ export async function getOrganization(id: number): Promise<Organization | undefi
   return rows[0];
 }
 
+// Resolve the caller's org timezone — falls back to America/Denver whenever
+// the org can't be looked up or its stored timezone is invalid. Used by Jarvis
+// (both LLM and local paths) so greetings, "today", and other user-facing
+// dates stay in local time on Vercel serverless (which runs in UTC).
+export async function resolveOrgTimezone(organizationId?: number): Promise<string> {
+  const FALLBACK = "America/Denver";
+  if (!organizationId) return FALLBACK;
+  try {
+    const org = await getOrganization(organizationId);
+    const tz = org?.timezone;
+    return isValidTimezone(tz) ? (tz as string) : FALLBACK;
+  } catch {
+    return FALLBACK;
+  }
+}
+
+// Local YYYY-MM-DD in a specific IANA timezone — so "today" doesn't roll over
+// at 6pm Denver just because it's midnight UTC. Safe: falls back to UTC on
+// invalid tz rather than throwing.
+export function todayInTz(timezone: string): string {
+  try {
+    // en-CA formats as YYYY-MM-DD natively.
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
 export async function updateOrgBilling(orgId: number, patch: Partial<{
   stripeCustomerId: string;
   stripeSubscriptionId: string;

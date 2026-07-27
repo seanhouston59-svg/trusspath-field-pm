@@ -126,6 +126,29 @@ export default function AdminSignupsPage() {
     },
   });
 
+  const purgeExpired = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/demo-accounts/purge", { graceDays: 0 });
+      return (await res.json()) as { purgedAccountIds: number[]; purgedOrgIds: number[]; graceDays: number };
+    },
+    onSuccess: (data) => {
+      const n = data.purgedAccountIds.length;
+      toast({
+        title: n
+          ? `Purged ${n} expired demo${n === 1 ? "" : "s"}`
+          : "Nothing to purge",
+        description: n
+          ? `Also removed ${data.purgedOrgIds.length} sandbox org${data.purgedOrgIds.length === 1 ? "" : "s"} and all their seeded data.`
+          : "No expired demo accounts were past the grace window.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/demo-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/accounts"] });
+    },
+    onError: (e: any) => {
+      toast({ title: "Purge failed", description: e?.message || "Please try again.", variant: "destructive" });
+    },
+  });
+
   const copyText = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -165,13 +188,27 @@ export default function AdminSignupsPage() {
       {/* Demo login generator */}
       <Card data-testid="card-demo-login">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Sparkles className="size-4 text-primary" /> Demo logins (48 hours)
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Generate a temporary login you can hand to a prospect. They land in their own isolated sandbox
-            with full edit access, and the login stops working automatically after 48 hours.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Sparkles className="size-4 text-primary" /> Demo logins (48 hours)
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Generate a temporary login you can hand to a prospect. They land in their own isolated sandbox
+                with full edit access, and the login stops working automatically after 48 hours.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => purgeExpired.mutate()}
+              disabled={purgeExpired.isPending}
+              data-testid="button-purge-expired-demos"
+              title="Delete every expired demo account plus its sandbox org and all its seeded data."
+            >
+              {purgeExpired.isPending ? "Purging\u2026" : "Purge expired"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">

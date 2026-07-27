@@ -473,6 +473,7 @@ export interface IStorage {
   createDemoAccount(email: string, password: string, displayName: string, expiresAt: string): Promise<AccountPublic>;
   listDemoAccounts(): Promise<AccountPublic[]>;
   expireDemoAccount(id: number): Promise<AccountPublic | undefined>;
+  purgeExpiredDemos(graceDays: number): Promise<{ purgedAccountIds: number[]; purgedOrgIds: number[] }>;
   // ----- Admin / access control -----
   listAccountsForAdmin(): Promise<AccountPublic[]>;
   setAccountApproval(id: number, status: "pending" | "approved" | "denied", approverId: number): Promise<AccountPublic | undefined>;
@@ -1217,6 +1218,100 @@ class DatabaseStorage implements IStorage {
       .where(eq(accounts.id, id))
       .returning();
     return row ? this.toPublic(row) : undefined;
+  }
+
+  // Hard-delete demo accounts whose expiry is more than `graceDays` in the past,
+  // along with the isolated demo orgs they own and every child row that lived
+  // inside them. Safety rails:
+  //   - only touches accounts with a non-null demo_expires_at
+  //   - only touches orgs that (a) the demo account is a member of AND
+  //     (b) contain no non-demo members
+  // This keeps the function safe to run on a cron / at startup without any
+  // chance of nuking a real customer org that happened to briefly host a demo
+  // seat.
+  async purgeExpiredDemos(graceDays: number): Promise<{ purgedAccountIds: number[]; purgedOrgIds: number[] }> {
+    await ensureReady();
+    const cutoff = new Date(Date.now() - graceDays * 86400 * 1000).toISOString();
+
+    // Step 1 - find candidate demo accounts.
+    const expiredAccounts = await sql`
+      SELECT id FROM accounts
+      WHERE demo_expires_at IS NOT NULL
+        AND demo_expires_at < ${cutoff}
+    ` as Array<{ id: number }>;
+    if (!expiredAccounts.length) return { purgedAccountIds: [], purgedOrgIds: [] };
+    const accountIds = expiredAccounts.map((r) => r.id);
+
+    // Step 2 - find orgs to purge. An org is only purged when every member of
+    // it is one of the expired demo accounts. Otherwise we leave it alone even
+    // if a demo account was ever attached, so a real paying org is never at
+    // risk. Using ANY(array) is safe because accountIds is numeric only.
+    const orgsToPurge = await sql`
+      SELECT o.id FROM organizations o
+      WHERE EXISTS (
+        SELECT 1 FROM memberships m
+        WHERE m.organization_id = o.id AND m.account_id = ANY(${accountIds}::int[])
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM memberships m2
+        WHERE m2.organization_id = o.id AND NOT (m2.account_id = ANY(${accountIds}::int[]))
+      )
+    ` as Array<{ id: number }>;
+    const orgIds = orgsToPurge.map((r) => r.id);
+
+    if (orgIds.length) {
+      // Step 3 - gather every project inside these orgs so we can wipe their
+      // project-scoped children too. Only projects belonging to purged orgs.
+      const projectRows = await sql`
+        SELECT id FROM projects WHERE organization_id = ANY(${orgIds}::int[])
+      ` as Array<{ id: number }>;
+      const projectIds = projectRows.map((r) => r.id);
+
+      // Order matters: children first, then org-scoped, then the orgs.
+      // Project-scoped children (safe no-op when projectIds is empty).
+      if (projectIds.length) {
+        // Timesheet_entries cascades via timesheet_id already (see DDL). Others
+        // are deleted here explicitly.
+        await sql`DELETE FROM action_items WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM blueprints WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM change_orders WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM daily_logs WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM documents WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM drone_captures WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM jarvis_memory WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM messages WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM milestones WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM notes WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM photos WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM project_members WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM punch_items WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM rfis WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM submittals WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM tasks WHERE project_id = ANY(${projectIds}::int[])`;
+        await sql`DELETE FROM timesheets WHERE project_id = ANY(${projectIds}::int[])`;
+      }
+
+      // Org-scoped rows.
+      await sql`DELETE FROM invites WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM team_members WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM contacts WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM equipment WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM company_documents WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM integrations WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM app_settings WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM projects WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM memberships WHERE organization_id = ANY(${orgIds}::int[])`;
+      await sql`DELETE FROM organizations WHERE id = ANY(${orgIds}::int[])`;
+    }
+
+    // Step 4 - kill sessions + password reset tokens + memberships on any org
+    // that survived, then delete the accounts themselves.
+    await sql`DELETE FROM sessions WHERE account_id = ANY(${accountIds}::int[])`;
+    await sql`DELETE FROM password_reset_tokens WHERE account_id = ANY(${accountIds}::int[])`;
+    await sql`DELETE FROM memberships WHERE account_id = ANY(${accountIds}::int[])`;
+    await sql`DELETE FROM accounts WHERE id = ANY(${accountIds}::int[])`;
+
+    return { purgedAccountIds: accountIds, purgedOrgIds: orgIds };
   }
   async createPasswordResetToken(accountId: number): Promise<string> {
     await ensureReady();

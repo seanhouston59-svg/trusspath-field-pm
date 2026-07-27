@@ -1505,12 +1505,30 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ account: updated });
   });
 
+  // Purge demo accounts + their isolated demo orgs whose expiry is past the
+  // grace period. Owner-only. Callable both manually from the admin panel and
+  // opportunistically on server boot (see index.ts).
+  app.post("/api/admin/demo-accounts/purge", requireOwner, async (req: any, res) => {
+    const rawGrace = req.body?.graceDays;
+    const graceDays = Number.isFinite(Number(rawGrace)) && Number(rawGrace) >= 0
+      ? Math.min(365, Number(rawGrace))
+      : 7;
+    try {
+      const result = await storage.purgeExpiredDemos(graceDays);
+      res.json({ graceDays, ...result });
+    } catch (err: any) {
+      console.error("[demo-purge] failed:", err?.message ?? err);
+      res.status(500).json({ message: "Purge failed", error: err?.message ?? String(err) });
+    }
+  });
+
   // JARVIS — AI assistant
   app.get("/api/jarvis/brief", async (req: any, res) => {
     try {
-      // Try LLM-powered brief first; fall back to local if no API key or error
+      // Try LLM-powered brief first; fall back to local if no API key or error.
+      // Pass org id so the LLM path sees the same tz-aware "today" as the local path.
       try {
-        const result = await jarvisBrief(pid(req));
+        const result = await jarvisBrief(pid(req), req.organizationId);
         res.json({ ...result, mode: "llm" });
       } catch (llmErr) {
         console.log("[jarvis] LLM brief failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
@@ -1527,9 +1545,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.post("/api/jarvis/chat", async (req: any, res) => {
     try {
       const history = Array.isArray(req.body?.messages) ? req.body.messages : [];
-      // Try LLM-powered chat first; fall back to local engine
+      // Try LLM-powered chat first; fall back to local engine. Pass org id so
+      // the LLM path sees the same tz-aware "today" as the local path.
       try {
-        const result = await jarvisChat(pid(req), history);
+        const result = await jarvisChat(pid(req), history, req.organizationId);
         res.json({ ...result, mode: "llm" });
       } catch (llmErr) {
         console.log("[jarvis] LLM chat failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
@@ -1983,6 +2002,29 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (stripe) syncSeatsForOrg(stripe, invite.organizationId).catch(e => console.error("[invite:accept] seat sync failed:", e));
     res.json({ ok: true, membership });
   });
+
+  // Opportunistic demo-purge: at most once per hour per process. Kicked off
+  // asynchronously so it never delays the first request. Grace is 7 days so
+  // the admin panel still shows recently expired demos briefly. Failures are
+  // swallowed - the manual endpoint above covers any real cleanup need.
+  {
+    let lastPurgeAt = 0;
+    const runPurge = () => {
+      const now = Date.now();
+      if (now - lastPurgeAt < 60 * 60 * 1000) return;
+      lastPurgeAt = now;
+      storage.purgeExpiredDemos(7).then((r) => {
+        if (r.purgedAccountIds.length) {
+          console.log(`[demo-purge] auto-swept ${r.purgedAccountIds.length} account(s), ${r.purgedOrgIds.length} org(s)`);
+        }
+      }).catch((e) => {
+        console.log("[demo-purge] auto-sweep skipped:", e?.message ?? e);
+      });
+    };
+    // Kick off shortly after boot and then piggyback on demo-list requests.
+    setTimeout(runPurge, 5_000).unref?.();
+    app.use("/api/admin/demo-accounts", (_req, _res, next) => { runPurge(); next(); });
+  }
 
   return _httpServer;
 }
