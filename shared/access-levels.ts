@@ -57,7 +57,24 @@ const R = {
   settings: "/settings",
   settingsTeam: "/settings/team",
   adminSignups: "/admin/signups",
+  // Mobile field kit (PWA) routes
+  field: "/field",
+  fieldDailyLog: "/field/daily-log",
+  fieldTimecard: "/field/timecard",
+  fieldPhoto: "/field/photo",
+  fieldObservation: "/field/observation",
+  fieldPunch: "/field/punch",
 };
+
+// Field kit routes as a bundle for reuse across roles.
+const FIELD_KIT_ROUTES = [
+  "/field",
+  "/field/daily-log",
+  "/field/timecard",
+  "/field/photo",
+  "/field/observation",
+  "/field/punch",
+];
 
 const ALL = Object.values(R);
 
@@ -92,6 +109,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
       R.contacts, R.messages, R.notes, R.timesheets,
+      ...FIELD_KIT_ROUTES,
     ],
   },
   {
@@ -105,6 +123,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.punch, R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints,
       R.messages, R.notes, R.timesheets,
+      ...FIELD_KIT_ROUTES,
     ],
   },
   {
@@ -117,6 +136,8 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     allowedRoutes: [
       R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.rfis, R.submittals, R.photos, R.documents, R.companyDocuments, R.blueprints, R.messages, R.timesheets,
+      // Subs can log field activity for their own scope (photos, observations).
+      R.field, R.fieldPhoto, R.fieldObservation,
     ],
   },
   {
@@ -131,6 +152,8 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
       R.contacts, R.messages, R.notes, R.timesheets,
+      // Field kit hub is browsable in read-only mode; individual pages remain gated by canCreateEdit inside the pages themselves.
+      R.field,
     ],
   },
 ];
