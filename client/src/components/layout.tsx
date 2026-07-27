@@ -24,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CommandPalette } from "@/components/command-palette";
 import { useToast } from "@/hooks/use-toast";
+import { useFieldMode } from "@/hooks/use-field-mode";
+import { HardHat, WifiOff } from "lucide-react";
 
 const ICONS: Record<string, any> = {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
@@ -493,6 +495,7 @@ function BackButton() {
 export function Layout({ children, title, actions }: { children: ReactNode; title: string; actions?: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const field = useFieldMode();
 
   // ⌘K / Ctrl+K opens the command palette anywhere in the app.
   useEffect(() => {
@@ -505,6 +508,11 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // Field mode: chromeless layout for on-site use. No sidebar, no top nav
+  // clutter, no command palette — just the page, a slim header with the
+  // field-kit brand + online indicator + exit, and the content.
+  if (field.enabled) return <FieldModeLayout title={title} actions={actions} onExit={field.exit}>{children}</FieldModeLayout>;
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
@@ -592,6 +600,74 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
         </main>
       </div>
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
+    </div>
+  );
+}
+
+// FieldModeLayout — chromeless, task-focused shell for the field kit. Used
+// whenever ?field=1 is present in the URL, sessionStorage has the sticky
+// flag, or an installed PWA launches into a /field route. See
+// hooks/use-field-mode.ts for the trigger logic.
+function FieldModeLayout({
+  children,
+  title,
+  actions,
+  onExit,
+}: {
+  children: ReactNode;
+  title: string;
+  actions?: ReactNode;
+  onExit: () => void;
+}) {
+  const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
+
+  const [, navigate] = useLocation();
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
+      {/* Slim field header — brand chip, page title, online pill, exit */}
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3">
+        <button
+          onClick={() => navigate("/field")}
+          className="inline-flex items-center gap-2 rounded-md px-1.5 py-1 text-left hover-elevate"
+          data-testid="field-mode-brand"
+          aria-label="Field kit home"
+        >
+          <span className="grid size-8 place-items-center rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <HardHat className="size-5" />
+          </span>
+          <span className="flex flex-col leading-tight">
+            <span className="font-display text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Field kit</span>
+            <span className="truncate font-display text-sm font-bold">{title}</span>
+          </span>
+        </button>
+        <div className="ml-auto flex items-center gap-2">
+          {!online && (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400"
+              data-testid="field-mode-offline"
+            >
+              <WifiOff className="size-3.5" /> Offline
+            </span>
+          )}
+          {actions && <div className="flex items-center gap-2 [&_button]:h-9">{actions}</div>}
+          <Button size="sm" variant="ghost" onClick={onExit} data-testid="field-mode-exit">
+            Exit
+          </Button>
+        </div>
+      </header>
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl p-3 sm:p-4">{children}</div>
+      </main>
     </div>
   );
 }

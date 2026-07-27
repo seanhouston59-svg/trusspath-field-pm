@@ -1,4 +1,4 @@
-import { Camera, ClipboardList, Clock, ListChecks, MapPin, MessageSquareWarning, Download, WifiOff, CheckCircle2 } from "lucide-react";
+import { Camera, ClipboardList, Clock, ListChecks, MapPin, MessageSquareWarning, Download, WifiOff, CheckCircle2, Maximize2 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
@@ -6,6 +6,7 @@ import { subscribeQueue } from "@/lib/offline-queue";
 import { subscribeInstallPrompt, triggerInstall, isStandalone, isIos } from "@/lib/pwa";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useFieldMode } from "@/hooks/use-field-mode";
 
 /**
  * Field hub — the one-stop landing for foremen once they open TrussPath on
@@ -36,6 +37,7 @@ export default function FieldHub() {
   const [installAvailable, setInstallAvailable] = useState(false);
   const [installed, setInstalled] = useState(isStandalone());
   const ios = isIos();
+  const fieldMode = useFieldMode();
 
   useEffect(() => subscribeQueue(setQueueSize), []);
   useEffect(() => subscribeInstallPrompt(setInstallAvailable), []);
@@ -79,6 +81,22 @@ export default function FieldHub() {
           )}
           {!installed && !installAvailable && ios && (
             <span className="ml-auto text-xs text-muted-foreground">Tap Share → Add to Home Screen to install</span>
+          )}
+          {installed && !fieldMode.enabled && (
+            <span className="ml-auto text-xs font-semibold text-emerald-600 dark:text-emerald-400" data-testid="field-installed-badge">
+              <CheckCircle2 className="inline size-3.5 mr-1" /> Installed
+            </span>
+          )}
+          {!fieldMode.enabled && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={fieldMode.enter}
+              data-testid="field-mode-enter"
+              className={installed || (!installAvailable && !ios) ? "" : "ml-auto"}
+            >
+              <Maximize2 className="size-4" /> Field mode
+            </Button>
           )}
         </div>
 

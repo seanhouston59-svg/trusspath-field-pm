@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import {
   FolderKanban, HelpCircle, ListChecks, CheckSquare, ArrowRight, AlertTriangle, TrendingUp,
   Activity, CircleDot, Clock, Building2, Hammer, FileWarning, GitPullRequestArrow,
+  HardHat, Smartphone,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState, GhostCards } from "@/components/ghost-state";
@@ -193,6 +194,11 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {/* Field kit mobile launcher — opens the field kit in a chromeless,
+          app-like standalone window (desktop popup) or full-page field mode
+          (mobile). Set for foremen who want to be one tap from a daily log. */}
+      <FieldKitLauncher />
+
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi icon={FolderKanban} label="Active Projects" value={String(activeProjects.length)} sub={`${projects.length} total in portfolio`} href="/projects" />
@@ -382,5 +388,75 @@ export default function Dashboard() {
       </>
       )}
     </Layout>
+  );
+}
+
+/**
+ * Opens the field kit in "field mode" — a chromeless, sidebar-less
+ * presentation of the same app that feels like a separate mobile app.
+ *
+ * Desktop: opens a small popup window (450x820) that looks like a phone,
+ * with the query flag that useFieldMode picks up. This gives the user a
+ * dedicated window to keep pinned on a second monitor while working.
+ *
+ * Mobile / tablet: navigates in-place with the flag. The lack of a
+ * separate window is fine because mobile browsers hide their chrome
+ * on scroll and the user usually has the PWA installed anyway.
+ */
+function openFieldMode() {
+  const url = "/#/field?field=1";
+  // Rough mobile check — no need to be perfect, only used to decide between
+  // popup vs in-place navigation.
+  const isSmall = typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches;
+  if (isSmall) {
+    window.location.assign(url);
+    return;
+  }
+  // Desktop: a fixed 450x820 popup gives the visual "second window app" feel.
+  // If popup blockers kill it, fall back to a same-tab navigate so the user
+  // still gets somewhere.
+  const w = window.open(
+    url,
+    "trusspath-field-kit",
+    "popup=1,width=450,height=820,menubar=no,toolbar=no,location=no,status=no",
+  );
+  if (!w) window.location.assign(url);
+}
+
+function FieldKitLauncher() {
+  return (
+    <section className="mt-3 overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent shadow-sm" data-testid="dashboard-field-launcher">
+      <div className="flex flex-col items-start gap-4 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-5">
+        <div className="flex items-center gap-4">
+          <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <HardHat className="size-7" />
+          </div>
+          <div className="min-w-0">
+            <div className="ff-kicker text-amber-600 dark:text-amber-400">Mobile</div>
+            <h3 className="mt-0.5 font-display text-lg font-extrabold tracking-tight">Field kit mobile</h3>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Daily logs, timecards, photos, punch — a chromeless app-like view for on-site foremen.
+            </p>
+          </div>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={openFieldMode}
+            data-testid="button-open-field-kit"
+            className="inline-flex items-center gap-2 rounded-md bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-amber-600 active:scale-[0.98]"
+          >
+            <Smartphone className="size-4" /> Open Field kit
+          </button>
+          <Link
+            href="/field"
+            data-testid="button-open-field-kit-inline"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            Open in-app <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }

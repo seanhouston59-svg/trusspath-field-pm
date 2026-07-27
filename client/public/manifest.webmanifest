@@ -31,21 +31,27 @@
   ],
   "shortcuts": [
     {
+      "name": "Field kit",
+      "short_name": "Field",
+      "url": "/#/field?field=1",
+      "description": "Open the mobile field kit in chromeless mode"
+    },
+    {
       "name": "Daily log",
       "short_name": "Log",
-      "url": "/#/field/daily-log",
+      "url": "/#/field/daily-log?field=1",
       "description": "Capture today's field notes"
     },
     {
       "name": "Timecard",
       "short_name": "Punch",
-      "url": "/#/field/timecard",
+      "url": "/#/field/timecard?field=1",
       "description": "Clock in or out"
     },
     {
       "name": "Take photo",
       "short_name": "Photo",
-      "url": "/#/field/photo",
+      "url": "/#/field/photo?field=1",
       "description": "Capture a geo-tagged photo"
     }
   ]
