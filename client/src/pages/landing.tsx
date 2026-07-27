@@ -8,6 +8,7 @@ import {
   ArrowRight, Check, HardHat, ClipboardList, FileText, GitPullRequestArrow,
   MessagesSquare, CalendarRange, Camera, Bot, ShieldCheck, Sparkles,
   Quote, Star, ChevronDown, ListChecks, Layers, Radar, Truck, Plug,
+  Smartphone, WifiOff, MapPin,
 } from "lucide-react";
 import { Logo } from "@/components/bits";
 import { Button } from "@/components/ui/button";
@@ -42,9 +43,8 @@ const PLANS: Plan[] = [
       "Up to 5 active projects",
       "10 team members",
       "Daily logs, RFIs, submittals, punch lists",
+      "Mobile field kit (PWA, offline)",
       "Photo & document library",
-      "Blueprints & drone add-ons available",
-      "Mobile field app",
       "Email support",
     ],
     cta: "Start with Starter",
@@ -63,6 +63,7 @@ const PLANS: Plan[] = [
       "Gantt + schedule + Google Calendar",
       "Blueprints + drone-capture add-ons",
       "Jarvis AI assistant (voice)",
+      "SMS alerts for urgent field events",
       "Integrations: ADP, TriNet, Sheets",
       "Priority support",
     ],
@@ -279,7 +280,11 @@ function DemoForm() {
 const FAQS: { q: string; a: string }[] = [
   {
     q: "How is TrussPath different from legacy construction PM platforms?",
-    a: "Same core capabilities (RFIs, submittals, change orders, punch lists, daily logs, blueprints, drone captures, schedule, and fleet) at roughly a third of the cost, plus a voice AI assistant, faster mobile experience, and no per-project fees. We're built for the field first, office second.",
+    a: "Same core capabilities (RFIs, submittals, change orders, punch lists, daily logs, blueprints, drone captures, schedule, and fleet) at roughly a third of the cost, plus a mobile field kit built for the truck cab, a voice AI assistant, and no per-project fees. We're built for the field first, office second.",
+  },
+  {
+    q: "Does it really work offline?",
+    a: "Yes. Install TrussPath to your home screen from any modern phone browser — the field kit (daily log, timecard, punch, photo, observation) caches locally and queues everything when you're out of signal. When you're back on data or wifi, the queue drains automatically.",
   },
   {
     q: "Is there a free trial?",
@@ -287,19 +292,19 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Can we migrate from another platform or spreadsheets?",
-    a: "Yes. Every paid plan includes a guided migration. We import projects, RFIs, submittals, daily logs, photos, and documents from your existing tools. Typical migration takes 3\u20135 business days.",
-  },
-  {
-    q: "Does it work offline?",
-    a: "The mobile app caches your active project. You can capture photos, daily logs, and punch items on-site with no signal \u2014 everything syncs when you're back on data or wifi.",
+    a: "Yes. Every paid plan includes a guided migration. We import projects, RFIs, submittals, daily logs, photos, and documents from your existing tools. Typical migration takes 3–5 business days.",
   },
   {
     q: "How does the Jarvis AI assistant work?",
-    a: "Jarvis is a voice-and-text copilot that reads your project data and takes action. Ask \u201Cwhat's overdue?\u201D, \u201Cdraft an RFI to the MEP sub about the coordination clash,\u201D or \u201Clog today's crew.\u201D It never trains on your data.",
+    a: "Jarvis is a voice-and-text copilot that reads your project data and takes action. Ask \u201cwhat's overdue?\u201d, \u201cdraft an RFI to the MEP sub about the coordination clash,\u201d or \u201clog today's crew.\u201d It never trains on your data.",
   },
   {
     q: "What integrations are supported?",
     a: "Google Calendar, Google Sheets, ADP, TriNet, QuickBooks, DocuSign, and Dropbox out of the box. Pro and Enterprise plans include our REST API for custom integrations.",
+  },
+  {
+    q: "Do you send SMS alerts for urgent events?",
+    a: "Yes. On Pro and Enterprise, urgent safety observations logged from the field automatically SMS the project team. Foremen verify their phone number in Settings; unverified numbers aren't texted.",
   },
   {
     q: "Is my data secure?",
@@ -381,11 +386,11 @@ export default function Landing() {
           </div>
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
             <button onClick={() => scrollTo("features")} className="hover:text-foreground" data-testid="nav-features">Features</button>
+            <button onClick={() => scrollTo("field")} className="hover:text-foreground" data-testid="nav-field">Field kit</button>
             <button onClick={() => scrollTo("testimonials")} className="hover:text-foreground" data-testid="nav-testimonials">Testimonials</button>
             <button onClick={() => scrollTo("pricing")} className="hover:text-foreground" data-testid="nav-pricing">Pricing</button>
             <button onClick={() => scrollTo("faq")} className="hover:text-foreground" data-testid="nav-faq">FAQ</button>
             <button onClick={() => scrollTo("demo")} className="hover:text-foreground" data-testid="nav-demo">Demo</button>
-            <button onClick={() => scrollTo("subscribe")} className="hover:text-foreground" data-testid="nav-subscribe">Subscribe</button>
           </nav>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => scrollTo("demo")} data-testid="button-nav-demo">Book demo</Button>
@@ -408,13 +413,13 @@ export default function Landing() {
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 py-16 md:grid-cols-2 md:py-24">
           <div>
             <div className="ff-kicker mb-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[10px]">
-              <Sparkles className="size-3 text-primary" /> Field project management, rebuilt
+              <Sparkles className="size-3 text-primary" /> Now with a full mobile field kit
             </div>
             <h1 className="font-display text-4xl font-black leading-[1.05] tracking-tight md:text-5xl">
-              The project management platform your <span className="text-primary">jobsite actually uses</span>.
+              Construction PM your crew <span className="text-primary">actually opens on the jobsite</span>.
             </h1>
             <p className="mt-5 max-w-lg text-base text-muted-foreground md:text-lg">
-              RFIs, submittals, change orders, punch lists, daily logs, blueprints, drone captures, Gantt schedules, fleet tracking, and a voice AI foreman — one system replacing legacy PM software, spreadsheets, and text threads.
+              A PWA that installs to the home screen. GPS-stamped photos, offline daily logs and timecards, punch lists that survive a dropped connection, and voice-driven Jarvis AI — plus every office tool (RFIs, submittals, change orders, schedule, drone, fleet) in one platform.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <Button size="lg" onClick={() => scrollTo("pricing")} data-testid="button-hero-subscribe">
@@ -427,10 +432,11 @@ export default function Landing() {
                 <Button size="lg" variant="ghost" data-testid="button-hero-app">Try live app →</Button>
               </Link>
             </div>
-            <div className="mt-6 flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5"><Smartphone className="size-3.5 text-primary" /> Installs to home screen</div>
+              <div className="flex items-center gap-1.5"><WifiOff className="size-3.5 text-primary" /> Works offline</div>
               <div className="flex items-center gap-1.5"><ShieldCheck className="size-3.5 text-primary" /> SOC 2 in progress</div>
               <div className="flex items-center gap-1.5"><Check className="size-3.5 text-primary" /> 14-day free trial</div>
-              <div className="hidden items-center gap-1.5 sm:flex"><Check className="size-3.5 text-primary" /> No card required</div>
             </div>
           </div>
           <div className="relative">
@@ -504,6 +510,39 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ------------------------------ Field kit callout (anchor for nav) ------------------------------ */}
+      <section id="field" className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="ff-kicker text-primary">Mobile field kit</div>
+            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Built for the truck cab, not the desk.</h2>
+            <p className="mt-3 text-muted-foreground">Installs like a native app. Works with one bar of signal. Survives a dropped connection.</p>
+          </div>
+          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { icon: Smartphone, title: "PWA install", desc: "Add to home screen from any modern phone browser. No app store, no MDM headaches." },
+              { icon: WifiOff, title: "Offline queue", desc: "Daily logs, timecards, and punch items queue locally and sync when you're back on data." },
+              { icon: MapPin, title: "GPS photos", desc: "Every jobsite photo tagged with location and timestamp — burned into the pixels." },
+              { icon: MessagesSquare, title: "SMS alerts", desc: "Urgent safety observations text the project team automatically. Verified numbers only." },
+            ].map((f) => (
+              <div key={f.title} className="rounded-xl border border-border bg-card p-5" data-testid={`field-${f.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                <div className="grid size-9 place-items-center rounded-md bg-primary/10 text-primary">
+                  <f.icon className="size-4" />
+                </div>
+                <div className="mt-4 font-display font-bold">{f.title}</div>
+                <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/field/hub">
+              <Button size="lg" variant="outline" data-testid="button-field-hub">Open field hub <ArrowRight className="ml-1.5 size-4" /></Button>
+            </Link>
+            <Button size="lg" variant="ghost" onClick={() => scrollTo("demo")} data-testid="button-field-demo">See it on your project</Button>
+          </div>
+        </div>
+      </section>
+
       {/* ------------------------------ Features ------------------------------ */}
       <section id="features" className="border-b border-border">
         <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
@@ -519,7 +558,7 @@ export default function Landing() {
               { icon: GitPullRequestArrow, title: "Change Orders", href: "/change-orders", desc: "Cost + schedule impact tracked from proposal to executed. No more spreadsheet drift." },
               { icon: ListChecks, title: "Punch Lists", href: "/punch", desc: "Walk-and-punch with assignees, due dates, and photo proof of closeout — synced to the schedule." },
               { icon: CalendarRange, title: "Schedule + Gantt", href: "/schedule", desc: "Classic month view, Gantt bars, and two-way sync with Google Calendar." },
-              { icon: Camera, title: "Photo Log", href: "/photos", desc: "Geo-stamped, project-tagged, searchable. Every image annotated in one tap." },
+              { icon: Camera, title: "Photo Log", href: "/photos", desc: "GPS-stamped, project-tagged, searchable. Every image annotated in one tap." },
               { icon: Layers, title: "Blueprints", href: "/blueprints", desc: "Sheet-level drawing management with cloud markups, version compare, and instant field access." },
               { icon: Radar, title: "Drone Captures", href: "/drone", desc: "Aerial progress flights, orthomosaic overlays, and site-to-plan comparison over time." },
               { icon: Truck, title: "Fleet & Equipment", href: "/equipment", desc: "Track fleet, hours, maintenance, and assignments across every jobsite from one register." },
@@ -593,7 +632,7 @@ export default function Landing() {
                 color: "bg-amber-500",
               },
               {
-                quote: "Change orders used to live in three spreadsheets and two group texts. Now it's one thread with a real audit trail.",
+                quote: "The mobile field kit is the whole ballgame. My foreman punches a wall from his phone with GPS on the photo, and it's in the punch list before he walks back to the truck.",
                 name: "Sara Whitfield",
                 role: "VP of Operations",
                 company: "Ridgeline Builders",
@@ -762,6 +801,7 @@ export default function Landing() {
             <ul className="mt-6 space-y-3 text-sm">
               {[
                 "Live walkthrough tailored to your workflows",
+                "Field kit demo on a real phone (bring yours)",
                 "Migration plan from your existing PM tool or spreadsheets",
                 "Q&A with an ex-superintendent, not a sales rep",
                 "Custom pricing for teams of 50+",
@@ -782,7 +822,7 @@ export default function Landing() {
       <section className="border-b border-border bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-14 text-center">
           <h2 className="font-display text-3xl font-black tracking-tight md:text-4xl">Get out of the truck. Get into TrussPath.</h2>
-          <p className="max-w-xl text-primary-foreground/80">Live app is one click away — try it with realistic seed data before you subscribe.</p>
+          <p className="max-w-xl text-primary-foreground/80">Try the live app on your phone — installs to the home screen in one tap. Realistic seed data included.</p>
           <div className="mt-2 flex flex-wrap justify-center gap-3">
             <Link href="/app">
               <Button size="lg" variant="secondary" data-testid="button-cta-app">Open the live app <ArrowRight className="ml-1.5 size-4" /></Button>
@@ -804,6 +844,7 @@ export default function Landing() {
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <button onClick={() => scrollTo("features")} className="hover:text-foreground">Features</button>
+            <button onClick={() => scrollTo("field")} className="hover:text-foreground">Field kit</button>
             <button onClick={() => scrollTo("pricing")} className="hover:text-foreground">Pricing</button>
             <button onClick={() => scrollTo("demo")} className="hover:text-foreground">Demo</button>
             <Link href="/app" className="hover:text-foreground">Live app</Link>
