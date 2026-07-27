@@ -82,6 +82,30 @@ const WEATHER_CODES: Record<number, string> = {
   99: "severe thunderstorms with hail",
 };
 
+/**
+ * Compact single-line weather summary suitable for inlining into the morning
+ * brief (e.g. "72°F, partly cloudy, 6 mph wind"). Returns null on failure.
+ * Uses the same free Open-Meteo API — no key needed.
+ */
+export async function getWeatherOneLiner(address: string): Promise<string | null> {
+  const geo = await geocode(address);
+  if (!geo) return null;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const cur = data?.current;
+    if (!cur) return null;
+    const temp = Math.round(cur.temperature_2m);
+    const wind = Math.round(cur.wind_speed_10m);
+    const desc = WEATHER_CODES[cur.weather_code] || "current conditions";
+    return `${temp}\u00B0F, ${desc}, ${wind} mph wind`;
+  } catch {
+    return null;
+  }
+}
+
 export async function getWeather(address: string): Promise<string | null> {
   const geo = await geocode(address);
   if (!geo) return null;

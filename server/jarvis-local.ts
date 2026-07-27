@@ -1,7 +1,7 @@
 import { storage, normalizeQuestion, inferTopic } from "./storage";
 import { buildContext, type ContextBundle } from "./jarvis";
 import { runHealthScan } from "./health";
-import { getWeather, getNearbyPlaces, hasPlacesApi } from "./apis";
+import { getWeather, getWeatherOneLiner, getNearbyPlaces, hasPlacesApi } from "./apis";
 
 // When no LLM API key is available, Jarvis uses this local response engine.
 // Responses are written to sound natural and conversational, the way a real
@@ -124,34 +124,220 @@ function matchPatterns(input: string, patterns: { keywords: string[]; answer: st
   return null;
 }
 
+/**
+ * Legacy synchronous brief — kept only for callers that still pass a
+ * ContextBundle. New code should call {@link buildRichLocalBrief} which does
+ * its own storage queries and produces a much more useful, natural brief with
+ * named items, weather, and a specific recommendation.
+ */
 export function buildLocalBrief(ctx: ContextBundle): string {
   const lines = ctx.compact.split("\n");
   const projectLine = lines[0] ?? "No active project found.";
   const today = lines[1] ?? "";
-
-  // Extract overdue items
   const overdueLines = lines.filter((l) => l.includes("OVERDUE"));
   const dueTodayLines = lines.filter((l) => l.includes("DUE TODAY"));
-
   const priorities: string[] = [];
-  if (overdueLines.length) priorities.push(`You've got overdue items — ${overdueLines.length} ${overdueLines.length === 1 ? "category has" : "categories have"} work that's slipped past the due date`);
+  if (overdueLines.length) priorities.push(`You've got overdue items \u2014 ${overdueLines.length} ${overdueLines.length === 1 ? "category has" : "categories have"} work that's slipped past the due date`);
   if (dueTodayLines.length) priorities.push("Some items are due today, so make sure the right people are on them");
-  if (!priorities.length) priorities.push("Nothing urgent — everything's on track");
-
+  if (!priorities.length) priorities.push("Nothing urgent \u2014 everything's on track");
   const overdue = overdueLines.length ? overdueLines.join("\n") : "Nothing overdue, which is great.";
+  return `Here's your morning briefing.\n\n${projectLine}\n${today}\n\nPriorities:\n${priorities.map((p) => `- ${p}`).join("\n")}\n\nOverdue:\n${overdue}\n\nOne thing to stay on top of \u2014 check the Schedule tab for any milestones coming up, and make sure everyone on the team has their tasks assigned.`;
+}
 
-  return `Here's your morning briefing.
+/* ---------- Rich local brief (no LLM required) ---------- */
 
-${projectLine}
-${today}
+// A construction PM briefing is only useful if it names specific items,
+// specific counts, and gives one concrete next action. buildRichLocalBrief
+// pulls the raw project data itself so it can do all three without an LLM.
 
-Priorities:
-${priorities.map((p) => `- ${p}`).join("\n")}
+const YYYY_MM_DD = () => new Date().toISOString().slice(0, 10);
+const OPEN_STATUSES = new Set(["open", "in_progress", "pending", "submitted", "under_review", "resubmitted", "active", "draft"]);
+const isOpen = (s: string | null | undefined) => !s || OPEN_STATUSES.has(String(s).toLowerCase());
 
-Overdue:
-${overdue}
+function fmtDaysLate(dateStr: string): string {
+  const days = Math.max(0, Math.floor((Date.parse(YYYY_MM_DD()) - Date.parse(dateStr)) / 86_400_000));
+  if (days === 0) return "today";
+  if (days === 1) return "1 day late";
+  return `${days} days late`;
+}
 
-One thing to stay on top of — check the Schedule tab for any milestones coming up, and make sure everyone on the team has their tasks assigned.`;
+function pickOverdue<T extends Record<string, any>>(items: T[], field: string): T[] {
+  const today = YYYY_MM_DD();
+  return items
+    .filter((x) => x[field] && x[field] < today && isOpen(x.status))
+    .sort((a, b) => String(a[field]).localeCompare(String(b[field]))); // oldest slip first
+}
+
+function pickDueToday<T extends Record<string, any>>(items: T[], field: string): T[] {
+  const today = YYYY_MM_DD();
+  return items.filter((x) => x[field] === today && isOpen(x.status));
+}
+
+function itemLabel(x: Record<string, any>): string {
+  const num = x.number ? `${x.number}` : "";
+  const title = (x.title || x.subject || x.description || "untitled").toString().trim();
+  return num ? `${num} \u2014 ${title}` : title;
+}
+
+function weekdayGreeting(): string {
+  const now = new Date();
+  const hr = now.getHours();
+  const day = now.toLocaleDateString("en-US", { weekday: "long" });
+  if (hr < 5) return `Late night check-in, ${day.toLowerCase()}. Here's where things stand.`;
+  if (hr < 12) return `Good morning \u2014 here's your ${day} briefing.`;
+  if (hr < 17) return `Afternoon check-in for ${day}. Here's where the project stands.`;
+  return `Evening wrap on ${day}. Here's where the project stands.`;
+}
+
+function projectHealthLine(project: any, today: string): string | null {
+  if (!project) return null;
+  const start = project.startDate;
+  const end = project.endDate;
+  if (!start || !end) return null;
+  const total = Math.max(1, (Date.parse(end) - Date.parse(start)) / 86_400_000);
+  const elapsed = Math.max(0, (Date.parse(today) - Date.parse(start)) / 86_400_000);
+  const pct = Math.min(100, Math.round((elapsed / total) * 100));
+  const daysToEnd = Math.round((Date.parse(end) - Date.parse(today)) / 86_400_000);
+  if (daysToEnd < 0) return `You're past the scheduled end date (${end}) by ${Math.abs(daysToEnd)} days.`;
+  if (daysToEnd === 0) return `Today is the scheduled end date. Confirm closeout status.`;
+  if (pct < 5) return `Project just kicked off \u2014 you're about ${pct}% through the contract duration, ${daysToEnd} days to end date.`;
+  return `You're roughly ${pct}% through the contract duration, ${daysToEnd} days to end date (${end}).`;
+}
+
+function buildRecommendation(bucket: { overdueRfis: any[]; overdueSubs: any[]; overdueTasks: any[]; overdueActions: any[]; overdueCos: any[]; dueTodayTotal: number; nothingOverdue: boolean }): string {
+  // Order matters — pick the highest-leverage thing to nudge on today.
+  if (bucket.overdueRfis.length >= 2) {
+    return `Focus today \u2014 you've got ${bucket.overdueRfis.length} RFIs waiting on responses. Chase the oldest one (${itemLabel(bucket.overdueRfis[0])}) with the architect first; nothing else moves until questions get answered.`;
+  }
+  if (bucket.overdueSubs.length >= 2) {
+    return `Focus today \u2014 ${bucket.overdueSubs.length} submittals are past due. Push the oldest (${itemLabel(bucket.overdueSubs[0])}) through review; late submittals delay procurement.`;
+  }
+  if (bucket.overdueRfis[0]) {
+    return `Chase the overdue RFI ${itemLabel(bucket.overdueRfis[0])} \u2014 it's been sitting for ${fmtDaysLate(bucket.overdueRfis[0].dueDate)}.`;
+  }
+  if (bucket.overdueSubs[0]) {
+    return `Chase submittal ${itemLabel(bucket.overdueSubs[0])} \u2014 ${fmtDaysLate(bucket.overdueSubs[0].dueDate)} on the review turnaround.`;
+  }
+  if (bucket.overdueTasks[0]) {
+    return `Get ${itemLabel(bucket.overdueTasks[0])} reassigned or closed today \u2014 it's ${fmtDaysLate(bucket.overdueTasks[0].dueDate)}.`;
+  }
+  if (bucket.overdueActions[0]) {
+    return `Circle back on the overdue action item: ${itemLabel(bucket.overdueActions[0])} \u2014 ${fmtDaysLate(bucket.overdueActions[0].dueDate)}.`;
+  }
+  if (bucket.overdueCos[0]) {
+    return `Chase change order ${itemLabel(bucket.overdueCos[0])} for owner sign-off \u2014 unsigned COs block invoicing.`;
+  }
+  if (bucket.dueTodayTotal > 0) {
+    return `${bucket.dueTodayTotal} ${bucket.dueTodayTotal === 1 ? "item is" : "items are"} due today \u2014 confirm each owner has what they need before end of day.`;
+  }
+  if (bucket.nothingOverdue) {
+    return `Nothing overdue right now. Good time to look ahead \u2014 review upcoming milestones on the Schedule tab and confirm next week's task assignments.`;
+  }
+  return `Keep the crew focused on their assigned tasks today. Check the Schedule tab for upcoming milestones.`;
+}
+
+export async function buildRichLocalBrief(projectId?: number): Promise<string> {
+  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  if (!project) {
+    return `${weekdayGreeting()}\n\nNo active project found yet. Head to the Projects tab and create one \u2014 once it's set up I can give you real briefings with overdue items, weather, and priorities.`;
+  }
+  const pid = project.id;
+  const today = YYYY_MM_DD();
+
+  const [tasks, rfis, subs, cos, actions, team] = await Promise.all([
+    storage.getTasks(pid),
+    storage.getRfis(pid),
+    storage.getSubmittals(pid),
+    storage.getChangeOrders(pid),
+    storage.getActionItems(pid),
+    storage.getTeam(),
+  ]);
+
+  const overdueTasks = pickOverdue(tasks, "dueDate");
+  const overdueRfis = pickOverdue(rfis, "dueDate");
+  const overdueSubs = pickOverdue(subs, "dueDate");
+  const overdueCos = pickOverdue(cos, "dateIssued");
+  const overdueActions = pickOverdue(actions, "dueDate");
+  const dueTodayTasks = pickDueToday(tasks, "dueDate");
+  const dueTodayRfis = pickDueToday(rfis, "dueDate");
+  const dueTodaySubs = pickDueToday(subs, "dueDate");
+  const dueTodayActions = pickDueToday(actions, "dueDate");
+
+  const overdueTotal = overdueTasks.length + overdueRfis.length + overdueSubs.length + overdueCos.length + overdueActions.length;
+  const dueTodayTotal = dueTodayTasks.length + dueTodayRfis.length + dueTodaySubs.length + dueTodayActions.length;
+
+  // Try to pull a compact weather line — optional, brief works without it.
+  let weatherLine: string | null = null;
+  if (project.address) {
+    try { weatherLine = await getWeatherOneLiner(project.address); } catch { /* ignore */ }
+  }
+
+  // Assemble the brief. Kept warm and specific — real names, real counts.
+  const lines: string[] = [];
+  lines.push(weekdayGreeting());
+  lines.push("");
+  const status = project.status ? ` (${project.status})` : "";
+  lines.push(`PROJECT: ${project.name}${status}`);
+  const health = projectHealthLine(project, today);
+  if (health) lines.push(health);
+  if (weatherLine) lines.push(`On site: ${weatherLine}.`);
+  lines.push("");
+
+  // Priorities section — specific items named, not a generic "you have overdue items".
+  lines.push("PRIORITIES");
+  if (overdueTotal === 0 && dueTodayTotal === 0) {
+    lines.push("- Nothing overdue, nothing due today. Everything's on track.");
+  } else {
+    if (dueTodayTotal > 0) {
+      const dueBits: string[] = [];
+      if (dueTodayTasks.length) dueBits.push(`${dueTodayTasks.length} ${dueTodayTasks.length === 1 ? "task" : "tasks"}`);
+      if (dueTodayRfis.length) dueBits.push(`${dueTodayRfis.length} ${dueTodayRfis.length === 1 ? "RFI" : "RFIs"}`);
+      if (dueTodaySubs.length) dueBits.push(`${dueTodaySubs.length} ${dueTodaySubs.length === 1 ? "submittal" : "submittals"}`);
+      if (dueTodayActions.length) dueBits.push(`${dueTodayActions.length} action ${dueTodayActions.length === 1 ? "item" : "items"}`);
+      lines.push(`- Due today: ${dueBits.join(", ")}. Make sure owners have what they need.`);
+    }
+    if (overdueRfis.length) {
+      const top = overdueRfis.slice(0, 2).map(itemLabel).join("; ");
+      lines.push(`- ${overdueRfis.length} ${overdueRfis.length === 1 ? "RFI is" : "RFIs are"} overdue \u2014 oldest: ${top} (${fmtDaysLate(overdueRfis[0].dueDate)}).`);
+    }
+    if (overdueSubs.length) {
+      const top = overdueSubs.slice(0, 2).map(itemLabel).join("; ");
+      lines.push(`- ${overdueSubs.length} ${overdueSubs.length === 1 ? "submittal is" : "submittals are"} overdue \u2014 oldest: ${top} (${fmtDaysLate(overdueSubs[0].dueDate)}).`);
+    }
+    if (overdueTasks.length) {
+      const top = overdueTasks.slice(0, 2).map(itemLabel).join("; ");
+      lines.push(`- ${overdueTasks.length} ${overdueTasks.length === 1 ? "task is" : "tasks are"} past due \u2014 e.g. ${top}.`);
+    }
+    if (overdueActions.length) {
+      lines.push(`- ${overdueActions.length} action ${overdueActions.length === 1 ? "item is" : "items are"} overdue.`);
+    }
+    if (overdueCos.length) {
+      lines.push(`- ${overdueCos.length} change ${overdueCos.length === 1 ? "order" : "orders"} still pending sign-off.`);
+    }
+  }
+  lines.push("");
+
+  // Numbers section — quick at-a-glance counts for anyone who wants the totals.
+  const openTasks = tasks.filter((t: any) => isOpen(t.status)).length;
+  const openRfis = rfis.filter((r: any) => isOpen(r.status)).length;
+  const openSubs = subs.filter((s: any) => isOpen(s.status)).length;
+  const openCos = cos.filter((c: any) => isOpen(c.status)).length;
+  lines.push("NUMBERS");
+  lines.push(`- Tasks: ${tasks.length} total, ${openTasks} open`);
+  lines.push(`- RFIs: ${rfis.length} total, ${openRfis} open`);
+  lines.push(`- Submittals: ${subs.length} total, ${openSubs} open`);
+  lines.push(`- Change orders: ${cos.length} total, ${openCos} open`);
+  lines.push(`- Team: ${team.length} ${team.length === 1 ? "member" : "members"}`);
+  lines.push("");
+
+  // One concrete recommendation.
+  lines.push("RECOMMENDATION");
+  lines.push(buildRecommendation({
+    overdueRfis, overdueSubs, overdueTasks, overdueActions, overdueCos,
+    dueTodayTotal, nothingOverdue: overdueTotal === 0,
+  }));
+
+  return lines.join("\n");
 }
 
 /* --------------------- Team Safety Brief Generator --------------------- */
@@ -451,10 +637,9 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
     }
   }
 
-  // Check for briefing/status intent
+  // Check for briefing/status intent — use the rich local brief.
   if (/\b(brief|briefing|status|update|summary|overview|morning|standup|what'?s happening|what'?s the status|overdue|what.?s due)\b/i.test(lower)) {
-    const ctx = await buildContext(projectId);
-    return { reply: buildLocalBrief(ctx) };
+    return { reply: await buildRichLocalBrief(projectId) };
   }
 
   // Check for "how many" project data queries

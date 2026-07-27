@@ -5,7 +5,7 @@ import fs from "node:fs";
 import multer from "multer";
 import { storage } from "./storage";
 import { jarvisChat, jarvisBrief } from "./jarvis";
-import { localJarvisChat, buildLocalBrief, buildSafetyBrief } from "./jarvis-local";
+import { localJarvisChat, buildRichLocalBrief, buildSafetyBrief } from "./jarvis-local";
 import { buildContext } from "./jarvis";
 import { runHealthScan } from "./health";
 import { sendSignupNotification, sendPasswordResetEmail, sendInviteEmail } from "./mailer";
@@ -1512,8 +1512,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         res.json(result);
       } catch (llmErr) {
         console.log("[jarvis] LLM brief failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
-        const ctx = await buildContext(pid(req));
-        res.json({ brief: buildLocalBrief(ctx), context: ctx });
+        // Rich local brief — named items, real counts, weather, one specific rec.
+        const brief = await buildRichLocalBrief(pid(req));
+        res.json({ brief, mode: "local" });
       }
     } catch (err) {
       console.error("[jarvis] brief error:", err);
