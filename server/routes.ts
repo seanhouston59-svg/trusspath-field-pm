@@ -17,13 +17,13 @@ import {
   insertTeamSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
-  isAccountInGoodStanding, isSubscriptionActive,
+  isAccountInGoodStanding, isSubscriptionActive, isDemoExpired,
   ORG_ROLES, type OrgRole,
   type Project,
 } from "@shared/schema";
 import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
 import {
-  bootstrapOrganizationForAccount,
+  bootstrapOrganizationForAccount, bootstrapDemoOrgForAccount,
   createInvite, getInviteByToken, listPendingInvites, markInviteAccepted, revokeInvite, isInviteRedeemable,
   createMembership, getMembership, getMembershipForAccount, listMembershipsForOrg, updateMembershipRole, removeMembership,
   syncSeatsForOrg,
@@ -34,6 +34,17 @@ import { resolveMembership, requireCap, requireRole } from "./lib/mt-middleware"
 
 function pid(req: any): number | undefined {
   return req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
+}
+
+// Human-readable random password for demo logins (owner reads it aloud/copies it).
+// Alphabet excludes similar-looking characters (0/O, 1/l/I). Not for real accounts.
+function generateReadablePassword(len: number = 16): string {
+  const alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
 }
 
 /* -------------------- Auth middleware -------------------- */
@@ -152,6 +163,16 @@ async function authMiddleware(req: any, res: any, next: any) {
   const token = cookies[SESSION_COOKIE] || bearer || queryToken;
   const s = token ? await storage.getSession(token) : null;
   if (!s) return res.status(401).json({ message: "Unauthorized" });
+
+  // Demo login expiry: refuse any request whose account's 48h window has passed.
+  // We also destroy the session so a fresh login attempt is required (and will
+  // also be blocked by verifyPassword). Clears the cookie so the client stops sending it.
+  if (isDemoExpired(s.account as any)) {
+    try { await storage.destroySession(token); } catch {}
+    clearSessionCookie(res);
+    return res.status(401).json({ message: "This demo login has expired.", reason: "demo_expired" });
+  }
+
   req.account = s.account;
   req.sessionToken = token;
 
@@ -484,6 +505,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const { email, password } = parsed.data;
     const account = await storage.verifyPassword(email, password);
     if (!account) return res.status(401).json({ message: "Invalid email or password" });
+    // Demo login expiry — refuse if this demo account's 48h window has elapsed.
+    if (isDemoExpired(account as any)) {
+      return res.status(401).json({ message: "This demo login has expired.", reason: "demo_expired" });
+    }
     const session = await storage.createSession(account.id);
     setSessionCookie(res, session.id);
     res.json({ account, token: session.id });
@@ -1402,6 +1427,79 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
     const updated = await storage.setAccountApproval(id, status as any, req.account.id);
     if (!updated) return res.status(404).json({ message: "Account not found" });
+    res.json({ account: updated });
+  });
+
+  /* ------------------------- ADMIN: Demo logins (48h) ------------------------- */
+  // Owner-only. Generates a fresh demo account + isolated demo org so a prospect
+  // can log in and click around with full edit access. Auto-expires after 48h
+  // (enforced in verifyPassword + authMiddleware; existing sessions are rejected).
+  app.get("/api/admin/demo-accounts", requireOwner, async (_req, res) => {
+    const rows = await storage.listDemoAccounts();
+    res.json({ demoAccounts: rows });
+  });
+
+  app.post("/api/admin/demo-accounts", requireOwner, async (req: any, res) => {
+    const label = (typeof req.body?.label === "string" && req.body.label.trim())
+      ? String(req.body.label).trim().slice(0, 60)
+      : "";
+
+    // Human-friendly random email + password so the owner can hand them over verbally.
+    // Not secret data — the account is time-boxed to 48h and isolated to its own org.
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const email = `demo-${suffix}@trusspath.app`;
+    const password = generateReadablePassword(16);
+    const displayName = label || `Demo User ${suffix}`;
+    const orgName = label ? `${label} (Demo)` : `TrussPath Demo ${suffix}`;
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+
+    try {
+      const account = await storage.createDemoAccount(email, password, displayName, expiresAt);
+      const { organizationId } = await bootstrapDemoOrgForAccount({
+        accountId: account.id,
+        orgName,
+      });
+
+      // Seed a tiny demo project so the sandbox isn't empty on first login.
+      // Kept minimal on purpose — the point is to click around, not audit real data.
+      try {
+        await storage.createProject({
+          organizationId,
+          name: "Demo: Warehouse Renovation",
+          number: "DEMO-001",
+          client: "Acme Distribution",
+          type: "Renovation",
+          status: "In Progress",
+          address: "1234 Demo St, Denver, CO",
+          startDate: new Date().toISOString().slice(0, 10),
+          endDate: new Date(Date.now() + 90 * 86400 * 1000).toISOString().slice(0, 10),
+          budget: 850000,
+          spent: 275000,
+          progress: 32,
+        } as any);
+      } catch (seedErr) {
+        console.error("[demo] seed project failed (non-fatal):", seedErr);
+      }
+
+      res.status(201).json({
+        account,
+        organizationId,
+        credentials: { email, password }, // shown once in the UI so owner can hand off
+        expiresAt,
+      });
+    } catch (e: any) {
+      const msg = e?.message || "Failed to create demo account";
+      const status = /already/i.test(msg) ? 409 : 500;
+      res.status(status).json({ message: msg });
+    }
+  });
+
+  // Revoke a demo login immediately (sets expiry to the epoch). Owner-only.
+  app.post("/api/admin/demo-accounts/:id/expire", requireOwner, async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid account id" });
+    const updated = await storage.expireDemoAccount(id);
+    if (!updated) return res.status(404).json({ message: "Demo account not found" });
     res.json({ account: updated });
   });
 

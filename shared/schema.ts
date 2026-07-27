@@ -418,9 +418,18 @@ export const accounts = pgTable("accounts", {
   subscriptionPlan: text("subscription_plan"), // starter, pro, enterprise
   subscriptionBilling: text("subscription_billing"), // monthly, annual
   subscriptionCurrentPeriodEnd: text("subscription_current_period_end"),
+  // Demo login — non-null on accounts created via /api/admin/demo-accounts. The
+  // account (and any sessions) stop working once now > demoExpiresAt. Real
+  // accounts leave this NULL and are unaffected.
+  demoExpiresAt: text("demo_expires_at"),
 });
 
 // Access helpers — shared between server and client so both agree on what "in good standing" means.
+
+// True if this account is a demo login whose 48h window has passed.
+export function isDemoExpired(a: Pick<Account, "demoExpiresAt"> | null | undefined, nowIso: string = new Date().toISOString()): boolean {
+  return !!a?.demoExpiresAt && a.demoExpiresAt <= nowIso;
+}
 export const ACTIVE_SUB_STATUSES = new Set(["active", "trialing"]);
 export function isSubscriptionActive(status: string | null | undefined): boolean {
   return !!status && ACTIVE_SUB_STATUSES.has(status);

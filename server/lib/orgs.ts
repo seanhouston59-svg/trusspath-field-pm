@@ -337,6 +337,26 @@ export async function bootstrapOrganizationForAccount(input: {
   return { organizationId: org.id, checkoutUrl: checkoutSession.url || undefined };
 }
 
+/* ============================ Demo login (48h) ============================ */
+
+// Spin up an isolated demo org for a prospect, with the account as owner. No
+// Stripe involved — subscriptionStatus is set to "trialing" so it satisfies
+// isOrgInGoodStanding() naturally. The 48h expiry lives on the account itself.
+export async function bootstrapDemoOrgForAccount(input: {
+  accountId: number;
+  orgName: string;
+}): Promise<{ organizationId: number }> {
+  const org = await createOrganization({
+    name: input.orgName,
+    ownerAccountId: input.accountId,
+    subscriptionStatus: "trialing", // demo orgs bypass paywall via this status
+    subscriptionPlan: "starter",
+    subscriptionBilling: "monthly",
+  });
+  await createMembership(input.accountId, org.id, "owner");
+  return { organizationId: org.id };
+}
+
 /* ============================ Utilities ============================ */
 
 function makeSlug(name: string): string {

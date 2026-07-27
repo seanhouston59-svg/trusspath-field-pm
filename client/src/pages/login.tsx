@@ -51,7 +51,15 @@ export default function Login() {
       const next = resolveNext(acc);
       window.location.hash = next.startsWith("/") ? next : `/${next}`;
     } catch (err: any) {
-      const msg = /401/.test(err?.message) ? "Invalid email or password" : err?.message || "Login failed";
+      // Prefer a specific server message when available (e.g. expired demo login),
+      // fall back to a generic 401 message so we don't leak account existence.
+      const raw: string = err?.message || "";
+      let msg = raw || "Login failed";
+      if (/demo login has expired/i.test(raw)) {
+        msg = "This demo login has expired. Ask for a fresh one.";
+      } else if (/^401/.test(raw)) {
+        msg = "Invalid email or password";
+      }
       toast({ title: "Sign in failed", description: msg, variant: "destructive" });
     } finally {
       setSubmitting(false);

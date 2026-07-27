@@ -29,7 +29,7 @@ import type {
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNotNull } from "drizzle-orm";
 import { existsSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
@@ -469,6 +469,10 @@ export interface IStorage {
   getSession(token: string): Promise<{ session: Session; account: AccountPublic } | null>;
   destroySession(token: string): void;
   countAccounts(): Promise<number>;
+  // ----- Demo login (48h) -----
+  createDemoAccount(email: string, password: string, displayName: string, expiresAt: string): Promise<AccountPublic>;
+  listDemoAccounts(): Promise<AccountPublic[]>;
+  expireDemoAccount(id: number): Promise<AccountPublic | undefined>;
   // ----- Admin / access control -----
   listAccountsForAdmin(): Promise<AccountPublic[]>;
   setAccountApproval(id: number, status: "pending" | "approved" | "denied", approverId: number): Promise<AccountPublic | undefined>;
@@ -1176,6 +1180,43 @@ class DatabaseStorage implements IStorage {
     if (!acc) return null;
     if (!this.verifyHash(password, acc.passwordHash)) return null;
     return this.toPublic(acc);
+  }
+  // Demo login — like createAccount but stamps demoExpiresAt and auto-approves so
+  // there's no admin approval step in the way of a prospect logging in.
+  async createDemoAccount(email: string, password: string, displayName: string, expiresAt: string): Promise<AccountPublic> {
+    await ensureReady();
+    const normEmail = email.trim().toLowerCase();
+    const existingRows = await db.select().from(accounts).where(eq(accounts.email, normEmail));
+    if (existingRows[0]) throw new Error("Email already registered");
+    const now = new Date().toISOString();
+    const [row] = await db.insert(accounts).values({
+      email: normEmail,
+      passwordHash: this.hashPassword(password),
+      displayName,
+      role: "member",
+      company: "TrussPath Demo",
+      createdAt: now,
+      approvalStatus: "approved",
+      approvedAt: now,
+      demoExpiresAt: expiresAt,
+    }).returning();
+    return this.toPublic(row);
+  }
+  async listDemoAccounts(): Promise<AccountPublic[]> {
+    await ensureReady();
+    const rows = await db.select().from(accounts).where(isNotNull(accounts.demoExpiresAt));
+    return rows.map((r) => this.toPublic(r));
+  }
+  // Force a demo to expire now (so login + existing sessions stop working immediately).
+  async expireDemoAccount(id: number): Promise<AccountPublic | undefined> {
+    await ensureReady();
+    const acc = (await db.select().from(accounts).where(eq(accounts.id, id)))[0];
+    if (!acc || !acc.demoExpiresAt) return undefined; // only touches demo accounts
+    const [row] = await db.update(accounts)
+      .set({ demoExpiresAt: new Date(0).toISOString() })
+      .where(eq(accounts.id, id))
+      .returning();
+    return row ? this.toPublic(row) : undefined;
   }
   async createPasswordResetToken(accountId: number): Promise<string> {
     await ensureReady();
