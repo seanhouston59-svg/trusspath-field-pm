@@ -19,8 +19,7 @@ import { cn } from "@/lib/utils";
  *   - rfi:     "why is this drawing showing X when the field shows Y?"
  *   - issue:   generic problem log
  *
- * Severity: low / normal / high / urgent. safety+high or safety+urgent (and
- * issue+high/urgent) fan out via SMS to the org's foremen/PMs on the server.
+ * Severity: low / normal / high / urgent.
  *
  * Same offline pattern as timecard: try POST first, queue on failure, stable
  * clientId for idempotency.
@@ -92,8 +91,6 @@ export default function FieldObservation() {
     if (projectId == null && projects.length > 0) setProjectId(projects[0].id);
   }, [projects, projectId]);
 
-  const willSendSms = (kind === "safety" || kind === "issue") && (severity === "high" || severity === "urgent");
-
   const submit = async () => {
     if (submitting) return;
     const t = title.trim();
@@ -132,7 +129,7 @@ export default function FieldObservation() {
             credentials: "include",
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          toast({ title: "Observation logged", description: willSendSms ? "SMS alert sent to your team" : t });
+          toast({ title: "Observation logged", description: t });
           resetAll();
           return;
         } catch { /* fall through to queue */ }
@@ -244,11 +241,6 @@ export default function FieldObservation() {
               </button>
             ))}
           </div>
-          {willSendSms && (
-            <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">
-              This will send an SMS alert to foremen/PMs on this project.
-            </p>
-          )}
         </div>
 
         {/* Title */}
@@ -284,16 +276,13 @@ export default function FieldObservation() {
               type="button"
               onClick={submit}
               disabled={submitting || projectId == null || !title.trim()}
-              className={cn(
-                "h-14 w-full text-base font-bold",
-                willSendSms && "bg-red-600 hover:bg-red-500 text-white",
-              )}
+              className="h-14 w-full text-base font-bold"
               data-testid="field-obs-save"
             >
               {submitting ? (
                 <><Loader2 className="size-5 animate-spin" /> Saving…</>
               ) : online ? (
-                <><CheckCircle2 className="size-5" /> {willSendSms ? "Send alert" : "Log observation"}</>
+                <><CheckCircle2 className="size-5" /> Log observation</>
               ) : (
                 <><WifiOff className="size-5" /> Save offline</>
               )}

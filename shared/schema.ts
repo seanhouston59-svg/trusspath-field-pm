@@ -429,31 +429,6 @@ export const accounts = pgTable("accounts", {
   // account (and any sessions) stop working once now > demoExpiresAt. Real
   // accounts leave this NULL and are unaffected.
   demoExpiresAt: text("demo_expires_at"),
-  // SMS / urgent-field-alert opt-in. Users opt in per-account (not per-org)
-  // because the account travels across orgs. sms_verified_at is only set
-  // after the user confirms an OTP; sms_opted_out_at is set when they
-  // text STOP or hit the in-app opt-out.
-  smsPhone: text("sms_phone"),
-  smsVerifiedAt: text("sms_verified_at"),
-  smsOptedOutAt: text("sms_opted_out_at"),
-  smsVerificationCode: text("sms_verification_code"),
-  smsVerificationExpiresAt: text("sms_verification_expires_at"),
-});
-
-// SMS send log - one row per attempted Twilio send. Used for rate limiting
-// (N sends per account per hour) and dedupe (same event doesn't spam the same
-// user in a 24h window).
-export const smsLog = pgTable("sms_log", {
-  id: serial("id").primaryKey(),
-  accountId: integer("account_id").notNull(),
-  organizationId: integer("organization_id"),
-  eventKey: text("event_key"), // e.g. "safety:observation:123", "rfi:overdue:45"
-  toPhone: text("to_phone").notNull(),
-  body: text("body").notNull(),
-  providerSid: text("provider_sid"),
-  status: text("status").notNull(), // sent | failed | rate_limited | opted_out | dry_run
-  error: text("error"),
-  createdAt: text("created_at").notNull().default(sql`NOW()`),
 });
 
 // Field punches - lightweight clock in/out records captured from the mobile

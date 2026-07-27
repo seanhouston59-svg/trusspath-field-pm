@@ -63,7 +63,6 @@ const PLANS: Plan[] = [
       "Gantt + schedule + Google Calendar",
       "Blueprints + drone-capture add-ons",
       "Jarvis AI assistant (voice)",
-      "SMS alerts for urgent field events",
       "Integrations: ADP, TriNet, Sheets",
       "Priority support",
     ],
@@ -303,10 +302,6 @@ const FAQS: { q: string; a: string }[] = [
     a: "Google Calendar, Google Sheets, ADP, TriNet, QuickBooks, DocuSign, and Dropbox out of the box. Pro and Enterprise plans include our REST API for custom integrations.",
   },
   {
-    q: "Do you send SMS alerts for urgent events?",
-    a: "Yes. On Pro and Enterprise, urgent safety observations logged from the field automatically SMS the project team. Foremen verify their phone number in Settings; unverified numbers aren't texted.",
-  },
-  {
     q: "Is my data secure?",
     a: "All data is encrypted in transit (TLS 1.3) and at rest (AES-256). We're SOC 2 Type II in progress with an expected completion in Q3. Enterprise plans include SSO/SAML and per-role permissions.",
   },
@@ -523,7 +518,7 @@ export default function Landing() {
               { icon: Smartphone, title: "PWA install", desc: "Add to home screen from any modern phone browser. No app store, no MDM headaches." },
               { icon: WifiOff, title: "Offline queue", desc: "Daily logs, timecards, and punch items queue locally and sync when you're back on data." },
               { icon: MapPin, title: "GPS photos", desc: "Every jobsite photo tagged with location and timestamp — burned into the pixels." },
-              { icon: MessagesSquare, title: "SMS alerts", desc: "Urgent safety observations text the project team automatically. Verified numbers only." },
+              { icon: ClipboardList, title: "Punch lists", desc: "Walk-and-punch from your phone with photo proof of closeout — syncs to the office schedule." },
             ].map((f) => (
               <div key={f.title} className="rounded-xl border border-border bg-card p-5" data-testid={`field-${f.title.toLowerCase().replace(/\s+/g, "-")}`}>
                 <div className="grid size-9 place-items-center rounded-md bg-primary/10 text-primary">

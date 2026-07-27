@@ -729,58 +729,6 @@ export function useUpcomingInvoice() {
   return useQuery<{ upcoming: UpcomingInvoice | null }>({ queryKey: ["/api/billing/upcoming"] });
 }
 
-/* ----------------------- SMS urgent alerts ----------------------- */
-export type SmsState = {
-  phone: string | null;
-  verified: boolean;
-  optedOut: boolean;
-  pendingVerification: boolean;
-};
-export function useSmsState() {
-  return useQuery<SmsState>({ queryKey: ["/api/account/sms"] });
-}
-export function useStartSmsVerification() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (phone: string) => {
-      const res = await apiRequest("POST", "/api/account/sms/start-verification", { phone });
-      return res.json() as Promise<{ ok: boolean; dryRun?: boolean }>;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/account/sms"] }); },
-  });
-}
-export function useVerifySms() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (code: string) => {
-      const res = await apiRequest("POST", "/api/account/sms/verify", { code });
-      return res.json();
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/account/sms"] }); },
-  });
-}
-export function useSmsOptOut() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async () => { await apiRequest("POST", "/api/account/sms/opt-out"); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/account/sms"] }); },
-  });
-}
-export function useSmsOptIn() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async () => { await apiRequest("POST", "/api/account/sms/opt-in"); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/account/sms"] }); },
-  });
-}
-export function useSmsRemove() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async () => { await apiRequest("DELETE", "/api/account/sms"); },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/account/sms"] }); },
-  });
-}
-
 /* ----------------------- Organization / Team ----------------------- */
 export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string };
 export type Invite = { id: number; token: string; organizationId: number; email: string; role: string; createdAt: string; expiresAt: string; acceptedAt: string | null };
