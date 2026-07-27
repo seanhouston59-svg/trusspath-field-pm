@@ -1,6 +1,6 @@
 import {
   projects, tasks, rfis, submittals, changeOrders, actionItems,
-  dailyLogs, punchItems, teamMembers, contacts, equipment, photos,
+  dailyLogs, punchItems, teamMembers, contacts, equipment, maintenanceLogs, photos,
   documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes,
   integrations,
   subscribers, demoRequests,
@@ -15,11 +15,12 @@ import {
 } from '@shared/schema';
 import type {
   Project, Task, Rfi, Submittal, ChangeOrder, ActionItem,
-  DailyLog, PunchItem, TeamMember, Contact, Equipment, Photo,
+  DailyLog, PunchItem, TeamMember, Contact, Equipment, MaintenanceLog, InsertMaintenanceLog, Photo,
   DocumentRow, CompanyDocument, DeletedItem, Blueprint, DroneCapture, Message, Note,
   Integration,
   InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder,
   InsertActionItem, InsertDailyLog, InsertPunchItem, InsertContact, InsertEquipment,
+  // MaintenanceLog is imported above already
   InsertPhoto, InsertDocument, InsertCompanyDocument, InsertDeletedItem, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember,
   InsertIntegration,
   Milestone, InsertMilestone,
@@ -401,7 +402,13 @@ export interface IStorage {
   updateContact(id: number, data: Partial<InsertContact>): Promise<Contact | undefined>;
   deleteContact(id: number): Promise<void>;
   getEquipment(projectId?: number): Promise<Equipment[]>;
+  getEquipmentById(id: number): Promise<Equipment | undefined>;
   createEquipment(data: InsertEquipment): Promise<Equipment>;
+  updateEquipment(id: number, patch: Partial<InsertEquipment>): Promise<Equipment | undefined>;
+  deleteEquipment(id: number): Promise<void>;
+  getMaintenanceLogs(equipmentId: number): Promise<MaintenanceLog[]>;
+  addMaintenanceLog(data: InsertMaintenanceLog): Promise<MaintenanceLog>;
+  deleteMaintenanceLog(id: number): Promise<void>;
   getPhotos(projectId?: number): Promise<Photo[]>;
   getPhoto(id: number): Promise<Photo | undefined>;
   createPhoto(data: InsertPhoto): Promise<Photo>;
@@ -734,10 +741,38 @@ class DatabaseStorage implements IStorage {
     if (conds.length === 1) return await db.select().from(equipment).where(conds[0]);
     return await db.select().from(equipment).where(and(...conds));
   }
+  async getEquipmentById(id: number): Promise<Equipment | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(equipment).where(eq(equipment.id, id));
+    return rows[0];
+  }
   async createEquipment(data: InsertEquipment): Promise<Equipment> {
     await ensureReady();
     const [row] = await db.insert(equipment).values(data).returning();
     return row;
+  }
+  async updateEquipment(id: number, patch: Partial<InsertEquipment>): Promise<Equipment | undefined> {
+    await ensureReady();
+    const [row] = await db.update(equipment).set(patch as any).where(eq(equipment.id, id)).returning();
+    return row;
+  }
+  async deleteEquipment(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(equipment).where(eq(equipment.id, id));
+    await db.delete(maintenanceLogs).where(eq(maintenanceLogs.equipmentId, id));
+  }
+  async getMaintenanceLogs(equipmentId: number): Promise<MaintenanceLog[]> {
+    await ensureReady();
+    return await db.select().from(maintenanceLogs).where(eq(maintenanceLogs.equipmentId, equipmentId)).orderBy(desc(maintenanceLogs.date));
+  }
+  async addMaintenanceLog(data: InsertMaintenanceLog): Promise<MaintenanceLog> {
+    await ensureReady();
+    const [row] = await db.insert(maintenanceLogs).values({ ...data, createdAt: new Date().toISOString() } as any).returning();
+    return row;
+  }
+  async deleteMaintenanceLog(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(maintenanceLogs).where(eq(maintenanceLogs.id, id));
   }
   async getPhotos(projectId?: number): Promise<Photo[]> {
     await ensureReady();
@@ -1112,7 +1147,7 @@ class DatabaseStorage implements IStorage {
   async resetAllData(): Promise<void> {
     await ensureReady();
     // neon-http doesn't support drizzle transactions — do sequential deletes.
-    for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, subscribers, demoRequests]) {
+    for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, maintenanceLogs, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, subscribers, demoRequests]) {
       await db.delete(t);
     }
     // Force re-seed on next request.
@@ -1123,7 +1158,7 @@ class DatabaseStorage implements IStorage {
   async wipeAllData(): Promise<void> {
     await ensureReady();
     // Delete all project data — NO re-seed. Leaves a clean slate.
-    for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, companyDocuments, deletedItems, subscribers, demoRequests]) {
+    for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, maintenanceLogs, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, companyDocuments, deletedItems, subscribers, demoRequests]) {
       await db.delete(t);
     }
   }
@@ -1811,7 +1846,9 @@ class DatabaseStorage implements IStorage {
     ];
     for (const x of contactsSeed) await db.insert(contacts).values(x);
 
-    const eqSeed: Omit<Equipment, "id" | "organizationId">[] = [
+    // Seed rows rely on DB column defaults for the newer asset_class + fleet
+    // fields — no need to enumerate every nullable column.
+    const eqSeed: Array<Partial<Equipment> & Pick<Equipment, "name" | "type" | "status">> = [
       { name: "Link-Belt 80T Crane #1", type: "Crane", status: "On Site", projectId: p[0].id, operator: "T. Bradshaw", location: "North pad" },
       { name: "CAT 336 Excavator", type: "Excavator", status: "On Site", projectId: p[0].id, operator: "Rental", location: "East excavation" },
       { name: "Bobcat S650 Skid Steer", type: "Skid Steer", status: "On Site", projectId: p[2].id, operator: "Crew B", location: "East lot" },

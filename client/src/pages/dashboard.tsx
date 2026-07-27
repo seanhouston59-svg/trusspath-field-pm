@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import {
   FolderKanban, HelpCircle, ListChecks, CheckSquare, ArrowRight, AlertTriangle, TrendingUp,
   Activity, CircleDot, Clock, Building2, Hammer, FileWarning, GitPullRequestArrow,
-  LayoutGrid, Eye, EyeOff, GripVertical, RotateCcw, Check, Plus, CloudSun, Bell, StickyNote,
+  LayoutGrid, Eye, EyeOff, GripVertical, RotateCcw, Check, Plus, CloudSun, Bell, StickyNote, Wrench,
 } from "lucide-react";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -22,7 +22,7 @@ import { useProjects, useTasks, useRfis, useSubmittals, usePunchItems, useTeamMa
 import { useAuth } from "@/lib/auth";
 import { formatCurrency, shortDate, relativeDays, isOverdue } from "@/lib/format";
 import { useAccess } from "@/lib/access";
-import { NotificationsBox, WeatherBar, StickyNotepadBox, NoteWallCarouselBox } from "@/components/dashboard-widgets";
+import { NotificationsBox, WeatherBar, StickyNotepadBox, NoteWallCarouselBox, FleetServiceBox } from "@/components/dashboard-widgets";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -283,6 +283,17 @@ const WIDGET_REGISTRY: WidgetDef[] = [
     description: "Slide through sticky notes from the board and reply inline.",
     icon: StickyNote,
     render: () => <NoteWallCarouselBox />,
+  },
+  {
+    id: "fleet-service",
+    title: "Service reminders",
+    description: "Vehicles and equipment overdue or due within 14 days.",
+    icon: Wrench,
+    render: () => (
+      <div className="h-full [&>div]:h-full">
+        <FleetServiceBox />
+      </div>
+    ),
   },
   {
     id: "projects",

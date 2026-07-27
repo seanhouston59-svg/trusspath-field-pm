@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, FileText, FileSpreadsheet, FileCheck, FileSignature, Download, Eye, Maximize2, Minimize2, UploadCloud, FileWarning } from "lucide-react";
+import { Plus, FileText, FileSpreadsheet, FileCheck, FileSignature, Receipt, Download, Eye, Maximize2, Minimize2, UploadCloud, FileWarning } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Avatar } from "@/components/bits";
 import { useDocuments, useTeamMap, useProjects, useTeam, useCreateDocument, useDeleteDocument } from "@/hooks/use-data";
@@ -20,9 +20,10 @@ const TYPE_META: Record<string, { icon: any; tint: string }> = {
   Spec: { icon: FileSpreadsheet, tint: "text-violet-500 bg-violet-500/12" },
   Permit: { icon: FileCheck, tint: "text-emerald-500 bg-emerald-500/12" },
   Contract: { icon: FileSignature, tint: "text-amber-500 bg-amber-500/12" },
+  Receipt: { icon: Receipt, tint: "text-teal-500 bg-teal-500/12" },
 };
 
-const TYPES = ["Drawing", "Spec", "Permit", "Contract"];
+const TYPES = ["Drawing", "Spec", "Permit", "Contract", "Receipt"];
 
 function isPdf(m?: string | null) { return m === "application/pdf"; }
 function isImage(m?: string | null) { return !!m && m.startsWith("image/"); }

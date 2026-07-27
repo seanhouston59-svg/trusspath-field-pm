@@ -62,7 +62,7 @@ export function defaultLayoutForRole(role?: string | null): DashboardLayout {
 // New widgets that should be VISIBLE on existing users' dashboards the moment
 // they ship, instead of being appended hidden. Reserve for widgets the user
 // explicitly asked for so we don't shove random things onto their layouts.
-const FORCE_VISIBLE_NEW_IDS = new Set<string>(["note-wall"]);
+const FORCE_VISIBLE_NEW_IDS = new Set<string>(["note-wall", "fleet-service"]);
 
 // Merge a persisted layout with the current widget catalog so newly-shipped
 // widgets show up (appended, hidden) instead of being invisible until the

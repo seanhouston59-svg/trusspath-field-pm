@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { apiRequest, apiUpload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, InsertDailyLog, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertTeamMember, InsertContact, InsertPunchItem, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, PunchItem, TeamMember, Contact, Equipment, Photo, DocumentRow, CompanyDocument, Blueprint, DroneCapture, Message, Note, Integration, AppSettings, Milestone, InsertMilestone, DeletedItem } from "@shared/schema";
+import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, InsertDailyLog, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertTeamMember, InsertContact, InsertPunchItem, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, PunchItem, TeamMember, Contact, Equipment, MaintenanceLog, InsertMaintenanceLog, Photo, DocumentRow, CompanyDocument, Blueprint, DroneCapture, Message, Note, Integration, AppSettings, Milestone, InsertMilestone, DeletedItem } from "@shared/schema";
 import { DEFAULT_SETTINGS } from "@shared/schema";
 
 function useDeleteWithUndo(entityType: string, queryKey: string, apiPath: string) {
@@ -482,6 +482,47 @@ export function useCreateEquipment() {
   return useMutation({
     mutationFn: async (data: InsertEquipment) => { const res = await apiRequest("POST", `/api/equipment`, data); return res.json(); },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/equipment"] }); },
+  });
+}
+export function useUpdateEquipment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: number; patch: Partial<InsertEquipment> }) => {
+      const res = await apiRequest("PATCH", `/api/equipment/${id}`, patch);
+      return res.json();
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/equipment"] }); },
+  });
+}
+export function useDeleteEquipment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/equipment/${id}`); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/equipment"] }); },
+  });
+}
+export function useMaintenanceLogs(equipmentId: number | null | undefined) {
+  return useQuery<MaintenanceLog[]>({
+    queryKey: ["/api/equipment", equipmentId, "maintenance"],
+    queryFn: async () => {
+      if (!equipmentId) return [];
+      const res = await apiRequest("GET", `/api/equipment/${equipmentId}/maintenance`);
+      return res.json();
+    },
+    enabled: !!equipmentId,
+  });
+}
+export function useAddMaintenanceLog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ equipmentId, data }: { equipmentId: number; data: Omit<InsertMaintenanceLog, "equipmentId"> }) => {
+      const res = await apiRequest("POST", `/api/equipment/${equipmentId}/maintenance`, data);
+      return res.json();
+    },
+    onSuccess: (_r, vars) => {
+      qc.invalidateQueries({ queryKey: ["/api/equipment", vars.equipmentId, "maintenance"] });
+      qc.invalidateQueries({ queryKey: ["/api/equipment"] });
+    },
   });
 }
 export function useCreatePhoto() {

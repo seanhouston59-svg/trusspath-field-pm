@@ -252,6 +252,44 @@ export const equipment = pgTable("equipment", {
   projectId: integer("project_id"),
   operator: text("operator"),
   location: text("location"),
+  // Discriminator so one table backs Equipment, Vehicle, and Tech assets.
+  // Values: "Equipment" | "Vehicle" | "Tech"
+  assetClass: text("asset_class").notNull().default("Equipment"),
+  // Vehicle fields
+  make: text("make"),
+  model: text("model"),
+  year: text("year"),
+  vin: text("vin"),
+  plate: text("plate"),
+  currentMileage: integer("current_mileage"),
+  // Service reminder (used by Equipment + Vehicle)
+  nextServiceDate: text("next_service_date"),
+  nextServiceMileage: integer("next_service_mileage"),
+  // Tech / issued-asset fields
+  assignedToId: integer("assigned_to_id"),
+  issueDate: text("issue_date"),
+  returnedDate: text("returned_date"),
+  returnSignature: text("return_signature"),
+  condition: text("condition"),
+  serialNumber: text("serial_number"),
+  purchaseDate: text("purchase_date"),
+  purchaseCost: text("purchase_cost"),
+  notes: text("notes"),
+});
+
+/* ------------------------- Maintenance Logs -------------------------- */
+export const maintenanceLogs = pgTable("maintenance_logs", {
+  id: serial("id").primaryKey(),
+  equipmentId: integer("equipment_id").notNull(),
+  date: text("date").notNull(),
+  mileage: integer("mileage"),
+  cost: text("cost"),
+  serviceType: text("service_type"),
+  notes: text("notes"),
+  performedBy: text("performed_by"),
+  receiptDocumentId: integer("receipt_document_id"),
+  loggedById: integer("logged_by_id"),
+  createdAt: text("created_at").notNull(),
 });
 
 /* ------------------------------- Photos -------------------------------- */
@@ -605,6 +643,7 @@ export const insertPunchItemSchema = createInsertSchema(punchItems).omit({ id: t
 export const insertTeamSchema = createInsertSchema(teamMembers).omit({ id: true });
 export const insertContactSchema = createInsertSchema(contacts).omit({ id: true });
 export const insertEquipmentSchema = createInsertSchema(equipment).omit({ id: true });
+export const insertMaintenanceLogSchema = createInsertSchema(maintenanceLogs).omit({ id: true, createdAt: true });
 export const insertPhotoSchema = createInsertSchema(photos).omit({ id: true });
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true });
 export const insertCompanyDocumentSchema = createInsertSchema(companyDocuments).omit({ id: true });
@@ -731,6 +770,8 @@ export type PunchItem = typeof punchItems.$inferSelect;
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
 export type Equipment = typeof equipment.$inferSelect;
+export type MaintenanceLog = typeof maintenanceLogs.$inferSelect;
+export type InsertMaintenanceLog = z.infer<typeof insertMaintenanceLogSchema>;
 export type Photo = typeof photos.$inferSelect;
 export type DocumentRow = typeof documents.$inferSelect;
 export type CompanyDocument = typeof companyDocuments.$inferSelect;

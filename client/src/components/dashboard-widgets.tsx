@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, CloudSun, StickyNote, ArrowRight, AlertTriangle, HelpCircle, GitPullRequestArrow, ClipboardList, Plus, ChevronDown, ChevronLeft, ChevronRight, CornerDownRight } from "lucide-react";
+import { Bell, CloudSun, StickyNote, ArrowRight, AlertTriangle, HelpCircle, GitPullRequestArrow, ClipboardList, Plus, ChevronDown, ChevronLeft, ChevronRight, CornerDownRight, Wrench, Car, HardHat } from "lucide-react";
 import { Avatar } from "@/components/bits";
-import { useCreateNote, useNotes, useAddNoteReply, useProjects } from "@/hooks/use-data";
+import { useCreateNote, useNotes, useAddNoteReply, useProjects, useEquipment } from "@/hooks/use-data";
 import { relativeDays, isOverdue } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { Task, Rfi, ChangeOrder, DailyLog, Project } from "@shared/schema";
+import type { Task, Rfi, ChangeOrder, DailyLog, Project, Equipment } from "@shared/schema";
 
 /* ---------------------------- Notifications ---------------------------- */
 type Notif = { id: string; icon: any; tone: string; text: string; meta: string; href: string };
@@ -588,6 +588,109 @@ export function NoteWallCarouselBox() {
             <ChevronRight className="size-4" />
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+/* --------------------------- Fleet service reminders --------------------------- */
+export function FleetServiceBox() {
+  const { data: equipment = [] } = useEquipment();
+  const today = new Date().toISOString().slice(0, 10);
+  const in14 = new Date(Date.now() + 14 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+
+  const items = useMemo(() => {
+    const flagged = (equipment as Equipment[])
+      .filter((e) => (e.assetClass ?? "Equipment") !== "Tech")
+      .map((e) => {
+        const overdue =
+          (!!e.nextServiceDate && e.nextServiceDate <= today) ||
+          !!(e.nextServiceMileage && e.currentMileage != null && e.currentMileage >= e.nextServiceMileage);
+        const dueSoon = !overdue && !!e.nextServiceDate && e.nextServiceDate <= in14;
+        return { e, overdue, dueSoon };
+      })
+      .filter((x) => x.overdue || x.dueSoon)
+      .sort((a, b) => {
+        if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+        return (a.e.nextServiceDate ?? "").localeCompare(b.e.nextServiceDate ?? "");
+      });
+    return flagged.slice(0, 5);
+  }, [equipment, today, in14]);
+
+  const totalFlagged = (equipment as Equipment[]).filter((e) => {
+    if ((e.assetClass ?? "Equipment") === "Tech") return false;
+    const overdue =
+      (!!e.nextServiceDate && e.nextServiceDate <= today) ||
+      !!(e.nextServiceMileage && e.currentMileage != null && e.currentMileage >= e.nextServiceMileage);
+    const dueSoon = !overdue && !!e.nextServiceDate && e.nextServiceDate <= in14;
+    return overdue || dueSoon;
+  }).length;
+
+  return (
+    <div className="flex flex-col rounded-lg border border-border bg-card p-4 shadow-sm" data-testid="box-fleet-service">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 font-display text-sm font-bold">
+          <Wrench className="size-4" /> Service reminders
+        </h3>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold",
+            totalFlagged > 0 ? "bg-red-500/12 text-red-600" : "bg-emerald-500/12 text-emerald-600"
+          )}
+        >
+          {totalFlagged}
+        </span>
+      </div>
+      <div className="mt-3 flex-1 space-y-2">
+        {items.length === 0 && (
+          <p className="py-6 text-center text-xs text-muted-foreground">Everything's caught up on service.</p>
+        )}
+        {items.map(({ e, overdue }) => {
+          const isVehicle = (e.assetClass ?? "Equipment") === "Vehicle";
+          const Icon = isVehicle ? Car : HardHat;
+          const meta: string[] = [];
+          if (e.nextServiceDate) meta.push(overdue ? `Due ${e.nextServiceDate}` : `Due ${e.nextServiceDate}`);
+          if (e.nextServiceMileage && e.currentMileage != null) {
+            meta.push(`${e.currentMileage.toLocaleString()} / ${e.nextServiceMileage.toLocaleString()} mi`);
+          }
+          return (
+            <Link
+              key={e.id}
+              href="/equipment"
+              className="flex items-start gap-2.5 rounded-md border border-border p-2.5 transition-colors hover:border-primary/50 hover:bg-muted/30"
+              data-testid={`svc-${e.id}`}
+            >
+              <span
+                className={cn(
+                  "mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md",
+                  overdue ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600"
+                )}
+              >
+                <Icon className="size-3.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium leading-tight">{e.name}</div>
+                <div className="truncate text-xs text-muted-foreground">{meta.join(" · ") || "Service due"}</div>
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                  overdue ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600"
+                )}
+              >
+                {overdue ? "Overdue" : "Soon"}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+      {totalFlagged > 0 && (
+        <Link
+          href="/equipment"
+          className="mt-3 inline-flex items-center justify-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          Open Fleet & Assets <ArrowRight className="size-3" />
+        </Link>
       )}
     </div>
   );

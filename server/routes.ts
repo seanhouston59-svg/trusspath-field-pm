@@ -13,7 +13,7 @@ import { weekStartMonday, ensureTimesheetForWeek, rollupPunchToTimesheet, runWee
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
-  insertPunchItemSchema, insertContactSchema, insertEquipmentSchema,
+  insertPunchItemSchema, insertContactSchema, insertEquipmentSchema, insertMaintenanceLogSchema,
   insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMessageSchema, insertNoteSchema, insertMilestoneSchema,
   insertTeamSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
@@ -1003,6 +1003,50 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const parsed = insertEquipmentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(await storage.createEquipment(withOrg(req, parsed.data)));
+  });
+  app.patch("/api/equipment/:id", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    const parsed = insertEquipmentSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const updated = await storage.updateEquipment(id, parsed.data);
+    if (!updated) return res.status(404).json({ message: "Equipment not found." });
+    res.json(updated);
+  });
+  app.delete("/api/equipment/:id", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    await storage.deleteEquipment(id);
+    res.status(204).end();
+  });
+
+  // Maintenance log endpoints
+  app.get("/api/equipment/:id/maintenance", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    res.json(await storage.getMaintenanceLogs(id));
+  });
+  app.post("/api/equipment/:id/maintenance", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    const parsed = insertMaintenanceLogSchema.safeParse({ ...req.body, equipmentId: id });
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const loggedById = req.account?.id ?? null;
+    const created = await storage.addMaintenanceLog({ ...parsed.data, loggedById });
+    // If a mileage was recorded, roll the equipment's current mileage forward.
+    if (parsed.data.mileage != null) {
+      const existing = await storage.getEquipmentById(id);
+      if (existing && (existing.currentMileage == null || parsed.data.mileage > existing.currentMileage)) {
+        await storage.updateEquipment(id, { currentMileage: parsed.data.mileage });
+      }
+    }
+    res.status(201).json(created);
+  });
+  app.delete("/api/maintenance/:id", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    await storage.deleteMaintenanceLog(id);
+    res.status(204).end();
   });
 
   // Photos
