@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { MapPin, Calendar, Building2, Plus, ExternalLink, FolderKanban } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState, GhostProjectCards } from "@/components/ghost-state";
@@ -20,12 +20,32 @@ export default function Projects() {
   const { data: teamList = [] } = useTeam();
   const create = useCreateProject();
   const [open, setOpen] = useState(false);
-  const [location] = useLocation();
 
-  // Auto-open create dialog when navigated with ?new=1
+  // Auto-open create dialog when navigated with ?new=1.
+  //
+  // The app uses wouter's useHashLocation, which strips the query string —
+  // e.g. for URL "/#/projects?new=1", useLocation() returns just "/projects".
+  // So we can't rely on the wouter location; we read the raw hash and parse
+  // it ourselves. We also listen for hashchange so navigating back to
+  // "/#/projects?new=1" from within the app re-opens the dialog.
   useEffect(() => {
-    if (location.includes("new=1")) setOpen(true);
-  }, [location]);
+    const checkAndOpen = () => {
+      const hash = window.location.hash || "";
+      const qIdx = hash.indexOf("?");
+      if (qIdx === -1) return;
+      const params = new URLSearchParams(hash.slice(qIdx + 1));
+      if (params.get("new") === "1") {
+        setOpen(true);
+        // Clean up the URL so a manual reload doesn't reopen the dialog
+        // and so closing the dialog leaves a clean history entry.
+        const cleanHash = hash.slice(0, qIdx);
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${cleanHash}`);
+      }
+    };
+    checkAndOpen();
+    window.addEventListener("hashchange", checkAndOpen);
+    return () => window.removeEventListener("hashchange", checkAndOpen);
+  }, []);
 
   const teamOptions = [{ value: "0", label: "Unassigned" }, ...teamList.map((m) => ({ value: String(m.id), label: m.name }))];
 

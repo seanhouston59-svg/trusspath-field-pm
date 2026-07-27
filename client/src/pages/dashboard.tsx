@@ -143,7 +143,7 @@ export default function Dashboard() {
             description="Create your first project to populate the dashboard with real-time stats, tasks, and field updates."
             icon={FolderKanban}
             ctaLabel="Create your first project"
-            ctaHref="/projects"
+            ctaHref="/projects?new=1"
           />
         </div>
       ) : (
