@@ -7,6 +7,7 @@ import {
   Contact as ContactIcon, MessageSquare, Building2, Clock,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
   LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2, Smartphone,
+  ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -30,6 +31,7 @@ const ICONS: Record<string, any> = {
   StickyNote, Wrench, Image, FileText, Contact: ContactIcon, MessageSquare, Building2, Clock,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings: SettingsIcon, Trash2, Network,
   ShieldCheck, Smartphone,
+  ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2,
 };
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {

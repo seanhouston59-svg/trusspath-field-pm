@@ -29,14 +29,20 @@ import {
   ListChecks, CheckSquare, HelpCircle, FileStack, GitPullRequestArrow,
   ClipboardList, Image as ImageIcon, FileText, PencilRuler, Wrench, Camera,
   Users, Contact, MessagesSquare, Plug, Settings, ArrowRight,
+  Smartphone, ClipboardEdit, Timer, AlertTriangle, CheckCircle2, Building2,
+  Clock, MessageSquare, ShieldCheck, Plane, Network, Trash2,
 } from "lucide-react";
 
-// Match nav icon keys to actual components
+// Match nav icon keys to actual components (must cover every icon key used in
+// shared/app-manifest.ts APP_NAV — the sidebar layout's ICONS map is the
+// authoritative list and this must stay in sync).
 const NAV_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard, StickyNote, FolderKanban, CalendarRange, GanttChartSquare,
   ListChecks, CheckSquare, HelpCircle, FileStack, GitPullRequestArrow,
   ClipboardList, Image: ImageIcon, FileText, PencilRuler, Wrench, Camera,
   Users, Contact, MessagesSquare, Plug, Settings,
+  Smartphone, ClipboardEdit, Timer, AlertTriangle, CheckCircle2, Building2,
+  Clock, MessageSquare, ShieldCheck, Plane, Network, Trash2,
 };
 
 interface CommandPaletteProps {

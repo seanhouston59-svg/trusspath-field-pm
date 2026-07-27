@@ -53,9 +53,19 @@ export const APP_NAV: NavGroup[] = [
     ],
   },
   {
-    title: "Field",
+    title: "Field kit (mobile)",
     items: [
-      { href: "/field", label: "Field (mobile)", icon: "Smartphone" },
+      { href: "/field", label: "Field kit hub", icon: "Smartphone" },
+      { href: "/field/daily-log", label: "Daily log (field)", icon: "ClipboardEdit" },
+      { href: "/field/timecard", label: "Timecard", icon: "Timer" },
+      { href: "/field/photo", label: "Photo capture", icon: "Camera" },
+      { href: "/field/observation", label: "Safety observation", icon: "AlertTriangle" },
+      { href: "/field/punch", label: "Punch (field)", icon: "CheckCircle2" },
+    ],
+  },
+  {
+    title: "Field records",
+    items: [
       { href: "/daily-logs", label: "Daily Logs", icon: "ClipboardList" },
       { href: "/photos", label: "Photo Log", icon: "Image" },
       { href: "/documents", label: "Documents", icon: "FileText" },
