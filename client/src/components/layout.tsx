@@ -551,7 +551,24 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
   // Field mode: chromeless layout for on-site use. No sidebar, no top nav
   // clutter, no command palette — just the page, a slim header with the
   // field-kit brand + online indicator + exit, and the content.
-  if (field.enabled) return <FieldModeLayout title={title} actions={actions} onExit={field.exit}>{children}</FieldModeLayout>;
+  if (field.enabled) {
+    // Exiting field mode drops the user back to the office-view dashboard —
+    // otherwise they'd be left staring at the field page they were on but
+    // rendered in full chrome, which is almost never what they want.
+    //
+    // Special case: if we were opened as a popup window (desktop 'Open Field
+    // kit' from the dashboard), close the popup instead of navigating — the
+    // parent tab still has the office view.
+    const exitToDashboard = () => {
+      field.exit();
+      const isPopup = typeof window !== "undefined" && !!window.opener && window.opener !== window;
+      if (isPopup) {
+        try { window.close(); return; } catch { /* fall through to hash nav */ }
+      }
+      window.location.hash = "/app";
+    };
+    return <FieldModeLayout title={title} actions={actions} onExit={exitToDashboard}>{children}</FieldModeLayout>;
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
