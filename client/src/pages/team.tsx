@@ -39,6 +39,49 @@ const POSITIONS: { value: string; label: string }[] = [
 
 const POSITION_BY_VALUE = Object.fromEntries(POSITIONS.map((p) => [p.value, p]));
 
+/**
+ * Common construction trades. Ordered roughly by build sequence — sitework first,
+ * structure/envelope next, MEP + finishes after. "Management" and "Quality" stay
+ * at the top so PMs / QC leads have obvious picks; "Other" at the end for anything
+ * uncommon (owners can type a free-form value via the legacy-value fallback).
+ */
+const TRADES: string[] = [
+  "Management",
+  "Quality",
+  "Safety",
+  "Sitework / Earthwork",
+  "Demolition",
+  "Concrete",
+  "Masonry",
+  "Structural Steel",
+  "Rough Carpentry",
+  "Finish Carpentry / Millwork",
+  "Roofing",
+  "Waterproofing",
+  "Insulation",
+  "Doors & Windows / Glazing",
+  "Drywall",
+  "Painting",
+  "Flooring",
+  "Tile",
+  "Ceilings",
+  "Electrical",
+  "Low Voltage / Data",
+  "Fire Alarm",
+  "Plumbing",
+  "HVAC / Mechanical",
+  "Fire Sprinkler",
+  "Elevator / Conveyance",
+  "Landscaping",
+  "Paving / Asphalt",
+  "Utilities",
+  "Environmental / Abatement",
+  "Surveying",
+  "Other",
+];
+
+const TRADE_SET = new Set(TRADES);
+
 const COLOR_OPTIONS = ["amber", "blue", "emerald", "violet", "rose", "cyan", "orange", "slate"];
 
 const TRADE_TINT: Record<string, string> = {
@@ -72,11 +115,17 @@ export default function Team() {
     ...POSITIONS.map((p) => ({ value: p.value, label: p.label })),
     ...(legacyRole ? [{ value: legacyRole, label: `${legacyRole} (custom)` }] : []),
   ];
+  // Same legacy-fallback pattern for Trade: preserve any old free-text value on edit.
+  const legacyTrade = editing?.trade && !TRADE_SET.has(editing.trade) ? editing.trade : null;
+  const TRADE_OPTIONS = [
+    ...TRADES.map((t) => ({ value: t, label: t })),
+    ...(legacyTrade ? [{ value: legacyTrade, label: `${legacyTrade} (custom)` }] : []),
+  ];
 
   const fields: FieldDef[] = [
     { name: "name", label: "Full Name", type: "text", required: true, half: true },
     { name: "role", label: "Position", type: "select", options: POSITION_OPTIONS, placeholder: "Select a position…", required: true, half: true },
-    { name: "trade", label: "Trade", type: "text", placeholder: "Electrical", required: true, half: true },
+    { name: "trade", label: "Trade", type: "select", options: TRADE_OPTIONS, placeholder: "Select a trade…", required: true, half: true },
     { name: "company", label: "Company", type: "text", required: true, half: true },
     { name: "email", label: "Email", type: "text", placeholder: "name@company.com", half: true },
     { name: "phone", label: "Phone", type: "text", placeholder: "(303) 555-0000", half: true },
