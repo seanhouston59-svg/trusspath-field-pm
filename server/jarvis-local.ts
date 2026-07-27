@@ -2,6 +2,40 @@ import { storage, normalizeQuestion, inferTopic } from "./storage";
 import { buildContext, type ContextBundle } from "./jarvis";
 import { runHealthScan } from "./health";
 import { getWeather, getWeatherOneLiner, getNearbyPlaces, hasPlacesApi } from "./apis";
+import { getOrganization, isValidTimezone } from "./lib/orgs";
+
+// Resolve the caller's org timezone — falls back to America/Denver whenever
+// the org can't be looked up or its stored timezone is invalid. Used to keep
+// greetings, "today", and other user-facing dates in local time on Vercel
+// serverless (which runs in UTC).
+async function resolveOrgTimezone(organizationId?: number): Promise<string> {
+  const FALLBACK = "America/Denver";
+  if (!organizationId) return FALLBACK;
+  try {
+    const org = await getOrganization(organizationId);
+    const tz = org?.timezone;
+    return isValidTimezone(tz) ? (tz as string) : FALLBACK;
+  } catch {
+    return FALLBACK;
+  }
+}
+
+// Local YYYY-MM-DD in a specific IANA timezone — so "today" doesn't roll over
+// at 6pm Denver just because it's midnight UTC.
+function todayInTz(timezone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    // en-CA yields YYYY-MM-DD already.
+    return parts;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
 
 // When no LLM API key is available, Jarvis uses this local response engine.
 // Responses are written to sound natural and conversational, the way a real
@@ -179,10 +213,26 @@ function itemLabel(x: Record<string, any>): string {
   return num ? `${num} \u2014 ${title}` : title;
 }
 
-function weekdayGreeting(): string {
+// Local time-of-day + weekday for a given IANA timezone. Vercel's runtime is
+// UTC, so this is what makes "morning" mean 9am in Denver instead of 3pm UTC.
+function localHourAndDay(timezone: string): { hour: number; day: string } {
   const now = new Date();
-  const hr = now.getHours();
-  const day = now.toLocaleDateString("en-US", { weekday: "long" });
+  // Grab the hour in the requested timezone as an integer (0–23).
+  const hourStr = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    hour12: false,
+  }).format(now);
+  const hour = parseInt(hourStr, 10);
+  const day = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "long",
+  }).format(now);
+  return { hour: Number.isFinite(hour) ? hour : 12, day };
+}
+
+function weekdayGreeting(timezone: string = "America/Denver"): string {
+  const { hour: hr, day } = localHourAndDay(timezone);
   if (hr < 5) return `Late night check-in, ${day.toLowerCase()}. Here's where things stand.`;
   if (hr < 12) return `Good morning \u2014 here's your ${day} briefing.`;
   if (hr < 17) return `Afternoon check-in for ${day}. Here's where the project stands.`;
@@ -236,13 +286,16 @@ function buildRecommendation(bucket: { overdueRfis: any[]; overdueSubs: any[]; o
   return `Keep the crew focused on their assigned tasks today. Check the Schedule tab for upcoming milestones.`;
 }
 
-export async function buildRichLocalBrief(projectId?: number): Promise<string> {
+export async function buildRichLocalBrief(projectId?: number, organizationId?: number): Promise<string> {
+  // Resolve the org's timezone so "today", "morning", etc. mean the user's local
+  // time — not UTC (Vercel serverless runs in UTC by default).
+  const timezone = await resolveOrgTimezone(organizationId);
   const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
   if (!project) {
-    return `${weekdayGreeting()}\n\nNo active project found yet. Head to the Projects tab and create one \u2014 once it's set up I can give you real briefings with overdue items, weather, and priorities.`;
+    return `${weekdayGreeting(timezone)}\n\nNo active project found yet. Head to the Projects tab and create one \u2014 once it's set up I can give you real briefings with overdue items, weather, and priorities.`;
   }
   const pid = project.id;
-  const today = YYYY_MM_DD();
+  const today = todayInTz(timezone);
 
   const [tasks, rfis, subs, cos, actions, team] = await Promise.all([
     storage.getTasks(pid),
@@ -274,7 +327,7 @@ export async function buildRichLocalBrief(projectId?: number): Promise<string> {
 
   // Assemble the brief. Kept warm and specific — real names, real counts.
   const lines: string[] = [];
-  lines.push(weekdayGreeting());
+  lines.push(weekdayGreeting(timezone));
   lines.push("");
   const status = project.status ? ` (${project.status})` : "";
   lines.push(`PROJECT: ${project.name}${status}`);
@@ -505,7 +558,7 @@ export async function buildSafetyBrief(projectId: number | undefined): Promise<s
   return brief;
 }
 
-export async function localJarvisChat(projectId: number | undefined, history: { role: "user" | "assistant"; content: string }[]): Promise<{ reply: string }> {
+export async function localJarvisChat(projectId: number | undefined, history: { role: "user" | "assistant"; content: string }[], organizationId?: number): Promise<{ reply: string }> {
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   const lower = lastUser.toLowerCase().trim();
 
@@ -639,7 +692,7 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
 
   // Check for briefing/status intent — use the rich local brief.
   if (/\b(brief|briefing|status|update|summary|overview|morning|standup|what'?s happening|what'?s the status|overdue|what.?s due)\b/i.test(lower)) {
-    return { reply: await buildRichLocalBrief(projectId) };
+    return { reply: await buildRichLocalBrief(projectId, organizationId) };
   }
 
   // Check for "how many" project data queries

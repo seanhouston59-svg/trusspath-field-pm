@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Bot, Building2, Mic2, Stethoscope, TriangleAlert, RotateCcw, CheckCircle2, XCircle, CreditCard, ExternalLink, Trash2, Users, ArrowRight } from "lucide-react";
+import { Bot, Building2, Mic2, Stethoscope, TriangleAlert, RotateCcw, CheckCircle2, XCircle, CreditCard, ExternalLink, Trash2, Users, ArrowRight, Clock } from "lucide-react";
 import { Link } from "wouter";
-import { useCurrentOrg } from "@/hooks/use-data";
+import { useCurrentOrg, useUpdateOrg } from "@/hooks/use-data";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,11 +52,14 @@ export default function SettingsPage() {
   const wipe = useWipeData();
   const { toast } = useToast();
   const { can } = useAccess();
+  const org = useCurrentOrg();
+  const updateOrg = useUpdateOrg();
   const [report, setReport] = useState<HealthReport | null>(null);
   const [resetText, setResetText] = useState("");
   const [wipeText, setWipeText] = useState("");
   const [company, setCompany] = useState("");
   const [addr, setAddr] = useState("");
+  const [tzCustom, setTzCustom] = useState("");
 
   // sync local input state once settings load from the server (defaultValue alone
   // would show fallbacks on a cold reload)
@@ -134,6 +137,68 @@ export default function SettingsPage() {
                 data-testid="setting-companyName"
               />
             </Row>
+          </Card>
+
+          {/* Timezone — owners/admins can change; controls Jarvis "today" + greetings. */}
+          <Card icon={Clock} title="Timezone" desc="Used for Jarvis greetings, morning-brief timing, and any user-facing dates.">
+            {(() => {
+              const currentTz = org.data?.organization.timezone || "America/Denver";
+              const role = org.data?.membership.role;
+              const canEdit = role === "owner" || role === "admin";
+              const presets = [
+                "America/Denver",
+                "America/Los_Angeles",
+                "America/Phoenix",
+                "America/Chicago",
+                "America/New_York",
+                "America/Anchorage",
+                "Pacific/Honolulu",
+              ];
+              const isPreset = presets.includes(currentTz);
+              const selectValue = isPreset ? currentTz : "__custom__";
+              const save = (tz: string) => updateOrg.mutate({ timezone: tz });
+              return (
+                <>
+                  <Row label="Organization timezone" hint="Applies to everyone in your org">
+                    <Select
+                      value={selectValue}
+                      onValueChange={(v) => {
+                        if (v === "__custom__") { setTzCustom(currentTz); return; }
+                        save(v);
+                      }}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="h-8 w-52" data-testid="setting-timezone"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {presets.map((tz) => (
+                          <SelectItem key={tz} value={tz}>{tz}</SelectItem>
+                        ))}
+                        {!isPreset && <SelectItem value={currentTz}>{currentTz}</SelectItem>}
+                        <SelectItem value="__custom__">Other… (IANA name)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Row>
+                  {selectValue === "__custom__" && canEdit && (
+                    <Row label="Custom IANA timezone" hint="e.g. Europe/London, Asia/Tokyo">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={tzCustom}
+                          onChange={(e) => setTzCustom(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                          className="h-8 w-44"
+                          placeholder="America/Denver"
+                          data-testid="setting-timezone-custom"
+                        />
+                        <Button size="sm" onClick={() => save(tzCustom.trim())} disabled={!tzCustom.trim() || updateOrg.isPending}>Save</Button>
+                      </div>
+                    </Row>
+                  )}
+                  {!canEdit && (
+                    <p className="text-xs text-muted-foreground mt-2">Only owners and admins can change the org timezone.</p>
+                  )}
+                </>
+              );
+            })()}
           </Card>
 
           <Card icon={Mic2} title="Default project" desc="Pre-selected on the Gantt chart.">

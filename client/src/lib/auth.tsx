@@ -12,6 +12,7 @@ type SignupPayload = {
   plan?: "starter" | "pro" | "enterprise";
   billing?: "monthly" | "annual";
   inviteToken?: string;
+  timezone?: string;
 };
 type LoginResponse = {
   account: AccountPublic;
@@ -74,7 +75,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signupMut = useMutation({
     mutationFn: async (data: SignupPayload) => {
-      const res = await apiRequest("POST", "/api/auth/signup", data);
+      // Capture the browser's IANA timezone if the caller didn't already pass one.
+      // Falls back to America/Denver on the server if invalid or unavailable.
+      let timezone = data.timezone;
+      if (!timezone) {
+        try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { timezone = undefined; }
+      }
+      const payload = { ...data, timezone };
+      const res = await apiRequest("POST", "/api/auth/signup", payload);
       const json = (await res.json()) as LoginResponse;
       if (json.token) setBearerToken(json.token);
       return json;

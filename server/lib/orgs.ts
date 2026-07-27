@@ -24,12 +24,32 @@ export interface CreateOrganizationInput {
   subscriptionPlan?: PlanTier;
   subscriptionBilling?: Billing;
   trialEndsAt?: string;
+  timezone?: string;
+}
+
+/**
+ * Validate that a candidate string is a real IANA timezone name.
+ * Uses `Intl.DateTimeFormat` under the hood — invalid names throw.
+ * Returns the input on success, or null on failure.
+ */
+export function isValidTimezone(tz: string | undefined | null): boolean {
+  if (!tz || typeof tz !== "string") return false;
+  try {
+    // Constructing a formatter with an invalid tz throws a RangeError.
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function createOrganization(input: CreateOrganizationInput): Promise<Organization> {
   const now = new Date().toISOString();
   const slug = input.slug || makeSlug(input.name);
-  const [row] = await db.insert(organizations).values({
+  // Trust caller-supplied timezone only if valid; otherwise fall back to the DB
+  // default (America/Denver) by omitting the column from the insert.
+  const tz = isValidTimezone(input.timezone) ? input.timezone : undefined;
+  const values: any = {
     name: input.name,
     slug,
     ownerAccountId: input.ownerAccountId,
@@ -40,7 +60,19 @@ export async function createOrganization(input: CreateOrganizationInput): Promis
     subscriptionPlan: input.subscriptionPlan ?? null,
     subscriptionBilling: input.subscriptionBilling ?? null,
     trialEndsAt: input.trialEndsAt ?? null,
-  }).returning();
+  };
+  if (tz) values.timezone = tz;
+  const [row] = await db.insert(organizations).values(values).returning();
+  return row;
+}
+
+/**
+ * Update the timezone for an organization. Silently ignored if the timezone is
+ * not a valid IANA name — returns the current row unchanged.
+ */
+export async function updateOrgTimezone(orgId: number, tz: string): Promise<Organization | undefined> {
+  if (!isValidTimezone(tz)) return getOrganization(orgId);
+  const [row] = await db.update(organizations).set({ timezone: tz }).where(eq(organizations.id, orgId)).returning();
   return row;
 }
 
@@ -294,6 +326,7 @@ export async function bootstrapOrganizationForAccount(input: {
   stripe?: any; // pass the initialized Stripe client, or omit for a no-Stripe test path
   returnUrl?: string; // if provided, will create a checkout session and return url
   cancelUrl?: string;
+  timezone?: string;
 }): Promise<{ organizationId: number; checkoutUrl?: string }> {
   const org = await createOrganization({
     name: input.orgName,
@@ -301,6 +334,7 @@ export async function bootstrapOrganizationForAccount(input: {
     subscriptionStatus: input.stripe ? undefined : "trialing", // pre-checkout state
     subscriptionPlan: input.tier,
     subscriptionBilling: input.billing,
+    timezone: input.timezone,
   });
   await createMembership(input.accountId, org.id, "owner");
 

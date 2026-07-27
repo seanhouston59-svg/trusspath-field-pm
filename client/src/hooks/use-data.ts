@@ -695,7 +695,7 @@ export function useManageBilling() {
 /* ----------------------- Organization / Team ----------------------- */
 export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string };
 export type Invite = { id: number; token: string; organizationId: number; email: string; role: string; createdAt: string; expiresAt: string; acceptedAt: string | null };
-export type OrgSummary = { id: number; name: string; slug: string; ownerAccountId: number; subscriptionStatus: string | null; subscriptionPlan: string | null; subscriptionBilling: string | null; trialEndsAt: string | null; };
+export type OrgSummary = { id: number; name: string; slug: string; ownerAccountId: number; subscriptionStatus: string | null; subscriptionPlan: string | null; subscriptionBilling: string | null; trialEndsAt: string | null; timezone: string; };
 
 export function useCurrentOrg() {
   return useQuery<{ organization: OrgSummary; membership: Membership; seats: { active: number; included: number | null; overage: number | null } }>({
@@ -703,6 +703,20 @@ export function useCurrentOrg() {
     retry: false,
   });
 }
+// Update org-level settings (currently just timezone). Owners + admins only.
+export function useUpdateOrg() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: { timezone?: string }) => {
+      const res = await apiRequest("PATCH", "/api/org/current", patch);
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/org/current"] });
+    },
+  });
+}
+
 export function useOrgMembers() {
   return useQuery<{ members: (Membership & { email: string; displayName: string })[] }>({
     queryKey: ["/api/org/members"],

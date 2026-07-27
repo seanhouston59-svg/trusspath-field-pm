@@ -28,6 +28,7 @@ import {
   createMembership, getMembership, getMembershipForAccount, listMembershipsForOrg, updateMembershipRole, removeMembership,
   syncSeatsForOrg,
   getOrganization, updateOrgBilling, getOrgByStripeCustomerId,
+  updateOrgTimezone, isValidTimezone,
   countActiveSeats,
 } from "./lib/orgs";
 import { resolveMembership, requireCap, requireRole } from "./lib/mt-middleware";
@@ -417,7 +418,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.post("/api/auth/signup", authRateLimit, async (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    const { email, password, displayName, company, plan, billing, inviteToken } = parsed.data;
+    const { email, password, displayName, company, plan, billing, inviteToken, timezone } = parsed.data;
     const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
 
     try {
@@ -463,6 +464,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         stripe: stripe || undefined,
         returnUrl: `${APP_URL}/#/settings?checkout=success`,
         cancelUrl: `${APP_URL}/#/paywall?checkout=cancelled`,
+        timezone,
       });
       checkoutUrl = bootstrap.checkoutUrl;
 
@@ -1504,7 +1506,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // JARVIS — AI assistant
-  app.get("/api/jarvis/brief", async (req, res) => {
+  app.get("/api/jarvis/brief", async (req: any, res) => {
     try {
       // Try LLM-powered brief first; fall back to local if no API key or error
       try {
@@ -1513,7 +1515,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       } catch (llmErr) {
         console.log("[jarvis] LLM brief failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
         // Rich local brief — named items, real counts, weather, one specific rec.
-        const brief = await buildRichLocalBrief(pid(req));
+        // Pass org id so greeting + "today" use the org's configured timezone.
+        const brief = await buildRichLocalBrief(pid(req), req.organizationId);
         res.json({ brief, mode: "local" });
       }
     } catch (err) {
@@ -1521,7 +1524,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       res.status(502).json({ message: "Jarvis is unavailable right now." });
     }
   });
-  app.post("/api/jarvis/chat", async (req, res) => {
+  app.post("/api/jarvis/chat", async (req: any, res) => {
     try {
       const history = Array.isArray(req.body?.messages) ? req.body.messages : [];
       // Try LLM-powered chat first; fall back to local engine
@@ -1530,7 +1533,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         res.json(result);
       } catch (llmErr) {
         console.log("[jarvis] LLM chat failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
-        const result = await localJarvisChat(pid(req), history);
+        const result = await localJarvisChat(pid(req), history, req.organizationId);
         res.json(result);
       }
     } catch (err) {
@@ -1808,6 +1811,26 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         overage: plan ? Math.max(0, seats - plan.includedSeats) : null,
       },
     });
+  });
+
+  // PATCH /api/org/current — update org-level settings (owners+admins).
+  // Currently supports: timezone. Extend the whitelist as more settings land.
+  app.patch("/api/org/current", requireCap("manageMembers"), async (req: any, res) => {
+    if (!req.organizationId) return res.status(404).json({ message: "No active organization" });
+    const body = req.body || {};
+    const patch: { timezone?: string } = {};
+    if (typeof body.timezone === "string") {
+      if (!isValidTimezone(body.timezone)) {
+        return res.status(400).json({ message: "Invalid timezone. Use an IANA name like 'America/Denver'." });
+      }
+      patch.timezone = body.timezone;
+    }
+    if (Object.keys(patch).length === 0) return res.status(400).json({ message: "No supported fields to update" });
+
+    let updated = await getOrganization(req.organizationId);
+    if (patch.timezone) updated = await updateOrgTimezone(req.organizationId, patch.timezone);
+    if (!updated) return res.status(404).json({ message: "Organization not found" });
+    res.json({ organization: updated });
   });
 
   // GET /api/org/members — list all members (owners+admins only).

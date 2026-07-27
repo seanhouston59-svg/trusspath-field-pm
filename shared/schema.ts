@@ -21,6 +21,9 @@ export const organizations = pgTable("organizations", {
   subscriptionBilling: text("subscription_billing"), // monthly | annual
   subscriptionCurrentPeriodEnd: text("subscription_current_period_end"),
   trialEndsAt: text("trial_ends_at"),
+  // IANA timezone name for this org. Used for greetings, "today" calculations,
+  // and any user-facing date formatting. Defaults to America/Denver in the DB.
+  timezone: text("timezone").notNull().default("America/Denver"),
 });
 
 /* ------------------------------- Memberships ----------------------------- */
@@ -545,6 +548,9 @@ export const signupSchema = z.object({
   billing: z.enum(["monthly", "annual"]).optional(),
   // Optional: signup via an invite token (skips org creation + billing; joins the inviter's org).
   inviteToken: z.string().optional(),
+  // IANA timezone, e.g. "America/Denver". Captured from browser on signup.
+  // Validated on the server; falls back to America/Denver when invalid/missing.
+  timezone: z.string().max(100).optional(),
 });
 
 export const inviteCreateSchema = z.object({
