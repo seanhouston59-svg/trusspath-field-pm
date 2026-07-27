@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { MapPin, Calendar, Building2, Plus, ExternalLink, FolderKanban } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { GhostState, GhostProjectCards } from "@/components/ghost-state";
+import { GhostProjectCards } from "@/components/ghost-state";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import { useProjects, useTeamMap, useTeam, useCreateProject } from "@/hooks/use-data";
@@ -95,17 +95,21 @@ export default function Projects() {
           {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-56 animate-pulse rounded-lg border border-border bg-muted" />)}
         </div>
       ) : projects.length === 0 ? (
-        <div>
-          <GhostProjectCards />
-          <div className="mt-4">
-            <GhostState
-              title="No projects yet"
-              description="The sample cards above show what your projects will look like. Create your first project to get started."
-              icon={FolderKanban}
-              ctaLabel="Create project"
-              ctaHref="/projects?new=1"
-            />
+        <div className="space-y-6">
+          {/* Primary CTA — the very first thing you see on an empty projects
+              page. Uses a direct onClick so it doesn't depend on query-string
+              parsing or hash routing to open the dialog. */}
+          <div className="rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-6 text-center">
+            <FolderKanban className="mx-auto size-8 text-primary" />
+            <h3 className="mt-3 font-display text-lg font-bold">No projects yet</h3>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+              Add your first project to start tracking tasks, RFIs, daily logs, and everything else.
+            </p>
+            <Button size="lg" onClick={() => setOpen(true)} className="mt-4" data-testid="button-create-first-project">
+              <Plus className="size-4" /> Create project
+            </Button>
           </div>
+          <GhostProjectCards />
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

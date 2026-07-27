@@ -217,24 +217,39 @@ export function GhostProjectCards() {
     { name: "Summit High School Addition", client: "Summit School District", type: "Education", status: "Planning", budget: "$890K", progress: 5 },
   ];
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {samples.map((s, i) => (
-        <div key={i} className="rounded-lg border border-dashed border-border/40 p-4 text-muted-foreground/40">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-xs font-semibold">PRJ-00{i + 1}</span>
-            <span className="text-xs">{s.status}</span>
-          </div>
-          <h3 className="mt-1 font-medium">{s.name}</h3>
-          <p className="text-xs">{s.client} · {s.type}</p>
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span>{s.budget}</span>
-            <span>{s.progress}%</span>
-          </div>
-          <div className="mt-1 h-1.5 rounded-full bg-muted">
-            <div className="h-full rounded-full bg-muted-foreground/20" style={{ width: `${s.progress}%` }} />
-          </div>
+    <div>
+      <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+        <div className="h-px flex-1 bg-border/40" />
+        <span>Preview — sample data</span>
+        <div className="h-px flex-1 bg-border/40" />
+      </div>
+      <div className="relative">
+        <div className="grid gap-4 opacity-40 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+          {samples.map((s, i) => (
+            <div key={i} className="rounded-lg border border-dashed border-border p-4 text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-semibold">PRJ-00{i + 1}</span>
+                <span className="text-xs">{s.status}</span>
+              </div>
+              <h3 className="mt-1 font-medium">{s.name}</h3>
+              <p className="text-xs">{s.client} · {s.type}</p>
+              <div className="mt-3 flex items-center justify-between text-xs">
+                <span>{s.budget}</span>
+                <span>{s.progress}%</span>
+              </div>
+              <div className="mt-1 h-1.5 rounded-full bg-muted">
+                <div className="h-full rounded-full bg-muted-foreground/40" style={{ width: `${s.progress}%` }} />
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+        {/* Diagonal "SAMPLE" watermark so nobody thinks these are real projects. */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden="true">
+          <span className="select-none font-display text-5xl font-black tracking-[0.3em] text-foreground/[0.06] md:text-6xl" style={{ transform: "rotate(-12deg)" }}>
+            SAMPLE
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
