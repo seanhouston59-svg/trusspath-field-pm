@@ -4,16 +4,33 @@ import { apiRequest, apiUrl, queryClient, setBearerToken, getBearerToken } from 
 import type { AccountPublic } from "@shared/schema";
 
 type MeResponse = { account: AccountPublic | null };
-type LoginResponse = { account: AccountPublic; token?: string };
+type SignupPayload = {
+  email: string;
+  password: string;
+  displayName: string;
+  company?: string;
+  plan?: "starter" | "pro" | "enterprise";
+  billing?: "monthly" | "annual";
+  inviteToken?: string;
+};
+type LoginResponse = {
+  account: AccountPublic;
+  token?: string;
+  organizationId?: number;
+  checkoutUrl?: string; // when signup returned a Stripe checkout URL
+};
 
 type AuthContextValue = {
   account: AccountPublic | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<AccountPublic>;
-  signup: (data: { email: string; password: string; displayName: string; company?: string }) => Promise<AccountPublic>;
+  signup: (data: SignupPayload) => Promise<LoginResponse>; // returns full response so caller can redirect to checkoutUrl
   logout: () => Promise<void>;
   updateProfile: (data: { displayName?: string; position?: string }) => Promise<AccountPublic>;
+  /** Refetch /api/auth/me and invalidate protected queries. Useful after actions that change
+   *  the caller's org context (e.g. accepting an invite). */
+  refresh: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -56,14 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const signupMut = useMutation({
-    mutationFn: async (data: { email: string; password: string; displayName: string; company?: string }) => {
+    mutationFn: async (data: SignupPayload) => {
       const res = await apiRequest("POST", "/api/auth/signup", data);
       const json = (await res.json()) as LoginResponse;
       if (json.token) setBearerToken(json.token);
-      return json.account;
+      return json;
     },
-    onSuccess: (account) => {
-      queryClient.setQueryData<MeResponse>(["/api/auth/me"], { account });
+    onSuccess: (response) => {
+      queryClient.setQueryData<MeResponse>(["/api/auth/me"], { account: response.account });
       queryClient.invalidateQueries();
     },
   });
@@ -101,8 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await logoutMut.mutateAsync();
       },
       updateProfile: (data) => profileMut.mutateAsync(data),
+      refresh: async () => {
+        await meQuery.refetch();
+        // Also invalidate protected queries so they refetch under the new org context.
+        queryClient.invalidateQueries();
+      },
     }),
-    [meQuery.data, meQuery.isLoading, loginMut, signupMut, logoutMut, profileMut]
+    [meQuery, loginMut, signupMut, logoutMut, profileMut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

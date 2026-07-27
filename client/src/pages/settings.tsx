@@ -1,5 +1,7 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Bot, Building2, Mic2, Stethoscope, TriangleAlert, RotateCcw, CheckCircle2, XCircle, CreditCard, ExternalLink, Trash2 } from "lucide-react";
+import { Bot, Building2, Mic2, Stethoscope, TriangleAlert, RotateCcw, CheckCircle2, XCircle, CreditCard, ExternalLink, Trash2, Users, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
+import { useCurrentOrg } from "@/hooks/use-data";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -279,11 +281,50 @@ export default function SettingsPage() {
         </Card>
       </div>
       <div className="mt-4">
+        <Card icon={Users} title="Team & Access" desc="Invite teammates, change roles, and manage who has access to your organization.">
+          <TeamSection />
+        </Card>
+      </div>
+      <div className="mt-4">
         <Card icon={CreditCard} title="Billing & Subscription" desc="Manage your subscription, payment method, and invoices via Stripe.">
           <BillingSection />
         </Card>
       </div>
     </Layout>
+  );
+}
+
+function TeamSection() {
+  const { data: orgData, isLoading } = useCurrentOrg();
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading team info…</p>;
+  const seats = orgData?.seats;
+  const org = orgData?.organization;
+  return (
+    <div className="space-y-3" data-testid="team-section">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
+        <div>
+          <div className="text-xs text-muted-foreground">Organization</div>
+          <div className="font-display text-sm font-bold">{org?.name || "—"}</div>
+        </div>
+        {seats && (
+          <div>
+            <div className="text-xs text-muted-foreground">Seats used</div>
+            <div className="text-sm font-semibold">
+              {seats.active}
+              {seats.included !== null && <span className="font-normal text-muted-foreground"> / {seats.included} included</span>}
+              {seats.overage && seats.overage > 0 && (
+                <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">+{seats.overage} overage</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      <Link href="/settings/team">
+        <Button variant="outline" data-testid="button-manage-team">
+          <Users className="size-4" /> Manage team <ArrowRight className="size-3.5 ml-1" />
+        </Button>
+      </Link>
+    </div>
   );
 }
 
@@ -318,6 +359,18 @@ function BillingSection() {
           <div>
             <div className="text-xs text-muted-foreground">Billing</div>
             <div className="text-sm font-medium capitalize">{billing.billing}</div>
+          </div>
+        )}
+        {billing?.seats && (
+          <div>
+            <div className="text-xs text-muted-foreground">Seats</div>
+            <div className="text-sm font-medium">
+              {billing.seats.active}
+              {billing.seats.included !== null && <span className="text-muted-foreground"> / {billing.seats.included}</span>}
+            </div>
+            {billing.seats.overage && billing.seats.overage > 0 && (
+              <div className="text-[11px] text-amber-600 dark:text-amber-400">+{billing.seats.overage} overage</div>
+            )}
           </div>
         )}
       </div>

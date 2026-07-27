@@ -111,6 +111,63 @@ export async function sendSignupNotification(n: SignupNotification): Promise<{ o
   }
 }
 
+export async function sendInviteEmail(input: {
+  toEmail: string;
+  orgName: string;
+  inviterName: string;
+  role: string;
+  inviteUrl: string;
+}): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;
+  const { toEmail, orgName, inviterName, role, inviteUrl } = input;
+
+  if (!apiKey) {
+    console.log(`[mailer] RESEND_API_KEY not set — skipping invite to ${toEmail}. Invite URL: ${inviteUrl}`);
+    return { ok: true, skipped: true };
+  }
+
+  const html = `<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
+    <div style="padding:16px 20px;background:#111;color:#fff;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;">You've been invited to TrussPath</div>
+    <div style="padding:24px 20px;">
+      <p style="font-size:15px;color:#111;margin:0 0 16px;"><strong>${escapeHtml(inviterName)}</strong> invited you to join <strong>${escapeHtml(orgName)}</strong> on TrussPath as a <strong>${escapeHtml(role)}</strong>.</p>
+      <p style="font-size:14px;color:#666;margin:0 0 24px;">Click the button below to accept the invite and set up your account. This link expires in 7 days.</p>
+      <a href="${escapeHtml(inviteUrl)}" style="display:inline-block;padding:12px 28px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Accept invite</a>
+      <p style="font-size:13px;color:#999;margin:24px 0 0;">If you didn't expect this, you can safely ignore this email.</p>
+    </div>
+    <div style="padding:12px 20px;color:#888;font-size:12px;border-top:1px solid #eee;">TrussPath — Field Project Management</div>
+  </div>
+</body></html>`;
+
+  const text = `${inviterName} invited you to join ${orgName} on TrussPath as a ${role}.\n\nAccept the invite here (link expires in 7 days):\n${inviteUrl}\n\nIf you didn't expect this, you can safely ignore this email.`;
+
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [toEmail],
+        subject: `${inviterName} invited you to ${orgName} on TrussPath`,
+        html,
+        text,
+      }),
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`[mailer] Resend ${resp.status}: ${body}`);
+      return { ok: false, error: `Resend ${resp.status}` };
+    }
+    console.log(`[mailer] Sent invite email to ${toEmail}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[mailer] Invite send failed:", err);
+    return { ok: false, error: String(err) };
+  }
+}
+
 export async function sendPasswordResetEmail(toEmail: string, resetUrl: string): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;

@@ -512,8 +512,9 @@ export function ensureReady(): Promise<void> {
 }
 
 class DatabaseStorage implements IStorage {
-  async getTeam(): Promise<TeamMember[]> {
+  async getTeam(organizationId?: number): Promise<TeamMember[]> {
     await ensureReady();
+    if (organizationId !== undefined) return await db.select().from(teamMembers).where(eq(teamMembers.organizationId, organizationId));
     return await db.select().from(teamMembers);
   }
   async getTeamMember(id: number): Promise<TeamMember | undefined> {
@@ -536,8 +537,9 @@ class DatabaseStorage implements IStorage {
     await db.delete(teamMembers).where(eq(teamMembers.id, id));
   }
 
-  async getProjects(): Promise<Project[]> {
+  async getProjects(organizationId?: number): Promise<Project[]> {
     await ensureReady();
+    if (organizationId !== undefined) return await db.select().from(projects).where(eq(projects.organizationId, organizationId));
     return await db.select().from(projects);
   }
   async getProject(id: number): Promise<Project | undefined> {
@@ -676,8 +678,9 @@ class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async getContacts(): Promise<Contact[]> {
+  async getContacts(organizationId?: number): Promise<Contact[]> {
     await ensureReady();
+    if (organizationId !== undefined) return await db.select().from(contacts).where(eq(contacts.organizationId, organizationId));
     return await db.select().from(contacts);
   }
   async createContact(data: InsertContact): Promise<Contact> {
@@ -694,10 +697,14 @@ class DatabaseStorage implements IStorage {
     await ensureReady();
     await db.delete(contacts).where(eq(contacts.id, id));
   }
-  async getEquipment(projectId?: number): Promise<Equipment[]> {
+  async getEquipment(projectId?: number, organizationId?: number): Promise<Equipment[]> {
     await ensureReady();
-    if (projectId !== undefined) return await db.select().from(equipment).where(eq(equipment.projectId, projectId));
-    return await db.select().from(equipment);
+    const conds: any[] = [];
+    if (projectId !== undefined) conds.push(eq(equipment.projectId, projectId));
+    if (organizationId !== undefined) conds.push(eq(equipment.organizationId, organizationId));
+    if (conds.length === 0) return await db.select().from(equipment);
+    if (conds.length === 1) return await db.select().from(equipment).where(conds[0]);
+    return await db.select().from(equipment).where(and(...conds));
   }
   async createEquipment(data: InsertEquipment): Promise<Equipment> {
     await ensureReady();
@@ -742,8 +749,11 @@ class DatabaseStorage implements IStorage {
     await ensureReady();
     await db.delete(documents).where(eq(documents.id, id));
   }
-  async getCompanyDocuments(): Promise<CompanyDocument[]> {
+  async getCompanyDocuments(organizationId?: number): Promise<CompanyDocument[]> {
     await ensureReady();
+    if (organizationId !== undefined) {
+      return await db.select().from(companyDocuments).where(eq(companyDocuments.organizationId, organizationId)).orderBy(desc(companyDocuments.date));
+    }
     return await db.select().from(companyDocuments).orderBy(desc(companyDocuments.date));
   }
   async getCompanyDocument(id: number): Promise<CompanyDocument | undefined> {
@@ -1417,7 +1427,7 @@ class DatabaseStorage implements IStorage {
     const existing = await db.select().from(teamMembers);
     if (existing.length > 0) { seedDone = true; return; }
 
-    const team: Omit<TeamMember, "id">[] = [
+    const team: Omit<TeamMember, "id" | "organizationId">[] = [
       { name: "Marcus Reyes", role: "Project Executive", trade: "Management", company: "Meridian Builders", initials: "MR", color: "amber", email: "m.reyes@meridian.co", phone: "(303) 555-0142", companyPhoto: "", accessLevel: "project_executive" },
       { name: "Dana Whitfield", role: "Superintendent", trade: "Self-perform", company: "Meridian Builders", initials: "DW", color: "blue", email: "d.whitfield@meridian.co", phone: "(303) 555-0188", companyPhoto: "", accessLevel: "superintendent" },
       { name: "Priya Anand", role: "Project Manager", trade: "Management", company: "Meridian Builders", initials: "PA", color: "emerald", email: "p.anand@meridian.co", phone: "(303) 555-0173", companyPhoto: "", accessLevel: "project_manager" },
@@ -1433,7 +1443,7 @@ class DatabaseStorage implements IStorage {
       t.push(row);
     }
 
-    const projectsSeed: Omit<Project, "id">[] = [
+    const projectsSeed: Omit<Project, "id" | "organizationId">[] = [
       { name: "Lakeside Medical Pavilion", number: "MB-2401", client: "Lakeside Health System", type: "Healthcare", status: "On Track", address: "1820 Healing Way, Denver, CO", startDate: "2025-09-02", endDate: "2026-12-18", budget: 48500000, spent: 21300000, progress: 44, superintendentId: t[1].id },
       { name: "Union Tower Office", number: "MB-2402", client: "Union Realty Partners", type: "Commercial", status: "At Risk", address: "440 Market St, Denver, CO", startDate: "2025-11-10", endDate: "2027-03-22", budget: 32200000, spent: 18900000, progress: 58, superintendentId: t[1].id },
       { name: "Riverside K-8 School", number: "MB-2403", client: "Denver Public Schools", type: "Education", status: "On Track", address: "705 River Bend Dr, Denver, CO", startDate: "2026-01-15", endDate: "2026-11-30", budget: 19800000, spent: 4100000, progress: 21, superintendentId: t[1].id },
@@ -1512,7 +1522,7 @@ class DatabaseStorage implements IStorage {
     ];
     for (const x of punchSeed) await db.insert(punchItems).values(x);
 
-    const contactsSeed: Omit<Contact, "id">[] = [
+    const contactsSeed: Omit<Contact, "id" | "organizationId">[] = [
       { name: "Dr. Helen Voss", company: "Lakeside Health System", role: "Owner Rep", trade: "Owner", type: "Owner", phone: "(303) 555-0142", email: "h.voss@lakesidehealth.org" },
       { name: "Raymond Soto", company: "Northwind Architects", role: "Lead Architect", trade: "Design", type: "Architect", phone: "(303) 555-0188", email: "rsoto@northwindarch.com" },
       { name: "Gloria Mendez", company: "Apex Concrete", trade: "Concrete", role: "Subcontractor PM", type: "Subcontractor", phone: "(720) 555-0110", email: "gmendez@apexconcrete.com" },
@@ -1523,7 +1533,7 @@ class DatabaseStorage implements IStorage {
     ];
     for (const x of contactsSeed) await db.insert(contacts).values(x);
 
-    const eqSeed: Omit<Equipment, "id">[] = [
+    const eqSeed: Omit<Equipment, "id" | "organizationId">[] = [
       { name: "Link-Belt 80T Crane #1", type: "Crane", status: "On Site", projectId: p[0].id, operator: "T. Bradshaw", location: "North pad" },
       { name: "CAT 336 Excavator", type: "Excavator", status: "On Site", projectId: p[0].id, operator: "Rental", location: "East excavation" },
       { name: "Bobcat S650 Skid Steer", type: "Skid Steer", status: "On Site", projectId: p[2].id, operator: "Crew B", location: "East lot" },

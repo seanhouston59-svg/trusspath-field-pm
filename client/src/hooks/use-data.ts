@@ -668,8 +668,17 @@ export function useEmptyDeletedItems() {
 }
 
 /* ----------------------- Billing ----------------------- */
+export type BillingStatus = {
+  plan: string | null;
+  status: string | null;
+  billing: string | null;
+  currentPeriodEnd: string | null;
+  trialEndsAt?: string | null;
+  hasCustomer: boolean;
+  seats?: { active: number; included: number | null; overage: number | null };
+};
 export function useBillingStatus() {
-  return useQuery<{ plan: string | null; status: string | null; billing: string | null; currentPeriodEnd: string | null; hasCustomer: boolean }>({
+  return useQuery<BillingStatus>({
     queryKey: ["/api/billing/status"],
   });
 }
@@ -680,6 +689,67 @@ export function useManageBilling() {
       return res.json() as Promise<{ url: string }>;
     },
     onSuccess: (data) => { window.location.href = data.url; },
+  });
+}
+
+/* ----------------------- Organization / Team ----------------------- */
+export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string };
+export type Invite = { id: number; token: string; organizationId: number; email: string; role: string; createdAt: string; expiresAt: string; acceptedAt: string | null };
+export type OrgSummary = { id: number; name: string; slug: string; ownerAccountId: number; subscriptionStatus: string | null; subscriptionPlan: string | null; subscriptionBilling: string | null; trialEndsAt: string | null; };
+
+export function useCurrentOrg() {
+  return useQuery<{ organization: OrgSummary; membership: Membership; seats: { active: number; included: number | null; overage: number | null } }>({
+    queryKey: ["/api/org/current"],
+    retry: false,
+  });
+}
+export function useOrgMembers() {
+  return useQuery<{ members: (Membership & { email: string; displayName: string })[] }>({
+    queryKey: ["/api/org/members"],
+  });
+}
+export function useUpdateMemberRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, role }: { id: number; role: string }) => {
+      const res = await apiRequest("POST", `/api/org/members/${id}/role`, { role });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/org/members"] });
+      qc.invalidateQueries({ queryKey: ["/api/org/current"] });
+    },
+  });
+}
+export function useRemoveMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/org/members/${id}`); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/org/members"] });
+      qc.invalidateQueries({ queryKey: ["/api/org/current"] });
+      qc.invalidateQueries({ queryKey: ["/api/billing/status"] });
+    },
+  });
+}
+export function useOrgInvites() {
+  return useQuery<{ invites: Invite[] }>({ queryKey: ["/api/org/invites"] });
+}
+export function useCreateInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ email, role }: { email: string; role: string }) => {
+      const res = await apiRequest("POST", "/api/org/invites", { email, role });
+      return res.json() as Promise<{ invite: Invite; inviteUrl: string }>;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/org/invites"] }); },
+  });
+}
+export function useRevokeInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/org/invites/${id}`); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/org/invites"] }); },
   });
 }
 

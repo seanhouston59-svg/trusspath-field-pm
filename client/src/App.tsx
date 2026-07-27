@@ -9,7 +9,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { APP_ROUTES } from "@shared/app-manifest";
 import { AccessProvider, useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { isAccountInGoodStanding } from "@shared/schema";
+import { useBillingStatus } from "@/hooks/use-data";
 import { setPendingRedirect } from "@/lib/queryClient";
 import type { AccessLevel } from "@shared/access-levels";
 import { Layout } from "@/components/layout";
@@ -52,6 +52,8 @@ import { ForgotPassword, ResetPassword } from "@/pages/password-reset";
 import AdminSignups from "@/pages/admin-signups";
 import Cpm from "@/pages/cpm";
 import Paywall from "@/pages/paywall";
+import TeamSettingsPage from "@/pages/team-settings";
+import InviteAcceptPage from "@/pages/invite-accept";
 
 // Single source of truth for routes lives in shared/app-manifest.ts (APP_ROUTES).
 // Map each manifest route pattern to its page component here.
@@ -84,6 +86,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/timesheets": Timesheets,
   "/deleted-items": DeletedItemsPage,
   "/settings": SettingsPage,
+  "/settings/team": TeamSettingsPage,
 };
 
 function AppRouter() {
@@ -137,26 +140,39 @@ function AccessGate() {
   return <AppRouter />;
 }
 
-/** Renders children only if the user is authenticated AND in good standing
- *  (admin-approved + active subscription, or an owner). While the auth check is
- *  in flight, shows a splash. If unauthenticated, redirects to /login; if not
- *  in good standing, redirects to /paywall. */
+/** Renders children only if the user is authenticated AND their org is in good
+ *  standing. Multi-tenant model: billing lives on the org, not the account.
+ *  Legacy platform-owners (account.role='owner') bypass the paywall entirely.
+ *  While the check is in flight, shows a splash.
+ *  If unauthenticated, redirects to /login; if their org isn't in good standing,
+ *  redirects to /paywall. */
+function isOrgInGoodStanding(billing: { status: string | null } | null | undefined): boolean {
+  if (!billing) return false;
+  return billing.status === "active" || billing.status === "trialing";
+}
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, account } = useAuth();
+  const billing = useBillingStatus();
   const [loc] = useLocation();
-  const inGoodStanding = isAccountInGoodStanding(account as any);
+
+  // Platform-owners bypass the billing check.
+  const isPlatformOwner = account?.role === "owner";
+  const orgOk = isPlatformOwner || isOrgInGoodStanding(billing.data);
+  const billingLoading = !!isAuthenticated && !isPlatformOwner && billing.isLoading;
+
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || billingLoading) return;
     if (!isAuthenticated) {
       setPendingRedirect(loc || "/app");
       window.location.hash = `/login`;
       return;
     }
-    if (!inGoodStanding) {
+    if (!orgOk) {
       window.location.hash = `/paywall`;
     }
-  }, [isLoading, isAuthenticated, inGoodStanding, loc]);
-  if (isLoading || !isAuthenticated || !inGoodStanding) {
+  }, [isLoading, billingLoading, isAuthenticated, orgOk, loc]);
+
+  if (isLoading || billingLoading || !isAuthenticated || !orgOk) {
     return (
       <div className="min-h-screen grid place-items-center bg-background">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -195,7 +211,7 @@ function AppChrome() {
   const { isAuthenticated } = useAuth();
   // Jarvis is only useful once you’re inside the app.
   if (!isAuthenticated) return null;
-  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup" || loc === "/paywall") return null;
+  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup" || loc.startsWith("/signup") || loc === "/paywall" || loc.startsWith("/invite/")) return null;
   return <JarvisPanel />;
 }
 
@@ -212,6 +228,8 @@ function RootRouter() {
       <Route path="/reset-password" component={ResetPassword} />
       {/* Paywall lives outside RequireAuth so pending/unpaid users can reach it. */}
       <Route path="/paywall" component={PaywallGate} />
+      {/* Invite acceptance is public: unauthenticated users can view the invite and sign up. */}
+      <Route path="/invite/:token" component={InviteAcceptPage} />
       {/* Everything else is a protected app route. */}
       <Route>
         <RequireAuth>

@@ -3,9 +3,78 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+/* ------------------------------ Organizations ---------------------------- */
+// A business (tenant) that pays for TrussPath. Every account belongs to at
+// least one organization via `memberships`. Data (projects, contacts, etc.) is
+// scoped to organization_id so orgs never see each other's data.
+export const organizations = pgTable("organizations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  ownerAccountId: integer("owner_account_id").notNull(), // primary owner — the account that created the org
+  createdAt: text("created_at").notNull(),
+  // Stripe billing (org-level, not account-level)
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: text("subscription_status"), // trialing, active, canceled, past_due, etc.
+  subscriptionPlan: text("subscription_plan"), // starter | pro | enterprise
+  subscriptionBilling: text("subscription_billing"), // monthly | annual
+  subscriptionCurrentPeriodEnd: text("subscription_current_period_end"),
+  trialEndsAt: text("trial_ends_at"),
+});
+
+/* ------------------------------- Memberships ----------------------------- */
+// Bridge between accounts and organizations. Carries the role, which controls
+// what the user can do inside the org.
+export const memberships = pgTable("memberships", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").notNull(),
+  organizationId: integer("organization_id").notNull(),
+  role: text("role").notNull(), // owner | admin | pm | foreman | viewer
+  status: text("status").notNull().default("active"), // active | removed
+  createdAt: text("created_at").notNull(),
+});
+
+/* -------------------------------- Invites -------------------------------- */
+// Pending email invites to join an organization. Consumed when the invitee
+// signs up (or logs in with a matching email) and clicks the invite link.
+export const invites = pgTable("invites", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  organizationId: integer("organization_id").notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull(),
+  invitedByAccountId: integer("invited_by_account_id").notNull(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  acceptedAt: text("accepted_at"),
+});
+
+/* ------------------------------ Roles / helpers -------------------------- */
+export type OrgRole = "owner" | "admin" | "pm" | "foreman" | "viewer";
+export const ORG_ROLES: OrgRole[] = ["owner", "admin", "pm", "foreman", "viewer"];
+
+// Capability matrix. Every UI action / server endpoint should route through this.
+export const ROLE_CAPS: Record<OrgRole, {
+  billing: boolean;             // manage subscription + payment methods
+  manageMembers: boolean;       // invite/remove/change role of other members
+  manageProjects: boolean;      // create/edit/delete projects
+  editProjectData: boolean;     // edit tasks, RFIs, daily logs, etc. within assigned projects
+  viewProjectData: boolean;     // read project data
+  restrictedToAssignedProjects: boolean; // if true, only sees projects they're explicitly on
+}> = {
+  owner:   { billing: true,  manageMembers: true,  manageProjects: true,  editProjectData: true,  viewProjectData: true,  restrictedToAssignedProjects: false },
+  admin:   { billing: false, manageMembers: true,  manageProjects: true,  editProjectData: true,  viewProjectData: true,  restrictedToAssignedProjects: false },
+  pm:      { billing: false, manageMembers: false, manageProjects: true,  editProjectData: true,  viewProjectData: true,  restrictedToAssignedProjects: false },
+  foreman: { billing: false, manageMembers: false, manageProjects: false, editProjectData: true,  viewProjectData: true,  restrictedToAssignedProjects: true },
+  viewer:  { billing: false, manageMembers: false, manageProjects: false, editProjectData: false, viewProjectData: true,  restrictedToAssignedProjects: true },
+};
+
 /* ----------------------------- Team members ----------------------------- */
+// Legacy per-project rolodex — not app logins. Scoped to org for isolation.
 export const teamMembers = pgTable("team_members", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id"), // nullable during migration; enforced by server after backfill
   name: text("name").notNull(),
   role: text("role").notNull(),
   trade: text("trade").notNull(),
@@ -21,6 +90,7 @@ export const teamMembers = pgTable("team_members", {
 /* ------------------------------- Projects ------------------------------- */
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id"), // nullable during migration; enforced after backfill
   name: text("name").notNull(),
   number: text("number").notNull(),
   client: text("client").notNull(),
@@ -33,6 +103,16 @@ export const projects = pgTable("projects", {
   spent: doublePrecision("spent").notNull(),
   progress: integer("progress").notNull(),
   superintendentId: integer("superintendent_id"),
+});
+
+/* --------------------- Project member assignments ------------------------ */
+// Which accounts (memberships) are on which projects. Used for foreman/viewer
+// scope restriction. Empty rows = restricted role sees nothing.
+export const projectMembers = pgTable("project_members", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  membershipId: integer("membership_id").notNull(),
+  createdAt: text("created_at").notNull(),
 });
 
 /* -------------------------------- Tasks --------------------------------- */
@@ -140,6 +220,7 @@ export const punchItems = pgTable("punch_items", {
 /* ------------------------------ Contacts ------------------------------- */
 export const contacts = pgTable("contacts", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id"),
   name: text("name").notNull(),
   company: text("company").notNull(),
   role: text("role").notNull(),
@@ -152,6 +233,7 @@ export const contacts = pgTable("contacts", {
 /* ------------------------------ Equipment ------------------------------- */
 export const equipment = pgTable("equipment", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id"),
   name: text("name").notNull(),
   type: text("type").notNull(),
   status: text("status").notNull(),
@@ -193,6 +275,7 @@ export const documents = pgTable("documents", {
 /* ------------------------- Company Documents --------------------------- */
 export const companyDocuments = pgTable("company_documents", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id"),
   title: text("title").notNull(),
   category: text("category").notNull(), // New Hire, Contract, HR, Safety, Vendor, Legal, Insurance, Other
   status: text("status").notNull().default("Draft"), // Draft, Active, Archived
@@ -275,6 +358,7 @@ export const notes = pgTable("notes", {
 
 export const integrations = pgTable("integrations", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id"),
   key: text("key").notNull().unique(),
   connected: boolean("connected").notNull().default(false),
   status: text("status").notNull().default("available"), // available, connected, needs_config, error
@@ -308,6 +392,7 @@ export const demoRequests = pgTable("demo_requests", {
 /* ------------------------------ Settings ------------------------------- */
 export const appSettings = pgTable("app_settings", {
   id: integer("id").primaryKey(),
+  organizationId: integer("organization_id"),
   config: text("config").notNull().default("{}"),
   updatedAt: text("updated_at").notNull(),
 });
@@ -340,10 +425,18 @@ export const ACTIVE_SUB_STATUSES = new Set(["active", "trialing"]);
 export function isSubscriptionActive(status: string | null | undefined): boolean {
   return !!status && ACTIVE_SUB_STATUSES.has(status);
 }
+
+// Legacy: single-tenant per-account check. Preserved for backward compat during migration.
+// New multi-tenant check is isOrgInGoodStanding() below — use that everywhere for new code.
 export function isAccountInGoodStanding(a: Pick<Account, "role" | "approvalStatus" | "subscriptionStatus"> | null | undefined): boolean {
   if (!a) return false;
-  if (a.role === "owner") return true; // Owner bypasses paywall.
+  if (a.role === "owner") return true; // Legacy platform-owner bypass.
   return a.approvalStatus === "approved" && isSubscriptionActive(a.subscriptionStatus);
+}
+
+// Multi-tenant: an org is in good standing if it has an active/trialing subscription.
+export function isOrgInGoodStanding(org: { subscriptionStatus?: string | null } | null | undefined): boolean {
+  return isSubscriptionActive(org?.subscriptionStatus);
 }
 
 export const sessions = pgTable("sessions", {
@@ -438,6 +531,16 @@ export const signupSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   displayName: z.string().min(1),
   company: z.string().optional(),
+  // Multi-tenant: on signup the user picks a plan; we start a 14-day trial with card.
+  plan: z.enum(["starter", "pro", "enterprise"]).optional(),
+  billing: z.enum(["monthly", "annual"]).optional(),
+  // Optional: signup via an invite token (skips org creation + billing; joins the inviter's org).
+  inviteToken: z.string().optional(),
+});
+
+export const inviteCreateSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(["owner", "admin", "pm", "foreman", "viewer"]),
 });
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -533,3 +636,9 @@ export type Message = typeof messages.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type Blueprint = typeof blueprints.$inferSelect;
 export type DroneCapture = typeof droneCaptures.$inferSelect;
+
+// Multi-tenant
+export type Organization = typeof organizations.$inferSelect;
+export type Membership = typeof memberships.$inferSelect;
+export type Invite = typeof invites.$inferSelect;
+export type ProjectMember = typeof projectMembers.$inferSelect;

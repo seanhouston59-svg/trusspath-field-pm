@@ -8,7 +8,7 @@ import { jarvisChat, jarvisBrief } from "./jarvis";
 import { localJarvisChat, buildLocalBrief, buildSafetyBrief } from "./jarvis-local";
 import { buildContext } from "./jarvis";
 import { runHealthScan } from "./health";
-import { sendSignupNotification, sendPasswordResetEmail } from "./mailer";
+import { sendSignupNotification, sendPasswordResetEmail, sendInviteEmail } from "./mailer";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
@@ -18,7 +18,19 @@ import {
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
   isAccountInGoodStanding, isSubscriptionActive,
+  ORG_ROLES, type OrgRole,
+  type Project,
 } from "@shared/schema";
+import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
+import {
+  bootstrapOrganizationForAccount,
+  createInvite, getInviteByToken, listPendingInvites, markInviteAccepted, revokeInvite, isInviteRedeemable,
+  createMembership, getMembership, getMembershipForAccount, listMembershipsForOrg, updateMembershipRole, removeMembership,
+  syncSeatsForOrg,
+  getOrganization, updateOrgBilling, getOrgByStripeCustomerId,
+  countActiveSeats,
+} from "./lib/orgs";
+import { resolveMembership, requireCap, requireRole } from "./lib/mt-middleware";
 
 function pid(req: any): number | undefined {
   return req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
@@ -105,6 +117,16 @@ const PUBLIC_API = new Set<string>([
   "/api/subscribe",
   "/api/demo-request",
 ]);
+// Public path prefixes — invite lookup (GET /api/invites/:token) is public so an
+// invitee can preview their invite before creating an account.
+const PUBLIC_API_PREFIXES = [
+  "/api/invites/", // GET only — accept requires auth so it runs through normal middleware
+];
+function isPublicApi(path: string, method: string): boolean {
+  if (PUBLIC_API.has(path)) return true;
+  if (method === "GET" && PUBLIC_API_PREFIXES.some(p => path.startsWith(p))) return true;
+  return false;
+}
 
 // Paths that require a session but bypass the paywall (approval + subscription) check.
 // These are the paths a not-yet-in-good-standing user needs to reach: their own account,
@@ -121,7 +143,7 @@ function isPaywallExempt(p: string): boolean {
 async function authMiddleware(req: any, res: any, next: any) {
   const p = req.path || req.url?.split("?")[0] || "";
   if (!p.startsWith("/api")) return next();
-  if (PUBLIC_API.has(p)) return next();
+  if (isPublicApi(p, req.method || "GET")) return next();
   const cookies = parseCookies(req.headers?.cookie);
   // Accept token via cookie, Authorization: Bearer header, or ?token= query param
   // (query is used for <img src> / <a href> where headers aren't possible).
@@ -133,22 +155,8 @@ async function authMiddleware(req: any, res: any, next: any) {
   req.account = s.account;
   req.sessionToken = token;
 
-  // Paywall gate — after auth, before any protected route runs. Owner bypasses.
-  // Approved + active subscription = in good standing. Everyone else gets 402.
-  if (!isPaywallExempt(p) && !isAccountInGoodStanding(s.account as any)) {
-    const reason =
-      s.account.approvalStatus !== "approved" ? "pending_approval" : "subscription_inactive";
-    return res.status(402).json({
-      message:
-        reason === "pending_approval"
-          ? "Your account is awaiting admin approval."
-          : "An active subscription is required to use TrussPath.",
-      reason,
-      approvalStatus: s.account.approvalStatus,
-      subscriptionStatus: s.account.subscriptionStatus || null,
-    });
-  }
-
+  // Legacy per-account paywall removed — the org-level paywall now runs in resolveMembership
+  // (multi-tenant subscriptions live on the organization, not the account).
   next();
 }
 
@@ -318,39 +326,151 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   // Gate all /api/* routes behind auth (except the PUBLIC_API allowlist).
   app.use(authMiddleware);
+  // Resolve req.membership/req.organization for every authenticated request.
+  app.use(resolveMembership);
+
+  // ==== Multi-tenant helpers ====
+  // Verify the given project belongs to the caller's org; returns 404 otherwise.
+  // Legacy platform-owners (req.account.role === 'owner') bypass — they can see any project.
+  async function requireProjectAccess(req: any, res: any, projectId: number): Promise<Project | null> {
+    const project = await storage.getProject(projectId);
+    if (!project) { res.status(404).json({ message: "Project not found" }); return null; }
+    if (req.account?.role === "owner") return project; // platform-owner bypass
+    if (!req.organizationId || project.organizationId !== req.organizationId) {
+      res.status(404).json({ message: "Project not found" }); // 404 (not 403) — don't reveal existence
+      return null;
+    }
+    return project;
+  }
+  // Inject org id into an insert payload so newly-created rows are correctly scoped.
+  function withOrg<T extends Record<string, any>>(req: any, data: T): T & { organizationId: number | null } {
+    return { ...data, organizationId: req.organizationId ?? null };
+  }
+
+  // Middleware for project-scoped child endpoints (/api/tasks, /api/rfis, etc.).
+  // If ?projectId= is set, verifies caller has access to that project.
+  // If unset, restricts callers to their own org's projects by filling req._orgProjectIds.
+  // Platform-owners bypass entirely.
+  async function scopeProjectQuery(req: any, res: any, next: any) {
+    if (req.account?.role === "owner") return next(); // platform owner — no filter
+    const q = req.query?.projectId;
+    if (q !== undefined && q !== "") {
+      const pid = parseInt(String(q), 10);
+      if (!Number.isFinite(pid)) return res.status(400).json({ message: "Invalid projectId" });
+      const project = await storage.getProject(pid);
+      if (!project || (req.organizationId && project.organizationId !== req.organizationId)) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      return next();
+    }
+    // No projectId supplied — we'll filter results client-side after fetching.
+    // Fetch the set of project IDs in this org so downstream can filter.
+    if (req.organizationId) {
+      const orgProjects = await storage.getProjects(req.organizationId);
+      req._orgProjectIds = new Set(orgProjects.map((p: Project) => p.id));
+    }
+    next();
+  }
+  // Filter an array of project-scoped rows to only those in the caller's org.
+  function filterByOrgProjects(req: any, rows: any[]): any[] {
+    if (req.account?.role === "owner") return rows;
+    if (!req._orgProjectIds) return rows; // e.g. projectId was supplied — already validated
+    return rows.filter(r => r.projectId == null || req._orgProjectIds.has(r.projectId));
+  }
+
+  // ============================ STRIPE BILLING (hoisted) ============================
+  // Initialized here (before auth routes) so signup + invite flows can reference `stripe`.
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const StripeCtor = stripeKey ? require("stripe") : null;
+  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2025-03-31.basil" }) : null;
+  // Legacy price map — old flat prices kept via env vars for backward compat with old checkout endpoint.
+  const PRICE_MAP: Record<string, { monthly?: string; annual?: string }> = {
+    starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },
+    pro: { monthly: process.env.STRIPE_PRICE_PRO_MONTHLY, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
+    enterprise: { monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY, annual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL },
+  };
+  const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
 
   /* ------------------------- Auth ------------------------- */
   app.post("/api/auth/signup", authRateLimit, async (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    const { email, password, displayName, company } = parsed.data;
+    const { email, password, displayName, company, plan, billing, inviteToken } = parsed.data;
+    const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
+
     try {
+      // Invite path: caller signs up via an invite link. Skip org creation + Stripe;
+      // join the inviter's org with the invite's role.
+      if (inviteToken) {
+        const invite = await getInviteByToken(inviteToken);
+        if (!invite || !isInviteRedeemable(invite)) {
+          return res.status(400).json({ message: "Invite is invalid or expired" });
+        }
+        if (invite.email.toLowerCase() !== email.trim().toLowerCase()) {
+          return res.status(400).json({ message: "Signup email must match the invite email" });
+        }
+        const account = await storage.createAccount(email, password, displayName, company);
+        await createMembership(account.id, invite.organizationId, invite.role as OrgRole);
+        await markInviteAccepted(invite.id);
+
+        // Re-sync Stripe seat count for the org (may add an overage seat).
+        try {
+          if (stripe) await syncSeatsForOrg(stripe, invite.organizationId);
+        } catch (e) {
+          console.error("[signup:invite] seat sync failed:", e);
+        }
+
+        const session = await storage.createSession(account.id);
+        setSessionCookie(res, session.id);
+        return res.status(201).json({ account, token: session.id, joinedOrganizationId: invite.organizationId });
+      }
+
+      // New-org path: creator becomes the org owner. If Stripe is configured and
+      // plan/billing are provided, we bootstrap a Stripe subscription (with trial + card).
       const account = await storage.createAccount(email, password, displayName, company);
+
+      let checkoutUrl: string | undefined;
+      const chosenPlan = (plan || "starter") as PlanTier;
+      const chosenBilling = (billing || "monthly") as Billing;
+      const bootstrap = await bootstrapOrganizationForAccount({
+        accountId: account.id,
+        accountEmail: email,
+        orgName: company || `${displayName}'s Org`,
+        tier: chosenPlan,
+        billing: chosenBilling,
+        stripe: stripe || undefined,
+        returnUrl: `${APP_URL}/#/settings?checkout=success`,
+        cancelUrl: `${APP_URL}/#/paywall?checkout=cancelled`,
+      });
+      checkoutUrl = bootstrap.checkoutUrl;
+
       const session = await storage.createSession(account.id);
       setSessionCookie(res, session.id);
-      // Notify owner about new account signup — flagged as pending approval so it's obvious action is required.
-      const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
+
+      // Notify platform-owner about the new account (does NOT gate access — orgs
+      // are self-serve; approval is legacy behavior).
       void sendSignupNotification({
         kind: "signup",
-        subject: `[Action needed] Approve TrussPath account — ${displayName} (${email})`,
-        banner: {
-          label: "Awaiting your approval — this account is locked out until you approve it.",
-          tone: "warning",
-        },
+        subject: `New TrussPath signup — ${displayName} (${email})`,
         fields: {
           Name: displayName,
           Email: email,
           Company: company,
+          Plan: chosenPlan,
+          Billing: chosenBilling,
+          Organization: `id=${bootstrap.organizationId}`,
           "Signed up": new Date().toISOString(),
-          Status: "pending approval",
         },
-        cta: {
-          label: "Review in admin console",
-          url: `${APP_URL}/#/admin/signups`,
-        },
+        cta: { label: "Review in admin console", url: `${APP_URL}/#/admin/signups` },
       });
-      // Also return token in body for cross-origin clients that can't rely on cookies.
-      res.status(201).json({ account, token: session.id });
+
+      res.status(201).json({
+        account,
+        token: session.id,
+        organizationId: bootstrap.organizationId,
+        checkoutUrl,
+      });
     } catch (e: any) {
       const msg = e?.message || "Signup failed";
       const status = /already/i.test(msg) ? 409 : 500;
@@ -436,11 +556,11 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Team
-  app.get("/api/team", async (_req, res) => res.json(await storage.getTeam()));
-  app.post("/api/team", async (req, res) => {
+  app.get("/api/team", async (req: any, res) => res.json(await storage.getTeam(req.organizationId)));
+  app.post("/api/team", async (req: any, res) => {
     const parsed = insertTeamSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createTeamMember(parsed.data));
+    res.status(201).json(await storage.createTeamMember(withOrg(req, parsed.data)));
   });
   app.patch("/api/team/:id", async (req, res) => {
     const parsed = insertTeamSchema.partial().safeParse(req.body);
@@ -455,26 +575,31 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Projects
-  app.get("/api/projects", async (_req, res) => res.json(await storage.getProjects()));
-  app.get("/api/projects/:id", async (req, res) => {
-    const project = await storage.getProject(parseInt(req.params.id, 10));
-    if (!project) return res.status(404).json({ message: "Project not found" });
+  app.get("/api/projects", async (req: any, res) => res.json(await storage.getProjects(req.organizationId)));
+  app.get("/api/projects/:id", async (req: any, res) => {
+    const project = await requireProjectAccess(req, res, parseInt(req.params.id, 10));
+    if (!project) return; // response already sent
     res.json(project);
   });
-  app.post("/api/projects", async (req, res) => {
+  app.post("/api/projects", async (req: any, res) => {
     const parsed = insertProjectSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createProject(parsed.data));
+    res.status(201).json(await storage.createProject(withOrg(req, parsed.data)));
   });
-  app.patch("/api/projects/:id", async (req, res) => {
+  app.patch("/api/projects/:id", async (req: any, res) => {
     const id = parseInt(req.params.id, 10);
+    const existing = await requireProjectAccess(req, res, id);
+    if (!existing) return;
     const updated = await storage.updateProject(id, req.body);
     if (!updated) return res.status(404).json({ message: "Project not found" });
     res.json(updated);
   });
 
   // Tasks
-  app.get("/api/tasks", async (req, res) => res.json(await storage.getTasks(pid(req))));
+  app.get("/api/tasks", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getTasks(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/tasks", async (req, res) => {
     const parsed = insertTaskSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -489,7 +614,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // RFIs
-  app.get("/api/rfis", async (req, res) => res.json(await storage.getRfis(pid(req))));
+  app.get("/api/rfis", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getRfis(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/rfis", async (req, res) => {
     const parsed = insertRfiSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -505,7 +633,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
 
   // Submittals
-  app.get("/api/submittals", async (req, res) => res.json(await storage.getSubmittals(pid(req))));
+  app.get("/api/submittals", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getSubmittals(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/submittals", async (req, res) => {
     const parsed = insertSubmittalSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -521,7 +652,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
 
   // Change orders
-  app.get("/api/change-orders", async (req, res) => res.json(await storage.getChangeOrders(pid(req))));
+  app.get("/api/change-orders", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getChangeOrders(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/change-orders", async (req, res) => {
     const parsed = insertChangeOrderSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -537,7 +671,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
 
   // Action items
-  app.get("/api/action-items", async (req, res) => res.json(await storage.getActionItems(pid(req))));
+  app.get("/api/action-items", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getActionItems(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/action-items", async (req, res) => {
     const parsed = insertActionItemSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -553,7 +690,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
 
   // Daily logs
-  app.get("/api/daily-logs", async (req, res) => res.json(await storage.getDailyLogs(pid(req))));
+  app.get("/api/daily-logs", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getDailyLogs(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/daily-logs", async (req, res) => {
     const parsed = insertDailyLogSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -572,7 +712,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Punch
-  app.get("/api/punch", async (req, res) => res.json(await storage.getPunchItems(pid(req))));
+  app.get("/api/punch", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getPunchItems(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/punch", async (req, res) => {
     const parsed = insertPunchItemSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -588,11 +731,11 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
 
   // Contacts
-  app.get("/api/contacts", async (_req, res) => res.json(await storage.getContacts()));
-  app.post("/api/contacts", async (req, res) => {
+  app.get("/api/contacts", async (req: any, res) => res.json(await storage.getContacts(req.organizationId)));
+  app.post("/api/contacts", async (req: any, res) => {
     const parsed = insertContactSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createContact(parsed.data));
+    res.status(201).json(await storage.createContact(withOrg(req, parsed.data)));
   });
   app.patch("/api/contacts/:id", async (req, res) => {
     const parsed = insertContactSchema.partial().safeParse(req.body);
@@ -607,15 +750,18 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Equipment
-  app.get("/api/equipment", async (req, res) => res.json(await storage.getEquipment(pid(req))));
-  app.post("/api/equipment", async (req, res) => {
+  app.get("/api/equipment", async (req: any, res) => res.json(await storage.getEquipment(pid(req), req.organizationId)));
+  app.post("/api/equipment", async (req: any, res) => {
     const parsed = insertEquipmentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createEquipment(parsed.data));
+    res.status(201).json(await storage.createEquipment(withOrg(req, parsed.data)));
   });
 
   // Photos
-  app.get("/api/photos", async (req, res) => res.json(await storage.getPhotos(pid(req))));
+  app.get("/api/photos", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getPhotos(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/photos", async (req, res) => {
     const parsed = insertPhotoSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -671,7 +817,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Documents
-  app.get("/api/documents", async (req, res) => res.json(await storage.getDocuments(pid(req))));
+  app.get("/api/documents", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getDocuments(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/documents", async (req, res) => {
     const parsed = insertDocumentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -733,12 +882,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     filename: (_req, file, cb) => { const ext = path.extname(file.originalname); cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`); },
   }) });
 
-  app.get("/api/company-documents", async (_req, res) => res.json(await storage.getCompanyDocuments()));
+  app.get("/api/company-documents", async (req: any, res) => res.json(await storage.getCompanyDocuments(req.organizationId)));
 
-  app.post("/api/company-documents", async (req, res) => {
+  app.post("/api/company-documents", async (req: any, res) => {
     const parsed = insertCompanyDocumentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createCompanyDocument(parsed.data));
+    res.status(201).json(await storage.createCompanyDocument(withOrg(req, parsed.data)));
   });
 
   app.post("/api/company-documents/upload", companyUpload.single("file"), async (req, res) => {
@@ -794,7 +943,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Blueprints
-  app.get("/api/blueprints", async (req, res) => res.json(await storage.getBlueprints(pid(req))));
+  app.get("/api/blueprints", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getBlueprints(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/blueprints", async (req, res) => {
     const parsed = insertBlueprintSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -802,7 +954,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Drone captures
-  app.get("/api/drone-captures", async (req, res) => res.json(await storage.getDroneCaptures(pid(req))));
+  app.get("/api/drone-captures", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getDroneCaptures(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/drone-captures", async (req, res) => {
     const parsed = insertDroneCaptureSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -810,7 +965,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Milestones
-  app.get("/api/milestones", async (req, res) => res.json(await storage.getMilestones(pid(req))));
+  app.get("/api/milestones", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getMilestones(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/milestones", async (req, res) => {
     const parsed = insertMilestoneSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -891,7 +1049,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Notes (sticky)
-  app.get("/api/notes", async (req, res) => res.json(await storage.getNotes(pid(req))));
+  app.get("/api/notes", scopeProjectQuery, async (req: any, res) => {
+    const rows = await storage.getNotes(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app.post("/api/notes", async (req, res) => {
     const parsed = insertNoteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -936,23 +1097,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ ok: true, message: "Connection verified" });
   });
 
-  // ============================ STRIPE BILLING ============================
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  // Stripe SDK: v14+ exports the class as the default export. Older buggy shape
-  // `new (require("stripe")(key))` throws "is not a constructor" because it calls
-  // Stripe as a function first, then tries to `new` the returned instance.
-  const StripeCtor = stripeKey ? require("stripe") : null;
-  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2025-03-31.basil" }) : null;
-
-  const PRICE_MAP: Record<string, { monthly?: string; annual?: string }> = {
-    starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },
-    pro: { monthly: process.env.STRIPE_PRICE_PRO_MONTHLY, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
-    enterprise: { monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY, annual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL },
-  };
-
-  const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
-
+  // ============================ STRIPE ROUTES ============================
   // Stripe webhook — must come BEFORE auth middleware (raw body, no session)
   app.post("/api/stripe/webhook", async (req, res) => {
     if (!stripe || !webhookSecret) return res.status(503).json({ error: "Stripe not configured" });
@@ -964,62 +1109,75 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       return res.status(400).send(`Webhook Error: ${e.message}`);
     }
     try {
+      // Helper: resolve the org for this Stripe event. Prefers metadata.organizationId,
+      // falls back to lookup by customer id. Also mirrors updates to any legacy
+      // account.stripeCustomerId (best-effort) so old UI still shows correct status.
+      const orgFromEvent = async (obj: any): Promise<{ orgId: number | null; customerId: string | null }> => {
+        const customerId = (obj?.customer as string) || null;
+        const metaOrg = obj?.metadata?.organizationId || obj?.subscription_details?.metadata?.organizationId;
+        let orgId: number | null = metaOrg ? parseInt(String(metaOrg), 10) : null;
+        if (!orgId && customerId) {
+          const org = await getOrgByStripeCustomerId(customerId);
+          if (org) orgId = org.id;
+        }
+        return { orgId: orgId ?? null, customerId };
+      };
+
       switch (event.type) {
         case "checkout.session.completed": {
           const session = event.data.object;
-          const customerId = session.customer as string;
-          const subscriptionId = session.subscription as string;
-          if (customerId) {
-            const account = await storage.getAccountByStripeCustomerId(customerId);
-            if (account) {
-              await storage.updateAccountBilling(account.id, {
-                stripeCustomerId: customerId,
-                stripeSubscriptionId: subscriptionId,
-                subscriptionStatus: "active",
-              });
-            }
+          const { orgId, customerId } = await orgFromEvent(session);
+          if (orgId) {
+            await updateOrgBilling(orgId, {
+              stripeCustomerId: customerId ?? undefined,
+              stripeSubscriptionId: (session.subscription as string) || undefined,
+              subscriptionStatus: "trialing", // real status arrives on subscription.updated
+            });
           }
           break;
         }
         case "customer.subscription.updated":
         case "customer.subscription.created": {
           const sub = event.data.object;
-          const customerId = sub.customer as string;
-          const account = await storage.getAccountByStripeCustomerId(customerId);
-          if (account) {
-            const planKey = sub.items?.data?.[0]?.price?.lookup_key || "";
-            const planMatch = planKey.match(/^(starter|pro|enterprise)/);
-            await storage.updateAccountBilling(account.id, {
-              stripeCustomerId: customerId,
+          const { orgId, customerId } = await orgFromEvent(sub);
+          if (orgId) {
+            // Derive plan/billing from the base price. Base prices have metadata.plan + metadata.kind='base'.
+            let planTier: string | undefined;
+            let billingKind: string | undefined;
+            for (const it of sub.items?.data || []) {
+              const md = it.price?.metadata || {};
+              if (md.kind === "base") {
+                planTier = md.plan;
+                billingKind = md.interval || (it.price?.recurring?.interval === "year" ? "annual" : "monthly");
+                break;
+              }
+            }
+            await updateOrgBilling(orgId, {
+              stripeCustomerId: customerId ?? undefined,
               stripeSubscriptionId: sub.id,
               subscriptionStatus: sub.status,
               subscriptionCurrentPeriodEnd: sub.current_period_end
                 ? new Date(sub.current_period_end * 1000).toISOString()
                 : undefined,
-              subscriptionPlan: planMatch ? planMatch[1] : undefined,
+              subscriptionPlan: planTier,
+              subscriptionBilling: billingKind,
+              trialEndsAt: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : undefined,
             });
           }
           break;
         }
         case "customer.subscription.deleted": {
           const sub = event.data.object;
-          const customerId = sub.customer as string;
-          const account = await storage.getAccountByStripeCustomerId(customerId);
-          if (account) {
-            await storage.updateAccountBilling(account.id, {
-              subscriptionStatus: "canceled",
-              stripeSubscriptionId: null as any,
-            });
+          const { orgId } = await orgFromEvent(sub);
+          if (orgId) {
+            await updateOrgBilling(orgId, { subscriptionStatus: "canceled" });
           }
           break;
         }
         case "invoice.payment_failed": {
           const invoice = event.data.object;
-          const customerId = invoice.customer as string;
-          const account = await storage.getAccountByStripeCustomerId(customerId);
-          if (account) {
-            await storage.updateAccountBilling(account.id, { subscriptionStatus: "past_due" });
-          }
+          const { orgId } = await orgFromEvent(invoice);
+          if (orgId) await updateOrgBilling(orgId, { subscriptionStatus: "past_due" });
           break;
         }
       }
@@ -1096,16 +1254,22 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
-  // Customer portal — manage subscription (cancel, update payment, swap plan)
-  app.post("/api/billing/portal", async (req, res) => {
+  // Customer portal — manage subscription (cancel, update payment, swap plan).
+  // Only owners can access billing.
+  app.post("/api/billing/portal", async (req: any, res) => {
     if (!stripe) return res.status(503).json({ error: "Billing is not configured" });
-    const account = (req as any).account;
-    if (!account) return res.status(401).json({ error: "Not authenticated" });
-    if (!account.stripeCustomerId) return res.status(400).json({ error: "No billing account found" });
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) return res.status(400).json({ error: "No active organization" });
+    // Only org owners can open the billing portal.
+    if (req.membership?.role !== "owner" && req.account.role !== "owner") {
+      return res.status(403).json({ error: "Only owners can manage billing" });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (!org?.stripeCustomerId) return res.status(400).json({ error: "No billing account found for this org" });
 
     try {
       const session = await stripe.billingPortal.sessions.create({
-        customer: account.stripeCustomerId,
+        customer: org.stripeCustomerId,
         return_url: `${APP_URL}/#/settings`,
       });
       res.json({ url: session.url });
@@ -1115,16 +1279,29 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
-  // Billing status for logged-in user
-  app.get("/api/billing/status", async (req, res) => {
-    const account = (req as any).account;
-    if (!account) return res.status(401).json({ error: "Not authenticated" });
+  // Billing status — now reports the caller's active organization's subscription
+  // (multi-tenant billing lives on the org, not the account).
+  app.get("/api/billing/status", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) {
+      return res.json({ plan: null, status: null, billing: null, currentPeriodEnd: null, hasCustomer: false });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (!org) return res.status(404).json({ error: "Organization not found" });
+    const seats = await countActiveSeats(org.id);
+    const plan = org.subscriptionPlan ? PLANS[org.subscriptionPlan as PlanTier] : null;
     res.json({
-      plan: account.subscriptionPlan || null,
-      status: account.subscriptionStatus || null,
-      billing: account.subscriptionBilling || null,
-      currentPeriodEnd: account.subscriptionCurrentPeriodEnd || null,
-      hasCustomer: !!account.stripeCustomerId,
+      plan: org.subscriptionPlan || null,
+      status: org.subscriptionStatus || null,
+      billing: org.subscriptionBilling || null,
+      currentPeriodEnd: org.subscriptionCurrentPeriodEnd || null,
+      trialEndsAt: org.trialEndsAt || null,
+      hasCustomer: !!org.stripeCustomerId,
+      seats: {
+        active: seats,
+        included: plan?.includedSeats ?? null,
+        overage: plan ? Math.max(0, seats - plan.includedSeats) : null,
+      },
     });
   });
 
@@ -1507,6 +1684,182 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
     await storage.wipeAllData();
     res.json({ ok: true, wipedAt: new Date().toISOString() });
+  });
+
+  /* ================================================================
+   * MULTI-TENANT: ORG, MEMBERSHIP, INVITE ENDPOINTS
+   *
+   * All of these run after resolveMembership, so req.membership +
+   * req.organizationId are already resolved for the current user.
+   * ================================================================ */
+
+  // GET /api/org/current — the caller's active org (with billing + seats).
+  app.get("/api/org/current", async (req: any, res) => {
+    if (!req.organizationId) return res.status(404).json({ message: "No active organization" });
+    const org = await getOrganization(req.organizationId);
+    if (!org) return res.status(404).json({ message: "Organization not found" });
+    const seats = await countActiveSeats(org.id);
+    const plan = org.subscriptionPlan ? PLANS[org.subscriptionPlan as PlanTier] : null;
+    res.json({
+      organization: org,
+      membership: req.membership,
+      seats: {
+        active: seats,
+        included: plan?.includedSeats ?? null,
+        overage: plan ? Math.max(0, seats - plan.includedSeats) : null,
+      },
+    });
+  });
+
+  // GET /api/org/members — list all members (owners+admins only).
+  app.get("/api/org/members", requireCap("manageMembers"), async (req: any, res) => {
+    const rows = await listMembershipsForOrg(req.organizationId);
+    res.json({ members: rows });
+  });
+
+  // POST /api/org/members/:id/role — change a member's role (admins can't grant owner).
+  app.post("/api/org/members/:id/role", requireCap("manageMembers"), async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    const newRole = req.body?.role as OrgRole;
+    if (!newRole || !ORG_ROLES.includes(newRole)) return res.status(400).json({ message: "Invalid role" });
+
+    const target = await getMembership(id);
+    if (!target || target.organizationId !== req.organizationId) {
+      return res.status(404).json({ message: "Member not found in this org" });
+    }
+
+    // Only owners can promote to owner or modify existing owners.
+    if ((newRole === "owner" || target.role === "owner") && req.membership.role !== "owner") {
+      return res.status(403).json({ message: "Only owners can change owner roles" });
+    }
+    // Prevent removing the primary owner (the account that created the org).
+    if (target.role === "owner" && newRole !== "owner") {
+      const org = await getOrganization(req.organizationId);
+      if (org?.ownerAccountId === target.accountId) {
+        return res.status(403).json({ message: "Cannot demote the primary owner" });
+      }
+    }
+
+    const updated = await updateMembershipRole(id, newRole);
+    res.json({ membership: updated });
+  });
+
+  // DELETE /api/org/members/:id — remove a member. Also decrements Stripe seat count.
+  app.delete("/api/org/members/:id", requireCap("manageMembers"), async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    const target = await getMembership(id);
+    if (!target || target.organizationId !== req.organizationId) {
+      return res.status(404).json({ message: "Member not found in this org" });
+    }
+    if (target.role === "owner" && req.membership.role !== "owner") {
+      return res.status(403).json({ message: "Only owners can remove other owners" });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (org?.ownerAccountId === target.accountId) {
+      return res.status(403).json({ message: "Cannot remove the primary owner. Transfer ownership first." });
+    }
+
+    await removeMembership(id);
+    // Fire-and-forget seat sync so the next invoice reflects the removed seat.
+    if (stripe) syncSeatsForOrg(stripe, req.organizationId).catch(e => console.error("[members:delete] seat sync failed:", e));
+    res.json({ ok: true });
+  });
+
+  // GET /api/org/invites — list pending invites.
+  app.get("/api/org/invites", requireCap("manageMembers"), async (req: any, res) => {
+    const rows = await listPendingInvites(req.organizationId);
+    res.json({ invites: rows });
+  });
+
+  // POST /api/org/invites — create + email a new invite.
+  app.post("/api/org/invites", requireCap("manageMembers"), async (req: any, res) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const role = String(req.body?.role || "pm") as OrgRole;
+    if (!email || !/@/.test(email)) return res.status(400).json({ message: "Valid email required" });
+    if (!ORG_ROLES.includes(role)) return res.status(400).json({ message: "Invalid role" });
+    // Non-owners cannot invite owners.
+    if (role === "owner" && req.membership.role !== "owner") {
+      return res.status(403).json({ message: "Only owners can invite other owners" });
+    }
+    // If this email already has a membership in this org, block.
+    const existing = await storage.getAccountByEmail(email);
+    if (existing) {
+      const m = await getMembershipForAccount(existing.id, req.organizationId);
+      if (m && m.status === "active") {
+        return res.status(409).json({ message: "This user is already a member of your org" });
+      }
+    }
+
+    const invite = await createInvite({
+      organizationId: req.organizationId,
+      email,
+      role,
+      invitedByAccountId: req.account.id,
+    });
+
+    // Fire-and-forget invite email.
+    const org = await getOrganization(req.organizationId);
+    const inviteUrl = `${APP_URL}/#/invite/${invite.token}`;
+    void sendInviteEmail({
+      toEmail: email,
+      orgName: org?.name || "TrussPath",
+      inviterName: req.account.displayName || req.account.email,
+      role,
+      inviteUrl,
+    });
+
+    res.status(201).json({ invite, inviteUrl });
+  });
+
+  // DELETE /api/org/invites/:id — revoke a pending invite.
+  app.delete("/api/org/invites/:id", requireCap("manageMembers"), async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    // Only revoke invites in your org — look it up first.
+    const rows = await listPendingInvites(req.organizationId);
+    if (!rows.find(r => r.id === id)) {
+      return res.status(404).json({ message: "Invite not found" });
+    }
+    await revokeInvite(id);
+    res.json({ ok: true });
+  });
+
+  // GET /api/invites/:token — public: look up an invite for the acceptance page.
+  // (This is auth-protected by the outer middleware; frontend fetches it after login
+  // OR the user hits the signup page with the token pre-filled and skips this call.)
+  app.get("/api/invites/:token", async (req: any, res) => {
+    const invite = await getInviteByToken(req.params.token);
+    if (!invite || !isInviteRedeemable(invite)) {
+      return res.status(404).json({ message: "Invite not found or expired" });
+    }
+    const org = await getOrganization(invite.organizationId);
+    res.json({
+      email: invite.email,
+      role: invite.role,
+      orgName: org?.name || "TrussPath",
+      expiresAt: invite.expiresAt,
+    });
+  });
+
+  // POST /api/invites/:token/accept — already-logged-in user accepts an invite.
+  // Their email must match. Adds a membership + syncs Stripe seats.
+  app.post("/api/invites/:token/accept", async (req: any, res) => {
+    if (!req.account) return res.status(401).json({ message: "Not authenticated" });
+    const invite = await getInviteByToken(req.params.token);
+    if (!invite || !isInviteRedeemable(invite)) {
+      return res.status(400).json({ message: "Invite not found or expired" });
+    }
+    if (invite.email.toLowerCase() !== (req.account.email as string).toLowerCase()) {
+      return res.status(403).json({ message: "Your email doesn't match the invite" });
+    }
+    const existing = await getMembershipForAccount(req.account.id, invite.organizationId);
+    if (existing && existing.status === "active") {
+      await markInviteAccepted(invite.id);
+      return res.json({ ok: true, membership: existing });
+    }
+    const membership = await createMembership(req.account.id, invite.organizationId, invite.role as OrgRole);
+    await markInviteAccepted(invite.id);
+    if (stripe) syncSeatsForOrg(stripe, invite.organizationId).catch(e => console.error("[invite:accept] seat sync failed:", e));
+    res.json({ ok: true, membership });
   });
 
   return _httpServer;

@@ -15,7 +15,7 @@ export const APP_ROUTES: RoutePattern[] = [
   "/", "/app", "/projects", "/projects/:id", "/schedule", "/gantt", "/cpm", "/integrations",
   "/tasks", "/action-items", "/rfis", "/submittals", "/change-orders", "/punch",
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
-  "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings",
+  "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings", "/settings/team",
 ];
 
 export type NavLink = { href: string; label: string; icon: string };
