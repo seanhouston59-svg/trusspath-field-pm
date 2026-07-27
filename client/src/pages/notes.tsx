@@ -5,14 +5,33 @@ import { useNotes, useCreateNote, useUpdateNotePosition, useDeleteNote, useProje
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-const NOTE_COLORS: Record<string, { bg: string; bar: string; text: string }> = {
-  amber: { bg: "#fef3c7", bar: "#e07412", text: "#5c2e07" },
-  blue: { bg: "#dbeafe", bar: "#2f7fd4", text: "#0c3a66" },
-  emerald: { bg: "#d1fae5", bar: "#1f9d6b", text: "#064e3b" },
-  rose: { bg: "#ffe4e6", bar: "#e0457b", text: "#6b0f2a" },
-  violet: { bg: "#ede9fe", bar: "#7c5cff", text: "#2e1065" },
+const NOTE_COLORS: Record<string, { bg: string; bar: string; text: string; pin: string }> = {
+  amber:   { bg: "#fef3c7", bar: "#e07412", text: "#5c2e07", pin: "#c0392b" },
+  blue:    { bg: "#dbeafe", bar: "#2f7fd4", text: "#0c3a66", pin: "#1e3a8a" },
+  emerald: { bg: "#d1fae5", bar: "#1f9d6b", text: "#064e3b", pin: "#065f46" },
+  rose:    { bg: "#ffe4e6", bar: "#e0457b", text: "#6b0f2a", pin: "#9d174d" },
+  violet:  { bg: "#ede9fe", bar: "#7c5cff", text: "#2e1065", pin: "#5b21b6" },
 };
 const COLOR_KEYS = Object.keys(NOTE_COLORS);
+
+// Sticky note dimensions. Bumped up so notes read like real paper stickies
+// on a corkboard rather than tiny thumbnail tiles. Board drag-clamp math
+// uses these so notes can't be dragged off the edge.
+const NOTE_W = 240;
+const NOTE_H = 220;
+
+// Corkboard background: layered radial gradients approximate cork grain
+// without an image asset. Two size-varied dot patterns give the surface a
+// non-uniform speckle; the base color is the warm tan of natural cork.
+// The wooden frame is drawn with a thick inset ring using CSS gradients.
+const CORK_BG =
+  "radial-gradient(circle at 20% 30%, rgba(120,72,32,0.18) 0 1.5px, transparent 2px)," +
+  "radial-gradient(circle at 70% 65%, rgba(90,50,20,0.22) 0 1.2px, transparent 1.8px)," +
+  "radial-gradient(circle at 45% 80%, rgba(140,90,45,0.14) 0 2px, transparent 2.6px)," +
+  "radial-gradient(circle at 85% 20%, rgba(100,55,20,0.20) 0 1.4px, transparent 2px)," +
+  "radial-gradient(ellipse at 30% 50%, rgba(160,110,60,0.12) 0%, transparent 55%)," +
+  "linear-gradient(135deg, #c89768 0%, #b8875a 35%, #a97b4d 65%, #b8875a 100%)";
+const CORK_BG_SIZE = "14px 14px, 18px 18px, 22px 22px, 16px 16px, 100% 100%, 100% 100%";
 
 export default function NotesPage() {
   const { data: projects = [] } = useProjects();
@@ -38,8 +57,8 @@ export default function NotesPage() {
     const onMove = (e: PointerEvent) => {
       const rect = boardRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const x = Math.max(0, Math.min(rect.width - 180, e.clientX - rect.left - drag.offX));
-      const y = Math.max(0, Math.min(rect.height - 150, e.clientY - rect.top - drag.offY));
+      const x = Math.max(0, Math.min(rect.width - NOTE_W, e.clientX - rect.left - drag.offX));
+      const y = Math.max(0, Math.min(rect.height - NOTE_H, e.clientY - rect.top - drag.offY));
       setDrag({ ...drag, x, y });
     };
     const onUp = () => {
@@ -123,44 +142,97 @@ export default function NotesPage() {
         <span className="ml-auto text-xs text-muted-foreground">Drag notes to reposition · {notes.length} notes</span>
       </div>
 
-      {/* board */}
+      {/* corkboard */}
       <div
         ref={boardRef}
-        className="relative h-[calc(100vh-19rem)] min-h-[420px] overflow-hidden rounded-lg border border-border bg-muted/30 shadow-sm"
+        className="relative h-[calc(100vh-19rem)] min-h-[520px] overflow-hidden rounded-xl shadow-inner"
+        style={{
+          backgroundImage: CORK_BG,
+          backgroundSize: CORK_BG_SIZE,
+          // Wooden frame around the cork — chunky, warm, and slightly darker
+          // on the inside so the cork looks recessed into the frame.
+          border: "10px solid",
+          borderImage: "linear-gradient(135deg, #8b5a2b 0%, #6b3f1a 45%, #8b5a2b 55%, #5a3210 100%) 1",
+          boxShadow: "inset 0 0 40px rgba(60, 30, 10, 0.35), 0 6px 18px rgba(0,0,0,0.25)",
+        }}
         data-testid="sticky-board"
       >
         {notes.length === 0 && (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No notes yet. Add your first sticky above.</div>
+          <div className="flex h-full items-center justify-center text-sm font-medium text-white/80 drop-shadow">
+            Empty corkboard. Add your first sticky above.
+          </div>
         )}
-        {notes.map((n) => {
+        {notes.map((n, i) => {
           const c = NOTE_COLORS[n.color] ?? NOTE_COLORS.amber;
           const isDragging = drag?.id === n.id;
           const x = isDragging ? drag!.x : n.x;
           const y = isDragging ? drag!.y : n.y;
+          // Give each note a tiny stable rotation so the board looks like
+          // real paper stickies, not a rigid grid. Rotation is deterministic
+          // per note id so the same sticky doesn't jitter between renders.
+          const rot = ((n.id * 37) % 9) - 4; // -4deg .. +4deg
           return (
             <div
               key={n.id}
               onPointerDown={(e) => {
-                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setDrag({ id: n.id, x: n.x, y: n.y, offX: e.clientX - rect.left, offY: e.clientY - rect.top });
+                // Compute the pointer offset relative to the note's stored
+                // top-left (n.x, n.y in board-space), NOT the note's current
+                // getBoundingClientRect() — that rect reflects the rotated
+                // element and would cause a small jump on drop when the note
+                // straightens for dragging.
+                const boardRect = boardRef.current?.getBoundingClientRect();
+                if (!boardRect) return;
+                const pointerBoardX = e.clientX - boardRect.left;
+                const pointerBoardY = e.clientY - boardRect.top;
+                setDrag({
+                  id: n.id,
+                  x: n.x, y: n.y,
+                  offX: pointerBoardX - n.x,
+                  offY: pointerBoardY - n.y,
+                });
                 (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
               }}
-              className="absolute w-[180px] cursor-grab touch-none select-none shadow-md transition-shadow hover:shadow-lg active:cursor-grabbing"
-              style={{ left: x, top: y, background: c.bg, color: c.text, opacity: isDragging ? 0.9 : 1, zIndex: isDragging ? 20 : 1 }}
+              className="absolute cursor-grab touch-none select-none transition-shadow hover:shadow-2xl active:cursor-grabbing"
+              style={{
+                left: x,
+                top: y,
+                width: NOTE_W,
+                minHeight: NOTE_H,
+                background: c.bg,
+                color: c.text,
+                opacity: isDragging ? 0.95 : 1,
+                zIndex: isDragging ? 20 : 1 + (i % 5),
+                transform: `rotate(${isDragging ? 0 : rot}deg)`,
+                // Layered shadow — a soft ambient drop plus a warmer contact
+                // shadow just below the note to sell the "pinned to cork"
+                // effect. Slight lift on hover is handled by hover:shadow-2xl.
+                boxShadow:
+                  "0 1px 2px rgba(0,0,0,0.15), 0 8px 18px rgba(40,20,5,0.35), 0 20px 30px -12px rgba(0,0,0,0.35)",
+              }}
               data-testid={`sticky-note-${n.id}`}
             >
-              <div className="flex items-center justify-between px-3 py-1" style={{ background: c.bar }}>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-white">Note</span>
+              {/* Pushpin */}
+              <div
+                aria-hidden
+                className="absolute left-1/2 top-[-8px] size-4 -translate-x-1/2 rounded-full"
+                style={{
+                  background: `radial-gradient(circle at 35% 30%, #fff 0 2px, ${c.pin} 3px 100%)`,
+                  boxShadow: "0 2px 3px rgba(0,0,0,0.4), inset 0 -2px 3px rgba(0,0,0,0.25)",
+                }}
+              />
+              {/* Colored header bar */}
+              <div className="flex items-center justify-between px-3 py-1.5" style={{ background: c.bar }}>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-white">Note</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); del.mutate(n.id); toast({ title: "Note deleted" }); }}
                   aria-label="Delete note"
                   data-testid={`button-delete-note-${n.id}`}
                   className="text-white/80 hover:text-white"
                 >
-                  <X className="size-3.5" />
+                  <X className="size-4" />
                 </button>
               </div>
-              <p className="p-3 text-sm font-medium leading-snug">{n.body}</p>
+              <p className="whitespace-pre-wrap break-words p-4 text-base font-medium leading-snug">{n.body}</p>
             </div>
           );
         })}
