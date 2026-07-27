@@ -1,6 +1,24 @@
 import type { ComponentType } from "react";
 import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
+
+/**
+ * Wouter's built-in useHashLocation returns the pathname WITH the query
+ * string still appended (e.g. "/field?field=1"). wouter uses `regexparam`
+ * to match Route paths, and its parser produces a regex like ^/field/?$
+ * which does NOT match a location containing a "?". Result: every route
+ * fails on the very first load if the URL includes any query flag, and
+ * we fall through to the <Route component={NotFound}> catch-all.
+ *
+ * We wrap useHashLocation to strip the query (and any accidental hash
+ * fragment) before it reaches the matcher. Field-mode still reads the
+ * ?field=1 flag directly from window.location, so nothing else breaks.
+ */
+function useHashLocationNoQuery(): [string, (to: string, opts?: unknown) => void] {
+  const [loc, nav] = useHashLocation();
+  const clean = loc.split("?")[0].split("#")[0] || "/";
+  return [clean, nav as (to: string, opts?: unknown) => void];
+}
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -275,7 +293,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <ErrorBoundary label="App">
-                <Router hook={useHashLocation}>
+                <Router hook={useHashLocationNoQuery}>
                   <RootRouter />
                   <AppChrome />
                 </Router>

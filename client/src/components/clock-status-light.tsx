@@ -261,7 +261,7 @@ export function ClockStatusLight() {
           <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" aria-hidden="true" />
         )}
       </span>
-      <span className="hidden sm:inline">{busy ? "Working\u2026" : label}</span>
+      <span className="whitespace-nowrap">{busy ? "Working\u2026" : label}</span>
     </button>
   );
 
