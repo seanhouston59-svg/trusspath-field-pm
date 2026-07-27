@@ -5,14 +5,15 @@
 // Grey               = clocked out
 //
 // Interactions:
-//   Click          → toggle punch (in ↔ out, or resume break)
-//   Right-click /  → open /timesheets (review)
-//   long-press
+//   Click while clocked out    → open a small project picker popover;
+//                                choosing a project clocks in immediately
+//   Click while clocked in     → clock out (reuses the active project)
+//   Click while on break       → resume from break
+//   Long-press / right-click   → open /timesheets for review
 //
-// The one-tap punch reuses the last-used project id from localStorage
-// (set by the timecard page) or falls back to the first accessible
-// project. If neither is available, we route to /field/timecard so the
-// user can pick a project explicitly.
+// The popover remembers the last picked project in localStorage so
+// repeat clock-ins are one tap (the row is auto-highlighted). This keeps
+// the fast path fast without forcing anyone off the current page.
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +21,8 @@ import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Check, MapPin, Search } from "lucide-react";
 import type { Project } from "@shared/schema";
 
 type OpenPunch = {
@@ -56,6 +59,8 @@ export function ClockStatusLight() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [filter, setFilter] = useState("");
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
 
@@ -74,8 +79,6 @@ export function ClockStatusLight() {
     refetchOnWindowFocus: true,
   });
 
-  // Also read the projects list so we can pick a fallback default when
-  // the user has never clocked in from this device before.
   const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
     retry: false,
@@ -88,6 +91,12 @@ export function ClockStatusLight() {
     return () => window.removeEventListener("trusspath:punch", onPunch);
   }, [qc]);
 
+  // Reset the filter each time the picker closes so the next open is a
+  // clean slate.
+  useEffect(() => {
+    if (!pickerOpen) setFilter("");
+  }, [pickerOpen]);
+
   const open = data?.open ?? null;
   const onBreak = open?.kind === "break_start";
   const clockedIn = open?.kind === "in" || open?.kind === "break_end";
@@ -95,47 +104,15 @@ export function ClockStatusLight() {
   const label = state === "in" ? "Clocked in" : state === "break" ? "On break" : "Clocked out";
   const nextAction = state === "in" ? "Clock out" : state === "break" ? "Resume" : "Clock in";
 
-  // Resolve the project id we should attribute a new "in" punch to.
-  //  1. The last "in" we saw on this account (server truth)
-  //  2. The last project id used on this device (localStorage)
-  //  3. The first project in the org
-  const resolveProjectId = (): number | null => {
-    if (open?.projectId) return open.projectId;
-    if (typeof localStorage !== "undefined") {
-      const stored = localStorage.getItem("trusspath.field.lastProjectId");
-      if (stored) {
-        const n = Number(stored);
-        if (Number.isFinite(n) && n > 0) return n;
-      }
-    }
-    if (projects && projects.length > 0) return projects[0].id;
-    return null;
-  };
+  const lastProjectId = (() => {
+    if (typeof localStorage === "undefined") return null;
+    const stored = localStorage.getItem("trusspath.field.lastProjectId");
+    if (!stored) return null;
+    const n = Number(stored);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
 
-  const doPunch = async () => {
-    if (busy) return;
-    const kind: "in" | "out" | "break_end" =
-      state === "in" ? "out" : state === "break" ? "break_end" : "in";
-
-    // Clock-in needs a project. If we can't resolve one, route to the
-    // full timecard so the user can pick one explicitly.
-    let projectId: number | null = null;
-    if (kind === "in") {
-      projectId = resolveProjectId();
-      if (projectId == null) {
-        toast({ title: "Pick a project first", description: "Opening timecard\u2026" });
-        setLocation("/field/timecard");
-        return;
-      }
-    } else {
-      // out / break_end reuse whatever the open punch is tied to.
-      projectId = open?.projectId ?? resolveProjectId();
-      if (projectId == null) {
-        toast({ title: "Couldn't find your active project", variant: "destructive" });
-        return;
-      }
-    }
-
+  const submitPunch = async (kind: "in" | "out" | "break_end", projectId: number) => {
     setBusy(true);
     try {
       const coords = await getCoords();
@@ -158,8 +135,6 @@ export function ClockStatusLight() {
         localStorage.setItem("trusspath.field.lastTimesheetId", String(body.timesheetId));
       }
 
-      // Notify the rest of the app (timecard page, etc.) so their local
-      // state refreshes without waiting for the next poll.
       window.dispatchEvent(new CustomEvent("trusspath:punch", { detail: { kind } }));
       qc.invalidateQueries({ queryKey: ["/api/field/punches"] });
       qc.invalidateQueries({ queryKey: ["/api/timesheets"] });
@@ -185,8 +160,31 @@ export function ClockStatusLight() {
     }
   };
 
-  // Long-press (600ms) opens the timesheets page for review. Works on
-  // both touch and mouse.
+  const handleMainClick = () => {
+    if (longPressed.current || busy) return;
+    if (state === "in") {
+      // Clock out from the currently open project — no picker needed.
+      const projectId = open?.projectId ?? lastProjectId;
+      if (projectId == null) {
+        toast({ title: "Couldn't find your active project", variant: "destructive" });
+        return;
+      }
+      void submitPunch("out", projectId);
+      return;
+    }
+    if (state === "break") {
+      const projectId = open?.projectId ?? lastProjectId;
+      if (projectId == null) {
+        toast({ title: "Couldn't find your active project", variant: "destructive" });
+        return;
+      }
+      void submitPunch("break_end", projectId);
+      return;
+    }
+    // Clocked out: open the picker.
+    setPickerOpen(true);
+  };
+
   const startLongPress = () => {
     longPressed.current = false;
     longPressTimer.current = setTimeout(() => {
@@ -201,13 +199,34 @@ export function ClockStatusLight() {
     }
   };
 
-  return (
+  // Filter projects for the picker. Exclude clearly-inactive statuses so
+  // the list stays short; users can still find them via search text.
+  const visibleProjects = (() => {
+    const list = projects ?? [];
+    const q = filter.trim().toLowerCase();
+    const filtered = q
+      ? list.filter(
+          (p) =>
+            p.name?.toLowerCase().includes(q) ||
+            p.number?.toLowerCase().includes(q) ||
+            p.client?.toLowerCase().includes(q),
+        )
+      : list.filter((p) => (p.status ?? "").toLowerCase() !== "completed");
+    // Put the last-used project first so the fast-path is always at the
+    // top of the list.
+    if (lastProjectId != null) {
+      const last = filtered.find((p) => p.id === lastProjectId);
+      if (last) {
+        return [last, ...filtered.filter((p) => p.id !== lastProjectId)];
+      }
+    }
+    return filtered;
+  })();
+
+  const trigger = (
     <button
       type="button"
-      onClick={() => {
-        if (longPressed.current) return; // long-press already handled
-        void doPunch();
-      }}
+      onClick={handleMainClick}
       onContextMenu={(e) => {
         e.preventDefault();
         setLocation("/timesheets");
@@ -244,5 +263,87 @@ export function ClockStatusLight() {
       </span>
       <span className="hidden sm:inline">{busy ? "Working\u2026" : label}</span>
     </button>
+  );
+
+  return (
+    <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0" data-testid="clock-project-picker">
+        <div className="border-b border-border p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clock in to</div>
+          <div className="mt-1 font-display text-base font-bold">Pick a project</div>
+        </div>
+        {(projects?.length ?? 0) > 6 && (
+          <div className="border-b border-border p-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                autoFocus
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Search projects\u2026"
+                data-testid="clock-project-picker-search"
+                className="h-9 w-full rounded-md border border-border bg-background pl-8 pr-2 text-sm outline-none focus:border-foreground/30"
+              />
+            </div>
+          </div>
+        )}
+        <div className="max-h-72 overflow-y-auto py-1">
+          {visibleProjects.length === 0 ? (
+            <div className="px-3 py-8 text-center text-xs text-muted-foreground">
+              {filter ? "No matches" : "No projects available yet"}
+            </div>
+          ) : (
+            visibleProjects.map((p) => {
+              const isLast = p.id === lastProjectId;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setPickerOpen(false);
+                    void submitPunch("in", p.id);
+                  }}
+                  data-testid={`clock-project-option-${p.id}`}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted focus:bg-muted focus:outline-none"
+                >
+                  <span className={cn(
+                    "grid size-8 place-items-center rounded-md text-xs font-bold",
+                    isLast ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground",
+                  )}>
+                    {isLast ? <Check className="size-4" /> : <MapPin className="size-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{p.name}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {[p.number, p.client, p.status].filter(Boolean).join(" \u00b7 ")}
+                    </span>
+                  </span>
+                  {isLast && (
+                    <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                      Last
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+        <div className="border-t border-border p-2">
+          <button
+            type="button"
+            onClick={() => {
+              setPickerOpen(false);
+              setLocation("/field/timecard");
+            }}
+            data-testid="clock-picker-open-timecard"
+            className="w-full rounded-md px-2 py-2 text-center text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            Open full timecard \u2192
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
