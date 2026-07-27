@@ -4,10 +4,11 @@
 // Amber              = on break (open break_start with no matching break_end)
 // Grey               = clocked out (no open punch)
 //
-// Clicking navigates to /timecard so the user can act on it. The light
-// polls every 30s to stay in sync when other devices punch, and also
-// invalidates on the `trusspath:timesheet-ready` custom event fired by
-// the timecard page after a clock in/out.
+// Clicking navigates to /timesheets — that route is universally allowed
+// across every access preset, unlike /field/timecard which some preview
+// roles can't see. The light polls every 30s to stay in sync when other
+// devices punch, and also listens for the `trusspath:punch` custom event
+// fired locally after a clock in/out so it updates instantly.
 
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -55,14 +56,17 @@ export function ClockStatusLight() {
   return (
     <button
       type="button"
-      onClick={() => setLocation("/timecard")}
-      aria-label={`${label} \u2014 open timecard`}
-      title={label}
+      onClick={() => setLocation("/timesheets")}
+      aria-label={`${label} \u2014 open timesheets`}
+      title={`${label} \u00b7 open timesheets`}
       data-testid="clock-status-light"
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground hover-elevate",
-        state === "in" && "text-emerald-700 dark:text-emerald-400",
-        state === "break" && "text-amber-700 dark:text-amber-400",
+        // Solid button surface with visible hover + focus ring so it reads
+        // as clickable in both light and dark modes. hover-elevate alone was
+        // too subtle against the dark header background.
+        "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        state === "in" && "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400",
+        state === "break" && "border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400",
       )}
     >
       <span
