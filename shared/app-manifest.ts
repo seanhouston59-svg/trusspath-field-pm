@@ -52,17 +52,12 @@ export const APP_NAV: NavGroup[] = [
       { href: "/punch", label: "Punch List", icon: "CheckSquare" },
     ],
   },
-  {
-    title: "Field kit (mobile)",
-    items: [
-      { href: "/field", label: "Field kit hub", icon: "Smartphone" },
-      { href: "/field/daily-log", label: "Daily log (field)", icon: "ClipboardEdit" },
-      { href: "/field/timecard", label: "Timecard", icon: "Timer" },
-      { href: "/field/photo", label: "Photo capture", icon: "Camera" },
-      { href: "/field/observation", label: "Safety observation", icon: "AlertTriangle" },
-      { href: "/field/punch", label: "Punch (field)", icon: "CheckCircle2" },
-    ],
-  },
+  // Field kit routes intentionally omitted from the sidebar — they're reached
+  // via the dedicated Field mode (topbar hard-hat toggle, dashboard launcher
+  // card, or the PWA homescreen shortcuts). Keeping them out of the sidebar
+  // avoids duplicating the same nav in two places and keeps the office view
+  // focused on office-side workflows. The /field routes still exist and are
+  // still whitelisted in shared/access-levels.ts.
   {
     title: "Field records",
     items: [
