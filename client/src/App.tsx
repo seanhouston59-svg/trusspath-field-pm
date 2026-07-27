@@ -59,7 +59,9 @@ import InviteAcceptPage from "@/pages/invite-accept";
 import FieldHub from "@/pages/field/hub";
 import FieldDailyLog from "@/pages/field/daily-log";
 import FieldTimecard from "@/pages/field/timecard";
-import { FieldPhoto, FieldObservation, FieldPunch } from "@/pages/field/coming-soon";
+import FieldPhoto from "@/pages/field/photo";
+import FieldObservation from "@/pages/field/observation";
+import FieldPunch from "@/pages/field/punch";
 
 // Single source of truth for routes lives in shared/app-manifest.ts (APP_ROUTES).
 // Map each manifest route pattern to its page component here.

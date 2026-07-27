@@ -10,6 +10,7 @@ import {
   jarvisMemory,
   timesheets, timeEntries,
   fieldPunches,
+  fieldObservations,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -28,6 +29,7 @@ import type {
   Timesheet, InsertTimesheet,
   TimeEntry, InsertTimeEntry,
   FieldPunch, InsertFieldPunch,
+  FieldObservation, InsertFieldObservation,
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -465,6 +467,9 @@ export interface IStorage {
   getRecentFieldPunches(accountId: number, limit?: number): Promise<FieldPunch[]>;
   getOpenFieldPunch(accountId: number): Promise<FieldPunch | undefined>;
   getFieldPunchByClientId(accountId: number, clientId: string): Promise<FieldPunch | undefined>;
+  createFieldObservation(data: InsertFieldObservation): Promise<FieldObservation>;
+  getRecentFieldObservations(opts: { accountId?: number; organizationId?: number; projectId?: number; limit?: number }): Promise<FieldObservation[]>;
+  getFieldObservationByClientId(accountId: number, clientId: string): Promise<FieldObservation | undefined>;
   updateAccountBilling(id: number, data: {
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
@@ -1230,6 +1235,30 @@ class DatabaseStorage implements IStorage {
   async getFieldPunchByClientId(accountId: number, clientId: string): Promise<FieldPunch | undefined> {
     await ensureReady();
     const rows = await db.select().from(fieldPunches).where(and(eq(fieldPunches.accountId, accountId), eq(fieldPunches.clientId, clientId))).limit(1);
+    return rows[0];
+  }
+  // Field observations — quick-capture safety/quality/rfi/issue entries.
+  async createFieldObservation(data: InsertFieldObservation): Promise<FieldObservation> {
+    await ensureReady();
+    const [row] = await db.insert(fieldObservations).values(data).returning();
+    return row;
+  }
+  async getRecentFieldObservations(opts: { accountId?: number; organizationId?: number; projectId?: number; limit?: number }): Promise<FieldObservation[]> {
+    await ensureReady();
+    const limit = opts.limit ?? 25;
+    const filters: any[] = [];
+    if (opts.accountId != null) filters.push(eq(fieldObservations.accountId, opts.accountId));
+    if (opts.organizationId != null) filters.push(eq(fieldObservations.organizationId, opts.organizationId));
+    if (opts.projectId != null) filters.push(eq(fieldObservations.projectId, opts.projectId));
+    const where = filters.length === 0 ? undefined : (filters.length === 1 ? filters[0] : and(...filters));
+    let q = db.select().from(fieldObservations) as any;
+    if (where) q = q.where(where);
+    const rows = await q.orderBy(desc(fieldObservations.createdAt)).limit(limit);
+    return rows;
+  }
+  async getFieldObservationByClientId(accountId: number, clientId: string): Promise<FieldObservation | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(fieldObservations).where(and(eq(fieldObservations.accountId, accountId), eq(fieldObservations.clientId, clientId))).limit(1);
     return rows[0];
   }
   async getAccountByStripeCustomerId(customerId: string): Promise<Account | undefined> {

@@ -476,6 +476,29 @@ export const fieldPunches = pgTable("field_punches", {
   createdAt: text("created_at").notNull().default(sql`NOW()`),
 });
 
+// Quick-capture field observations. kind = 'safety' | 'quality' | 'rfi' |
+// 'issue'. These are the fast-entry equivalent of a formal RFI; a future
+// promotion job can convert an observation into a numbered RFI. Same
+// (accountId, clientId) uniqueness pattern as fieldPunches for offline
+// dedupe.
+export const fieldObservations = pgTable("field_observations", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").notNull(),
+  organizationId: integer("organization_id"),
+  projectId: integer("project_id").notNull(),
+  kind: text("kind").notNull(),
+  severity: text("severity").notNull().default("normal"), // 'low' | 'normal' | 'high' | 'urgent'
+  title: text("title").notNull(),
+  body: text("body"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  accuracyM: doublePrecision("accuracy_m"),
+  photoId: integer("photo_id"),
+  occurredAt: text("occurred_at").notNull().default(sql`NOW()`),
+  clientId: text("client_id"),
+  createdAt: text("created_at").notNull().default(sql`NOW()`),
+});
+
 // Access helpers — shared between server and client so both agree on what "in good standing" means.
 
 // True if this account is a demo login whose 48h window has passed.
@@ -624,6 +647,8 @@ export type TimeEntry = typeof timeEntries.$inferSelect;
 export type InsertTimeEntry = z.infer<typeof insertTimeEntrySchema>;
 export type FieldPunch = typeof fieldPunches.$inferSelect;
 export type InsertFieldPunch = typeof fieldPunches.$inferInsert;
+export type FieldObservation = typeof fieldObservations.$inferSelect;
+export type InsertFieldObservation = typeof fieldObservations.$inferInsert;
 
 /** Default app settings (single source for server + client). */
 export const DEFAULT_SETTINGS = {

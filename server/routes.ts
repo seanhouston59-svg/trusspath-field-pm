@@ -773,6 +773,84 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.status(201).json({ punch });
   });
 
+  // Field observations — fast-capture safety/quality/rfi/issue entries from
+  // the mobile foreman flow. Scoped to the org so anyone in the org can see
+  // observations logged by teammates.
+  app.get("/api/field/observations", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const limit = Math.max(1, Math.min(100, Number(req.query?.limit) || 25));
+    const projectId = req.query?.projectId ? Number(req.query.projectId) : undefined;
+    const rows = await storage.getRecentFieldObservations({
+      organizationId: req.organizationId ?? undefined,
+      projectId: Number.isFinite(projectId as number) ? (projectId as number) : undefined,
+      limit,
+    });
+    res.json({ observations: rows });
+  });
+
+  app.post("/api/field/observations", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const kind = String(req.body?.kind || "");
+    if (!/^(safety|quality|rfi|issue)$/.test(kind)) {
+      return res.status(400).json({ error: "kind must be one of safety | quality | rfi | issue" });
+    }
+    const severity = String(req.body?.severity || "normal");
+    if (!/^(low|normal|high|urgent)$/.test(severity)) {
+      return res.status(400).json({ error: "severity must be one of low | normal | high | urgent" });
+    }
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+    const title = req.body?.title ? String(req.body.title).slice(0, 200).trim() : "";
+    if (!title) return res.status(400).json({ error: "title required" });
+    const clientId = req.body?.clientId ? String(req.body.clientId).slice(0, 64) : null;
+    if (clientId) {
+      const existing = await storage.getFieldObservationByClientId(req.account.id, clientId);
+      if (existing) return res.status(200).json({ observation: existing, deduped: true });
+    }
+    const body = req.body?.body ? String(req.body.body).slice(0, 2000) : null;
+    const lat = req.body?.lat != null ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null ? Number(req.body.lng) : null;
+    const accuracyM = req.body?.accuracyM != null ? Number(req.body.accuracyM) : null;
+    const photoId = req.body?.photoId != null ? Number(req.body.photoId) : null;
+    const occurredAt = req.body?.occurredAt ? String(req.body.occurredAt) : new Date().toISOString();
+    const observation = await storage.createFieldObservation({
+      accountId: req.account.id,
+      organizationId: req.organizationId ?? null,
+      projectId,
+      kind,
+      severity,
+      title,
+      body,
+      lat: Number.isFinite(lat as number) ? (lat as number) : null,
+      lng: Number.isFinite(lng as number) ? (lng as number) : null,
+      accuracyM: Number.isFinite(accuracyM as number) ? (accuracyM as number) : null,
+      photoId: Number.isFinite(photoId as number) ? (photoId as number) : null,
+      occurredAt,
+      clientId,
+    });
+
+    // Urgent/high safety observations trigger the SMS fan-out path from
+    // slice 6. Best-effort — broadcastSmsToProject internally no-ops when
+    // Twilio env vars are unset and per-account rate-limits/dedupes inside
+    // sendSmsToAccount, so it's safe to call unconditionally.
+    if ((kind === "safety" || kind === "issue") && (severity === "high" || severity === "urgent")) {
+      try {
+        const { broadcastSmsToProject } = await import("./notifications").catch(() => ({ broadcastSmsToProject: null as any }));
+        if (broadcastSmsToProject) {
+          const smsBody = `[${severity.toUpperCase()}] ${kind}: ${title}${body ? " \u2014 " + body.slice(0, 120) : ""}`;
+          void broadcastSmsToProject({
+            projectId,
+            eventKey: `field-observation:${observation.id}`,
+            body: smsBody,
+            exceptAccountId: req.account.id,
+          }).catch(() => {});
+        }
+      } catch { /* notifications are best-effort */ }
+    }
+
+    res.status(201).json({ observation });
+  });
+
   // Team
   app.get("/api/team", async (req: any, res) => res.json(await storage.getTeam(req.organizationId)));
   app.post("/api/team", async (req: any, res) => {
@@ -939,6 +1017,52 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(await storage.createPunchItem(parsed.data));
   });
+
+  // Field-flow punch create — lighter contract with offline-queue idempotency.
+  // Uses an in-memory clientId map keyed by (accountId, clientId) for simple
+  // dedupe. Because punch_items don't have an org column, we also filter the
+  // dedupe lookup by looking at the last N minutes of that account's punch
+  // creates. Kept short-lived because punch items themselves are rare from
+  // the field.
+  const fieldPunchItemIdemp = new Map<string, { id: number; ts: number }>();
+  const IDEMP_TTL_MS = 60 * 60 * 1000; // 1h
+  app.post("/api/field/punch-items", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+    const title = req.body?.title ? String(req.body.title).slice(0, 200).trim() : "";
+    if (!title) return res.status(400).json({ error: "title required" });
+    const location = req.body?.location ? String(req.body.location).slice(0, 200) : "";
+    const trade = req.body?.trade ? String(req.body.trade).slice(0, 80) : "General";
+    const status = req.body?.status ? String(req.body.status).slice(0, 40) : "Open";
+    const clientId = req.body?.clientId ? String(req.body.clientId).slice(0, 64) : null;
+
+    // Dedupe: prune expired entries then check.
+    const now = Date.now();
+    fieldPunchItemIdemp.forEach((v, k) => {
+      if (now - v.ts > IDEMP_TTL_MS) fieldPunchItemIdemp.delete(k);
+    });
+    const idempKey = clientId ? `${req.account.id}:${clientId}` : null;
+    if (idempKey) {
+      const existing = fieldPunchItemIdemp.get(idempKey);
+      if (existing) {
+        const rows = await storage.getPunchItems(projectId);
+        const found = rows.find((r) => r.id === existing.id);
+        if (found) return res.status(200).json({ punchItem: found, deduped: true });
+      }
+    }
+
+    const created = await storage.createPunchItem({
+      projectId,
+      title,
+      location,
+      trade,
+      status,
+      assigneeId: req.body?.assigneeId != null ? Number(req.body.assigneeId) : undefined,
+    });
+    if (idempKey) fieldPunchItemIdemp.set(idempKey, { id: created.id, ts: now });
+    res.status(201).json({ punchItem: created });
+  });
   app.patch("/api/punch/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
@@ -984,6 +1108,61 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const parsed = insertPhotoSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     res.status(201).json(await storage.createPhoto(parsed.data));
+  });
+
+  // JSON photo upload — used by the mobile foreman flow and the offline
+  // queue. Accepts a base64-encoded image + metadata in a single JSON body so
+  // the offline queue (which serializes JSON to IndexedDB) can persist and
+  // replay it without needing FormData support. Same 25mb JSON limit applies.
+  app.post("/api/photos/upload-base64", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+    const dataUrl = String(req.body?.image || "");
+    // data:image/jpeg;base64,AAAA...
+    const m = /^data:([-\w.+]+\/[-\w.+]+);base64,(.+)$/i.exec(dataUrl);
+    if (!m) return res.status(400).json({ error: "image must be a data URL (data:image/*;base64,...)" });
+    const mime = m[1].toLowerCase();
+    if (!IMAGE_MIME.has(mime)) return res.status(400).json({ error: "unsupported image type" });
+    let buf: Buffer;
+    try { buf = Buffer.from(m[2], "base64"); } catch { return res.status(400).json({ error: "invalid base64" }); }
+    if (buf.length === 0) return res.status(400).json({ error: "empty image" });
+    if (buf.length > 20 * 1024 * 1024) return res.status(413).json({ error: "image too large (20mb cap)" });
+
+    const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1] || "bin";
+    const filename = `field-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    try { fs.mkdirSync(PHOTO_DIR, { recursive: true }); } catch {}
+    const abs = path.resolve(PHOTO_DIR, filename);
+    fs.writeFileSync(abs, buf);
+
+    // Compose the location string from optional lat/lng + free-form label.
+    // Kept short so it fits the existing photos list card.
+    const lat = req.body?.lat != null ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null ? Number(req.body.lng) : null;
+    const labelBits: string[] = [];
+    if (req.body?.locationLabel) labelBits.push(String(req.body.locationLabel).slice(0, 80));
+    if (Number.isFinite(lat as number) && Number.isFinite(lng as number)) {
+      labelBits.push(`${(lat as number).toFixed(4)}, ${(lng as number).toFixed(4)}`);
+    }
+    const location = labelBits.join(" \u00b7 ");
+
+    const caption = req.body?.caption ? String(req.body.caption).slice(0, 240) : `Field photo ${new Date().toLocaleString()}`;
+    const date = req.body?.date ? String(req.body.date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const hue = Math.floor(Math.random() * 360);
+
+    const created = await storage.createPhoto({
+      projectId,
+      caption,
+      location,
+      takenById: req.account?.id ?? undefined,
+      date,
+      hue,
+      storedFileName: filename,
+      originalFileName: filename,
+      mimeType: mime,
+      fileSizeBytes: buf.length,
+    });
+    res.status(201).json(created);
   });
 
   // Photo file upload (multipart: metadata + image in one request)
