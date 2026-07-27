@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Plus, Clock, Trash2, Pencil, Check, X, ChevronLeft, FileText, Printer, Send, FolderCheck, Calendar, ChevronRight } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState } from "@/components/ghost-state";
@@ -91,6 +92,33 @@ export default function Timesheets() {
   const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [location] = useLocation();
+
+  // Deep-link: /timesheets?open=<id> opens that timesheet directly. Used by
+  // the field timecard "Open this week's timesheet" card and by the manager
+  // approval email.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get("open");
+    if (openId && !selectedId) {
+      const idNum = Number(openId);
+      if (Number.isFinite(idNum) && idNum > 0) setSelectedId(idNum);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
+
+  // Fetch the caller's current timesheet so we can show a
+  // "pending signature" callout at the top even if it hasn't loaded into
+  // the main list yet (e.g., freshly auto-created this morning).
+  const { data: myCurrent } = useQuery<Timesheet & { entries: TimeEntry[] }>({
+    queryKey: ["/api/timesheets/me/current"],
+    // Poll periodically — the weekly rollover cron might flip the status
+    // from "draft" to "needs-signature" between visits.
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const pendingSignature = myCurrent && (myCurrent.status === "needs-signature" || (myCurrent.status === "draft" && parseFloat(myCurrent.totalHours || "0") > 0));
 
   const createMut = useMutation({
     mutationFn: async (data: any) => {
@@ -134,6 +162,30 @@ export default function Timesheets() {
         </Button>
       }
     >
+      {pendingSignature && myCurrent && (
+        <button
+          type="button"
+          onClick={() => setSelectedId(myCurrent.id)}
+          data-testid="timesheet-pending-callout"
+          className="mb-4 flex w-full items-center justify-between gap-3 rounded-lg border-2 border-amber-500/60 bg-amber-500/5 p-4 text-left hover-elevate"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-400">
+              <Send className="size-5" />
+            </span>
+            <div>
+              <div className="font-display text-base font-bold">
+                {myCurrent.status === "needs-signature" ? "Please sign and submit your timesheet" : "Your timesheet is ready to review"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Week of {myCurrent.weekStart} · {parseFloat(myCurrent.totalHours || "0").toFixed(2)}h logged
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="size-5 text-muted-foreground" />
+        </button>
+      )}
+
       {isLoading ? (
         <div className="text-muted-foreground">Loading timesheets...</div>
       ) : timesheets.length === 0 ? (

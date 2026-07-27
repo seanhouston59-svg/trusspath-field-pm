@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CommandPalette } from "@/components/command-palette";
+import { ClockStatusLight } from "@/components/clock-status-light";
 import { useToast } from "@/hooks/use-toast";
 import { useFieldMode } from "@/hooks/use-field-mode";
 import { HardHat, WifiOff } from "lucide-react";
@@ -653,6 +654,9 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
               <Search className="size-4" />
             </button>
             {actions && <div className="flex items-center gap-2 [&_button]:h-10 md:[&_button]:h-9">{actions}</div>}
+            {/* Clock status indicator — visible on both mobile and desktop so
+                users always know their punch state at a glance. */}
+            <ClockStatusLight />
             {/* Desktop: show all controls inline */}
             <div className="hidden md:flex items-center gap-2">
               <FieldModeToggle />
@@ -730,6 +734,7 @@ function FieldModeLayout({
             </span>
           )}
           {actions && <div className="flex items-center gap-2 [&_button]:h-9">{actions}</div>}
+          <ClockStatusLight />
           <Button size="sm" variant="ghost" onClick={onExit} data-testid="field-mode-exit">
             Exit
           </Button>

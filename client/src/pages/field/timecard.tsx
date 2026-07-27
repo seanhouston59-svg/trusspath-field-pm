@@ -105,6 +105,21 @@ export default function FieldTimecard() {
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [queueSize, setQueueSize] = useState(0);
   const [tick, setTick] = useState(0); // used to re-render the "clocked in for XXm" counter every 30s
+  // Server-echoed timesheet id from the most recent punch response. Persists
+  // in localStorage so the CTA survives a page reload. When null we skip
+  // showing the "open this week's timesheet" card.
+  const [lastTimesheetId, setLastTimesheetIdState] = useState<number | null>(() => {
+    if (typeof localStorage === "undefined") return null;
+    const v = localStorage.getItem("trusspath.field.lastTimesheetId");
+    return v ? Number(v) : null;
+  });
+  const setLastTimesheetId = (id: number | null) => {
+    setLastTimesheetIdState(id);
+    if (typeof localStorage !== "undefined") {
+      if (id == null) localStorage.removeItem("trusspath.field.lastTimesheetId");
+      else localStorage.setItem("trusspath.field.lastTimesheetId", String(id));
+    }
+  };
 
   useEffect(() => subscribeQueue(setQueueSize), []);
   useEffect(() => {
@@ -171,8 +186,24 @@ export default function FieldTimecard() {
             credentials: "include",
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          // Server returns { punch, timesheetId, hoursToday, totalHours } —
+          // pull the linkage so we can surface a jump-to-timesheet CTA and
+          // fire the global event that refreshes the top-nav clock light.
+          let timesheetId: number | null = null;
+          let hoursToday: number | null = null;
+          try {
+            const body = await resp.json();
+            timesheetId = body?.timesheetId ?? null;
+            hoursToday = body?.hoursToday ?? null;
+            if (timesheetId) setLastTimesheetId(timesheetId);
+          } catch {}
+          window.dispatchEvent(new CustomEvent("trusspath:punch", { detail: { kind } }));
           const project = projects.find((p) => p.id === effectiveProjectId)?.name || `Project #${effectiveProjectId}`;
-          toast({ title: describeKind(kind), description: coords ? `Location captured · ${project}` : `${project} · location unavailable` });
+          const desc =
+            timesheetId != null
+              ? `${project} · ${hoursToday != null ? hoursToday.toFixed(2) + "h today" : "linked to timesheet"}`
+              : (coords ? `Location captured · ${project}` : `${project} · location unavailable`);
+          toast({ title: describeKind(kind), description: desc });
           await refresh();
           return;
         } catch {
@@ -283,6 +314,25 @@ export default function FieldTimecard() {
             </>
           )}
         </div>
+
+        {/* This week's timesheet — shown any time we have a server-linked
+            timesheet id. Deep-links straight into /timesheets so the user can
+            sign & submit at end of week without hunting for the row. */}
+        {lastTimesheetId != null && (
+          <Link
+            href={`/timesheets?open=${lastTimesheetId}`}
+            className="mt-4 block rounded-xl border border-border bg-card p-4 hover-elevate"
+            data-testid="timecard-timesheet-link"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">This week&apos;s timesheet</div>
+                <div className="mt-0.5 font-display text-base font-bold">Open &amp; review</div>
+              </div>
+              <div className="text-sm font-semibold text-primary">Go →</div>
+            </div>
+          </Link>
+        )}
 
         {/* Project picker — only used when clocking in */}
         {!open && (

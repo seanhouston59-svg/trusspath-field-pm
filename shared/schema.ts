@@ -534,16 +534,32 @@ export const jarvisMemory = pgTable("jarvis_memory", {
 });
 
 /* ----------------------------- Timesheets ------------------------------ */
+// Weekly timesheet. Auto-created on first clock-in of the week for a given
+// (accountId, weekStart) pair. Time_entries roll up daily from field_punches.
+// Lifecycle:
+//   draft            — auto-created, still accepting punches for the week
+//   needs-signature  — week rolled over, employee must sign & submit
+//   pending-approval — employee signed, awaiting manager countersign
+//   approved         — manager countersigned; locked from further edits
 export const timesheets = pgTable("timesheets", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
+  // Account and org linkage. Nullable for legacy hand-created timesheets
+  // from before the auto-create system — the server treats null accountId as
+  // "generic" and never auto-populates from punches.
+  accountId: integer("account_id"),
+  organizationId: integer("organization_id"),
   employeeName: text("employee_name").notNull(),
   weekStart: text("week_start").notNull(),
   weekEnd: text("week_end").notNull(),
   totalHours: text("total_hours").notNull().default("0"),
   status: text("status").notNull().default("draft"),
   employeeSignature: text("employee_signature"),
+  employeeSubmittedAt: text("employee_submitted_at"),
   managerSignature: text("manager_signature"),
+  managerApprovedAt: text("manager_approved_at"),
+  managerName: text("manager_name"),
+  managerEmail: text("manager_email"),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at"),

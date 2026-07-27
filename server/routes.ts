@@ -9,6 +9,7 @@ import { localJarvisChat, buildRichLocalBrief, buildSafetyBrief } from "./jarvis
 import { buildContext } from "./jarvis";
 import { runHealthScan } from "./health";
 import { sendSignupNotification, sendPasswordResetEmail, sendInviteEmail } from "./mailer";
+import { weekStartMonday, ensureTimesheetForWeek, rollupPunchToTimesheet, runWeeklyRolloverIfDue, findManagerForProject } from "./timesheet-auto";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
@@ -621,7 +622,43 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       note,
       clientId,
     });
-    res.status(201).json({ punch });
+
+    // Auto-timesheet linkage. We never block the punch response on this — if
+    // the rollup fails we still recorded the punch, and the next successful
+    // clock event will catch up. But under normal conditions we synchronously
+    // ensure a draft timesheet for the current week and roll the day's total
+    // in so the client can navigate straight to it.
+    let timesheetId: number | null = null;
+    let hoursToday: number | null = null;
+    let totalHours: number | null = null;
+    try {
+      const weekStart = weekStartMonday(occurredAt);
+      const project = await storage.getProject(projectId);
+      const ts = await ensureTimesheetForWeek({
+        accountId: req.account.id,
+        organizationId: req.organizationId ?? null,
+        projectId,
+        employeeName: req.account.name || req.account.email || `Account ${req.account.id}`,
+        weekStart,
+      });
+      timesheetId = ts.id;
+      // Only roll up on "out" and "break_end" — those close a work interval so
+      // there's real hours to sum. "in" just seeds the timesheet, and
+      // "break_start" pauses accumulation (recomputed next time).
+      if (kind === "out" || kind === "break_end" || kind === "break_start") {
+        const rolled = await rollupPunchToTimesheet({
+          accountId: req.account.id,
+          timesheetId: ts.id,
+          occurredAt,
+          projectName: project?.name ?? null,
+        });
+        hoursToday = rolled.hoursToday;
+        totalHours = rolled.totalHours;
+      }
+    } catch (err) {
+      console.warn("[field/punches] auto-timesheet failed:", (err as Error)?.message ?? err);
+    }
+    res.status(201).json({ punch, timesheetId, hoursToday, totalHours });
   });
 
   // Field observations — fast-capture safety/quality/rfi/issue entries from
@@ -1814,15 +1851,143 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   /* ---------------------------- TIMESHEETS ---------------------------- */
 
-  // List timesheets (optionally filtered by project)
-  app.get("/api/timesheets", async (req, res) => {
+  // List timesheets (optionally filtered by project, or scoped to the caller)
+  app.get("/api/timesheets", async (req: any, res) => {
     try {
+      // Fire the weekly rollover opportunistically — cheap early-exit inside.
+      runWeeklyRolloverIfDue().catch(() => {});
+      const scope = String(req.query?.scope || "");
+      if (scope === "me") {
+        if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+        const rows = await storage.getTimesheetsForAccount(req.account.id);
+        return res.json(rows);
+      }
       const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
       const rows = await storage.getTimesheets(projectId);
       res.json(rows);
     } catch (err) {
       console.error("[timesheets] list error:", err);
       res.status(500).json({ message: "Failed to list timesheets" });
+    }
+  });
+
+  // Current-week timesheet for the caller. Auto-creates one on the fly if
+  // the user has never clocked in this week — that way the /timesheets page
+  // still has something to link to for salaried/manual entries.
+  app.get("/api/timesheets/me/current", async (req: any, res) => {
+    try {
+      if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+      const weekStart = weekStartMonday(new Date().toISOString());
+      let ts = await storage.getTimesheetByAccountWeek(req.account.id, weekStart);
+      if (!ts) {
+        // Find any project they belong to; fall back to 0 (org-wide) so the
+        // row still exists. Downstream UI treats projectId=0 as "no project".
+        const projects = await storage.getProjects();
+        const project = projects[0];
+        ts = await ensureTimesheetForWeek({
+          accountId: req.account.id,
+          organizationId: req.organizationId ?? null,
+          projectId: project?.id ?? 0,
+          employeeName: req.account.name || req.account.email || `Account ${req.account.id}`,
+          weekStart,
+        });
+      }
+      const entries = await storage.getTimeEntries(ts.id);
+      res.json({ ...ts, entries });
+    } catch (err) {
+      console.error("[timesheets] me/current error:", err);
+      res.status(500).json({ message: "Failed to load current timesheet" });
+    }
+  });
+
+  // Employee signs & submits their weekly timesheet. Notifies the
+  // project's superintendent (if one is set) via email so they can
+  // countersign. Idempotent — re-submitting overwrites the signature.
+  app.post("/api/timesheets/:id/submit-employee", async (req: any, res) => {
+    try {
+      if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+      const id = Number(req.params.id);
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      if (ts.accountId && ts.accountId !== req.account.id) {
+        return res.status(403).json({ message: "Not your timesheet" });
+      }
+      const signature = String(req.body?.signature || req.account.name || req.account.email || "Signed").slice(0, 200);
+      const nowIso = new Date().toISOString();
+      // Find manager linkage from the project so subsequent approval UI
+      // knows who to route this to.
+      const project = ts.projectId ? await storage.getProject(ts.projectId) : undefined;
+      const manager = await findManagerForProject(project);
+      const updated = await storage.updateTimesheet(id, {
+        status: "pending-approval",
+        employeeSignature: signature,
+        employeeSubmittedAt: nowIso,
+        managerName: manager?.name ?? null,
+        managerEmail: manager?.email ?? null,
+      });
+      // Fire the manager notification email in the background; failure just
+      // logs — the submit itself already succeeded and the manager can pick
+      // it up from their /timesheets queue.
+      if (manager?.email && process.env.RESEND_API_KEY) {
+        (async () => {
+          try {
+            const linkBase = process.env.PUBLIC_BASE_URL || "https://www.trusspath.com";
+            const resp = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                from: "TrussPath <noreply@trusspath.com>",
+                to: manager.email,
+                subject: `Timesheet awaiting your approval — ${updated?.employeeName ?? "Employee"} (${updated?.weekStart} → ${updated?.weekEnd})`,
+                html: `<p>${updated?.employeeName ?? "An employee"} submitted their weekly timesheet for your countersignature.</p>
+                       <p><strong>Week:</strong> ${updated?.weekStart} – ${updated?.weekEnd}<br/>
+                          <strong>Hours:</strong> ${updated?.totalHours ?? 0}</p>
+                       <p><a href="${linkBase}/timesheets?open=${id}">Review &amp; approve</a></p>`,
+              }),
+            });
+            if (!resp.ok) console.warn("[timesheets] manager notify status", resp.status);
+          } catch (e) {
+            console.warn("[timesheets] manager notify failed:", (e as Error)?.message ?? e);
+          }
+        })();
+      }
+      res.json(updated);
+    } catch (err) {
+      console.error("[timesheets] submit-employee error:", err);
+      res.status(500).json({ message: "Failed to submit timesheet" });
+    }
+  });
+
+  // Manager countersigns — flips to "approved". Only the superintendent on
+  // the linked project (or an org owner/admin) may approve.
+  app.post("/api/timesheets/:id/approve-manager", async (req: any, res) => {
+    try {
+      if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+      const id = Number(req.params.id);
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      // Access check: owners/admins always allowed; otherwise must match the
+      // team member row referenced by projects.superintendentId.
+      const isPrivileged = req.orgRole === "owner" || req.orgRole === "admin";
+      if (!isPrivileged) {
+        const project = ts.projectId ? await storage.getProject(ts.projectId) : undefined;
+        const manager = await findManagerForProject(project);
+        const matchByEmail = !!manager?.email && manager.email.toLowerCase() === (req.account.email ?? "").toLowerCase();
+        if (!matchByEmail) return res.status(403).json({ message: "Only the assigned superintendent can approve" });
+      }
+      const signature = String(req.body?.signature || req.account.name || req.account.email || "Approved").slice(0, 200);
+      const updated = await storage.updateTimesheet(id, {
+        status: "approved",
+        managerSignature: signature,
+        managerApprovedAt: new Date().toISOString(),
+      });
+      res.json(updated);
+    } catch (err) {
+      console.error("[timesheets] approve-manager error:", err);
+      res.status(500).json({ message: "Failed to approve timesheet" });
     }
   });
 

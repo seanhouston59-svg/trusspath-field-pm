@@ -33,7 +33,7 @@ import type {
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, desc, and, isNotNull } from "drizzle-orm";
+import { eq, desc, and, isNotNull, gte, lt } from "drizzle-orm";
 import { existsSync, copyFileSync, mkdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
@@ -498,7 +498,9 @@ export interface IStorage {
   deleteJarvisMemory(id: number): Promise<void>;
   // Timesheets
   getTimesheets(projectId?: number): Promise<Timesheet[]>;
+  getTimesheetsForAccount(accountId: number): Promise<Timesheet[]>;
   getTimesheet(id: number): Promise<Timesheet | undefined>;
+  getTimesheetByAccountWeek(accountId: number, weekStart: string): Promise<Timesheet | undefined>;
   createTimesheet(data: InsertTimesheet): Promise<Timesheet>;
   updateTimesheet(id: number, data: Partial<InsertTimesheet>): Promise<Timesheet | undefined>;
   deleteTimesheet(id: number): Promise<void>;
@@ -508,6 +510,9 @@ export interface IStorage {
   updateTimeEntry(id: number, data: Partial<InsertTimeEntry>): Promise<TimeEntry | undefined>;
   deleteTimeEntry(id: number): Promise<void>;
   replaceTimeEntries(timesheetId: number, entries: InsertTimeEntry[]): Promise<void>;
+  upsertDailyTimeEntry(timesheetId: number, entryDate: string, patch: Partial<InsertTimeEntry>): Promise<TimeEntry>;
+  // Field punches
+  getFieldPunchesForDay(accountId: number, dayStartIso: string, dayEndIso: string): Promise<FieldPunch[]>;
 }
 
 // Ensure schema is ready before any query. Idempotent + memoized.
@@ -1563,9 +1568,22 @@ class DatabaseStorage implements IStorage {
     return await db.select().from(timesheets);
   }
 
+  async getTimesheetsForAccount(accountId: number): Promise<Timesheet[]> {
+    await ensureReady();
+    return await db.select().from(timesheets).where(eq(timesheets.accountId, accountId)).orderBy(desc(timesheets.weekStart));
+  }
+
   async getTimesheet(id: number): Promise<Timesheet | undefined> {
     await ensureReady();
     const rows = await db.select().from(timesheets).where(eq(timesheets.id, id));
+    return rows[0];
+  }
+
+  async getTimesheetByAccountWeek(accountId: number, weekStart: string): Promise<Timesheet | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(timesheets)
+      .where(and(eq(timesheets.accountId, accountId), eq(timesheets.weekStart, weekStart)))
+      .limit(1);
     return rows[0];
   }
 
@@ -1617,6 +1635,42 @@ class DatabaseStorage implements IStorage {
       const now = new Date().toISOString();
       await db.insert(timeEntries).values(entries.map((e) => ({ ...e, timesheetId, createdAt: now })));
     }
+  }
+
+  // Upsert a single day's row inside a timesheet. Used by the punch→timesheet
+  // rollup so repeated clock-in/out cycles on the same day update one row.
+  async upsertDailyTimeEntry(timesheetId: number, entryDate: string, patch: Partial<InsertTimeEntry>): Promise<TimeEntry> {
+    await ensureReady();
+    const existing = await db.select().from(timeEntries)
+      .where(and(eq(timeEntries.timesheetId, timesheetId), eq(timeEntries.entryDate, entryDate)))
+      .limit(1);
+    if (existing[0]) {
+      const [row] = await db.update(timeEntries).set(patch).where(eq(timeEntries.id, existing[0].id)).returning();
+      return row;
+    }
+    const now = new Date().toISOString();
+    const [row] = await db.insert(timeEntries).values({
+      timesheetId,
+      entryDate,
+      dayOfWeek: patch.dayOfWeek ?? new Date(entryDate).toLocaleDateString("en-US", { weekday: "long" }),
+      hoursWorked: patch.hoursWorked ?? "0",
+      clientName: patch.clientName ?? null,
+      projectName: patch.projectName ?? null,
+      activities: patch.activities ?? null,
+      createdAt: now,
+    }).returning();
+    return row;
+  }
+
+  async getFieldPunchesForDay(accountId: number, dayStartIso: string, dayEndIso: string): Promise<FieldPunch[]> {
+    await ensureReady();
+    return await db.select().from(fieldPunches)
+      .where(and(
+        eq(fieldPunches.accountId, accountId),
+        gte(fieldPunches.occurredAt, dayStartIso),
+        lt(fieldPunches.occurredAt, dayEndIso),
+      ))
+      .orderBy(fieldPunches.occurredAt);
   }
 
   /* ----------------------------- Seed ------------------------------ */
