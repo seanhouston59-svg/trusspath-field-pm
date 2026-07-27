@@ -163,6 +163,17 @@ export const queryClient = new QueryClient({
     },
     mutations: {
       retry: false,
+      // Surface failed writes in the console AND as a browser toast so silent
+      // 4xx/5xx responses (schema mismatch, missing org, etc.) never disappear.
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        // eslint-disable-next-line no-console
+        console.error("[trusspath] mutation failed:", msg, err);
+        try {
+          const ev = new CustomEvent("trusspath:mutation-error", { detail: { message: msg } });
+          window.dispatchEvent(ev);
+        } catch {}
+      },
     },
   },
 });

@@ -69,7 +69,8 @@ type RowSpec = {
 export default function SchedulePage() {
   const { data: projects = [] } = useProjects();
   const { data: settings } = useSettings();
-  const active = projects.filter((p) => p.status !== "Planning");
+  // Include ALL projects — hiding Planning-status projects was masking newly-created work.
+  const active = projects;
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
   useEffect(() => {
     if (selectedId !== undefined) return;
@@ -121,8 +122,44 @@ export default function SchedulePage() {
 
   const { start, end, months, weeks, days, totalDays, todayOffset, timelineWidth } = useMemo(() => {
     if (!project) return { start: "", end: "", months: [] as string[], weeks: [] as string[], days: [] as string[], totalDays: 0, todayOffset: 0, timelineWidth: 0 };
-    const s = project.startDate;
-    const e = addMonths(project.endDate, 1);
+    // Collect every date that needs to be visible on the timeline. Falls back to
+    // project bounds when a workflow item is missing dates. We then min/max across
+    // all of them so a task/rfi/CO/submittal outside the project's original window
+    // still shows up (previously they'd render at off=0 or off-canvas).
+    // Return the earlier of two YYYY-MM-DD strings, tolerating empty inputs.
+    const min = (a: string, b: string) => (!a ? b : !b ? a : (a < b ? a : b));
+    const max = (a: string, b: string) => (!a ? b : !b ? a : (a > b ? a : b));
+    let lo: string = project.startDate;
+    let hi: string = project.endDate;
+    for (const t of tasks) {
+      const ts = t.startDate ?? t.dueDate;
+      const te = t.endDate ?? t.dueDate;
+      if (ts) lo = min(lo, ts);
+      if (te) hi = max(hi, te);
+    }
+    for (const m of milestones) if (m.date) { lo = min(lo, m.date); hi = max(hi, m.date); }
+    for (const r of rfis as any[]) {
+      const rd = r.dateSubmitted ?? r.createdAt ?? r.dueDate;
+      if (rd) { lo = min(lo, rd); hi = max(hi, rd); }
+      if (r.dueDate) hi = max(hi, r.dueDate);
+    }
+    for (const s of subs as any[]) {
+      const sd = s.dateSubmitted ?? s.createdAt ?? s.dueDate;
+      if (sd) { lo = min(lo, sd); hi = max(hi, sd); }
+      if (s.dueDate) hi = max(hi, s.dueDate);
+    }
+    for (const c of cos as any[]) {
+      const cd = c.startDate ?? c.dateSubmitted ?? c.createdAt;
+      if (cd) { lo = min(lo, cd); hi = max(hi, cd); }
+      if (c.endDate) hi = max(hi, c.endDate);
+    }
+    // If either bound is still missing/invalid, fall back to a 90-day window
+    // centered on today so the Gantt still renders sensibly.
+    const today = new Date().toISOString().slice(0, 10);
+    if (!lo || Number.isNaN(Number(parseDate(lo)))) lo = addDays(today, -30);
+    if (!hi || Number.isNaN(Number(parseDate(hi)))) hi = addDays(today, 60);
+    const s = lo;
+    const e = addMonths(hi, 1);
     const total = Math.max(1, dayDiff(s, e));
     const ms: string[] = [];
     let cur = s;
@@ -133,10 +170,9 @@ export default function SchedulePage() {
     const ds: string[] = [];
     let cd = s;
     while (parseDate(cd) < parseDate(e)) { ds.push(cd); cd = addDays(cd, 1); }
-    const today = new Date().toISOString().slice(0, 10);
     const off = dayDiff(s, today);
     return { start: s, end: e, months: ms, weeks: ws, days: ds, totalDays: total, todayOffset: off, timelineWidth: total * PX_PER_DAY };
-  }, [project, PX_PER_DAY]);
+  }, [project, PX_PER_DAY, tasks, milestones, rfis, subs, cos]);
 
   useEffect(() => {
     const el = scrollRef.current;

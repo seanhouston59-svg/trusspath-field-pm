@@ -137,7 +137,8 @@ export default function SchedulePage() {
   // /integrations, the whole GoogleCalendarSection disappears for everyone
   // in the org and .ics import/export is unreachable from this page.
   const gcalEnabled = useIntegrationEnabled("googleCalendar");
-  const active = projects.filter((p) => p.status !== "Planning");
+  // Include ALL projects — hiding Planning-status projects was masking newly-created work.
+  const active = projects;
   const [showAll, setShowAll] = useState(true);
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
   const projectId = showAll ? undefined : (selectedId ?? active[0]?.id);

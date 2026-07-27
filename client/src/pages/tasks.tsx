@@ -87,6 +87,10 @@ export default function TasksPage() {
             priority: String(v.priority),
             assigneeId: v.assigneeId === "0" ? undefined : Number(v.assigneeId),
             dueDate: String(v.dueDate),
+            // Gantt needs start/end to render a bar with proper width. Fall
+            // back to dueDate so “bare” tasks still get a visible sliver.
+            startDate: v.startDate ? String(v.startDate) : String(v.dueDate),
+            endDate: v.endDate ? String(v.endDate) : String(v.dueDate),
           })
         }
       />

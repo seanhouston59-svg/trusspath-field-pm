@@ -535,6 +535,7 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const field = useFieldMode();
+  const { toast } = useToast();
 
   // ⌘K / Ctrl+K opens the command palette anywhere in the app.
   useEffect(() => {
@@ -547,6 +548,18 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // Surface global mutation errors (dispatched from queryClient) as a toast so
+  // silent 4xx/5xx write failures are visible even if the origin dialog closed.
+  useEffect(() => {
+    const onMutErr = (e: Event) => {
+      const detail = (e as CustomEvent<{ message?: string }>).detail;
+      const msg = detail?.message || "Something went wrong saving your changes.";
+      toast({ title: "Save failed", description: msg, variant: "destructive" });
+    };
+    window.addEventListener("trusspath:mutation-error", onMutErr);
+    return () => window.removeEventListener("trusspath:mutation-error", onMutErr);
+  }, [toast]);
 
   // Field mode: chromeless layout for on-site use. No sidebar, no top nav
   // clutter, no command palette — just the page, a slim header with the
