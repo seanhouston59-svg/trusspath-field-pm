@@ -23,18 +23,30 @@ export const APP_ROUTES: RoutePattern[] = [
 export type NavLink = { href: string; label: string; icon: string };
 export type NavGroup = { title: string; items: NavLink[] };
 
-/** Sidebar navigation groups (mirrors client/src/components/layout.tsx). */
+/**
+ * Sidebar navigation groups (mirrors client/src/components/layout.tsx).
+ *
+ * Grouping principle: each section answers a single question a construction
+ * PM or owner asks themselves during the day — "where do things stand?",
+ * "what's on the schedule?", "what's happening in the field?", etc. Sections
+ * default to collapsed (see NavList in layout.tsx) so the sidebar is a short
+ * clean list of intents, not a wall of links. The group holding the active
+ * route auto-expands so you always see where you are.
+ *
+ * Field kit routes are intentionally NOT in the sidebar — they're reached
+ * via the dedicated Field mode (topbar hard-hat toggle or PWA homescreen).
+ * They remain whitelisted in shared/access-levels.ts.
+ */
 export const APP_NAV: NavGroup[] = [
   {
-    title: "Overview",
+    title: "Home",
     items: [
       { href: "/app", label: "Dashboard", icon: "LayoutDashboard" },
       { href: "/notes", label: "Sticky Board", icon: "StickyNote" },
-      { href: "/timesheets", label: "Time Tracking", icon: "Clock" },
     ],
   },
   {
-    title: "Planning",
+    title: "Projects",
     items: [
       { href: "/projects", label: "Projects", icon: "FolderKanban" },
       { href: "/schedule", label: "Schedule", icon: "CalendarRange" },
@@ -43,56 +55,51 @@ export const APP_NAV: NavGroup[] = [
     ],
   },
   {
-    title: "Workflows",
-    items: [
-      { href: "/tasks", label: "Tasks", icon: "ListChecks" },
-      { href: "/action-items", label: "Action Items", icon: "CheckSquare" },
-      { href: "/rfis", label: "RFIs", icon: "HelpCircle" },
-      { href: "/submittals", label: "Submittals", icon: "FileStack" },
-      { href: "/change-orders", label: "Change Orders", icon: "GitPullRequestArrow" },
-      { href: "/punch", label: "Punch List", icon: "CheckSquare" },
-    ],
-  },
-  // Field kit routes intentionally omitted from the sidebar — they're reached
-  // via the dedicated Field mode (topbar hard-hat toggle, dashboard launcher
-  // card, or the PWA homescreen shortcuts). Keeping them out of the sidebar
-  // avoids duplicating the same nav in two places and keeps the office view
-  // focused on office-side workflows. The /field routes still exist and are
-  // still whitelisted in shared/access-levels.ts.
-  {
-    title: "Field records",
+    title: "Field Ops",
     items: [
       { href: "/daily-logs", label: "Daily Logs", icon: "ClipboardList" },
       { href: "/photos", label: "Photo Log", icon: "Image" },
-      { href: "/documents", label: "Documents", icon: "FileText" },
-      { href: "/company-documents", label: "Company Documents", icon: "Building2" },
+      { href: "/punch", label: "Punch List", icon: "CheckSquare" },
       { href: "/blueprints", label: "Blueprints", icon: "PencilRuler" },
+      { href: "/drone", label: "Drone Captures", icon: "Plane" },
       { href: "/equipment", label: "Fleet & Equipment", icon: "Wrench" },
     ],
   },
   {
-    title: "Add-ons",
+    title: "Documents",
     items: [
-      { href: "/drone", label: "Drone Captures", icon: "Plane" },
+      { href: "/documents", label: "Project Documents", icon: "FileText" },
+      { href: "/company-documents", label: "Company Documents", icon: "Building2" },
     ],
   },
   {
-    title: "People",
+    title: "Requests & Tasks",
+    items: [
+      { href: "/rfis", label: "RFIs", icon: "HelpCircle" },
+      { href: "/submittals", label: "Submittals", icon: "FileStack" },
+      { href: "/change-orders", label: "Change Orders", icon: "GitPullRequestArrow" },
+      { href: "/tasks", label: "Tasks", icon: "ListChecks" },
+      { href: "/action-items", label: "Action Items", icon: "CheckSquare" },
+    ],
+  },
+  {
+    title: "People & Time",
     items: [
       { href: "/team", label: "Project Team", icon: "Users" },
       { href: "/contacts", label: "Contacts", icon: "Contact" },
       { href: "/messages", label: "Messages", icon: "MessageSquare" },
+      { href: "/timesheets", label: "Time Tracking", icon: "Clock" },
     ],
   },
   {
-    title: "System",
+    title: "Apps & Admin",
     items: [
       { href: "/teams", label: "Microsoft Teams", icon: "Video" },
       { href: "/excel", label: "Microsoft Excel", icon: "FileSpreadsheet" },
       { href: "/integrations", label: "Integrations", icon: "Plug" },
-      { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" },
       { href: "/settings", label: "Settings", icon: "Settings" },
       { href: "/settings/team", label: "Team & Access", icon: "ShieldCheck" },
+      { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" },
     ],
   },
 ];

@@ -40,10 +40,14 @@ const ICONS: Record<string, any> = {
 };
 
 // Collapse state is persisted per-group in localStorage. Missing entries
-// default to "expanded" so the sidebar isn't a wall of collapsed headers
-// the first time you load. The group containing the active route is force-
-// expanded regardless of persisted state.
-const NAV_COLLAPSE_STORAGE_KEY = "trusspath:nav:collapsed";
+// default to "collapsed" so the sidebar is a short clean list of section
+// headers you can drill into deliberately, rather than a wall of links.
+// The group containing the active route is force-expanded regardless of
+// persisted state — you should always see where you are.
+// Bump the storage-key suffix whenever the collapse-default policy changes,
+// so existing users get the new default on next load instead of being stuck
+// with a persisted "all expanded" object from the old policy.
+const NAV_COLLAPSE_STORAGE_KEY = "trusspath:nav:collapsed:v2";
 
 function readCollapsedGroups(): Record<string, boolean> {
   if (typeof window === "undefined") return {};
@@ -71,7 +75,12 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 
   const toggleGroup = (title: string) => {
     setCollapsed((prev) => {
-      const next = { ...prev, [title]: !prev[title] };
+      // Default state is "collapsed" (undefined → collapsed). Toggling has to
+      // treat undefined as `true` so the first click on a fresh group
+      // actually opens it instead of writing `!undefined === true` and
+      // leaving it closed.
+      const current = prev[title] === undefined ? true : prev[title];
+      const next = { ...prev, [title]: !current };
       writeCollapsedGroups(next);
       return next;
     });
@@ -93,7 +102,12 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
         const groupHasActive = items.some((it) => isActiveHref(it.href));
         // Force expand if this group contains the active route — you should
         // always see where you are.
-        const isCollapsed = collapsed[group.title] && !groupHasActive;
+        // Default to collapsed when the persisted state has no opinion.
+        // Explicit `false` means the user chose to expand this group; keep it
+        // expanded. Explicit `true` means they collapsed it (or default).
+        // Force-expand the group containing the active route regardless.
+        const persisted = collapsed[group.title];
+        const isCollapsed = (persisted === undefined ? true : persisted) && !groupHasActive;
         return (
           <div key={group.title}>
             <button
