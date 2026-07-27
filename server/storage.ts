@@ -437,6 +437,8 @@ export interface IStorage {
   getNotes(projectId?: number): Promise<Note[]>;
   createNote(data: InsertNote): Promise<Note>;
   updateNotePosition(id: number, x: number, y: number): Promise<Note | undefined>;
+  getNoteById(id: number): Promise<Note | undefined>;
+  updateNote(id: number, patch: Partial<Note>): Promise<Note | undefined>;
   deleteNote(id: number): Promise<void>;
   getIntegrations(): Promise<Integration[]>;
   setIntegration(key: string, connected: boolean, config?: string): Promise<Integration>;
@@ -961,6 +963,16 @@ class DatabaseStorage implements IStorage {
   async updateNotePosition(id: number, x: number, y: number): Promise<Note | undefined> {
     await ensureReady();
     const [row] = await db.update(notes).set({ x, y }).where(eq(notes.id, id)).returning();
+    return row;
+  }
+  async getNoteById(id: number): Promise<Note | undefined> {
+    await ensureReady();
+    const [row] = await db.select().from(notes).where(eq(notes.id, id));
+    return row;
+  }
+  async updateNote(id: number, patch: Partial<Note>): Promise<Note | undefined> {
+    await ensureReady();
+    const [row] = await db.update(notes).set(patch).where(eq(notes.id, id)).returning();
     return row;
   }
   async deleteNote(id: number): Promise<void> {
@@ -1908,10 +1920,10 @@ class DatabaseStorage implements IStorage {
     for (const x of msgSeed) await db.insert(messages).values(x);
 
     const noteSeed: Omit<Note, "id">[] = [
-      { projectId: p[0].id, body: "Concrete pour Friday 7am — 3 trucks. Barricades reset Thu EOD.", color: "amber", x: 40, y: 40 },
-      { projectId: p[0].id, body: "Glazing RFI-015 is blocking south elevation. Escalate to architect today.", color: "rose", x: 300, y: 90 },
-      { projectId: p[0].id, body: "Owner wants progress photos of curtainwall by 3pm Thu.", color: "blue", x: 560, y: 50 },
-      { projectId: p[0].id, body: "Inspector confirmed for med-gas — keep L2 ICU clear.", color: "emerald", x: 120, y: 220 },
+      { projectId: p[0].id, body: "Concrete pour Friday 7am — 3 trucks. Barricades reset Thu EOD.", color: "amber", x: 40, y: 40, replies: null },
+      { projectId: p[0].id, body: "Glazing RFI-015 is blocking south elevation. Escalate to architect today.", color: "rose", x: 300, y: 90, replies: null },
+      { projectId: p[0].id, body: "Owner wants progress photos of curtainwall by 3pm Thu.", color: "blue", x: 560, y: 50, replies: null },
+      { projectId: p[0].id, body: "Inspector confirmed for med-gas — keep L2 ICU clear.", color: "emerald", x: 120, y: 220, replies: null },
     ];
     for (const x of noteSeed) await db.insert(notes).values(x);
 

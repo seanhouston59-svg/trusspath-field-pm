@@ -22,7 +22,7 @@ import { useProjects, useTasks, useRfis, useSubmittals, usePunchItems, useTeamMa
 import { useAuth } from "@/lib/auth";
 import { formatCurrency, shortDate, relativeDays, isOverdue } from "@/lib/format";
 import { useAccess } from "@/lib/access";
-import { NotificationsBox, WeatherBar, StickyNotepadBox } from "@/components/dashboard-widgets";
+import { NotificationsBox, WeatherBar, StickyNotepadBox, NoteWallCarouselBox } from "@/components/dashboard-widgets";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -276,6 +276,13 @@ const WIDGET_REGISTRY: WidgetDef[] = [
     description: "Quick note pinned to your first active project.",
     icon: StickyNote,
     render: () => <StickyNotepadBox />,
+  },
+  {
+    id: "note-wall",
+    title: "Note Wall",
+    description: "Slide through sticky notes from the board and reply inline.",
+    icon: StickyNote,
+    render: () => <NoteWallCarouselBox />,
   },
   {
     id: "projects",

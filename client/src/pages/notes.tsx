@@ -1,9 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, CornerDownRight } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { useNotes, useCreateNote, useUpdateNotePosition, useDeleteNote, useProjects } from "@/hooks/use-data";
+import { useNotes, useCreateNote, useUpdateNotePosition, useDeleteNote, useAddNoteReply, useProjects } from "@/hooks/use-data";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+
+// Shape of a parsed reply. Persisted on the server as a JSON string in
+// notes.replies. Missing/invalid JSON → empty list (see parseReplies).
+type NoteReply = { author: string; initials: string; body: string; at: string };
+
+function parseReplies(raw: unknown): NoteReply[] {
+  if (!raw || typeof raw !== "string") return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((r): r is NoteReply => !!r && typeof r === "object" && typeof (r as any).body === "string");
+  } catch {
+    return [];
+  }
+}
 
 const NOTE_COLORS: Record<string, { bg: string; bar: string; text: string; pin: string }> = {
   amber:   { bg: "#fef3c7", bar: "#e07412", text: "#5c2e07", pin: "#c0392b" },
@@ -17,8 +32,8 @@ const COLOR_KEYS = Object.keys(NOTE_COLORS);
 // Sticky note dimensions. Bumped up so notes read like real paper stickies
 // on a corkboard rather than tiny thumbnail tiles. Board drag-clamp math
 // uses these so notes can't be dragged off the edge.
-const NOTE_W = 240;
-const NOTE_H = 220;
+const NOTE_W = 260;
+const NOTE_H = 260;
 
 // Corkboard background: layered radial gradients approximate cork grain
 // without an image asset. Two size-varied dot patterns give the surface a
@@ -45,12 +60,33 @@ export default function NotesPage() {
   const create = useCreateNote(pid ?? 0);
   const updatePos = useUpdateNotePosition();
   const del = useDeleteNote();
+  const addReply = useAddNoteReply();
   const { toast } = useToast();
 
   const [color, setColor] = useState("amber");
   const [draft, setDraft] = useState("");
   const [drag, setDrag] = useState<{ id: number; x: number; y: number; offX: number; offY: number } | null>(null);
+  // Per-note reply drafts, keyed by note id. We keep this in the parent so the
+  // input stays in sync across re-renders (useNotes will refetch after each
+  // reply is posted) without dropping keystrokes.
+  const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const boardRef = useRef<HTMLDivElement>(null);
+
+  const submitReply = (noteId: number) => {
+    const body = (replyDrafts[noteId] ?? "").trim();
+    if (!body) return;
+    addReply.mutate(
+      { id: noteId, body },
+      {
+        onSuccess: () => {
+          setReplyDrafts((d) => ({ ...d, [noteId]: "" }));
+        },
+        onError: (err: any) => {
+          toast({ title: "Couldn't add reply", description: err?.message ?? "Unknown error" });
+        },
+      },
+    );
+  };
 
   useEffect(() => {
     if (!drag) return;
@@ -232,7 +268,61 @@ export default function NotesPage() {
                   <X className="size-4" />
                 </button>
               </div>
-              <p className="whitespace-pre-wrap break-words p-4 text-base font-medium leading-snug">{n.body}</p>
+              <p className="whitespace-pre-wrap break-words px-4 pt-3 text-base font-medium leading-snug">{n.body}</p>
+              {/* Replies — each shown with a small signature. Clicks/pointer
+                  events here stop propagation so the drag handler on the note
+                  doesn't hijack them (otherwise you can't select text or type). */}
+              {(() => {
+                const replies = parseReplies((n as any).replies);
+                if (replies.length === 0) return null;
+                return (
+                  <div className="mx-4 mt-2 space-y-1.5 border-t border-black/10 pt-2" onPointerDown={(e) => e.stopPropagation()}>
+                    {replies.map((r, ri) => (
+                      <div key={ri} className="text-sm leading-snug">
+                        <div className="flex items-start gap-1.5">
+                          <CornerDownRight className="mt-0.5 size-3 shrink-0 opacity-60" />
+                          <div className="min-w-0 flex-1">
+                            <p className="whitespace-pre-wrap break-words">{r.body}</p>
+                            <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider opacity-60">
+                              — {r.initials || r.author}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+              {/* Reply composer */}
+              <div
+                className="m-3 mt-2 flex items-center gap-1 rounded border border-black/10 bg-white/40 p-1"
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <input
+                  value={replyDrafts[n.id] ?? ""}
+                  onChange={(e) => setReplyDrafts((d) => ({ ...d, [n.id]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      submitReply(n.id);
+                    }
+                  }}
+                  placeholder="Reply…"
+                  data-testid={`input-note-reply-${n.id}`}
+                  className="h-6 min-w-0 flex-1 bg-transparent px-1 text-xs outline-none placeholder:opacity-60"
+                  style={{ color: c.text }}
+                  maxLength={500}
+                />
+                <button
+                  onClick={() => submitReply(n.id)}
+                  disabled={!(replyDrafts[n.id] ?? "").trim() || addReply.isPending}
+                  data-testid={`button-note-reply-${n.id}`}
+                  className="inline-flex h-6 items-center rounded px-2 text-[10px] font-bold uppercase tracking-wider text-white disabled:opacity-40"
+                  style={{ background: c.bar }}
+                >
+                  Post
+                </button>
+              </div>
             </div>
           );
         })}

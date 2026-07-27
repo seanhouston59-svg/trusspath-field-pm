@@ -404,6 +404,19 @@ export function useDeleteNote() {
   return useDeleteWithUndo("notes", "/api/notes", "/api/notes");
 }
 
+export function useAddNoteReply() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: number; body: string }) => {
+      const res = await apiRequest("POST", `/api/notes/${id}/replies`, { body });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/notes"] });
+    },
+  });
+}
+
 /* ----------------------- Generic create hooks ----------------------- */
 export function useCreateProject() {
   const qc = useQueryClient();

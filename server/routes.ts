@@ -1374,6 +1374,46 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.status(204).end();
   });
 
+  // Append a reply to a sticky note. Replies are stored inline on the note
+  // itself (as a JSON array) so the note reads like a running mini-conversation.
+  // Signature is derived from the current account so users can't spoof authors.
+  app.post("/api/notes/:id/replies", async (req: any, res) => {
+    try {
+      if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+      const id = parseInt(req.params.id, 10);
+      const body = String(req.body?.body ?? "").trim();
+      if (!body) return res.status(400).json({ message: "Reply body required" });
+      if (body.length > 500) return res.status(400).json({ message: "Reply too long (500 char max)" });
+      const existing = await storage.getNoteById(id);
+      if (!existing) return res.status(404).json({ message: "Note not found" });
+      const displayName = String(req.account.displayName ?? req.account.email ?? "Someone");
+      const initials = displayName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((s: string) => s[0]?.toUpperCase() ?? "")
+        .join("") || displayName.slice(0, 2).toUpperCase();
+      let arr: any[] = [];
+      try {
+        arr = existing.replies ? JSON.parse(existing.replies) : [];
+        if (!Array.isArray(arr)) arr = [];
+      } catch {
+        arr = [];
+      }
+      arr.push({
+        author: displayName,
+        initials,
+        body,
+        at: new Date().toISOString(),
+      });
+      const updated = await storage.updateNote(id, { replies: JSON.stringify(arr) });
+      res.json(updated);
+    } catch (err) {
+      console.error("[notes] reply error:", err);
+      res.status(500).json({ message: "Failed to add reply" });
+    }
+  });
+
   // INTEGRATIONS — connect/disconnect third-party services
   app.get("/api/integrations", async (_req, res) => {
     res.json(await storage.getIntegrations());

@@ -40,6 +40,7 @@ export const DEFAULT_LAYOUT_ALL: WidgetPref[] = [
   { id: "kpi-punch",      size: "sm" },
   { id: "notifications",  size: "lg" }, // 2 cols
   { id: "notepad",        size: "sm" }, // 1 col
+  { id: "note-wall",      size: "md" }, // sliding tab through the sticky-board notes
   { id: "projects",       size: "lg" }, // 2 cols
   { id: "ops-feed",       size: "sm" }, // 1 col
   { id: "financials",     size: "lg" }, // 2 cols (owner/PM only via roleGate)
@@ -57,6 +58,11 @@ export function defaultLayoutForRole(role?: string | null): DashboardLayout {
   });
   return { widgets: base };
 }
+
+// New widgets that should be VISIBLE on existing users' dashboards the moment
+// they ship, instead of being appended hidden. Reserve for widgets the user
+// explicitly asked for so we don't shove random things onto their layouts.
+const FORCE_VISIBLE_NEW_IDS = new Set<string>(["note-wall"]);
 
 // Merge a persisted layout with the current widget catalog so newly-shipped
 // widgets show up (appended, hidden) instead of being invisible until the
@@ -77,10 +83,14 @@ export function mergeWithCatalog(
     seen.add(w.id);
     kept.push({ id: w.id, size: w.size ?? "md", hidden: !!w.hidden });
   }
-  // Append any brand-new widgets the user hasn't seen yet, as hidden — so
-  // shipping a new widget doesn't force it into everyone's dashboard.
+  // Append any brand-new widgets the user hasn't seen yet. Force-visible ids
+  // are appended visible; everything else defaults to hidden so shipping a
+  // new widget doesn't shove itself into every user's dashboard.
   for (const id of catalogIds) {
-    if (!seen.has(id)) kept.push({ id, size: "md", hidden: true });
+    if (seen.has(id)) continue;
+    const hidden = !FORCE_VISIBLE_NEW_IDS.has(id);
+    const size = id === "note-wall" ? "md" : "md";
+    kept.push({ id, size, hidden });
   }
   return { widgets: kept };
 }

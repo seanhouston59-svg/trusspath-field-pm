@@ -366,6 +366,10 @@ export const notes = pgTable("notes", {
   color: text("color").notNull(),
   x: integer("x").notNull(),
   y: integer("y").notNull(),
+  // JSON-encoded array of { author: string, initials: string, body: string, at: ISO }.
+  // Null / empty = no replies. Written to inline on the sticky itself so the note
+  // becomes a mini conversation. See POST /api/notes/:id/replies.
+  replies: text("replies"),
 });
 
 export const integrations = pgTable("integrations", {
@@ -568,6 +572,10 @@ export const timesheets = pgTable("timesheets", {
   managerApprovedAt: text("manager_approved_at"),
   managerName: text("manager_name"),
   managerEmail: text("manager_email"),
+  // Tracks when/where the timesheet was sent to a Project Executive for approval.
+  // Manager signature is gated on sentAt being non-null (see PATCH /api/timesheets/:id).
+  sentAt: text("sent_at"),
+  sentTo: text("sent_to"),
   notes: text("notes"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at"),

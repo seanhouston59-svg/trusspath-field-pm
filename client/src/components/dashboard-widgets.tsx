@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, CloudSun, StickyNote, ArrowRight, AlertTriangle, HelpCircle, GitPullRequestArrow, ClipboardList, Plus, ChevronDown } from "lucide-react";
+import { Bell, CloudSun, StickyNote, ArrowRight, AlertTriangle, HelpCircle, GitPullRequestArrow, ClipboardList, Plus, ChevronDown, ChevronLeft, ChevronRight, CornerDownRight } from "lucide-react";
 import { Avatar } from "@/components/bits";
-import { useCreateNote, useProjects } from "@/hooks/use-data";
+import { useCreateNote, useNotes, useAddNoteReply, useProjects } from "@/hooks/use-data";
 import { relativeDays, isOverdue } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -387,6 +387,208 @@ export function StickyNotepadBox() {
           aria-hidden
         />
       </div>
+    </div>
+  );
+}
+
+/* ------------------------ Note Wall carousel --------------------------- */
+// Sliding tab that pages through the sticky notes on the Sticky Board wall
+// straight from the dashboard, so you can read (and reply to) recent notes
+// without opening /notes. Colors mirror the corkboard palette used on the
+// full page so the stickies feel like the same paper.
+
+type NoteReplyLite = { author: string; initials: string; body: string; at: string };
+
+function parseNoteReplies(raw: unknown): NoteReplyLite[] {
+  if (!raw || typeof raw !== "string") return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((r): r is NoteReplyLite => !!r && typeof r === "object" && typeof (r as any).body === "string");
+  } catch {
+    return [];
+  }
+}
+
+const WALL_COLORS: Record<string, { bg: string; bar: string; text: string; pin: string }> = {
+  amber:   { bg: "#fef3c7", bar: "#e07412", text: "#5c2e07", pin: "#c0392b" },
+  blue:    { bg: "#dbeafe", bar: "#2f7fd4", text: "#0c3a66", pin: "#1e3a8a" },
+  emerald: { bg: "#d1fae5", bar: "#1f9d6b", text: "#064e3b", pin: "#065f46" },
+  rose:    { bg: "#ffe4e6", bar: "#e0457b", text: "#6b0f2a", pin: "#9d174d" },
+  violet:  { bg: "#ede9fe", bar: "#7c5cff", text: "#2e1065", pin: "#5b21b6" },
+};
+
+export function NoteWallCarouselBox() {
+  const { data: projects = [] } = useProjects();
+  // Default to first project; give the user a chip switcher below if there
+  // are multiple. Matches /notes behavior.
+  const [projectId, setProjectId] = useState<number | undefined>(undefined);
+  const pid = projectId ?? projects[0]?.id;
+  const { data: notes = [] } = useNotes(pid);
+  const addReply = useAddNoteReply();
+  const { toast } = useToast();
+  const [idx, setIdx] = useState(0);
+  const [replyDraft, setReplyDraft] = useState("");
+
+  // Keep idx in bounds when the notes list shrinks (deletes) or the user
+  // switches projects.
+  const safeIdx = notes.length === 0 ? 0 : Math.min(idx, notes.length - 1);
+  const current = notes[safeIdx];
+
+  const goPrev = () => {
+    if (notes.length === 0) return;
+    setIdx((i) => (i - 1 + notes.length) % notes.length);
+    setReplyDraft("");
+  };
+  const goNext = () => {
+    if (notes.length === 0) return;
+    setIdx((i) => (i + 1) % notes.length);
+    setReplyDraft("");
+  };
+
+  const submit = () => {
+    if (!current || !replyDraft.trim()) return;
+    addReply.mutate(
+      { id: current.id, body: replyDraft.trim() },
+      {
+        onSuccess: () => setReplyDraft(""),
+        onError: (err: any) => toast({ title: "Couldn't add reply", description: err?.message ?? "Unknown error" }),
+      },
+    );
+  };
+
+  const c = current ? (WALL_COLORS[current.color] ?? WALL_COLORS.amber) : WALL_COLORS.amber;
+  const replies = useMemo(() => parseNoteReplies((current as any)?.replies), [current]);
+
+  return (
+    <div className="flex h-full flex-col" data-testid="box-note-wall-carousel">
+      {/* Header */}
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <StickyNote className="size-4 text-primary" />
+          <h3 className="font-display text-sm font-bold">Note Wall</h3>
+        </div>
+        <Link href="/notes" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline" data-testid="link-open-note-wall">
+          Open <ArrowRight className="size-3" />
+        </Link>
+      </div>
+
+      {/* Project switcher — only if user has more than one */}
+      {projects.length > 1 && (
+        <div className="mb-2 flex flex-wrap items-center gap-1">
+          {projects.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => { setProjectId(p.id); setIdx(0); setReplyDraft(""); }}
+              data-testid={`carousel-project-${p.id}`}
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                pid === p.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground",
+              )}
+            >
+              {p.name.split(" ")[0]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Sticky viewport */}
+      <div className="relative flex-1">
+        {notes.length === 0 || !current ? (
+          <div className="flex h-full min-h-[180px] items-center justify-center rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+            {projects.length === 0
+              ? "Add a project first, then jot a note."
+              : "No notes on the wall yet. Open the board to add one."}
+          </div>
+        ) : (
+          <div
+            className="relative rounded-md p-3 shadow-md"
+            style={{ background: c.bg, color: c.text, minHeight: 180 }}
+            data-testid={`carousel-note-${current.id}`}
+          >
+            {/* Colored header stripe */}
+            <div className="-mx-3 -mt-3 mb-2 flex items-center justify-between px-3 py-1" style={{ background: c.bar }}>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white">Note</span>
+              <span className="text-[10px] font-semibold text-white/85">{safeIdx + 1} / {notes.length}</span>
+            </div>
+            <p className="whitespace-pre-wrap break-words text-sm font-medium leading-snug">{current.body}</p>
+
+            {replies.length > 0 && (
+              <div className="mt-2 space-y-1 border-t border-black/10 pt-2">
+                {replies.slice(-3).map((r, ri) => (
+                  <div key={ri} className="flex items-start gap-1.5 text-xs leading-snug">
+                    <CornerDownRight className="mt-0.5 size-3 shrink-0 opacity-60" />
+                    <div className="min-w-0 flex-1">
+                      <p className="whitespace-pre-wrap break-words">{r.body}</p>
+                      <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider opacity-60">
+                        — {r.initials || r.author}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {replies.length > 3 && (
+                  <div className="text-[10px] opacity-60">+{replies.length - 3} more on the board</div>
+                )}
+              </div>
+            )}
+
+            {/* Reply composer */}
+            <div className="mt-2 flex items-center gap-1 rounded border border-black/10 bg-white/40 p-1">
+              <input
+                value={replyDraft}
+                onChange={(e) => setReplyDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
+                placeholder="Reply…"
+                data-testid="carousel-reply-input"
+                className="h-6 min-w-0 flex-1 bg-transparent px-1 text-xs outline-none placeholder:opacity-60"
+                style={{ color: c.text }}
+                maxLength={500}
+              />
+              <button
+                onClick={submit}
+                disabled={!replyDraft.trim() || addReply.isPending}
+                data-testid="carousel-reply-post"
+                className="inline-flex h-6 items-center rounded px-2 text-[10px] font-bold uppercase tracking-wider text-white disabled:opacity-40"
+                style={{ background: c.bar }}
+              >
+                Post
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Nav */}
+      {notes.length > 1 && (
+        <div className="mt-2 flex items-center justify-between">
+          <button
+            onClick={goPrev}
+            data-testid="carousel-prev"
+            className="inline-flex size-7 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+            aria-label="Previous note"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          {/* Dot indicator (max 8 dots) */}
+          <div className="flex items-center gap-1">
+            {notes.slice(0, 8).map((_, i) => (
+              <span
+                key={i}
+                className={cn("size-1.5 rounded-full transition-colors", i === safeIdx ? "bg-primary" : "bg-border")}
+              />
+            ))}
+            {notes.length > 8 && <span className="text-[10px] text-muted-foreground">…</span>}
+          </div>
+          <button
+            onClick={goNext}
+            data-testid="carousel-next"
+            className="inline-flex size-7 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+            aria-label="Next note"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
