@@ -573,12 +573,17 @@ export function useDeleteContact() {
 // ---- JARVIS AI assistant ----
 export type JarvisMsg = { role: "user" | "assistant"; content: string };
 
+// Jarvis response mode: 'llm' when a real OpenAI answer was produced, 'local'
+// when we fell back to the deterministic in-process engine. Useful for showing
+// a badge in the UI so users know when they're getting canned replies.
+export type JarvisMode = "llm" | "local";
+
 export function useJarvisBrief(projectId?: number) {
   return useMutation({
     mutationFn: async () => {
       const qs = projectId ? `?projectId=${projectId}` : "";
       const res = await apiRequest("GET", `/api/jarvis/brief${qs}`);
-      return res.json() as Promise<{ brief: string }>;
+      return res.json() as Promise<{ brief: string; mode?: JarvisMode }>;
     },
   });
 }
@@ -588,7 +593,7 @@ export function useJarvisChat(projectId?: number) {
     mutationFn: async (messages: JarvisMsg[]) => {
       const qs = projectId ? `?projectId=${projectId}` : "";
       const res = await apiRequest("POST", `/api/jarvis/chat${qs}`, { messages });
-      return res.json() as Promise<{ reply: string }>;
+      return res.json() as Promise<{ reply: string; mode?: JarvisMode }>;
     },
   });
 }

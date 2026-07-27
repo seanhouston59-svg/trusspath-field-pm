@@ -1511,7 +1511,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       // Try LLM-powered brief first; fall back to local if no API key or error
       try {
         const result = await jarvisBrief(pid(req));
-        res.json(result);
+        res.json({ ...result, mode: "llm" });
       } catch (llmErr) {
         console.log("[jarvis] LLM brief failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
         // Rich local brief — named items, real counts, weather, one specific rec.
@@ -1530,11 +1530,11 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       // Try LLM-powered chat first; fall back to local engine
       try {
         const result = await jarvisChat(pid(req), history);
-        res.json(result);
+        res.json({ ...result, mode: "llm" });
       } catch (llmErr) {
         console.log("[jarvis] LLM chat failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
         const result = await localJarvisChat(pid(req), history, req.organizationId);
-        res.json(result);
+        res.json({ ...result, mode: "local" });
       }
     } catch (err) {
       console.error("[jarvis] chat error:", err);

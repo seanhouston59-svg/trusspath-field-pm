@@ -2,8 +2,23 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import { runHealthScan } from "./health";
 
-// Model routed through the platform OpenAI proxy (Responses API).
-const MODEL = "gpt_5_1";
+// OpenAI model used for Jarvis. Configurable via env so we can swap without a
+// deploy — defaults to gpt-4o-mini which is cheap ($0.15/1M input, $0.60/1M
+// output) and plenty smart for our briefing + chat use case.
+const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+// Fail fast (and clearly) when the LLM path is invoked without an API key.
+// The routes.ts callers catch this and drop through to the local engine.
+function assertHasOpenAIKey(): void {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY not set");
+  }
+}
+
+// Public helper so routes / other callers can check without triggering the SDK.
+export function hasOpenAIKey(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY);
+}
 
 function buildPersona(s: Record<string, any> = {}): string {
   const term = (s.addressTerm as string)?.trim() || "sir";
@@ -101,6 +116,7 @@ function formatScan(r: Awaited<ReturnType<typeof runHealthScan>>): string {
 }
 
 export async function jarvisChat(projectId: number | undefined, history: Msg[]): Promise<{ reply: string }> {
+  assertHasOpenAIKey();
   const { compact } = await buildContext(projectId);
   const settings = await storage.getSettings();
   const persona = buildPersona(settings);
@@ -147,6 +163,7 @@ export async function jarvisChat(projectId: number | undefined, history: Msg[]):
 }
 
 export async function jarvisBrief(projectId: number | undefined): Promise<{ brief: string; context: ContextBundle }> {
+  assertHasOpenAIKey();
   const context = await buildContext(projectId);
   const settings = await storage.getSettings();
   const persona = buildPersona(settings);

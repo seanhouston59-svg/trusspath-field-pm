@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, X, Send, Volume2, VolumeX, Sparkles, Radio, Mic, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useJarvisBrief, useJarvisChat, useSettings, useUpdateSettings, useHealthScan, type JarvisMsg } from "@/hooks/use-data";
+import { useJarvisBrief, useJarvisChat, useSettings, useUpdateSettings, useHealthScan, type JarvisMsg, type JarvisMode } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
 
 /* ---------- minimal markdown render (bold, bullets, paragraphs) ---------- */
@@ -129,6 +129,10 @@ export function JarvisPanel() {
   const [listening, setListening] = useState(false);
   const [messages, setMessages] = useState<JarvisMsg[]>([]);
   const [brief, setBrief] = useState<string | null>(null);
+  // Track the most recent response mode so we can show a subtle "Local mode"
+  // pill — users know when Jarvis is running on the offline rules engine vs a
+  // real LLM. Server sets this from routes.ts.
+  const [lastMode, setLastMode] = useState<JarvisMode | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const briefMut = useJarvisBrief();
@@ -185,7 +189,11 @@ export function JarvisPanel() {
 
   const runBrief = () => {
     briefMut.mutate(undefined, {
-      onSuccess: (r) => { setBrief(r.brief); if (voice) speak(r.brief, { rate, pitch }); },
+      onSuccess: (r) => {
+        setBrief(r.brief);
+        if (r.mode) setLastMode(r.mode);
+        if (voice) speak(r.brief, { rate, pitch });
+      },
       onError: () => setBrief("My apologies, sir — I couldn't retrieve the morning brief just now. Please try again shortly."),
     });
   };
@@ -218,7 +226,11 @@ export function JarvisPanel() {
     setMessages(next);
     setInput("");
     chatMut.mutate(next, {
-      onSuccess: (r) => { setMessages((m) => [...m, { role: "assistant", content: r.reply }]); if (voice && autoSpeak) speak(r.reply, { rate, pitch }); },
+      onSuccess: (r) => {
+        setMessages((m) => [...m, { role: "assistant", content: r.reply }]);
+        if (r.mode) setLastMode(r.mode);
+        if (voice && autoSpeak) speak(r.reply, { rate, pitch });
+      },
       onError: () => setMessages((m) => [...m, { role: "assistant", content: "My apologies, sir — I'm having trouble connecting. Please try again." }]),
     });
   };
@@ -280,7 +292,18 @@ export function JarvisPanel() {
               {/* morning brief */}
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary"><Sparkles className="size-3.5" /> Morning Brief</div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+                    <Sparkles className="size-3.5" /> Morning Brief
+                    {lastMode === "local" && (
+                      <span
+                        title="Jarvis is running in local mode — no OpenAI API key configured. Replies come from the built-in rules engine. Add OPENAI_API_KEY in Vercel to enable the LLM."
+                        data-testid="jarvis-local-mode-badge"
+                        className="ml-1 inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-amber-600 dark:text-amber-400"
+                      >
+                        Local mode
+                      </span>
+                    )}
+                  </div>
                   <Button size="sm" variant="outline" onClick={runBrief} disabled={briefMut.isPending} data-testid="jarvis-brief-btn" className="h-7 px-2 text-xs">
                     {briefMut.isPending ? "Generating…" : brief ? "Regenerate" : "Generate"}
                   </Button>
