@@ -116,11 +116,19 @@ export const APP_LINKS: { href: string; label: string; source: "nav" | "landing"
   ...LANDING_FEATURE_LINKS.map((f) => ({ href: f.href, label: f.label, source: "landing" as const })),
 ];
 
-/** Match a concrete href (e.g. "/projects/3") against the route patterns. */
+/** Match a concrete href (e.g. "/projects/3") against the route patterns.
+ *
+ * Callers sometimes pass a full location value like "/field?field=1" or
+ * "/projects/3#section" — in particular wouter's useHashLocation returns
+ * the pathname with any query string still appended. Strip the query and
+ * hash before comparing so a query flag doesn't accidentally lock a user
+ * out of a page they should be able to see.
+ */
 export function hrefMatchesRoute(href: string, pattern: string): boolean {
-  if (pattern === href) return true;
+  const cleanHref = href.split("?")[0].split("#")[0];
+  if (pattern === cleanHref) return true;
   const seg = pattern.split("/");
-  const h = href.split("/");
+  const h = cleanHref.split("/");
   if (seg.length !== h.length) return false;
   return seg.every((s, i) => s.startsWith(":") || s === h[i]);
 }
