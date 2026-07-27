@@ -432,7 +432,15 @@ function MobileOverflowMenu() {
               </Select>
             </div>
             <button
-              onClick={() => { setOpen(false); field.enter(); }}
+              onClick={() => {
+                setOpen(false);
+                field.enter();
+                // Take the user to the field hub — the whole point of the mobile
+                // shortcut. If they're already on a /field route it's a no-op.
+                if (!window.location.hash.startsWith("#/field")) {
+                  window.location.hash = "/field";
+                }
+              }}
               className="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted"
               data-testid="button-field-mode-mobile"
             >

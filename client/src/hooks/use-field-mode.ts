@@ -18,6 +18,21 @@ import { useEffect, useState } from "react";
  */
 
 const SS_KEY = "trusspath:field-mode";
+const CHANGE_EVENT = "trusspath:field-mode-change";
+
+/**
+ * Cross-instance broadcast. Each component that calls useFieldMode() keeps
+ * its own React state, so a call to enter()/exit() from one instance won't
+ * automatically update the others (in particular, when the mobile overflow
+ * menu calls enter(), the Layout component wouldn't otherwise re-render into
+ * FieldModeLayout). Dispatching a window event lets every mounted hook
+ * recompute from sessionStorage + URL and stay in sync.
+ */
+function broadcastChange() {
+  try {
+    window.dispatchEvent(new Event(CHANGE_EVENT));
+  } catch { /* SSR / very old browsers */ }
+}
 
 function readFromUrl(): boolean {
   if (typeof window === "undefined") return false;
@@ -84,19 +99,27 @@ export function useFieldMode(): { enabled: boolean; exit: () => void; enter: () 
     };
     window.addEventListener("hashchange", recompute);
     window.addEventListener("popstate", recompute);
+    window.addEventListener(CHANGE_EVENT, recompute);
+    // Cross-tab support: sessionStorage isn't shared across tabs, but if we
+    // ever migrate to localStorage this catches remote writes for free.
+    window.addEventListener("storage", recompute);
     return () => {
       window.removeEventListener("hashchange", recompute);
       window.removeEventListener("popstate", recompute);
+      window.removeEventListener(CHANGE_EVENT, recompute);
+      window.removeEventListener("storage", recompute);
     };
   }, []);
 
   const enter = () => {
     writeSession(true);
     setEnabled(true);
+    broadcastChange();
   };
   const exit = () => {
     writeSession(false);
     setEnabled(false);
+    broadcastChange();
   };
 
   return { enabled, exit, enter };
