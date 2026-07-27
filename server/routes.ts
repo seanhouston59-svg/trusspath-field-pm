@@ -1312,6 +1312,88 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
   });
 
+  // Invoice history - returns the most recent Stripe invoices for the org.
+  // Owner-only. Empty list is a valid response when the org has no invoices
+  // yet (e.g. still in trial with no payment recorded).
+  app.get("/api/billing/invoices", async (req: any, res) => {
+    if (!stripe) return res.status(503).json({ error: "Billing is not configured" });
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) return res.status(400).json({ error: "No active organization" });
+    if (req.membership?.role !== "owner" && req.account.role !== "owner") {
+      return res.status(403).json({ error: "Only owners can view invoices" });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (!org?.stripeCustomerId) return res.json({ invoices: [] });
+    try {
+      const list = await stripe.invoices.list({ customer: org.stripeCustomerId, limit: 12 });
+      const invoices = (list.data as any[]).map((inv) => ({
+        id: inv.id,
+        number: inv.number,
+        status: inv.status, // draft | open | paid | uncollectible | void
+        amountDue: inv.amount_due,
+        amountPaid: inv.amount_paid,
+        currency: inv.currency,
+        created: inv.created ? new Date(inv.created * 1000).toISOString() : null,
+        periodStart: inv.period_start ? new Date(inv.period_start * 1000).toISOString() : null,
+        periodEnd: inv.period_end ? new Date(inv.period_end * 1000).toISOString() : null,
+        hostedInvoiceUrl: inv.hosted_invoice_url ?? null,
+        invoicePdf: inv.invoice_pdf ?? null,
+      }));
+      res.json({ invoices });
+    } catch (e: any) {
+      console.error("[stripe invoices] error:", e);
+      res.status(500).json({ error: e?.message || "Failed to load invoices" });
+    }
+  });
+
+  // Upcoming invoice preview - what Stripe will charge on the next cycle.
+  // Uses Stripe's upcoming-invoice endpoint. Returns null when there is no
+  // subscription (e.g. free trial that never converted).
+  app.get("/api/billing/upcoming", async (req: any, res) => {
+    if (!stripe) return res.status(503).json({ error: "Billing is not configured" });
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) return res.status(400).json({ error: "No active organization" });
+    if (req.membership?.role !== "owner" && req.account.role !== "owner") {
+      return res.status(403).json({ error: "Only owners can view upcoming charges" });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (!org?.stripeCustomerId || !org.stripeSubscriptionId) return res.json({ upcoming: null });
+    try {
+      // NOTE: stripe.invoices.retrieveUpcoming is deprecated in newer API
+      // versions in favor of stripe.invoices.createPreview. We try the newer
+      // API first and fall back to the legacy one so this works on both.
+      let inv: any = null;
+      try {
+        inv = await stripe.invoices.createPreview({ customer: org.stripeCustomerId, subscription: org.stripeSubscriptionId });
+      } catch {
+        try {
+          inv = await (stripe.invoices as any).retrieveUpcoming({ customer: org.stripeCustomerId, subscription: org.stripeSubscriptionId });
+        } catch {
+          inv = null;
+        }
+      }
+      if (!inv) return res.json({ upcoming: null });
+      res.json({
+        upcoming: {
+          amountDue: inv.amount_due,
+          currency: inv.currency,
+          periodStart: inv.period_start ? new Date(inv.period_start * 1000).toISOString() : null,
+          periodEnd: inv.period_end ? new Date(inv.period_end * 1000).toISOString() : null,
+          // Best-effort next-charge date. Stripe puts it on next_payment_attempt for
+          // trialing subs; otherwise it's roughly period_end.
+          nextPaymentAttempt: inv.next_payment_attempt ? new Date(inv.next_payment_attempt * 1000).toISOString() : null,
+          lineCount: Array.isArray(inv.lines?.data) ? inv.lines.data.length : 0,
+        },
+      });
+    } catch (e: any) {
+      // A totally-fresh trial can 404 for upcoming - treat as "no preview yet".
+      const msg = String(e?.message || "");
+      if (msg.includes("upcoming")) return res.json({ upcoming: null });
+      console.error("[stripe upcoming] error:", e);
+      res.status(500).json({ error: msg || "Failed to load upcoming invoice" });
+    }
+  });
+
   // Billing status — now reports the caller's active organization's subscription
   // (multi-tenant billing lives on the org, not the account).
   app.get("/api/billing/status", async (req: any, res) => {

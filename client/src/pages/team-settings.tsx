@@ -11,6 +11,7 @@ import {
   useCurrentOrg, useOrgMembers, useOrgInvites, useCreateInvite, useRevokeInvite, useUpdateMemberRole, useRemoveMember,
   type Membership,
 } from "@/hooks/use-data";
+import { BillingSection } from "@/components/billing-section";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -322,6 +323,9 @@ export default function TeamSettingsPage() {
             </div>
           </section>
         )}
+
+        {/* Billing (owner-only) */}
+        {isOwner && <BillingSection />}
 
         {/* Role legend */}
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm">

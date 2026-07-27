@@ -700,6 +700,35 @@ export function useManageBilling() {
   });
 }
 
+export type Invoice = {
+  id: string;
+  number: string | null;
+  status: string | null;
+  amountDue: number;
+  amountPaid: number;
+  currency: string;
+  created: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+};
+export function useInvoices() {
+  return useQuery<{ invoices: Invoice[] }>({ queryKey: ["/api/billing/invoices"] });
+}
+
+export type UpcomingInvoice = {
+  amountDue: number;
+  currency: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  nextPaymentAttempt: string | null;
+  lineCount: number;
+};
+export function useUpcomingInvoice() {
+  return useQuery<{ upcoming: UpcomingInvoice | null }>({ queryKey: ["/api/billing/upcoming"] });
+}
+
 /* ----------------------- Organization / Team ----------------------- */
 export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string };
 export type Invite = { id: number; token: string; organizationId: number; email: string; role: string; createdAt: string; expiresAt: string; acceptedAt: string | null };
