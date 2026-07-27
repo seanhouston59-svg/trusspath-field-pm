@@ -29,6 +29,7 @@ const ICONS: Record<string, any> = {
   CheckSquare, Users, CalendarRange, FileStack, GitPullRequestArrow,
   StickyNote, Wrench, Image, FileText, Contact: ContactIcon, MessageSquare, Building2, Clock,
   GanttChartSquare, Plug, PencilRuler, Plane, Settings: SettingsIcon, Trash2, Network,
+  ShieldCheck,
 };
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
@@ -39,12 +40,22 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
       {APP_NAV.map((group) => {
         const items = group.items.filter(({ href }) => isAllowed(href));
         if (items.length === 0) return null;
+        // For each nav item, mark it active when it prefix-matches the current location,
+        // but only if no *more-specific* sibling href also matches. This prevents parents
+        // like "/settings" from staying active when the user is on "/settings/team".
+        const allHrefs = APP_NAV.flatMap(g => g.items.map(i => i.href));
+        const isActiveHref = (href: string) => {
+          if (href === "/") return location === "/";
+          if (!location.startsWith(href)) return false;
+          // Any longer href that also matches wins over this one.
+          return !allHrefs.some(h => h !== href && h.startsWith(href) && location.startsWith(h));
+        };
         return (
         <div key={group.title}>
           <div className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">{group.title}</div>
           <div className="flex flex-col gap-0">
             {items.map(({ href, label, icon }) => {
-              const active = href === "/" ? location === "/" : location.startsWith(href);
+              const active = isActiveHref(href);
               const Icon = ICONS[icon] ?? LayoutDashboard;
               return (
                 <Link

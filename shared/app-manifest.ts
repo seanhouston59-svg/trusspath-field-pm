@@ -82,6 +82,7 @@ export const APP_NAV: NavGroup[] = [
       { href: "/integrations", label: "Integrations", icon: "Plug" },
       { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" },
       { href: "/settings", label: "Settings", icon: "Settings" },
+      { href: "/settings/team", label: "Team & Access", icon: "ShieldCheck" },
     ],
   },
 ];
