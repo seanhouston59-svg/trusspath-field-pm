@@ -1,10 +1,18 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
-import { ArrowLeft, Rocket } from "lucide-react";
+import { ArrowLeft, FileText, Rocket } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 import { Avatar } from "@/components/bits";
 import {
   ProgressRing, HealthChip, PermitStatusBadge, YesNoBadge, EmptyState,
@@ -116,6 +124,97 @@ function riskFields(team: TeamMember[], teamMap: Map<number, TeamMember>): Track
   ];
 }
 
+/**
+ * Generates the Mobilization Plan PDF. The report streams from the server, so
+ * it opens in a new tab rather than going through the query client.
+ */
+function GenerateReportDialog({ projectId, seeded }: { projectId: number; seeded: boolean }) {
+  const { account } = useAuth();
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [preparedBy, setPreparedBy] = useState("");
+  const [revision, setRevision] = useState("Rev 0");
+
+  const openDialog = () => {
+    setPreparedBy(account?.displayName || "");
+    setOpen(true);
+  };
+
+  const generate = () => {
+    const qs = new URLSearchParams({
+      preparedBy: preparedBy.trim() || account?.displayName || "Project Team",
+      revision: revision.trim() || "Rev 0",
+    });
+    window.open(`/api/projects/${projectId}/mobilization/report?${qs}`, "_blank");
+    setOpen(false);
+    toast({
+      title: "Generating Mobilization Plan",
+      description: "Your PDF will download in a new tab.",
+    });
+  };
+
+  const trigger = (
+    <Button size="sm" disabled={!seeded} onClick={openDialog} data-testid="mob-generate-report">
+      <FileText className="size-4" /> Generate Mobilization Plan
+    </Button>
+  );
+
+  return (
+    <>
+      {seeded ? trigger : (
+        <TooltipProvider>
+          <Tooltip>
+            {/* A disabled button swallows pointer events, so the tooltip needs a live wrapper. */}
+            <TooltipTrigger asChild><span className="inline-block">{trigger}</span></TooltipTrigger>
+            <TooltipContent>Set up mobilization first</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generate Mobilization Plan</DialogTitle>
+            <DialogDescription>
+              Produces the executive PDF from the current plan data.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="mob-prepared-by" className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">
+                Prepared by
+              </Label>
+              <Input
+                id="mob-prepared-by"
+                value={preparedBy}
+                onChange={(e) => setPreparedBy(e.target.value)}
+                placeholder="Project Team"
+              />
+            </div>
+            <div>
+              <Label htmlFor="mob-revision" className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">
+                Revision
+              </Label>
+              <Input
+                id="mob-revision"
+                value={revision}
+                onChange={(e) => setRevision(e.target.value)}
+                placeholder="Rev 0"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={generate} data-testid="mob-generate-report-submit">
+              <FileText className="size-4" /> Generate PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 export default function MobilizationDetail() {
   const [, params] = useRoute("/executive-os/mobilization/:id");
   const projectId = params?.id ? parseInt(params.id, 10) : undefined;
@@ -158,6 +257,9 @@ export default function MobilizationDetail() {
                 )}
               </p>
             </div>
+            {projectId != null && (
+              <GenerateReportDialog projectId={projectId} seeded={!!bundle?.seeded} />
+            )}
           </div>
         </div>
 

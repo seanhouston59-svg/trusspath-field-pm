@@ -47,6 +47,7 @@ export const EVENT_KINDS = {
   // Mobilization (Executive OS)
   MOBILIZATION_ITEM_COMPLETED: "mobilization.item_completed",
   MOBILIZATION_PERMIT_APPROVED: "mobilization.permit_approved",
+  MOBILIZATION_REPORT_GENERATED: "mobilization.report_generated",
 } as const;
 
 export type EventKind = typeof EVENT_KINDS[keyof typeof EVENT_KINDS];
@@ -111,6 +112,7 @@ export const EVENT_KIND_META: Record<string, EventKindMeta> = {
   [EVENT_KINDS.NOTE_ADDED]: { label: "Note added", category: "project" },
   [EVENT_KINDS.MOBILIZATION_ITEM_COMPLETED]: { label: "Mobilization item completed", category: "project" },
   [EVENT_KINDS.MOBILIZATION_PERMIT_APPROVED]: { label: "Permit approved", category: "project" },
+  [EVENT_KINDS.MOBILIZATION_REPORT_GENERATED]: { label: "Mobilization Plan generated", category: "doc" },
 };
 
 // Kinds grouped by category \u2014 used by the client to render filter chips and

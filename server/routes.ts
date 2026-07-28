@@ -27,10 +27,8 @@ import {
   type Project,
 } from "@shared/schema";
 import { EVENT_KINDS } from "@shared/project-event-kinds";
-import {
-  MOBILIZATION_SECTIONS, MOBILIZATION_MILESTONE_KIND, EARTHWORK_MILESTONE_TITLE,
-  computeHealth, daysUntil, pct,
-} from "@shared/mobilization-catalog";
+import { mobilizationRollup } from "./mobilization-rollup";
+import { generateMobilizationPlan } from "./reports/mobilization-plan";
 import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
 import {
   bootstrapOrganizationForAccount, bootstrapDemoOrgForAccount,
@@ -1715,59 +1713,6 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
    * from the caller's org.
    */
 
-  // Rolls a project's mobilization state into the numbers both the health
-  // endpoint and the portfolio cards render. Kept in one place so a project
-  // can never show a different % or colour in two views.
-  async function mobilizationRollup(projectId: number) {
-    const [plan, items, permits, equipmentRows, utilities, staff, subs, risks, allMilestones] = await Promise.all([
-      storage.getMobilizationPlan(projectId),
-      storage.getMobilizationItems(projectId),
-      storage.getMobilizationPermits(projectId),
-      storage.getMobilizationEquipment(projectId),
-      storage.getMobilizationUtilities(projectId),
-      storage.getMobilizationStaff(projectId),
-      storage.getMobilizationSubs(projectId),
-      storage.getMobilizationRisks(projectId),
-      storage.getMilestones(projectId),
-    ]);
-    const mobMilestones = allMilestones.filter((m) => m.kind === MOBILIZATION_MILESTONE_KIND);
-
-    // "na" items drop out of the denominator — marking something not-applicable
-    // should raise the percentage, not permanently cap it.
-    const countable = items.filter((i) => i.status !== "na");
-    const doneCount = countable.filter((i) => i.status === "done").length;
-    const overallPct = pct(doneCount, countable.length);
-
-    const sectionPct: Record<string, number> = {};
-    for (const section of MOBILIZATION_SECTIONS) {
-      const inSection = countable.filter((i) => i.section === section);
-      sectionPct[section] = pct(inSection.filter((i) => i.status === "done").length, inSection.length);
-    }
-
-    const approved = permits.filter((p) => p.status === "Approved").length;
-    const notStarted = permits.filter((p) => p.status === "Not Started").length;
-    const blocked = permits.filter((p) => p.status === "Rejected" || p.status === "Expired").length;
-    const permitStatus = { approved, pending: permits.length - approved - notStarted - blocked, notStarted, blocked, total: permits.length };
-
-    const earthwork = mobMilestones.find((m) => m.title === EARTHWORK_MILESTONE_TITLE);
-    const milestoneDaysToEarthwork = daysUntil(earthwork?.date);
-
-    return {
-      seeded: !!plan,
-      plan, items, permits, equipment: equipmentRows, utilities, staff, subs, risks,
-      milestones: mobMilestones,
-      overallPct,
-      sectionPct,
-      permitStatus,
-      equipmentOnSitePct: pct(equipmentRows.filter((e) => e.onSiteConfirmed).length, equipmentRows.length),
-      utilitiesInstalledPct: pct(utilities.filter((u) => !!u.installedDate).length, utilities.length),
-      staffOnboardedPct: pct(staff.filter((s) => s.orientationDone && s.drugTestDone && s.ppeIssued).length, staff.length),
-      subsReadyPct: pct(subs.filter((s) => s.insuranceOnFile && s.w9OnFile && s.msaSigned).length, subs.length),
-      risksOpen: risks.filter((r) => r.status === "open").length,
-      milestoneDaysToEarthwork,
-      health: computeHealth({ overallPct, hasBlockedPermit: blocked > 0, daysToEarthwork: milestoneDaysToEarthwork }),
-    };
-  }
 
   // Full plan bundle for the detail page — one request feeds all eight tabs.
   app.get("/api/projects/:id/mobilization", async (req: any, res) => {
@@ -1793,6 +1738,38 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       staffOnboardedPct: r.staffOnboardedPct, subsReadyPct: r.subsReadyPct,
       risksOpen: r.risksOpen, milestoneDaysToEarthwork: r.milestoneDaysToEarthwork,
       health: r.health, seeded: r.seeded,
+    });
+  });
+
+  // Mobilization Plan PDF. Streams straight into the response, so once
+  // generateMobilizationPlan has written a byte we can no longer switch to a
+  // JSON error body — hence the try/catch that only responds when headers are
+  // still unsent.
+  app.get("/api/projects/:id/mobilization/report", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+
+    const revision = (req.query.revision as string)?.trim() || "Rev 0";
+    const preparedBy =
+      (req.query.preparedBy as string)?.trim() || req.account?.displayName || "Project Team";
+
+    try {
+      await generateMobilizationPlan(projectId, { preparedBy, revision, res });
+    } catch (err) {
+      console.error("[mobilization/report] generation failed", err);
+      if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
+      else res.end();
+      return;
+    }
+
+    logEvent(req, {
+      projectId,
+      kind: EVENT_KINDS.MOBILIZATION_REPORT_GENERATED,
+      title: "Mobilization Plan generated",
+      subtitle: `${revision} — prepared by ${preparedBy}`,
+      meta: { revision, preparedBy },
+      sourceType: "mobilization_plan",
     });
   });
 

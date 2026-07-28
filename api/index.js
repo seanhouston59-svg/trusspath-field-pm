@@ -12,11 +12,11 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
-var __copyProps = (to, from, except, desc2) => {
+var __copyProps = (to, from, except, desc3) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
       if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc3 = __getOwnPropDesc(from, key)) || desc3.enumerable });
   }
   return to;
 };
@@ -31,6 +31,106 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // shared/schema.ts
+var schema_exports = {};
+__export(schema_exports, {
+  ACTIVE_SUB_STATUSES: () => ACTIVE_SUB_STATUSES,
+  DEFAULT_SETTINGS: () => DEFAULT_SETTINGS,
+  ORG_ROLES: () => ORG_ROLES,
+  ROLE_CAPS: () => ROLE_CAPS,
+  accounts: () => accounts,
+  actionItems: () => actionItems,
+  appSettings: () => appSettings,
+  blueprints: () => blueprints,
+  changeOrders: () => changeOrders,
+  companyDocuments: () => companyDocuments,
+  contacts: () => contacts,
+  dailyLogs: () => dailyLogs,
+  deletedItems: () => deletedItems,
+  demoRequests: () => demoRequests,
+  documents: () => documents,
+  droneCaptures: () => droneCaptures,
+  equipment: () => equipment,
+  fieldObservations: () => fieldObservations,
+  fieldPunches: () => fieldPunches,
+  insertActionItemSchema: () => insertActionItemSchema,
+  insertBlueprintSchema: () => insertBlueprintSchema,
+  insertChangeOrderSchema: () => insertChangeOrderSchema,
+  insertCompanyDocumentSchema: () => insertCompanyDocumentSchema,
+  insertContactSchema: () => insertContactSchema,
+  insertDailyLogSchema: () => insertDailyLogSchema,
+  insertDeletedItemSchema: () => insertDeletedItemSchema,
+  insertDemoRequestSchema: () => insertDemoRequestSchema,
+  insertDocumentSchema: () => insertDocumentSchema,
+  insertDroneCaptureSchema: () => insertDroneCaptureSchema,
+  insertEquipmentSchema: () => insertEquipmentSchema,
+  insertIntegrationSchema: () => insertIntegrationSchema,
+  insertJarvisMemorySchema: () => insertJarvisMemorySchema,
+  insertMaintenanceLogSchema: () => insertMaintenanceLogSchema,
+  insertMessageSchema: () => insertMessageSchema,
+  insertMilestoneSchema: () => insertMilestoneSchema,
+  insertMobilizationEquipmentSchema: () => insertMobilizationEquipmentSchema,
+  insertMobilizationItemSchema: () => insertMobilizationItemSchema,
+  insertMobilizationPermitSchema: () => insertMobilizationPermitSchema,
+  insertMobilizationPlanSchema: () => insertMobilizationPlanSchema,
+  insertMobilizationRiskSchema: () => insertMobilizationRiskSchema,
+  insertMobilizationStaffSchema: () => insertMobilizationStaffSchema,
+  insertMobilizationSubSchema: () => insertMobilizationSubSchema,
+  insertMobilizationUtilitySchema: () => insertMobilizationUtilitySchema,
+  insertNoteSchema: () => insertNoteSchema,
+  insertPhotoSchema: () => insertPhotoSchema,
+  insertProjectEventSchema: () => insertProjectEventSchema,
+  insertProjectSchema: () => insertProjectSchema,
+  insertPunchItemSchema: () => insertPunchItemSchema,
+  insertRfiSchema: () => insertRfiSchema,
+  insertSettingsSchema: () => insertSettingsSchema,
+  insertSubmittalSchema: () => insertSubmittalSchema,
+  insertSubscriberSchema: () => insertSubscriberSchema,
+  insertTaskSchema: () => insertTaskSchema,
+  insertTeamSchema: () => insertTeamSchema,
+  insertTimeEntrySchema: () => insertTimeEntrySchema,
+  insertTimesheetSchema: () => insertTimesheetSchema,
+  integrations: () => integrations,
+  inviteCreateSchema: () => inviteCreateSchema,
+  invites: () => invites,
+  isAccountInGoodStanding: () => isAccountInGoodStanding,
+  isDemoExpired: () => isDemoExpired,
+  isOrgInGoodStanding: () => isOrgInGoodStanding,
+  isSubscriptionActive: () => isSubscriptionActive,
+  jarvisMemory: () => jarvisMemory,
+  loginSchema: () => loginSchema,
+  maintenanceLogs: () => maintenanceLogs,
+  memberships: () => memberships,
+  messages: () => messages,
+  milestones: () => milestones,
+  mobilizationEquipment: () => mobilizationEquipment,
+  mobilizationItems: () => mobilizationItems,
+  mobilizationPermits: () => mobilizationPermits,
+  mobilizationPlans: () => mobilizationPlans,
+  mobilizationRisks: () => mobilizationRisks,
+  mobilizationStaff: () => mobilizationStaff,
+  mobilizationSubs: () => mobilizationSubs,
+  mobilizationUtilities: () => mobilizationUtilities,
+  notes: () => notes,
+  organizations: () => organizations,
+  passwordResetTokens: () => passwordResetTokens,
+  photos: () => photos,
+  projectEvents: () => projectEvents,
+  projectMembers: () => projectMembers,
+  projects: () => projects,
+  punchItems: () => punchItems,
+  rfis: () => rfis,
+  sessions: () => sessions,
+  signupSchema: () => signupSchema,
+  submittals: () => submittals,
+  subscribers: () => subscribers,
+  tasks: () => tasks,
+  teamMembers: () => teamMembers,
+  timeEntries: () => timeEntries,
+  timesheets: () => timesheets
+});
+function isDemoExpired(a, nowIso = (/* @__PURE__ */ new Date()).toISOString()) {
+  return !!a?.demoExpiresAt && a.demoExpiresAt <= nowIso;
+}
 function isSubscriptionActive(status) {
   return !!status && ACTIVE_SUB_STATUSES.has(status);
 }
@@ -39,15 +139,81 @@ function isAccountInGoodStanding(a) {
   if (a.role === "owner") return true;
   return a.approvalStatus === "approved" && isSubscriptionActive(a.subscriptionStatus);
 }
-var import_pg_core, import_drizzle_zod, import_zod, teamMembers, projects, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, ACTIVE_SUB_STATUSES, sessions, passwordResetTokens, jarvisMemory, timesheets, timeEntries, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertJarvisMemorySchema, insertTimesheetSchema, insertTimeEntrySchema, insertMilestoneSchema, insertSettingsSchema, signupSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
+function isOrgInGoodStanding(org) {
+  return isSubscriptionActive(org?.subscriptionStatus);
+}
+var import_pg_core, import_drizzle_orm, import_drizzle_zod, import_zod, organizations, memberships, invites, ORG_ROLES, ROLE_CAPS, teamMembers, projects, projectMembers, tasks, milestones, rfis, submittals, changeOrders, actionItems, dailyLogs, punchItems, contacts, equipment, maintenanceLogs, photos, documents, companyDocuments, deletedItems, blueprints, droneCaptures, messages, notes, integrations, subscribers, demoRequests, appSettings, accounts, fieldPunches, fieldObservations, projectEvents, insertProjectEventSchema, ACTIVE_SUB_STATUSES, sessions, passwordResetTokens, jarvisMemory, timesheets, timeEntries, mobilizationPlans, mobilizationItems, mobilizationPermits, mobilizationEquipment, mobilizationUtilities, mobilizationStaff, mobilizationSubs, mobilizationRisks, insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema, insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema, insertPunchItemSchema, insertTeamSchema, insertContactSchema, insertEquipmentSchema, insertMaintenanceLogSchema, insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertDeletedItemSchema, insertMessageSchema, insertNoteSchema, insertIntegrationSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertJarvisMemorySchema, insertTimesheetSchema, insertTimeEntrySchema, insertMilestoneSchema, insertMobilizationPlanSchema, insertMobilizationItemSchema, insertMobilizationPermitSchema, insertMobilizationEquipmentSchema, insertMobilizationUtilitySchema, insertMobilizationStaffSchema, insertMobilizationSubSchema, insertMobilizationRiskSchema, insertSettingsSchema, signupSchema, inviteCreateSchema, loginSchema, DEFAULT_SETTINGS, insertSubscriberSchema, insertDemoRequestSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
     import_pg_core = require("drizzle-orm/pg-core");
+    import_drizzle_orm = require("drizzle-orm");
     import_drizzle_zod = require("drizzle-zod");
     import_zod = require("zod");
+    organizations = (0, import_pg_core.pgTable)("organizations", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      name: (0, import_pg_core.text)("name").notNull(),
+      slug: (0, import_pg_core.text)("slug").notNull().unique(),
+      ownerAccountId: (0, import_pg_core.integer)("owner_account_id").notNull(),
+      // primary owner — the account that created the org
+      createdAt: (0, import_pg_core.text)("created_at").notNull(),
+      // Stripe billing (org-level, not account-level)
+      stripeCustomerId: (0, import_pg_core.text)("stripe_customer_id"),
+      stripeSubscriptionId: (0, import_pg_core.text)("stripe_subscription_id"),
+      subscriptionStatus: (0, import_pg_core.text)("subscription_status"),
+      // trialing, active, canceled, past_due, etc.
+      subscriptionPlan: (0, import_pg_core.text)("subscription_plan"),
+      // starter | pro | enterprise
+      subscriptionBilling: (0, import_pg_core.text)("subscription_billing"),
+      // monthly | annual
+      subscriptionCurrentPeriodEnd: (0, import_pg_core.text)("subscription_current_period_end"),
+      trialEndsAt: (0, import_pg_core.text)("trial_ends_at"),
+      // True once the user schedules a cancel from the Stripe portal; the sub is
+      // still active until subscriptionCurrentPeriodEnd, then Stripe fires
+      // customer.subscription.deleted and we flip subscriptionStatus to 'canceled'.
+      cancelAtPeriodEnd: (0, import_pg_core.boolean)("cancel_at_period_end").notNull().default(false),
+      // IANA timezone name for this org. Used for greetings, "today" calculations,
+      // and any user-facing date formatting. Defaults to America/Denver in the DB.
+      timezone: (0, import_pg_core.text)("timezone").notNull().default("America/Denver"),
+      // JSONB of integration keys the org has explicitly turned OFF.
+      // Shape: { "googleCalendar": true, "sheets": true, ... }. Missing key or
+      // false = integration is enabled (default-on). This lets the owner hide
+      // an integration's UI everywhere in the app for the whole org.
+      disabledIntegrations: (0, import_pg_core.jsonb)("disabled_integrations").$type().default({}).notNull()
+    });
+    memberships = (0, import_pg_core.pgTable)("memberships", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      accountId: (0, import_pg_core.integer)("account_id").notNull(),
+      organizationId: (0, import_pg_core.integer)("organization_id").notNull(),
+      role: (0, import_pg_core.text)("role").notNull(),
+      // owner | admin | pm | foreman | viewer
+      status: (0, import_pg_core.text)("status").notNull().default("active"),
+      // active | removed
+      createdAt: (0, import_pg_core.text)("created_at").notNull()
+    });
+    invites = (0, import_pg_core.pgTable)("invites", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      token: (0, import_pg_core.text)("token").notNull().unique(),
+      organizationId: (0, import_pg_core.integer)("organization_id").notNull(),
+      email: (0, import_pg_core.text)("email").notNull(),
+      role: (0, import_pg_core.text)("role").notNull(),
+      invitedByAccountId: (0, import_pg_core.integer)("invited_by_account_id").notNull(),
+      createdAt: (0, import_pg_core.text)("created_at").notNull(),
+      expiresAt: (0, import_pg_core.text)("expires_at").notNull(),
+      acceptedAt: (0, import_pg_core.text)("accepted_at")
+    });
+    ORG_ROLES = ["owner", "admin", "pm", "foreman", "viewer"];
+    ROLE_CAPS = {
+      owner: { billing: true, manageMembers: true, manageProjects: true, editProjectData: true, viewProjectData: true, restrictedToAssignedProjects: false },
+      admin: { billing: false, manageMembers: true, manageProjects: true, editProjectData: true, viewProjectData: true, restrictedToAssignedProjects: false },
+      pm: { billing: false, manageMembers: false, manageProjects: true, editProjectData: true, viewProjectData: true, restrictedToAssignedProjects: false },
+      foreman: { billing: false, manageMembers: false, manageProjects: false, editProjectData: true, viewProjectData: true, restrictedToAssignedProjects: true },
+      viewer: { billing: false, manageMembers: false, manageProjects: false, editProjectData: false, viewProjectData: true, restrictedToAssignedProjects: true }
+    };
     teamMembers = (0, import_pg_core.pgTable)("team_members", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
+      // nullable during migration; enforced by server after backfill
       name: (0, import_pg_core.text)("name").notNull(),
       role: (0, import_pg_core.text)("role").notNull(),
       trade: (0, import_pg_core.text)("trade").notNull(),
@@ -61,6 +227,8 @@ var init_schema = __esm({
     });
     projects = (0, import_pg_core.pgTable)("projects", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
+      // nullable during migration; enforced after backfill
       name: (0, import_pg_core.text)("name").notNull(),
       number: (0, import_pg_core.text)("number").notNull(),
       client: (0, import_pg_core.text)("client").notNull(),
@@ -73,6 +241,12 @@ var init_schema = __esm({
       spent: (0, import_pg_core.doublePrecision)("spent").notNull(),
       progress: (0, import_pg_core.integer)("progress").notNull(),
       superintendentId: (0, import_pg_core.integer)("superintendent_id")
+    });
+    projectMembers = (0, import_pg_core.pgTable)("project_members", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      membershipId: (0, import_pg_core.integer)("membership_id").notNull(),
+      createdAt: (0, import_pg_core.text)("created_at").notNull()
     });
     tasks = (0, import_pg_core.pgTable)("tasks", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
@@ -107,7 +281,10 @@ var init_schema = __esm({
       status: (0, import_pg_core.text)("status").notNull(),
       assigneeId: (0, import_pg_core.integer)("assignee_id"),
       dateCreated: (0, import_pg_core.text)("date_created").notNull(),
-      dueDate: (0, import_pg_core.text)("due_date").notNull()
+      dueDate: (0, import_pg_core.text)("due_date").notNull(),
+      // Optional trade tag — auto-filled from the RFI subject catalog when the
+      // user picks a known subject, editable freely otherwise.
+      trade: (0, import_pg_core.text)("trade")
     });
     submittals = (0, import_pg_core.pgTable)("submittals", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
@@ -118,7 +295,10 @@ var init_schema = __esm({
       status: (0, import_pg_core.text)("status").notNull(),
       assigneeId: (0, import_pg_core.integer)("assignee_id"),
       dateSubmitted: (0, import_pg_core.text)("date_submitted").notNull(),
-      dueDate: (0, import_pg_core.text)("due_date").notNull()
+      dueDate: (0, import_pg_core.text)("due_date").notNull(),
+      // Optional trade tag — auto-filled from the submittal subject catalog
+      // when the user picks a known subject, editable freely otherwise.
+      trade: (0, import_pg_core.text)("trade")
     });
     changeOrders = (0, import_pg_core.pgTable)("change_orders", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
@@ -128,7 +308,10 @@ var init_schema = __esm({
       status: (0, import_pg_core.text)("status").notNull(),
       amount: (0, import_pg_core.doublePrecision)("amount").notNull(),
       scheduleImpact: (0, import_pg_core.integer)("schedule_impact").notNull(),
-      dateIssued: (0, import_pg_core.text)("date_issued").notNull()
+      dateIssued: (0, import_pg_core.text)("date_issued").notNull(),
+      // Optional trade tag — auto-filled from the CO title catalog when the
+      // user picks a known title, editable freely otherwise.
+      trade: (0, import_pg_core.text)("trade")
     });
     actionItems = (0, import_pg_core.pgTable)("action_items", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
@@ -158,10 +341,18 @@ var init_schema = __esm({
       location: (0, import_pg_core.text)("location").notNull(),
       trade: (0, import_pg_core.text)("trade").notNull(),
       status: (0, import_pg_core.text)("status").notNull(),
+      // Optional — defaults to "Medium" so legacy rows and older API callers
+      // stay valid. Kept as free text so we can extend the picklist without a
+      // schema change.
+      priority: (0, import_pg_core.text)("priority").default("Medium"),
+      // Optional free-text work notes / description. Populated by the Field kit's
+      // work-notes templates plus the desktop create dialog.
+      notes: (0, import_pg_core.text)("notes"),
       assigneeId: (0, import_pg_core.integer)("assignee_id")
     });
     contacts = (0, import_pg_core.pgTable)("contacts", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
       name: (0, import_pg_core.text)("name").notNull(),
       company: (0, import_pg_core.text)("company").notNull(),
       role: (0, import_pg_core.text)("role").notNull(),
@@ -172,12 +363,49 @@ var init_schema = __esm({
     });
     equipment = (0, import_pg_core.pgTable)("equipment", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
       name: (0, import_pg_core.text)("name").notNull(),
       type: (0, import_pg_core.text)("type").notNull(),
       status: (0, import_pg_core.text)("status").notNull(),
       projectId: (0, import_pg_core.integer)("project_id"),
       operator: (0, import_pg_core.text)("operator"),
-      location: (0, import_pg_core.text)("location")
+      location: (0, import_pg_core.text)("location"),
+      // Discriminator so one table backs Equipment, Vehicle, and Tech assets.
+      // Values: "Equipment" | "Vehicle" | "Tech"
+      assetClass: (0, import_pg_core.text)("asset_class").notNull().default("Equipment"),
+      // Vehicle fields
+      make: (0, import_pg_core.text)("make"),
+      model: (0, import_pg_core.text)("model"),
+      year: (0, import_pg_core.text)("year"),
+      vin: (0, import_pg_core.text)("vin"),
+      plate: (0, import_pg_core.text)("plate"),
+      currentMileage: (0, import_pg_core.integer)("current_mileage"),
+      // Service reminder (used by Equipment + Vehicle)
+      nextServiceDate: (0, import_pg_core.text)("next_service_date"),
+      nextServiceMileage: (0, import_pg_core.integer)("next_service_mileage"),
+      // Tech / issued-asset fields
+      assignedToId: (0, import_pg_core.integer)("assigned_to_id"),
+      issueDate: (0, import_pg_core.text)("issue_date"),
+      returnedDate: (0, import_pg_core.text)("returned_date"),
+      returnSignature: (0, import_pg_core.text)("return_signature"),
+      condition: (0, import_pg_core.text)("condition"),
+      serialNumber: (0, import_pg_core.text)("serial_number"),
+      purchaseDate: (0, import_pg_core.text)("purchase_date"),
+      purchaseCost: (0, import_pg_core.text)("purchase_cost"),
+      notes: (0, import_pg_core.text)("notes")
+    });
+    maintenanceLogs = (0, import_pg_core.pgTable)("maintenance_logs", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      equipmentId: (0, import_pg_core.integer)("equipment_id").notNull(),
+      date: (0, import_pg_core.text)("date").notNull(),
+      mileage: (0, import_pg_core.integer)("mileage"),
+      cost: (0, import_pg_core.text)("cost"),
+      serviceType: (0, import_pg_core.text)("service_type"),
+      notes: (0, import_pg_core.text)("notes"),
+      performedBy: (0, import_pg_core.text)("performed_by"),
+      receiptDocumentId: (0, import_pg_core.integer)("receipt_document_id"),
+      loggedById: (0, import_pg_core.integer)("logged_by_id"),
+      createdAt: (0, import_pg_core.text)("created_at").notNull()
     });
     photos = (0, import_pg_core.pgTable)("photos", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
@@ -207,6 +435,7 @@ var init_schema = __esm({
     });
     companyDocuments = (0, import_pg_core.pgTable)("company_documents", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
       title: (0, import_pg_core.text)("title").notNull(),
       category: (0, import_pg_core.text)("category").notNull(),
       // New Hire, Contract, HR, Safety, Vendor, Legal, Insurance, Other
@@ -278,10 +507,15 @@ var init_schema = __esm({
       body: (0, import_pg_core.text)("body").notNull(),
       color: (0, import_pg_core.text)("color").notNull(),
       x: (0, import_pg_core.integer)("x").notNull(),
-      y: (0, import_pg_core.integer)("y").notNull()
+      y: (0, import_pg_core.integer)("y").notNull(),
+      // JSON-encoded array of { author: string, initials: string, body: string, at: ISO }.
+      // Null / empty = no replies. Written to inline on the sticky itself so the note
+      // becomes a mini conversation. See POST /api/notes/:id/replies.
+      replies: (0, import_pg_core.text)("replies")
     });
     integrations = (0, import_pg_core.pgTable)("integrations", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
       key: (0, import_pg_core.text)("key").notNull().unique(),
       connected: (0, import_pg_core.boolean)("connected").notNull().default(false),
       status: (0, import_pg_core.text)("status").notNull().default("available"),
@@ -310,6 +544,7 @@ var init_schema = __esm({
     });
     appSettings = (0, import_pg_core.pgTable)("app_settings", {
       id: (0, import_pg_core.integer)("id").primaryKey(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
       config: (0, import_pg_core.text)("config").notNull().default("{}"),
       updatedAt: (0, import_pg_core.text)("updated_at").notNull()
     });
@@ -338,8 +573,83 @@ var init_schema = __esm({
       // starter, pro, enterprise
       subscriptionBilling: (0, import_pg_core.text)("subscription_billing"),
       // monthly, annual
-      subscriptionCurrentPeriodEnd: (0, import_pg_core.text)("subscription_current_period_end")
+      subscriptionCurrentPeriodEnd: (0, import_pg_core.text)("subscription_current_period_end"),
+      // Demo login — non-null on accounts created via /api/admin/demo-accounts. The
+      // account (and any sessions) stop working once now > demoExpiresAt. Real
+      // accounts leave this NULL and are unaffected.
+      demoExpiresAt: (0, import_pg_core.text)("demo_expires_at"),
+      // Per-user dashboard customization. Null / missing keys → use role defaults
+      // (see client/src/lib/dashboard-layout.ts). Structure:
+      //   { widgets: [{ id: string, size: "sm"|"md"|"lg"|"xl", hidden?: boolean }] }
+      // The order of the array is the render order. Unknown ids are ignored so
+      // that removing a widget in a future release doesn't strand old prefs.
+      dashboardLayout: (0, import_pg_core.jsonb)("dashboard_layout").$type()
     });
+    fieldPunches = (0, import_pg_core.pgTable)("field_punches", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      accountId: (0, import_pg_core.integer)("account_id").notNull(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      kind: (0, import_pg_core.text)("kind").notNull(),
+      // "in" | "out" | "break_start" | "break_end"
+      occurredAt: (0, import_pg_core.text)("occurred_at").notNull().default(import_drizzle_orm.sql`NOW()`),
+      lat: (0, import_pg_core.doublePrecision)("lat"),
+      lng: (0, import_pg_core.doublePrecision)("lng"),
+      accuracyM: (0, import_pg_core.doublePrecision)("accuracy_m"),
+      note: (0, import_pg_core.text)("note"),
+      clientId: (0, import_pg_core.text)("client_id"),
+      createdAt: (0, import_pg_core.text)("created_at").notNull().default(import_drizzle_orm.sql`NOW()`)
+    });
+    fieldObservations = (0, import_pg_core.pgTable)("field_observations", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      accountId: (0, import_pg_core.integer)("account_id").notNull(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      kind: (0, import_pg_core.text)("kind").notNull(),
+      severity: (0, import_pg_core.text)("severity").notNull().default("normal"),
+      // 'low' | 'normal' | 'high' | 'urgent'
+      title: (0, import_pg_core.text)("title").notNull(),
+      body: (0, import_pg_core.text)("body"),
+      lat: (0, import_pg_core.doublePrecision)("lat"),
+      lng: (0, import_pg_core.doublePrecision)("lng"),
+      accuracyM: (0, import_pg_core.doublePrecision)("accuracy_m"),
+      photoId: (0, import_pg_core.integer)("photo_id"),
+      occurredAt: (0, import_pg_core.text)("occurred_at").notNull().default(import_drizzle_orm.sql`NOW()`),
+      clientId: (0, import_pg_core.text)("client_id"),
+      createdAt: (0, import_pg_core.text)("created_at").notNull().default(import_drizzle_orm.sql`NOW()`)
+    });
+    projectEvents = (0, import_pg_core.pgTable)("project_events", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      // Who caused the event. Nullable because system-generated events (Jarvis
+      // auto-close, cron rollups) don't have a human actor.
+      actorAccountId: (0, import_pg_core.integer)("actor_account_id"),
+      actorName: (0, import_pg_core.text)("actor_name"),
+      // denormalized snapshot — survives if member leaves
+      // Stable dotted identifier: "<entity>.<verb>". Keep the list in
+      // shared/project-event-kinds.ts (server + client).
+      kind: (0, import_pg_core.text)("kind").notNull(),
+      // Short human-readable summary that renders as the timeline row title.
+      // Server-generated at insert time so we don't need the actor's locale on
+      // the read side. Example: "RFI #37 submitted — Beam sizing at grid B-4".
+      title: (0, import_pg_core.text)("title").notNull(),
+      // Optional second line, e.g. "assigned to Marcus" or a truncated body.
+      subtitle: (0, import_pg_core.text)("subtitle"),
+      // Route-specific detail. Common keys the UI understands:
+      //   { number, status, category, count, weather, temp, sourceUrl }
+      meta: (0, import_pg_core.jsonb)("meta").notNull().default(import_drizzle_orm.sql`'{}'::jsonb`),
+      // Optional link back to the source row — lets the UI deep-link to the
+      // detail page for that entity.
+      sourceType: (0, import_pg_core.text)("source_type"),
+      // 'rfi' | 'punch' | 'photo' | 'timesheet' | …
+      sourceId: (0, import_pg_core.integer)("source_id"),
+      // When the underlying event actually happened. For most rows this equals
+      // createdAt, but backfills and offline sync may set an earlier occurredAt.
+      occurredAt: (0, import_pg_core.text)("occurred_at").notNull().default(import_drizzle_orm.sql`NOW()`),
+      createdAt: (0, import_pg_core.text)("created_at").notNull().default(import_drizzle_orm.sql`NOW()`)
+    });
+    insertProjectEventSchema = (0, import_drizzle_zod.createInsertSchema)(projectEvents).omit({ id: true, createdAt: true });
     ACTIVE_SUB_STATUSES = /* @__PURE__ */ new Set(["active", "trialing"]);
     sessions = (0, import_pg_core.pgTable)("sessions", {
       id: (0, import_pg_core.text)("id").primaryKey(),
@@ -370,13 +680,26 @@ var init_schema = __esm({
     timesheets = (0, import_pg_core.pgTable)("timesheets", {
       id: (0, import_pg_core.serial)("id").primaryKey(),
       projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      // Account and org linkage. Nullable for legacy hand-created timesheets
+      // from before the auto-create system — the server treats null accountId as
+      // "generic" and never auto-populates from punches.
+      accountId: (0, import_pg_core.integer)("account_id"),
+      organizationId: (0, import_pg_core.integer)("organization_id"),
       employeeName: (0, import_pg_core.text)("employee_name").notNull(),
       weekStart: (0, import_pg_core.text)("week_start").notNull(),
       weekEnd: (0, import_pg_core.text)("week_end").notNull(),
       totalHours: (0, import_pg_core.text)("total_hours").notNull().default("0"),
       status: (0, import_pg_core.text)("status").notNull().default("draft"),
       employeeSignature: (0, import_pg_core.text)("employee_signature"),
+      employeeSubmittedAt: (0, import_pg_core.text)("employee_submitted_at"),
       managerSignature: (0, import_pg_core.text)("manager_signature"),
+      managerApprovedAt: (0, import_pg_core.text)("manager_approved_at"),
+      managerName: (0, import_pg_core.text)("manager_name"),
+      managerEmail: (0, import_pg_core.text)("manager_email"),
+      // Tracks when/where the timesheet was sent to a Project Executive for approval.
+      // Manager signature is gated on sentAt being non-null (see PATCH /api/timesheets/:id).
+      sentAt: (0, import_pg_core.text)("sent_at"),
+      sentTo: (0, import_pg_core.text)("sent_to"),
       notes: (0, import_pg_core.text)("notes"),
       createdAt: (0, import_pg_core.text)("created_at").notNull(),
       updatedAt: (0, import_pg_core.text)("updated_at")
@@ -392,6 +715,106 @@ var init_schema = __esm({
       activities: (0, import_pg_core.text)("activities"),
       createdAt: (0, import_pg_core.text)("created_at").notNull()
     });
+    mobilizationPlans = (0, import_pg_core.pgTable)("mobilization_plans", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull().unique(),
+      status: (0, import_pg_core.text)("status").notNull().default("planning"),
+      // planning | in_progress | complete
+      targetStartDate: (0, import_pg_core.text)("target_start_date").notNull(),
+      startedAt: (0, import_pg_core.text)("started_at"),
+      completedAt: (0, import_pg_core.text)("completed_at"),
+      notes: (0, import_pg_core.text)("notes")
+    });
+    mobilizationItems = (0, import_pg_core.pgTable)("mobilization_items", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      section: (0, import_pg_core.text)("section").notNull(),
+      title: (0, import_pg_core.text)("title").notNull(),
+      description: (0, import_pg_core.text)("description"),
+      ownerId: (0, import_pg_core.integer)("owner_id"),
+      // team_members.id
+      targetDate: (0, import_pg_core.text)("target_date"),
+      status: (0, import_pg_core.text)("status").notNull().default("not_started"),
+      // not_started | in_progress | done | na
+      completedAt: (0, import_pg_core.text)("completed_at"),
+      sortOrder: (0, import_pg_core.integer)("sort_order").notNull().default(0),
+      notes: (0, import_pg_core.text)("notes")
+    });
+    mobilizationPermits = (0, import_pg_core.pgTable)("mobilization_permits", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      name: (0, import_pg_core.text)("name").notNull(),
+      agency: (0, import_pg_core.text)("agency"),
+      permitNumber: (0, import_pg_core.text)("permit_number"),
+      status: (0, import_pg_core.text)("status").notNull().default("Not Started"),
+      // Not Started | Applied | Approved | Rejected | Expired
+      appliedDate: (0, import_pg_core.text)("applied_date"),
+      approvedDate: (0, import_pg_core.text)("approved_date"),
+      expirationDate: (0, import_pg_core.text)("expiration_date"),
+      notes: (0, import_pg_core.text)("notes")
+    });
+    mobilizationEquipment = (0, import_pg_core.pgTable)("mobilization_equipment", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      name: (0, import_pg_core.text)("name").notNull(),
+      vendor: (0, import_pg_core.text)("vendor"),
+      arrivalDate: (0, import_pg_core.text)("arrival_date"),
+      onSiteConfirmed: (0, import_pg_core.boolean)("on_site_confirmed").notNull().default(false),
+      departureDate: (0, import_pg_core.text)("departure_date"),
+      notes: (0, import_pg_core.text)("notes")
+    });
+    mobilizationUtilities = (0, import_pg_core.pgTable)("mobilization_utilities", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      kind: (0, import_pg_core.text)("kind").notNull(),
+      // power | water | internet | wifi | cameras | security | lighting | hvac | other
+      provider: (0, import_pg_core.text)("provider"),
+      requestedDate: (0, import_pg_core.text)("requested_date"),
+      installedDate: (0, import_pg_core.text)("installed_date"),
+      accountNumber: (0, import_pg_core.text)("account_number"),
+      meterNumber: (0, import_pg_core.text)("meter_number"),
+      notes: (0, import_pg_core.text)("notes")
+    });
+    mobilizationStaff = (0, import_pg_core.pgTable)("mobilization_staff", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      teamMemberId: (0, import_pg_core.integer)("team_member_id").notNull(),
+      // team_members.id
+      startDate: (0, import_pg_core.text)("start_date"),
+      orientationDone: (0, import_pg_core.boolean)("orientation_done").notNull().default(false),
+      drugTestDone: (0, import_pg_core.boolean)("drug_test_done").notNull().default(false),
+      ppeIssued: (0, import_pg_core.boolean)("ppe_issued").notNull().default(false),
+      notes: (0, import_pg_core.text)("notes")
+    });
+    mobilizationSubs = (0, import_pg_core.pgTable)("mobilization_subs", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      trade: (0, import_pg_core.text)("trade").notNull(),
+      company: (0, import_pg_core.text)("company").notNull(),
+      contactName: (0, import_pg_core.text)("contact_name"),
+      phone: (0, import_pg_core.text)("phone"),
+      email: (0, import_pg_core.text)("email"),
+      insuranceOnFile: (0, import_pg_core.boolean)("insurance_on_file").notNull().default(false),
+      w9OnFile: (0, import_pg_core.boolean)("w9_on_file").notNull().default(false),
+      msaSigned: (0, import_pg_core.boolean)("msa_signed").notNull().default(false),
+      onSiteDate: (0, import_pg_core.text)("on_site_date"),
+      notes: (0, import_pg_core.text)("notes")
+    });
+    mobilizationRisks = (0, import_pg_core.pgTable)("mobilization_risks", {
+      id: (0, import_pg_core.serial)("id").primaryKey(),
+      projectId: (0, import_pg_core.integer)("project_id").notNull(),
+      risk: (0, import_pg_core.text)("risk").notNull(),
+      likelihood: (0, import_pg_core.text)("likelihood").notNull().default("med"),
+      // low | med | high
+      impact: (0, import_pg_core.text)("impact").notNull().default("med"),
+      // low | med | high
+      mitigation: (0, import_pg_core.text)("mitigation"),
+      ownerId: (0, import_pg_core.integer)("owner_id"),
+      // team_members.id
+      status: (0, import_pg_core.text)("status").notNull().default("open"),
+      // open | monitoring | mitigated | closed
+      notes: (0, import_pg_core.text)("notes")
+    });
     insertProjectSchema = (0, import_drizzle_zod.createInsertSchema)(projects).omit({ id: true });
     insertTaskSchema = (0, import_drizzle_zod.createInsertSchema)(tasks).omit({ id: true });
     insertRfiSchema = (0, import_drizzle_zod.createInsertSchema)(rfis).omit({ id: true });
@@ -403,6 +826,7 @@ var init_schema = __esm({
     insertTeamSchema = (0, import_drizzle_zod.createInsertSchema)(teamMembers).omit({ id: true });
     insertContactSchema = (0, import_drizzle_zod.createInsertSchema)(contacts).omit({ id: true });
     insertEquipmentSchema = (0, import_drizzle_zod.createInsertSchema)(equipment).omit({ id: true });
+    insertMaintenanceLogSchema = (0, import_drizzle_zod.createInsertSchema)(maintenanceLogs).omit({ id: true, createdAt: true });
     insertPhotoSchema = (0, import_drizzle_zod.createInsertSchema)(photos).omit({ id: true });
     insertDocumentSchema = (0, import_drizzle_zod.createInsertSchema)(documents).omit({ id: true });
     insertCompanyDocumentSchema = (0, import_drizzle_zod.createInsertSchema)(companyDocuments).omit({ id: true });
@@ -416,12 +840,32 @@ var init_schema = __esm({
     insertTimesheetSchema = (0, import_drizzle_zod.createInsertSchema)(timesheets).omit({ id: true, createdAt: true, updatedAt: true });
     insertTimeEntrySchema = (0, import_drizzle_zod.createInsertSchema)(timeEntries).omit({ id: true, createdAt: true });
     insertMilestoneSchema = (0, import_drizzle_zod.createInsertSchema)(milestones).omit({ id: true });
+    insertMobilizationPlanSchema = (0, import_drizzle_zod.createInsertSchema)(mobilizationPlans).omit({ id: true });
+    insertMobilizationItemSchema = (0, import_drizzle_zod.createInsertSchema)(mobilizationItems).omit({ id: true });
+    insertMobilizationPermitSchema = (0, import_drizzle_zod.createInsertSchema)(mobilizationPermits).omit({ id: true });
+    insertMobilizationEquipmentSchema = (0, import_drizzle_zod.createInsertSchema)(mobilizationEquipment).omit({ id: true });
+    insertMobilizationUtilitySchema = (0, import_drizzle_zod.createInsertSchema)(mobilizationUtilities).omit({ id: true });
+    insertMobilizationStaffSchema = (0, import_drizzle_zod.createInsertSchema)(mobilizationStaff).omit({ id: true });
+    insertMobilizationSubSchema = (0, import_drizzle_zod.createInsertSchema)(mobilizationSubs).omit({ id: true });
+    insertMobilizationRiskSchema = (0, import_drizzle_zod.createInsertSchema)(mobilizationRisks).omit({ id: true });
     insertSettingsSchema = (0, import_drizzle_zod.createInsertSchema)(appSettings).omit({ id: true, updatedAt: true });
     signupSchema = import_zod.z.object({
       email: import_zod.z.string().email(),
       password: import_zod.z.string().min(6, "Password must be at least 6 characters"),
       displayName: import_zod.z.string().min(1),
-      company: import_zod.z.string().optional()
+      company: import_zod.z.string().optional(),
+      // Multi-tenant: on signup the user picks a plan; we start a 14-day trial with card.
+      plan: import_zod.z.enum(["starter", "pro", "enterprise"]).optional(),
+      billing: import_zod.z.enum(["monthly", "annual"]).optional(),
+      // Optional: signup via an invite token (skips org creation + billing; joins the inviter's org).
+      inviteToken: import_zod.z.string().optional(),
+      // IANA timezone, e.g. "America/Denver". Captured from browser on signup.
+      // Validated on the server; falls back to America/Denver when invalid/missing.
+      timezone: import_zod.z.string().max(100).optional()
+    });
+    inviteCreateSchema = import_zod.z.object({
+      email: import_zod.z.string().email(),
+      role: import_zod.z.enum(["owner", "admin", "pm", "foreman", "viewer"])
     });
     loginSchema = import_zod.z.object({
       email: import_zod.z.string().email(),
@@ -454,6 +898,235 @@ var init_schema = __esm({
   }
 });
 
+// shared/mobilization-catalog.ts
+function addDays(isoDate, days) {
+  const base = isoDate ? new Date(isoDate) : /* @__PURE__ */ new Date();
+  const d = Number.isNaN(base.getTime()) ? /* @__PURE__ */ new Date() : base;
+  const out = new Date(d.getTime());
+  out.setDate(out.getDate() + days);
+  return out.toISOString().slice(0, 10);
+}
+function daysUntil(isoDate) {
+  if (!isoDate) return null;
+  const target = new Date(isoDate);
+  if (Number.isNaN(target.getTime())) return null;
+  const today = /* @__PURE__ */ new Date();
+  const a = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
+  const b = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((a - b) / 864e5);
+}
+function computeHealth(args) {
+  const { overallPct, hasBlockedPermit, daysToEarthwork } = args;
+  if (hasBlockedPermit) return "red";
+  if (overallPct < 60) return "red";
+  if (daysToEarthwork !== null && daysToEarthwork < 3 && overallPct < 80) return "red";
+  if (overallPct >= 90) return "green";
+  return "yellow";
+}
+function pct(done, total) {
+  if (total <= 0) return 0;
+  return Math.round(done / total * 100);
+}
+var MOBILIZATION_SECTIONS, UTILITY_KIND_LABELS, DEFAULT_MOBILIZATION_ITEMS, DEFAULT_PERMITS, DEFAULT_MILESTONE_OFFSETS, EARTHWORK_MILESTONE_TITLE, MOBILIZATION_MILESTONE_KIND, DEFAULT_ITEM_COUNT;
+var init_mobilization_catalog = __esm({
+  "shared/mobilization-catalog.ts"() {
+    "use strict";
+    MOBILIZATION_SECTIONS = [
+      "Project Information",
+      "Mobilization Objectives",
+      "Staffing Plan",
+      "Site Setup",
+      "Temporary Utilities",
+      "Equipment Mobilization",
+      "Permits",
+      "Procurement",
+      "Safety Mobilization",
+      "Environmental Plan",
+      "Communications Plan",
+      "Logistics Plan",
+      "Schedule",
+      "Risk Register",
+      "Mobilization Checklist"
+    ];
+    UTILITY_KIND_LABELS = {
+      power: "Temp Power",
+      water: "Water",
+      internet: "Internet",
+      wifi: "Site Wi-Fi",
+      cameras: "Cameras",
+      security: "Security",
+      lighting: "Lighting",
+      hvac: "HVAC",
+      other: "Other"
+    };
+    DEFAULT_MOBILIZATION_ITEMS = {
+      "Project Information": [
+        { title: "Confirm project name, number, and address", description: "Auto-populated from the project record \u2014 verify and correct in Project settings." },
+        { title: "Confirm owner and architect of record" },
+        { title: "Confirm contract value and delivery method" },
+        { title: "Confirm baseline start and substantial completion dates" }
+      ],
+      "Mobilization Objectives": [
+        { title: "Define mobilization success criteria" },
+        { title: "Set target date for field work to begin" },
+        { title: "Identify long-lead constraints that gate mobilization" },
+        { title: "Publish objectives to the project team" }
+      ],
+      "Staffing Plan": [
+        { title: "Assign Project Executive" },
+        { title: "Assign Project Manager" },
+        { title: "Assign Superintendent" },
+        { title: "Assign Field Engineer / Project Engineer" },
+        { title: "Assign Safety Manager" },
+        { title: "Confirm start dates and responsibilities for each role" }
+      ],
+      "Site Setup": [
+        { title: "Construction entrance" },
+        { title: "Fencing" },
+        { title: "Gates" },
+        { title: "Signage" },
+        { title: "Office trailers" },
+        { title: "Parking" },
+        { title: "Laydown yard" },
+        { title: "Material storage" },
+        { title: "Fuel storage" },
+        { title: "Portable toilets" },
+        { title: "Dumpster locations" },
+        { title: "First aid station" },
+        { title: "Emergency assembly point" }
+      ],
+      "Temporary Utilities": [
+        { title: "Temporary power" },
+        { title: "Temporary water" },
+        { title: "Internet service" },
+        { title: "Site Wi-Fi" },
+        { title: "Site cameras" },
+        { title: "Security system" },
+        { title: "Temporary lighting" },
+        { title: "Trailer HVAC" }
+      ],
+      "Equipment Mobilization": [
+        { title: "Tower / mobile crane" },
+        { title: "Excavator" },
+        { title: "Dozer" },
+        { title: "Skid steer" },
+        { title: "Telehandler / forklift" },
+        { title: "Generators" },
+        { title: "Light towers" },
+        { title: "Survey equipment" }
+      ],
+      Permits: [
+        { title: "Building Permit" },
+        { title: "Grading Permit" },
+        { title: "Utility Permit" },
+        { title: "Stormwater Permit" },
+        { title: "Environmental Permit" },
+        { title: "Fire Department Approval" },
+        { title: "OSHA Notifications" }
+      ],
+      Procurement: [
+        { title: "Structural steel", description: "Track ordered / approved / fab status / delivery date." },
+        { title: "HVAC equipment", description: "Track ordered / approved / fab status / delivery date." },
+        { title: "Electrical switchgear", description: "Track ordered / approved / fab status / delivery date." },
+        { title: "Generators", description: "Track ordered / approved / fab status / delivery date." },
+        { title: "Roofing", description: "Track ordered / approved / fab status / delivery date." },
+        { title: "Doors", description: "Track ordered / approved / fab status / delivery date." },
+        { title: "Windows", description: "Track ordered / approved / fab status / delivery date." }
+      ],
+      "Safety Mobilization": [
+        { title: "Site Safety Plan" },
+        { title: "Emergency Action Plan" },
+        { title: "OSHA orientation" },
+        { title: "PPE requirements" },
+        { title: "Drug testing" },
+        { title: "Site-specific training" },
+        { title: "Daily briefing process" },
+        { title: "Emergency contacts" }
+      ],
+      "Environmental Plan": [
+        { title: "Dust control" },
+        { title: "Noise mitigation" },
+        { title: "Erosion control" },
+        { title: "Stormwater protection" },
+        { title: "Spill kits" },
+        { title: "Waste management" },
+        { title: "Hazmat procedures" }
+      ],
+      "Communications Plan": [
+        { title: "Daily super meeting" },
+        { title: "Weekly owner meeting" },
+        { title: "Weekly sub meeting" },
+        { title: "Monthly exec review" },
+        { title: "RFI workflow" },
+        { title: "Submittal process" },
+        { title: "Change order process" },
+        { title: "Document control platform" }
+      ],
+      "Logistics Plan": [
+        { title: "Truck routes" },
+        { title: "Delivery hours" },
+        { title: "Crane access" },
+        { title: "Material laydown areas" },
+        { title: "Employee parking" },
+        { title: "Visitor parking" },
+        { title: "Traffic control" },
+        { title: "Gate schedule" }
+      ],
+      Schedule: [
+        { title: "Baseline mobilization schedule published" },
+        { title: "Notice to Proceed logged" },
+        { title: "Earthwork start date confirmed" },
+        { title: "Schedule reviewed with owner" }
+      ],
+      "Risk Register": [
+        { title: "Initial risk workshop held" },
+        { title: "Top mobilization risks logged with mitigations" },
+        { title: "Risk owners assigned" }
+      ],
+      "Mobilization Checklist": [
+        { title: "Contracts executed" },
+        { title: "Insurance received" },
+        { title: "Bonds received" },
+        { title: "Permits approved" },
+        { title: "Utilities installed" },
+        { title: "Office trailer operational" },
+        { title: "Internet active" },
+        { title: "Fencing complete" },
+        { title: "Safety orientation completed" },
+        { title: "First subs mobilized" },
+        { title: "Equipment on site" },
+        { title: "Site logistics approved" },
+        { title: "Emergency contacts posted" },
+        { title: "Environmental controls installed" },
+        { title: "Baseline schedule approved" }
+      ]
+    };
+    DEFAULT_PERMITS = [
+      { name: "Building Permit", agency: "City Building Department" },
+      { name: "Grading Permit", agency: "City Engineering" },
+      { name: "Utility Permit", agency: "Public Works" },
+      { name: "Stormwater Permit", agency: "State Environmental Agency" },
+      { name: "Environmental Permit", agency: "State Environmental Agency" },
+      { name: "Fire Department Approval", agency: "Fire Marshal" },
+      { name: "OSHA Notifications", agency: "OSHA" }
+    ];
+    DEFAULT_MILESTONE_OFFSETS = [
+      { title: "Notice to Proceed", dayOffset: 0 },
+      { title: "Survey Complete", dayOffset: 2 },
+      { title: "Site Fence Installed", dayOffset: 3 },
+      { title: "Temp Power Energized", dayOffset: 5 },
+      { title: "Site Office Operational", dayOffset: 7 },
+      { title: "Utilities Connected", dayOffset: 10 },
+      { title: "Equipment Delivered", dayOffset: 12 },
+      { title: "Safety Orientation Held", dayOffset: 13 },
+      { title: "Earthwork Begins", dayOffset: 14 }
+    ];
+    EARTHWORK_MILESTONE_TITLE = "Earthwork Begins";
+    MOBILIZATION_MILESTONE_KIND = "mobilization";
+    DEFAULT_ITEM_COUNT = Object.values(DEFAULT_MOBILIZATION_ITEMS).reduce((n, items) => n + items.length, 0);
+  }
+});
+
 // server/storage.ts
 var storage_exports = {};
 __export(storage_exports, {
@@ -465,14 +1138,14 @@ __export(storage_exports, {
   tokenSimilarity: () => tokenSimilarity
 });
 async function migrate() {
-  await sql`CREATE TABLE IF NOT EXISTS team_members (
+  await sql2`CREATE TABLE IF NOT EXISTS team_members (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL, role TEXT NOT NULL, trade TEXT NOT NULL,
     company TEXT NOT NULL, initials TEXT NOT NULL, color TEXT NOT NULL,
     email TEXT, phone TEXT, company_photo TEXT,
     access_level TEXT NOT NULL DEFAULT 'project_manager'
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS projects (
+  await sql2`CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL, number TEXT NOT NULL, client TEXT NOT NULL,
     type TEXT NOT NULL, status TEXT NOT NULL, address TEXT NOT NULL,
@@ -480,71 +1153,71 @@ async function migrate() {
     budget DOUBLE PRECISION NOT NULL, spent DOUBLE PRECISION NOT NULL, progress INTEGER NOT NULL,
     superintendent_id INTEGER
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS tasks (
+  await sql2`CREATE TABLE IF NOT EXISTS tasks (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, title TEXT NOT NULL, trade TEXT NOT NULL,
     status TEXT NOT NULL, priority TEXT NOT NULL, assignee_id INTEGER,
     due_date TEXT NOT NULL, start_date TEXT, end_date TEXT, seq INTEGER,
     depends_on TEXT
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS rfis (
+  await sql2`CREATE TABLE IF NOT EXISTS rfis (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, number TEXT NOT NULL, subject TEXT NOT NULL,
     status TEXT NOT NULL, assignee_id INTEGER,
     date_created TEXT NOT NULL, due_date TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS submittals (
+  await sql2`CREATE TABLE IF NOT EXISTS submittals (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, number TEXT NOT NULL, subject TEXT NOT NULL,
     type TEXT NOT NULL, status TEXT NOT NULL, assignee_id INTEGER,
     date_submitted TEXT NOT NULL, due_date TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS change_orders (
+  await sql2`CREATE TABLE IF NOT EXISTS change_orders (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, number TEXT NOT NULL, title TEXT NOT NULL,
     status TEXT NOT NULL, amount DOUBLE PRECISION NOT NULL, schedule_impact INTEGER NOT NULL,
     date_issued TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS action_items (
+  await sql2`CREATE TABLE IF NOT EXISTS action_items (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, title TEXT NOT NULL, owner TEXT NOT NULL,
     status TEXT NOT NULL, priority TEXT NOT NULL, due_date TEXT NOT NULL,
     source TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS daily_logs (
+  await sql2`CREATE TABLE IF NOT EXISTS daily_logs (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, date TEXT NOT NULL, author_id INTEGER,
     weather TEXT NOT NULL, temp INTEGER NOT NULL, crew_count INTEGER NOT NULL,
     summary TEXT NOT NULL, photos TEXT
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS punch_items (
+  await sql2`CREATE TABLE IF NOT EXISTS punch_items (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, title TEXT NOT NULL, location TEXT NOT NULL,
     trade TEXT NOT NULL, status TEXT NOT NULL, assignee_id INTEGER
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS contacts (
+  await sql2`CREATE TABLE IF NOT EXISTS contacts (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL, company TEXT NOT NULL, role TEXT NOT NULL,
     trade TEXT NOT NULL, type TEXT NOT NULL, phone TEXT NOT NULL, email TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS equipment (
+  await sql2`CREATE TABLE IF NOT EXISTS equipment (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL, type TEXT NOT NULL, status TEXT NOT NULL,
     project_id INTEGER, operator TEXT, location TEXT
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS photos (
+  await sql2`CREATE TABLE IF NOT EXISTS photos (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, caption TEXT NOT NULL, location TEXT NOT NULL,
     taken_by_id INTEGER, date TEXT NOT NULL, hue INTEGER NOT NULL,
     stored_file_name TEXT, original_file_name TEXT, mime_type TEXT, file_size_bytes INTEGER
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS documents (
+  await sql2`CREATE TABLE IF NOT EXISTS documents (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL,
     size TEXT NOT NULL, uploaded_by_id INTEGER, date TEXT NOT NULL,
     stored_file_name TEXT, original_file_name TEXT, mime_type TEXT, file_size_bytes INTEGER
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS company_documents (
+  await sql2`CREATE TABLE IF NOT EXISTS company_documents (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
     category TEXT NOT NULL,
@@ -563,7 +1236,7 @@ async function migrate() {
     mime_type TEXT,
     file_size_bytes INTEGER
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS deleted_items (
+  await sql2`CREATE TABLE IF NOT EXISTS deleted_items (
     id SERIAL PRIMARY KEY,
     entity_type TEXT NOT NULL,
     entity_id INTEGER NOT NULL,
@@ -572,30 +1245,48 @@ async function migrate() {
     deleted_at TEXT NOT NULL,
     deleted_by_id INTEGER
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS blueprints (
+  await sql2`CREATE TABLE IF NOT EXISTS blueprints (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, sheet_number TEXT NOT NULL, title TEXT NOT NULL,
     discipline TEXT NOT NULL, revision TEXT NOT NULL, status TEXT NOT NULL,
     uploaded_by_id INTEGER, date TEXT NOT NULL, hue INTEGER NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS drone_captures (
+  await sql2`CREATE TABLE IF NOT EXISTS drone_captures (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, title TEXT NOT NULL, capture_type TEXT NOT NULL,
     pilot TEXT, flight_date TEXT NOT NULL, altitude TEXT, area TEXT,
     status TEXT NOT NULL, hue INTEGER NOT NULL,
     stored_file_name TEXT, original_file_name TEXT, mime_type TEXT, file_size_bytes INTEGER
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS messages (
+  await sql2`CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL, author_id INTEGER,
     body TEXT NOT NULL, created_at TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS notes (
+  await sql2`CREATE TABLE IF NOT EXISTS project_events (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER,
+    project_id INTEGER NOT NULL,
+    actor_account_id INTEGER,
+    actor_name TEXT,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    subtitle TEXT,
+    meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+    source_type TEXT,
+    source_id INTEGER,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  await sql2`CREATE INDEX IF NOT EXISTS idx_project_events_project_time ON project_events(project_id, occurred_at DESC)`;
+  await sql2`CREATE INDEX IF NOT EXISTS idx_project_events_org_time ON project_events(organization_id, occurred_at DESC)`;
+  await sql2`CREATE INDEX IF NOT EXISTS idx_project_events_kind ON project_events(kind)`;
+  await sql2`CREATE TABLE IF NOT EXISTS notes (
     id SERIAL PRIMARY KEY,
     project_id INTEGER, body TEXT NOT NULL, color TEXT NOT NULL,
     x INTEGER NOT NULL, y INTEGER NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS integrations (
+  await sql2`CREATE TABLE IF NOT EXISTS integrations (
     id SERIAL PRIMARY KEY,
     key TEXT NOT NULL UNIQUE,
     connected BOOLEAN NOT NULL DEFAULT FALSE,
@@ -604,9 +1295,9 @@ async function migrate() {
     connected_at TEXT,
     config TEXT
   )`;
-  await sql`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'available'`;
-  await sql`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS account_label TEXT`;
-  await sql`CREATE TABLE IF NOT EXISTS subscribers (
+  await sql2`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'available'`;
+  await sql2`ALTER TABLE integrations ADD COLUMN IF NOT EXISTS account_label TEXT`;
+  await sql2`CREATE TABLE IF NOT EXISTS subscribers (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     plan TEXT NOT NULL,
@@ -614,7 +1305,7 @@ async function migrate() {
     company TEXT,
     created_at TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS demo_requests (
+  await sql2`CREATE TABLE IF NOT EXISTS demo_requests (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
@@ -624,12 +1315,12 @@ async function migrate() {
     notes TEXT,
     created_at TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS app_settings (
+  await sql2`CREATE TABLE IF NOT EXISTS app_settings (
     id INTEGER PRIMARY KEY,
     config TEXT NOT NULL DEFAULT '{}',
     updated_at TEXT NOT NULL
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS milestones (
+  await sql2`CREATE TABLE IF NOT EXISTS milestones (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL,
     title TEXT NOT NULL,
@@ -638,7 +1329,7 @@ async function migrate() {
     status TEXT NOT NULL,
     notes TEXT
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS accounts (
+  await sql2`CREATE TABLE IF NOT EXISTS accounts (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
@@ -648,41 +1339,46 @@ async function migrate() {
     company TEXT,
     created_at TEXT NOT NULL
   )`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS position TEXT`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_status TEXT`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_plan TEXT`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_billing TEXT`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_current_period_end TEXT`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending'`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_at TEXT`;
-  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
-  await sql`CREATE TABLE IF NOT EXISTS sessions (
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS position TEXT`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_status TEXT`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_plan TEXT`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_billing TEXT`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS subscription_current_period_end TEXT`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending'`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_at TEXT`;
+  await sql2`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
+  await sql2`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     account_id INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     expires_at TEXT NOT NULL
   )`;
-  await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS depends_on TEXT`;
-  await sql`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS photos TEXT`;
-  await sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS email TEXT`;
-  await sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS phone TEXT`;
-  await sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS company_photo TEXT`;
-  await sql`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS access_level TEXT NOT NULL DEFAULT 'project_manager'`;
-  await sql`ALTER TABLE documents ADD COLUMN IF NOT EXISTS stored_file_name TEXT`;
-  await sql`ALTER TABLE documents ADD COLUMN IF NOT EXISTS original_file_name TEXT`;
-  await sql`ALTER TABLE documents ADD COLUMN IF NOT EXISTS mime_type TEXT`;
-  await sql`ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER`;
-  await sql`ALTER TABLE photos ADD COLUMN IF NOT EXISTS stored_file_name TEXT`;
-  await sql`ALTER TABLE photos ADD COLUMN IF NOT EXISTS original_file_name TEXT`;
-  await sql`ALTER TABLE photos ADD COLUMN IF NOT EXISTS mime_type TEXT`;
-  await sql`ALTER TABLE photos ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER`;
-  await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS stored_file_name TEXT`;
-  await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS original_file_name TEXT`;
-  await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS mime_type TEXT`;
-  await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER`;
-  await sql`UPDATE team_members SET access_level = CASE
+  await sql2`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS depends_on TEXT`;
+  await sql2`ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS photos TEXT`;
+  await sql2`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS email TEXT`;
+  await sql2`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS phone TEXT`;
+  await sql2`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS company_photo TEXT`;
+  await sql2`ALTER TABLE team_members ADD COLUMN IF NOT EXISTS access_level TEXT NOT NULL DEFAULT 'project_manager'`;
+  await sql2`ALTER TABLE documents ADD COLUMN IF NOT EXISTS stored_file_name TEXT`;
+  await sql2`ALTER TABLE documents ADD COLUMN IF NOT EXISTS original_file_name TEXT`;
+  await sql2`ALTER TABLE documents ADD COLUMN IF NOT EXISTS mime_type TEXT`;
+  await sql2`ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER`;
+  await sql2`ALTER TABLE photos ADD COLUMN IF NOT EXISTS stored_file_name TEXT`;
+  await sql2`ALTER TABLE photos ADD COLUMN IF NOT EXISTS original_file_name TEXT`;
+  await sql2`ALTER TABLE photos ADD COLUMN IF NOT EXISTS mime_type TEXT`;
+  await sql2`ALTER TABLE photos ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER`;
+  await sql2`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS stored_file_name TEXT`;
+  await sql2`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS original_file_name TEXT`;
+  await sql2`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS mime_type TEXT`;
+  await sql2`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER`;
+  await sql2`ALTER TABLE punch_items ADD COLUMN IF NOT EXISTS priority TEXT`;
+  await sql2`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS trade TEXT`;
+  await sql2`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS trade TEXT`;
+  await sql2`ALTER TABLE submittals ADD COLUMN IF NOT EXISTS trade TEXT`;
+  await sql2`ALTER TABLE punch_items ADD COLUMN IF NOT EXISTS notes TEXT`;
+  await sql2`UPDATE team_members SET access_level = CASE
     WHEN role LIKE '%Executive%' THEN 'project_executive'
     WHEN role LIKE '%Superintendent%' THEN 'superintendent'
     WHEN role LIKE '%Foreman%' THEN 'foreman'
@@ -690,17 +1386,17 @@ async function migrate() {
     WHEN role LIKE '%Manager%' THEN 'project_manager'
     ELSE access_level END
     WHERE access_level = 'project_manager'`;
-  await sql`UPDATE team_members SET
+  await sql2`UPDATE team_members SET
     email = CASE WHEN email IS NULL OR email = '' THEN lower(replace(name,' ','.')) || '@' || lower(replace(replace(company,' ',''),'.','')) || '.com' ELSE email END,
     phone = CASE WHEN phone IS NULL OR phone = '' THEN '(303) 555-' || substr('0000' || ((id * 137) % 9000 + 1000)::text, -4) ELSE phone END`;
-  await sql`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  await sql2`CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id SERIAL PRIMARY KEY,
     token TEXT NOT NULL UNIQUE,
     account_id INTEGER NOT NULL REFERENCES accounts(id),
     expires_at TEXT NOT NULL,
     used_at TEXT
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS jarvis_memory (
+  await sql2`CREATE TABLE IF NOT EXISTS jarvis_memory (
     id SERIAL PRIMARY KEY,
     project_id INTEGER,
     question TEXT NOT NULL,
@@ -713,7 +1409,7 @@ async function migrate() {
     created_at TEXT NOT NULL,
     updated_at TEXT
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS timesheets (
+  await sql2`CREATE TABLE IF NOT EXISTS timesheets (
     id SERIAL PRIMARY KEY,
     project_id INTEGER NOT NULL,
     employee_name TEXT NOT NULL,
@@ -727,7 +1423,7 @@ async function migrate() {
     created_at TEXT NOT NULL,
     updated_at TEXT
   )`;
-  await sql`CREATE TABLE IF NOT EXISTS time_entries (
+  await sql2`CREATE TABLE IF NOT EXISTS time_entries (
     id SERIAL PRIMARY KEY,
     timesheet_id INTEGER NOT NULL REFERENCES timesheets(id) ON DELETE CASCADE,
     entry_date TEXT NOT NULL,
@@ -738,10 +1434,102 @@ async function migrate() {
     activities TEXT,
     created_at TEXT NOT NULL
   )`;
+  await sql2`CREATE TABLE IF NOT EXISTS mobilization_plans (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'planning',
+    target_start_date TEXT NOT NULL,
+    started_at TEXT,
+    completed_at TEXT,
+    notes TEXT
+  )`;
+  await sql2`CREATE TABLE IF NOT EXISTS mobilization_items (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    section TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    owner_id INTEGER,
+    target_date TEXT,
+    status TEXT NOT NULL DEFAULT 'not_started',
+    completed_at TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    notes TEXT
+  )`;
+  await sql2`CREATE TABLE IF NOT EXISTS mobilization_permits (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    agency TEXT,
+    permit_number TEXT,
+    status TEXT NOT NULL DEFAULT 'Not Started',
+    applied_date TEXT,
+    approved_date TEXT,
+    expiration_date TEXT,
+    notes TEXT
+  )`;
+  await sql2`CREATE TABLE IF NOT EXISTS mobilization_equipment (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    vendor TEXT,
+    arrival_date TEXT,
+    on_site_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    departure_date TEXT,
+    notes TEXT
+  )`;
+  await sql2`CREATE TABLE IF NOT EXISTS mobilization_utilities (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    provider TEXT,
+    requested_date TEXT,
+    installed_date TEXT,
+    account_number TEXT,
+    meter_number TEXT,
+    notes TEXT
+  )`;
+  await sql2`CREATE TABLE IF NOT EXISTS mobilization_staff (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    team_member_id INTEGER NOT NULL,
+    start_date TEXT,
+    orientation_done BOOLEAN NOT NULL DEFAULT FALSE,
+    drug_test_done BOOLEAN NOT NULL DEFAULT FALSE,
+    ppe_issued BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT
+  )`;
+  await sql2`CREATE TABLE IF NOT EXISTS mobilization_subs (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    trade TEXT NOT NULL,
+    company TEXT NOT NULL,
+    contact_name TEXT,
+    phone TEXT,
+    email TEXT,
+    insurance_on_file BOOLEAN NOT NULL DEFAULT FALSE,
+    w9_on_file BOOLEAN NOT NULL DEFAULT FALSE,
+    msa_signed BOOLEAN NOT NULL DEFAULT FALSE,
+    on_site_date TEXT,
+    notes TEXT
+  )`;
+  await sql2`CREATE TABLE IF NOT EXISTS mobilization_risks (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    risk TEXT NOT NULL,
+    likelihood TEXT NOT NULL DEFAULT 'med',
+    impact TEXT NOT NULL DEFAULT 'med',
+    mitigation TEXT,
+    owner_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'open',
+    notes TEXT
+  )`;
+  await sql2`CREATE INDEX IF NOT EXISTS mobilization_items_project_idx ON mobilization_items (project_id)`;
+  await sql2`CREATE INDEX IF NOT EXISTS mobilization_permits_project_idx ON mobilization_permits (project_id)`;
   const ownerEmail = (process.env.OWNER_EMAIL || "houston.sean90@gmail.com").trim().toLowerCase();
   if (ownerEmail) {
     try {
-      await sql`UPDATE accounts
+      await sql2`UPDATE accounts
         SET role = 'owner',
             approval_status = 'approved',
             approved_at = COALESCE(approved_at, ${(/* @__PURE__ */ new Date()).toISOString()}),
@@ -750,6 +1538,256 @@ async function migrate() {
     } catch (e) {
       console.error("[migrate] owner bootstrap failed:", e);
     }
+  }
+  try {
+    const settingsRow = await sql2`SELECT config FROM app_settings WHERE id = 1 LIMIT 1`;
+    let cfg = {};
+    if (settingsRow.length > 0) {
+      try {
+        cfg = JSON.parse(settingsRow[0].config || "{}");
+      } catch {
+        cfg = {};
+      }
+    }
+    if (!cfg.event_backfill_done) {
+      console.log("[migrate] running project_events backfill\u2026");
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, r.project_id, NULL, r.submitted_by,
+               'rfi.created',
+               'RFI ' || r.number || ' submitted \u2014 ' || r.subject,
+               NULL,
+               jsonb_build_object('status', r.status, 'priority', r.priority),
+               'rfi', r.id,
+               COALESCE(r.date_submitted::timestamptz, NOW())
+        FROM rfis r
+        JOIN projects p ON p.id = r.project_id
+        WHERE r.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='rfi' AND e.source_id=r.id AND e.kind='rfi.created')`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, r.project_id, NULL, r.submitted_by,
+               'rfi.resolved',
+               'RFI ' || r.number || ' resolved',
+               NULL,
+               jsonb_build_object('status', r.status),
+               'rfi', r.id,
+               COALESCE(r.date_submitted::timestamptz, NOW())
+        FROM rfis r
+        JOIN projects p ON p.id = r.project_id
+        WHERE r.deleted_at IS NULL
+          AND lower(r.status) IN ('closed','resolved','answered')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='rfi' AND e.source_id=r.id AND e.kind='rfi.resolved')`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, c.project_id, NULL, NULL,
+               'change_order.created',
+               'CO ' || c.number || ' requested \u2014 ' || c.title,
+               NULL,
+               jsonb_build_object('status', c.status, 'amount', c.amount),
+               'change_order', c.id,
+               COALESCE(c.date_issued::timestamptz, NOW())
+        FROM change_orders c
+        JOIN projects p ON p.id = c.project_id
+        WHERE c.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='change_order' AND e.source_id=c.id AND e.kind='change_order.created')`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, c.project_id, NULL, NULL,
+               'change_order.approved',
+               'CO ' || c.number || ' approved',
+               NULL,
+               jsonb_build_object('status', c.status, 'amount', c.amount),
+               'change_order', c.id,
+               COALESCE(c.date_issued::timestamptz, NOW())
+        FROM change_orders c
+        JOIN projects p ON p.id = c.project_id
+        WHERE c.deleted_at IS NULL
+          AND lower(c.status) IN ('approved','accepted','executed')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='change_order' AND e.source_id=c.id AND e.kind='change_order.approved')`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, d.project_id, NULL, d.superintendent,
+               'daily_log.submitted',
+               'Daily log submitted',
+               d.summary,
+               jsonb_build_object('weather', d.weather, 'temp', d.temp, 'crewCount', d.crew_count),
+               'daily_log', d.id,
+               COALESCE(d.date::timestamptz, NOW())
+        FROM daily_logs d
+        JOIN projects p ON p.id = d.project_id
+        WHERE d.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='daily_log' AND e.source_id=d.id)`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, pu.project_id, NULL, NULL,
+               'punch.created',
+               'Punch item added \u2014 ' || pu.title,
+               pu.location,
+               jsonb_build_object('status', pu.status, 'trade', pu.trade),
+               'punch', pu.id,
+               NOW()
+        FROM punch_items pu
+        JOIN projects p ON p.id = pu.project_id
+        WHERE pu.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='punch' AND e.source_id=pu.id AND e.kind='punch.created')`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, pu.project_id, NULL, NULL,
+               'punch.closed',
+               'Punch item closed \u2014 ' || pu.title,
+               NULL,
+               jsonb_build_object('status', pu.status),
+               'punch', pu.id,
+               NOW()
+        FROM punch_items pu
+        JOIN projects p ON p.id = pu.project_id
+        WHERE pu.deleted_at IS NULL
+          AND lower(pu.status) IN ('closed','complete','completed','resolved','done')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='punch' AND e.source_id=pu.id AND e.kind='punch.closed')`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, ph.project_id, NULL, NULL,
+               'photo.uploaded',
+               'Photo uploaded \u2014 ' || COALESCE(ph.title, 'Untitled'),
+               ph.description,
+               jsonb_build_object('location', ph.location, 'trade', ph.trade),
+               'photo', ph.id,
+               COALESCE(ph.date::timestamptz, NOW())
+        FROM photos ph
+        JOIN projects p ON p.id = ph.project_id
+        WHERE ph.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='photo' AND e.source_id=ph.id)`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, t.project_id, NULL, NULL,
+               'task.created',
+               'Task created \u2014 ' || t.title,
+               t.trade,
+               jsonb_build_object('status', t.status, 'priority', t.priority),
+               'task', t.id,
+               COALESCE(t.start_date::timestamptz, NOW())
+        FROM tasks t
+        JOIN projects p ON p.id = t.project_id
+        WHERE t.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='task' AND e.source_id=t.id AND e.kind='task.created')`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, t.project_id, NULL, NULL,
+               'task.completed',
+               'Task completed \u2014 ' || t.title,
+               NULL,
+               jsonb_build_object('status', t.status),
+               'task', t.id,
+               COALESCE(t.end_date::timestamptz, NOW())
+        FROM tasks t
+        JOIN projects p ON p.id = t.project_id
+        WHERE t.deleted_at IS NULL
+          AND lower(t.status) IN ('done','complete','completed','closed')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='task' AND e.source_id=t.id AND e.kind='task.completed')`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, d.project_id, NULL, NULL,
+               'doc.uploaded',
+               'Document uploaded \u2014 ' || d.name,
+               NULL,
+               jsonb_build_object('type', d.type, 'size', d.size),
+               'document', d.id,
+               COALESCE(d.date::timestamptz, NOW())
+        FROM documents d
+        JOIN projects p ON p.id = d.project_id
+        WHERE d.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='document' AND e.source_id=d.id)`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, b.project_id, NULL, NULL,
+               'blueprint.uploaded',
+               'Blueprint uploaded \u2014 ' || b.title,
+               b.sheet_number,
+               jsonb_build_object('discipline', b.discipline, 'revision', b.revision),
+               'blueprint', b.id,
+               COALESCE(b.date::timestamptz, NOW())
+        FROM blueprints b
+        JOIN projects p ON p.id = b.project_id
+        WHERE b.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='blueprint' AND e.source_id=b.id)`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, dc.project_id, NULL, NULL,
+               'drone.captured',
+               'Drone capture \u2014 ' || COALESCE(dc.title, 'Untitled'),
+               dc.notes,
+               jsonb_build_object('altitude', dc.altitude, 'weather', dc.weather),
+               'drone_capture', dc.id,
+               COALESCE(dc.flight_date::timestamptz, NOW())
+        FROM drone_captures dc
+        JOIN projects p ON p.id = dc.project_id
+        WHERE dc.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='drone_capture' AND e.source_id=dc.id)`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, fp.project_id, fp.account_id,
+               COALESCE((SELECT display_name FROM accounts a WHERE a.id = fp.account_id), 'Field worker'),
+               CASE WHEN lower(fp.kind) = 'in' THEN 'timesheet.clockin' ELSE 'timesheet.clockout' END,
+               CASE WHEN lower(fp.kind) = 'in' THEN 'Clocked in' ELSE 'Clocked out' END,
+               NULL,
+               jsonb_build_object('source', 'field_punch'),
+               'field_punch', fp.id,
+               COALESCE(fp.punched_at::timestamptz, NOW())
+        FROM field_punches fp
+        JOIN projects p ON p.id = fp.project_id
+        WHERE lower(fp.kind) IN ('in','out')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='field_punch' AND e.source_id=fp.id)`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, fo.project_id, fo.account_id,
+               COALESCE((SELECT display_name FROM accounts a WHERE a.id = fo.account_id), 'Field worker'),
+               'observation.logged',
+               'Field observation \u2014 ' || COALESCE(fo.category, 'Note'),
+               fo.note,
+               jsonb_build_object('severity', fo.severity),
+               'field_observation', fo.id,
+               COALESCE(fo.observed_at::timestamptz, NOW())
+        FROM field_observations fo
+        JOIN projects p ON p.id = fo.project_id
+        WHERE NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='field_observation' AND e.source_id=fo.id)`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, m.project_id, NULL, NULL,
+               'milestone.reached',
+               'Milestone reached \u2014 ' || m.title,
+               m.notes,
+               jsonb_build_object('status', m.status, 'kind', m.kind),
+               'milestone', m.id,
+               COALESCE(m.date::timestamptz, NOW())
+        FROM milestones m
+        JOIN projects p ON p.id = m.project_id
+        WHERE lower(m.status) LIKE 'complete%'
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='milestone' AND e.source_id=m.id)`;
+      await sql2`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, n.project_id, NULL, NULL,
+               'note.added',
+               'Note added',
+               LEFT(n.text, 200),
+               '{}'::jsonb,
+               'note', n.id,
+               COALESCE(n.created_at::timestamptz, NOW())
+        FROM notes n
+        JOIN projects p ON p.id = n.project_id
+        WHERE n.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='note' AND e.source_id=n.id)`;
+      cfg.event_backfill_done = true;
+      const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+      if (settingsRow.length > 0) {
+        await sql2`UPDATE app_settings SET config = ${JSON.stringify(cfg)}, updated_at = ${nowIso} WHERE id = 1`;
+      } else {
+        await sql2`INSERT INTO app_settings (id, config, updated_at) VALUES (1, ${JSON.stringify(cfg)}, ${nowIso})`;
+      }
+      console.log("[migrate] project_events backfill complete");
+    }
+  } catch (e) {
+    console.warn("[migrate] project_events backfill skipped:", e?.message ?? e);
   }
 }
 function ensureReady() {
@@ -850,14 +1888,15 @@ function inferTopic(q) {
   if (/permit|inspection|city|county|jurisdiction/.test(lower)) return "permits";
   return null;
 }
-var import_neon_http, import_serverless, import_drizzle_orm, import_node_fs, import_node_path, import_node_crypto, RAW_CONN, CONN, sql, db, initPromise, DatabaseStorage, seedDone, storage;
+var import_neon_http, import_serverless, import_drizzle_orm2, import_node_fs, import_node_path, import_node_crypto, RAW_CONN, CONN, sql2, db, initPromise, DatabaseStorage, seedDone, storage;
 var init_storage = __esm({
   "server/storage.ts"() {
     "use strict";
     init_schema();
+    init_mobilization_catalog();
     import_neon_http = require("drizzle-orm/neon-http");
     import_serverless = require("@neondatabase/serverless");
-    import_drizzle_orm = require("drizzle-orm");
+    import_drizzle_orm2 = require("drizzle-orm");
     import_node_fs = require("node:fs");
     import_node_path = require("node:path");
     import_node_crypto = require("node:crypto");
@@ -867,17 +1906,18 @@ var init_storage = __esm({
       console.error(msg);
     }
     CONN = RAW_CONN ? RAW_CONN.replace(/-pooler\./, ".").replace(/[?&]channel_binding=[^&]*/g, "").replace(/[?&]sslmode=[^&]*/g, "").replace(/\?$/, "") : "postgresql://user:pass@localhost/placeholder";
-    sql = (0, import_serverless.neon)(CONN);
-    db = (0, import_neon_http.drizzle)(sql);
+    sql2 = (0, import_serverless.neon)(CONN);
+    db = (0, import_neon_http.drizzle)(sql2);
     initPromise = null;
     DatabaseStorage = class {
-      async getTeam() {
+      async getTeam(organizationId) {
         await ensureReady();
+        if (organizationId !== void 0) return await db.select().from(teamMembers).where((0, import_drizzle_orm2.eq)(teamMembers.organizationId, organizationId));
         return await db.select().from(teamMembers);
       }
       async getTeamMember(id) {
         await ensureReady();
-        const rows = await db.select().from(teamMembers).where((0, import_drizzle_orm.eq)(teamMembers.id, id));
+        const rows = await db.select().from(teamMembers).where((0, import_drizzle_orm2.eq)(teamMembers.id, id));
         return rows[0];
       }
       async createTeamMember(data) {
@@ -887,20 +1927,21 @@ var init_storage = __esm({
       }
       async updateTeamMember(id, data) {
         await ensureReady();
-        const [row] = await db.update(teamMembers).set(data).where((0, import_drizzle_orm.eq)(teamMembers.id, id)).returning();
+        const [row] = await db.update(teamMembers).set(data).where((0, import_drizzle_orm2.eq)(teamMembers.id, id)).returning();
         return row;
       }
       async deleteTeamMember(id) {
         await ensureReady();
-        await db.delete(teamMembers).where((0, import_drizzle_orm.eq)(teamMembers.id, id));
+        await db.delete(teamMembers).where((0, import_drizzle_orm2.eq)(teamMembers.id, id));
       }
-      async getProjects() {
+      async getProjects(organizationId) {
         await ensureReady();
+        if (organizationId !== void 0) return await db.select().from(projects).where((0, import_drizzle_orm2.eq)(projects.organizationId, organizationId));
         return await db.select().from(projects);
       }
       async getProject(id) {
         await ensureReady();
-        const rows = await db.select().from(projects).where((0, import_drizzle_orm.eq)(projects.id, id));
+        const rows = await db.select().from(projects).where((0, import_drizzle_orm2.eq)(projects.id, id));
         return rows[0];
       }
       async createProject(data) {
@@ -913,12 +1954,12 @@ var init_storage = __esm({
       }
       async updateProject(id, data) {
         await ensureReady();
-        const [row] = await db.update(projects).set(data).where((0, import_drizzle_orm.eq)(projects.id, id)).returning();
+        const [row] = await db.update(projects).set(data).where((0, import_drizzle_orm2.eq)(projects.id, id)).returning();
         return row;
       }
       async getTasks(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(tasks).where((0, import_drizzle_orm.eq)(tasks.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(tasks).where((0, import_drizzle_orm2.eq)(tasks.projectId, projectId));
         return await db.select().from(tasks);
       }
       async createTask(data) {
@@ -928,12 +1969,12 @@ var init_storage = __esm({
       }
       async updateTaskStatus(id, status) {
         await ensureReady();
-        const [row] = await db.update(tasks).set({ status }).where((0, import_drizzle_orm.eq)(tasks.id, id)).returning();
+        const [row] = await db.update(tasks).set({ status }).where((0, import_drizzle_orm2.eq)(tasks.id, id)).returning();
         return row;
       }
       async getRfis(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(rfis).where((0, import_drizzle_orm.eq)(rfis.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(rfis).where((0, import_drizzle_orm2.eq)(rfis.projectId, projectId));
         return await db.select().from(rfis);
       }
       async createRfi(data) {
@@ -943,12 +1984,12 @@ var init_storage = __esm({
       }
       async updateRfiStatus(id, status) {
         await ensureReady();
-        const [row] = await db.update(rfis).set({ status }).where((0, import_drizzle_orm.eq)(rfis.id, id)).returning();
+        const [row] = await db.update(rfis).set({ status }).where((0, import_drizzle_orm2.eq)(rfis.id, id)).returning();
         return row;
       }
       async getSubmittals(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(submittals).where((0, import_drizzle_orm.eq)(submittals.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(submittals).where((0, import_drizzle_orm2.eq)(submittals.projectId, projectId));
         return await db.select().from(submittals);
       }
       async createSubmittal(data) {
@@ -958,12 +1999,12 @@ var init_storage = __esm({
       }
       async updateSubmittalStatus(id, status) {
         await ensureReady();
-        const [row] = await db.update(submittals).set({ status }).where((0, import_drizzle_orm.eq)(submittals.id, id)).returning();
+        const [row] = await db.update(submittals).set({ status }).where((0, import_drizzle_orm2.eq)(submittals.id, id)).returning();
         return row;
       }
       async getChangeOrders(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(changeOrders).where((0, import_drizzle_orm.eq)(changeOrders.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(changeOrders).where((0, import_drizzle_orm2.eq)(changeOrders.projectId, projectId));
         return await db.select().from(changeOrders);
       }
       async createChangeOrder(data) {
@@ -973,12 +2014,12 @@ var init_storage = __esm({
       }
       async updateChangeOrderStatus(id, status) {
         await ensureReady();
-        const [row] = await db.update(changeOrders).set({ status }).where((0, import_drizzle_orm.eq)(changeOrders.id, id)).returning();
+        const [row] = await db.update(changeOrders).set({ status }).where((0, import_drizzle_orm2.eq)(changeOrders.id, id)).returning();
         return row;
       }
       async getActionItems(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(actionItems).where((0, import_drizzle_orm.eq)(actionItems.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(actionItems).where((0, import_drizzle_orm2.eq)(actionItems.projectId, projectId));
         return await db.select().from(actionItems);
       }
       async createActionItem(data) {
@@ -988,12 +2029,12 @@ var init_storage = __esm({
       }
       async updateActionItemStatus(id, status) {
         await ensureReady();
-        const [row] = await db.update(actionItems).set({ status }).where((0, import_drizzle_orm.eq)(actionItems.id, id)).returning();
+        const [row] = await db.update(actionItems).set({ status }).where((0, import_drizzle_orm2.eq)(actionItems.id, id)).returning();
         return row;
       }
       async getDailyLogs(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(dailyLogs).where((0, import_drizzle_orm.eq)(dailyLogs.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(dailyLogs).where((0, import_drizzle_orm2.eq)(dailyLogs.projectId, projectId));
         return await db.select().from(dailyLogs);
       }
       async createDailyLog(data) {
@@ -1003,21 +2044,21 @@ var init_storage = __esm({
       }
       async updateDailyLog(id, data) {
         await ensureReady();
-        const [row] = await db.update(dailyLogs).set(data).where((0, import_drizzle_orm.eq)(dailyLogs.id, id)).returning();
+        const [row] = await db.update(dailyLogs).set(data).where((0, import_drizzle_orm2.eq)(dailyLogs.id, id)).returning();
         return row;
       }
       async deleteDailyLog(id) {
         await ensureReady();
-        await db.delete(dailyLogs).where((0, import_drizzle_orm.eq)(dailyLogs.id, id));
+        await db.delete(dailyLogs).where((0, import_drizzle_orm2.eq)(dailyLogs.id, id));
       }
       async getPunchItems(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(punchItems).where((0, import_drizzle_orm.eq)(punchItems.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(punchItems).where((0, import_drizzle_orm2.eq)(punchItems.projectId, projectId));
         return await db.select().from(punchItems);
       }
       async updatePunchStatus(id, status) {
         await ensureReady();
-        const [row] = await db.update(punchItems).set({ status }).where((0, import_drizzle_orm.eq)(punchItems.id, id)).returning();
+        const [row] = await db.update(punchItems).set({ status }).where((0, import_drizzle_orm2.eq)(punchItems.id, id)).returning();
         return row;
       }
       async createPunchItem(data) {
@@ -1025,8 +2066,9 @@ var init_storage = __esm({
         const [row] = await db.insert(punchItems).values(data).returning();
         return row;
       }
-      async getContacts() {
+      async getContacts(organizationId) {
         await ensureReady();
+        if (organizationId !== void 0) return await db.select().from(contacts).where((0, import_drizzle_orm2.eq)(contacts.organizationId, organizationId));
         return await db.select().from(contacts);
       }
       async createContact(data) {
@@ -1036,31 +2078,63 @@ var init_storage = __esm({
       }
       async updateContact(id, data) {
         await ensureReady();
-        const [row] = await db.update(contacts).set(data).where((0, import_drizzle_orm.eq)(contacts.id, id)).returning();
+        const [row] = await db.update(contacts).set(data).where((0, import_drizzle_orm2.eq)(contacts.id, id)).returning();
         return row;
       }
       async deleteContact(id) {
         await ensureReady();
-        await db.delete(contacts).where((0, import_drizzle_orm.eq)(contacts.id, id));
+        await db.delete(contacts).where((0, import_drizzle_orm2.eq)(contacts.id, id));
       }
-      async getEquipment(projectId) {
+      async getEquipment(projectId, organizationId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(equipment).where((0, import_drizzle_orm.eq)(equipment.projectId, projectId));
-        return await db.select().from(equipment);
+        const conds = [];
+        if (projectId !== void 0) conds.push((0, import_drizzle_orm2.eq)(equipment.projectId, projectId));
+        if (organizationId !== void 0) conds.push((0, import_drizzle_orm2.eq)(equipment.organizationId, organizationId));
+        if (conds.length === 0) return await db.select().from(equipment);
+        if (conds.length === 1) return await db.select().from(equipment).where(conds[0]);
+        return await db.select().from(equipment).where((0, import_drizzle_orm2.and)(...conds));
+      }
+      async getEquipmentById(id) {
+        await ensureReady();
+        const rows = await db.select().from(equipment).where((0, import_drizzle_orm2.eq)(equipment.id, id));
+        return rows[0];
       }
       async createEquipment(data) {
         await ensureReady();
         const [row] = await db.insert(equipment).values(data).returning();
         return row;
       }
+      async updateEquipment(id, patch) {
+        await ensureReady();
+        const [row] = await db.update(equipment).set(patch).where((0, import_drizzle_orm2.eq)(equipment.id, id)).returning();
+        return row;
+      }
+      async deleteEquipment(id) {
+        await ensureReady();
+        await db.delete(equipment).where((0, import_drizzle_orm2.eq)(equipment.id, id));
+        await db.delete(maintenanceLogs).where((0, import_drizzle_orm2.eq)(maintenanceLogs.equipmentId, id));
+      }
+      async getMaintenanceLogs(equipmentId) {
+        await ensureReady();
+        return await db.select().from(maintenanceLogs).where((0, import_drizzle_orm2.eq)(maintenanceLogs.equipmentId, equipmentId)).orderBy((0, import_drizzle_orm2.desc)(maintenanceLogs.date));
+      }
+      async addMaintenanceLog(data) {
+        await ensureReady();
+        const [row] = await db.insert(maintenanceLogs).values({ ...data, createdAt: (/* @__PURE__ */ new Date()).toISOString() }).returning();
+        return row;
+      }
+      async deleteMaintenanceLog(id) {
+        await ensureReady();
+        await db.delete(maintenanceLogs).where((0, import_drizzle_orm2.eq)(maintenanceLogs.id, id));
+      }
       async getPhotos(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(photos).where((0, import_drizzle_orm.eq)(photos.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(photos).where((0, import_drizzle_orm2.eq)(photos.projectId, projectId));
         return await db.select().from(photos);
       }
       async getPhoto(id) {
         await ensureReady();
-        const rows = await db.select().from(photos).where((0, import_drizzle_orm.eq)(photos.id, id));
+        const rows = await db.select().from(photos).where((0, import_drizzle_orm2.eq)(photos.id, id));
         return rows[0];
       }
       async createPhoto(data) {
@@ -1070,16 +2144,16 @@ var init_storage = __esm({
       }
       async deletePhoto(id) {
         await ensureReady();
-        await db.delete(photos).where((0, import_drizzle_orm.eq)(photos.id, id));
+        await db.delete(photos).where((0, import_drizzle_orm2.eq)(photos.id, id));
       }
       async getDocuments(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(documents).where((0, import_drizzle_orm.eq)(documents.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(documents).where((0, import_drizzle_orm2.eq)(documents.projectId, projectId));
         return await db.select().from(documents);
       }
       async getDocument(id) {
         await ensureReady();
-        const rows = await db.select().from(documents).where((0, import_drizzle_orm.eq)(documents.id, id));
+        const rows = await db.select().from(documents).where((0, import_drizzle_orm2.eq)(documents.id, id));
         return rows[0];
       }
       async createDocument(data) {
@@ -1089,15 +2163,18 @@ var init_storage = __esm({
       }
       async deleteDocument(id) {
         await ensureReady();
-        await db.delete(documents).where((0, import_drizzle_orm.eq)(documents.id, id));
+        await db.delete(documents).where((0, import_drizzle_orm2.eq)(documents.id, id));
       }
-      async getCompanyDocuments() {
+      async getCompanyDocuments(organizationId) {
         await ensureReady();
-        return await db.select().from(companyDocuments).orderBy((0, import_drizzle_orm.desc)(companyDocuments.date));
+        if (organizationId !== void 0) {
+          return await db.select().from(companyDocuments).where((0, import_drizzle_orm2.eq)(companyDocuments.organizationId, organizationId)).orderBy((0, import_drizzle_orm2.desc)(companyDocuments.date));
+        }
+        return await db.select().from(companyDocuments).orderBy((0, import_drizzle_orm2.desc)(companyDocuments.date));
       }
       async getCompanyDocument(id) {
         await ensureReady();
-        const rows = await db.select().from(companyDocuments).where((0, import_drizzle_orm.eq)(companyDocuments.id, id));
+        const rows = await db.select().from(companyDocuments).where((0, import_drizzle_orm2.eq)(companyDocuments.id, id));
         return rows[0];
       }
       async createCompanyDocument(data) {
@@ -1107,12 +2184,12 @@ var init_storage = __esm({
       }
       async updateCompanyDocument(id, data) {
         await ensureReady();
-        const [row] = await db.update(companyDocuments).set(data).where((0, import_drizzle_orm.eq)(companyDocuments.id, id)).returning();
+        const [row] = await db.update(companyDocuments).set(data).where((0, import_drizzle_orm2.eq)(companyDocuments.id, id)).returning();
         return row;
       }
       async deleteCompanyDocument(id) {
         await ensureReady();
-        await db.delete(companyDocuments).where((0, import_drizzle_orm.eq)(companyDocuments.id, id));
+        await db.delete(companyDocuments).where((0, import_drizzle_orm2.eq)(companyDocuments.id, id));
       }
       // ---- Deleted Items Bin ----
       ENTITY_CONFIG = {
@@ -1136,18 +2213,18 @@ var init_storage = __esm({
       };
       async getDeletedItems() {
         await ensureReady();
-        return await db.select().from(deletedItems).orderBy((0, import_drizzle_orm.desc)(deletedItems.deletedAt));
+        return await db.select().from(deletedItems).orderBy((0, import_drizzle_orm2.desc)(deletedItems.deletedAt));
       }
       async softDeleteEntity(entityType, entityId, deletedById) {
         await ensureReady();
         const cfg = this.ENTITY_CONFIG[entityType];
         if (!cfg) throw new Error(`Unknown entity type: ${entityType}`);
-        const rows = await db.select().from(cfg.table).where((0, import_drizzle_orm.eq)(cfg.table.id, entityId));
+        const rows = await db.select().from(cfg.table).where((0, import_drizzle_orm2.eq)(cfg.table.id, entityId));
         const row = rows[0];
         if (!row) throw new Error(`${entityType} #${entityId} not found`);
         let projectName = null;
         if (cfg.projectCol && row[cfg.projectCol]) {
-          const projRows = await db.select().from(projects).where((0, import_drizzle_orm.eq)(projects.id, row[cfg.projectCol]));
+          const projRows = await db.select().from(projects).where((0, import_drizzle_orm2.eq)(projects.id, row[cfg.projectCol]));
           projectName = projRows[0]?.name ?? null;
         }
         const [deleted] = await db.insert(deletedItems).values({
@@ -1158,25 +2235,25 @@ var init_storage = __esm({
           deletedAt: (/* @__PURE__ */ new Date()).toISOString(),
           deletedById: deletedById ?? null
         }).returning();
-        await db.delete(cfg.table).where((0, import_drizzle_orm.eq)(cfg.table.id, entityId));
+        await db.delete(cfg.table).where((0, import_drizzle_orm2.eq)(cfg.table.id, entityId));
         return deleted;
       }
       async restoreEntity(entityType, entityId) {
         await ensureReady();
         const cfg = this.ENTITY_CONFIG[entityType];
         if (!cfg) throw new Error(`Unknown entity type: ${entityType}`);
-        const binRows = await db.select().from(deletedItems).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(deletedItems.entityType, entityType), (0, import_drizzle_orm.eq)(deletedItems.entityId, entityId)));
+        const binRows = await db.select().from(deletedItems).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(deletedItems.entityType, entityType), (0, import_drizzle_orm2.eq)(deletedItems.entityId, entityId)));
         const binRow = binRows[0];
         if (!binRow) throw new Error(`Deleted ${entityType} #${entityId} not found in bin`);
         const rowData = JSON.parse(binRow.data);
         const { id, ...rest } = rowData;
         const restored = (await db.insert(cfg.table).values(rest).returning())[0];
-        await db.delete(deletedItems).where((0, import_drizzle_orm.eq)(deletedItems.id, binRow.id));
+        await db.delete(deletedItems).where((0, import_drizzle_orm2.eq)(deletedItems.id, binRow.id));
         return restored;
       }
       async permanentDeleteEntity(entityType, entityId) {
         await ensureReady();
-        await db.delete(deletedItems).where((0, import_drizzle_orm.and)((0, import_drizzle_orm.eq)(deletedItems.entityType, entityType), (0, import_drizzle_orm.eq)(deletedItems.entityId, entityId)));
+        await db.delete(deletedItems).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(deletedItems.entityType, entityType), (0, import_drizzle_orm2.eq)(deletedItems.entityId, entityId)));
       }
       async emptyDeletedItems() {
         await ensureReady();
@@ -1184,7 +2261,7 @@ var init_storage = __esm({
       }
       async getBlueprints(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(blueprints).where((0, import_drizzle_orm.eq)(blueprints.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(blueprints).where((0, import_drizzle_orm2.eq)(blueprints.projectId, projectId));
         return await db.select().from(blueprints);
       }
       async createBlueprint(data) {
@@ -1194,12 +2271,12 @@ var init_storage = __esm({
       }
       async getDroneCaptures(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(droneCaptures).where((0, import_drizzle_orm.eq)(droneCaptures.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(droneCaptures).where((0, import_drizzle_orm2.eq)(droneCaptures.projectId, projectId));
         return await db.select().from(droneCaptures);
       }
       async getDroneCapture(id) {
         await ensureReady();
-        const rows = await db.select().from(droneCaptures).where((0, import_drizzle_orm.eq)(droneCaptures.id, id));
+        const rows = await db.select().from(droneCaptures).where((0, import_drizzle_orm2.eq)(droneCaptures.id, id));
         return rows[0];
       }
       async createDroneCapture(data) {
@@ -1209,18 +2286,18 @@ var init_storage = __esm({
       }
       async deleteDroneCapture(id) {
         await ensureReady();
-        await db.delete(droneCaptures).where((0, import_drizzle_orm.eq)(droneCaptures.id, id));
+        await db.delete(droneCaptures).where((0, import_drizzle_orm2.eq)(droneCaptures.id, id));
       }
       async getMilestones(projectId) {
         await ensureReady();
         if (projectId) {
-          return await db.select().from(milestones).where((0, import_drizzle_orm.eq)(milestones.projectId, projectId));
+          return await db.select().from(milestones).where((0, import_drizzle_orm2.eq)(milestones.projectId, projectId));
         }
         return await db.select().from(milestones);
       }
       async getMilestone(id) {
         await ensureReady();
-        const rows = await db.select().from(milestones).where((0, import_drizzle_orm.eq)(milestones.id, id));
+        const rows = await db.select().from(milestones).where((0, import_drizzle_orm2.eq)(milestones.id, id));
         return rows[0];
       }
       async createMilestone(data) {
@@ -1230,16 +2307,214 @@ var init_storage = __esm({
       }
       async updateMilestone(id, data) {
         await ensureReady();
-        const [row] = await db.update(milestones).set(data).where((0, import_drizzle_orm.eq)(milestones.id, id)).returning();
+        const [row] = await db.update(milestones).set(data).where((0, import_drizzle_orm2.eq)(milestones.id, id)).returning();
         return row;
       }
       async deleteMilestone(id) {
         await ensureReady();
-        await db.delete(milestones).where((0, import_drizzle_orm.eq)(milestones.id, id));
+        await db.delete(milestones).where((0, import_drizzle_orm2.eq)(milestones.id, id));
+      }
+      /* --------------------------- Mobilization --------------------------- */
+      // Seeds a fresh project's mobilization plan: the plan row, the full
+      // 15-section checklist, the 7 standard permits, and the milestone timeline.
+      // Equipment/utilities/subs/risks are intentionally NOT seeded — those are
+      // project-specific and get added by hand. Idempotent: bails if a plan
+      // already exists, so a retried project create can't double-seed.
+      async seedMobilization(projectId, startDate) {
+        await ensureReady();
+        const existing = await this.getMobilizationPlan(projectId);
+        if (existing) return;
+        const target = addDays(startDate, 0);
+        await db.insert(mobilizationPlans).values({
+          projectId,
+          status: "planning",
+          targetStartDate: target
+        });
+        const items = [];
+        MOBILIZATION_SECTIONS.forEach((section) => {
+          DEFAULT_MOBILIZATION_ITEMS[section].forEach((item, i) => {
+            items.push({
+              projectId,
+              section,
+              title: item.title,
+              description: item.description ?? null,
+              status: "not_started",
+              sortOrder: i
+            });
+          });
+        });
+        if (items.length > 0) await db.insert(mobilizationItems).values(items);
+        await db.insert(mobilizationPermits).values(
+          DEFAULT_PERMITS.map((p) => ({
+            projectId,
+            name: p.name,
+            agency: p.agency,
+            status: "Not Started"
+          }))
+        );
+        await db.insert(milestones).values(
+          DEFAULT_MILESTONE_OFFSETS.map((m) => ({
+            projectId,
+            title: m.title,
+            date: addDays(startDate, m.dayOffset),
+            kind: MOBILIZATION_MILESTONE_KIND,
+            status: "pending"
+          }))
+        );
+      }
+      async getMobilizationPlan(projectId) {
+        await ensureReady();
+        const rows = await db.select().from(mobilizationPlans).where((0, import_drizzle_orm2.eq)(mobilizationPlans.projectId, projectId));
+        return rows[0];
+      }
+      async upsertMobilizationPlan(projectId, data) {
+        await ensureReady();
+        const existing = await this.getMobilizationPlan(projectId);
+        if (!existing) {
+          const [row2] = await db.insert(mobilizationPlans).values({
+            projectId,
+            status: data.status ?? "planning",
+            targetStartDate: data.targetStartDate ?? addDays(null, 0),
+            startedAt: data.startedAt ?? null,
+            completedAt: data.completedAt ?? null,
+            notes: data.notes ?? null
+          }).returning();
+          return row2;
+        }
+        const { projectId: _ignored, ...patch } = data;
+        if (Object.keys(patch).length === 0) return existing;
+        const [row] = await db.update(mobilizationPlans).set(patch).where((0, import_drizzle_orm2.eq)(mobilizationPlans.projectId, projectId)).returning();
+        return row;
+      }
+      async getMobilizationItems(projectId) {
+        await ensureReady();
+        return await db.select().from(mobilizationItems).where((0, import_drizzle_orm2.eq)(mobilizationItems.projectId, projectId));
+      }
+      async createMobilizationItem(data) {
+        await ensureReady();
+        const [row] = await db.insert(mobilizationItems).values(data).returning();
+        return row;
+      }
+      async updateMobilizationItem(id, data) {
+        await ensureReady();
+        const [row] = await db.update(mobilizationItems).set(data).where((0, import_drizzle_orm2.eq)(mobilizationItems.id, id)).returning();
+        return row;
+      }
+      async deleteMobilizationItem(id) {
+        await ensureReady();
+        await db.delete(mobilizationItems).where((0, import_drizzle_orm2.eq)(mobilizationItems.id, id));
+      }
+      async getMobilizationPermits(projectId) {
+        await ensureReady();
+        return await db.select().from(mobilizationPermits).where((0, import_drizzle_orm2.eq)(mobilizationPermits.projectId, projectId));
+      }
+      async createMobilizationPermit(data) {
+        await ensureReady();
+        const [row] = await db.insert(mobilizationPermits).values(data).returning();
+        return row;
+      }
+      async updateMobilizationPermit(id, data) {
+        await ensureReady();
+        const [row] = await db.update(mobilizationPermits).set(data).where((0, import_drizzle_orm2.eq)(mobilizationPermits.id, id)).returning();
+        return row;
+      }
+      async deleteMobilizationPermit(id) {
+        await ensureReady();
+        await db.delete(mobilizationPermits).where((0, import_drizzle_orm2.eq)(mobilizationPermits.id, id));
+      }
+      async getMobilizationEquipment(projectId) {
+        await ensureReady();
+        return await db.select().from(mobilizationEquipment).where((0, import_drizzle_orm2.eq)(mobilizationEquipment.projectId, projectId));
+      }
+      async createMobilizationEquipment(data) {
+        await ensureReady();
+        const [row] = await db.insert(mobilizationEquipment).values(data).returning();
+        return row;
+      }
+      async updateMobilizationEquipment(id, data) {
+        await ensureReady();
+        const [row] = await db.update(mobilizationEquipment).set(data).where((0, import_drizzle_orm2.eq)(mobilizationEquipment.id, id)).returning();
+        return row;
+      }
+      async deleteMobilizationEquipment(id) {
+        await ensureReady();
+        await db.delete(mobilizationEquipment).where((0, import_drizzle_orm2.eq)(mobilizationEquipment.id, id));
+      }
+      async getMobilizationUtilities(projectId) {
+        await ensureReady();
+        return await db.select().from(mobilizationUtilities).where((0, import_drizzle_orm2.eq)(mobilizationUtilities.projectId, projectId));
+      }
+      async createMobilizationUtility(data) {
+        await ensureReady();
+        const [row] = await db.insert(mobilizationUtilities).values(data).returning();
+        return row;
+      }
+      async updateMobilizationUtility(id, data) {
+        await ensureReady();
+        const [row] = await db.update(mobilizationUtilities).set(data).where((0, import_drizzle_orm2.eq)(mobilizationUtilities.id, id)).returning();
+        return row;
+      }
+      async deleteMobilizationUtility(id) {
+        await ensureReady();
+        await db.delete(mobilizationUtilities).where((0, import_drizzle_orm2.eq)(mobilizationUtilities.id, id));
+      }
+      async getMobilizationStaff(projectId) {
+        await ensureReady();
+        return await db.select().from(mobilizationStaff).where((0, import_drizzle_orm2.eq)(mobilizationStaff.projectId, projectId));
+      }
+      async createMobilizationStaff(data) {
+        await ensureReady();
+        const [row] = await db.insert(mobilizationStaff).values(data).returning();
+        return row;
+      }
+      async updateMobilizationStaff(id, data) {
+        await ensureReady();
+        const [row] = await db.update(mobilizationStaff).set(data).where((0, import_drizzle_orm2.eq)(mobilizationStaff.id, id)).returning();
+        return row;
+      }
+      async deleteMobilizationStaff(id) {
+        await ensureReady();
+        await db.delete(mobilizationStaff).where((0, import_drizzle_orm2.eq)(mobilizationStaff.id, id));
+      }
+      async getMobilizationSubs(projectId) {
+        await ensureReady();
+        return await db.select().from(mobilizationSubs).where((0, import_drizzle_orm2.eq)(mobilizationSubs.projectId, projectId));
+      }
+      async createMobilizationSub(data) {
+        await ensureReady();
+        const [row] = await db.insert(mobilizationSubs).values(data).returning();
+        return row;
+      }
+      async updateMobilizationSub(id, data) {
+        await ensureReady();
+        const [row] = await db.update(mobilizationSubs).set(data).where((0, import_drizzle_orm2.eq)(mobilizationSubs.id, id)).returning();
+        return row;
+      }
+      async deleteMobilizationSub(id) {
+        await ensureReady();
+        await db.delete(mobilizationSubs).where((0, import_drizzle_orm2.eq)(mobilizationSubs.id, id));
+      }
+      async getMobilizationRisks(projectId) {
+        await ensureReady();
+        return await db.select().from(mobilizationRisks).where((0, import_drizzle_orm2.eq)(mobilizationRisks.projectId, projectId));
+      }
+      async createMobilizationRisk(data) {
+        await ensureReady();
+        const [row] = await db.insert(mobilizationRisks).values(data).returning();
+        return row;
+      }
+      async updateMobilizationRisk(id, data) {
+        await ensureReady();
+        const [row] = await db.update(mobilizationRisks).set(data).where((0, import_drizzle_orm2.eq)(mobilizationRisks.id, id)).returning();
+        return row;
+      }
+      async deleteMobilizationRisk(id) {
+        await ensureReady();
+        await db.delete(mobilizationRisks).where((0, import_drizzle_orm2.eq)(mobilizationRisks.id, id));
       }
       async getMessages(projectId) {
         await ensureReady();
-        return await db.select().from(messages).where((0, import_drizzle_orm.eq)(messages.projectId, projectId));
+        return await db.select().from(messages).where((0, import_drizzle_orm2.eq)(messages.projectId, projectId));
       }
       async createMessage(data) {
         await ensureReady();
@@ -1248,7 +2523,7 @@ var init_storage = __esm({
       }
       async getNotes(projectId) {
         await ensureReady();
-        if (projectId !== void 0) return await db.select().from(notes).where((0, import_drizzle_orm.eq)(notes.projectId, projectId));
+        if (projectId !== void 0) return await db.select().from(notes).where((0, import_drizzle_orm2.eq)(notes.projectId, projectId));
         return await db.select().from(notes);
       }
       async createNote(data) {
@@ -1258,12 +2533,22 @@ var init_storage = __esm({
       }
       async updateNotePosition(id, x, y) {
         await ensureReady();
-        const [row] = await db.update(notes).set({ x, y }).where((0, import_drizzle_orm.eq)(notes.id, id)).returning();
+        const [row] = await db.update(notes).set({ x, y }).where((0, import_drizzle_orm2.eq)(notes.id, id)).returning();
+        return row;
+      }
+      async getNoteById(id) {
+        await ensureReady();
+        const [row] = await db.select().from(notes).where((0, import_drizzle_orm2.eq)(notes.id, id));
+        return row;
+      }
+      async updateNote(id, patch) {
+        await ensureReady();
+        const [row] = await db.update(notes).set(patch).where((0, import_drizzle_orm2.eq)(notes.id, id)).returning();
         return row;
       }
       async deleteNote(id) {
         await ensureReady();
-        await db.delete(notes).where((0, import_drizzle_orm.eq)(notes.id, id));
+        await db.delete(notes).where((0, import_drizzle_orm2.eq)(notes.id, id));
       }
       async getIntegrations() {
         await ensureReady();
@@ -1272,10 +2557,10 @@ var init_storage = __esm({
       async setIntegration(key, connected, config) {
         await ensureReady();
         const now = (/* @__PURE__ */ new Date()).toISOString();
-        const existingRows = await db.select().from(integrations).where((0, import_drizzle_orm.eq)(integrations.key, key));
+        const existingRows = await db.select().from(integrations).where((0, import_drizzle_orm2.eq)(integrations.key, key));
         const existing = existingRows[0];
         if (existing) {
-          const [row2] = await db.update(integrations).set({ connected, connectedAt: connected ? now : null, config: config ?? existing.config }).where((0, import_drizzle_orm.eq)(integrations.key, key)).returning();
+          const [row2] = await db.update(integrations).set({ connected, connectedAt: connected ? now : null, config: config ?? existing.config }).where((0, import_drizzle_orm2.eq)(integrations.key, key)).returning();
           return row2;
         }
         const [row] = await db.insert(integrations).values({ key, connected, connectedAt: connected ? now : null, config }).returning();
@@ -1284,7 +2569,7 @@ var init_storage = __esm({
       async connectIntegration(key, data) {
         await ensureReady();
         const now = (/* @__PURE__ */ new Date()).toISOString();
-        const existingRows = await db.select().from(integrations).where((0, import_drizzle_orm.eq)(integrations.key, key));
+        const existingRows = await db.select().from(integrations).where((0, import_drizzle_orm2.eq)(integrations.key, key));
         const existing = existingRows[0];
         const values = {
           connected: true,
@@ -1294,7 +2579,7 @@ var init_storage = __esm({
           config: data.config ?? existing?.config ?? null
         };
         if (existing) {
-          const [row2] = await db.update(integrations).set(values).where((0, import_drizzle_orm.eq)(integrations.key, key)).returning();
+          const [row2] = await db.update(integrations).set(values).where((0, import_drizzle_orm2.eq)(integrations.key, key)).returning();
           return row2;
         }
         const [row] = await db.insert(integrations).values({ key, ...values }).returning();
@@ -1302,7 +2587,7 @@ var init_storage = __esm({
       }
       async disconnectIntegration(key) {
         await ensureReady();
-        const existingRows = await db.select().from(integrations).where((0, import_drizzle_orm.eq)(integrations.key, key));
+        const existingRows = await db.select().from(integrations).where((0, import_drizzle_orm2.eq)(integrations.key, key));
         const existing = existingRows[0];
         const values = {
           connected: false,
@@ -1311,7 +2596,7 @@ var init_storage = __esm({
           accountLabel: null
         };
         if (existing) {
-          const [row2] = await db.update(integrations).set(values).where((0, import_drizzle_orm.eq)(integrations.key, key)).returning();
+          const [row2] = await db.update(integrations).set(values).where((0, import_drizzle_orm2.eq)(integrations.key, key)).returning();
           return row2;
         }
         const [row] = await db.insert(integrations).values({ key, ...values }).returning();
@@ -1320,10 +2605,10 @@ var init_storage = __esm({
       async createSubscriber(data) {
         await ensureReady();
         const now = (/* @__PURE__ */ new Date()).toISOString();
-        const existingRows = await db.select().from(subscribers).where((0, import_drizzle_orm.eq)(subscribers.email, data.email));
+        const existingRows = await db.select().from(subscribers).where((0, import_drizzle_orm2.eq)(subscribers.email, data.email));
         const existing = existingRows[0];
         if (existing) {
-          const [row2] = await db.update(subscribers).set({ plan: data.plan, billing: data.billing, company: data.company ?? existing.company }).where((0, import_drizzle_orm.eq)(subscribers.email, data.email)).returning();
+          const [row2] = await db.update(subscribers).set({ plan: data.plan, billing: data.billing, company: data.company ?? existing.company }).where((0, import_drizzle_orm2.eq)(subscribers.email, data.email)).returning();
           return row2;
         }
         const [row] = await db.insert(subscribers).values({ ...data, createdAt: now }).returning();
@@ -1346,7 +2631,7 @@ var init_storage = __esm({
       /* --------------------------- Settings ---------------------------- */
       async getSettings() {
         await ensureReady();
-        const rows = await db.select().from(appSettings).where((0, import_drizzle_orm.eq)(appSettings.id, 1));
+        const rows = await db.select().from(appSettings).where((0, import_drizzle_orm2.eq)(appSettings.id, 1));
         const row = rows[0];
         let stored = {};
         if (row?.config) {
@@ -1383,9 +2668,9 @@ var init_storage = __esm({
           }
         }
         const now = (/* @__PURE__ */ new Date()).toISOString();
-        const existingRows = await db.select().from(appSettings).where((0, import_drizzle_orm.eq)(appSettings.id, 1));
+        const existingRows = await db.select().from(appSettings).where((0, import_drizzle_orm2.eq)(appSettings.id, 1));
         if (existingRows[0]) {
-          await db.update(appSettings).set({ config: JSON.stringify(clean), updatedAt: now }).where((0, import_drizzle_orm.eq)(appSettings.id, 1));
+          await db.update(appSettings).set({ config: JSON.stringify(clean), updatedAt: now }).where((0, import_drizzle_orm2.eq)(appSettings.id, 1));
         } else {
           await db.insert(appSettings).values({ id: 1, config: JSON.stringify(clean), updatedAt: now });
         }
@@ -1393,7 +2678,7 @@ var init_storage = __esm({
       }
       async resetAllData() {
         await ensureReady();
-        for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, subscribers, demoRequests]) {
+        for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, maintenanceLogs, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, subscribers, demoRequests]) {
           await db.delete(t);
         }
         seedDone = false;
@@ -1401,7 +2686,7 @@ var init_storage = __esm({
       }
       async wipeAllData() {
         await ensureReady();
-        for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, companyDocuments, deletedItems, subscribers, demoRequests]) {
+        for (const t of [messages, notes, droneCaptures, blueprints, documents, photos, maintenanceLogs, equipment, contacts, punchItems, dailyLogs, actionItems, changeOrders, submittals, rfis, tasks, milestones, projects, teamMembers, integrations, companyDocuments, deletedItems, subscribers, demoRequests]) {
           await db.delete(t);
         }
       }
@@ -1426,7 +2711,7 @@ var init_storage = __esm({
       async createAccount(email, password, displayName, company, role = "member") {
         await ensureReady();
         const normEmail = email.trim().toLowerCase();
-        const existingRows = await db.select().from(accounts).where((0, import_drizzle_orm.eq)(accounts.email, normEmail));
+        const existingRows = await db.select().from(accounts).where((0, import_drizzle_orm2.eq)(accounts.email, normEmail));
         if (existingRows[0]) throw new Error("Email already registered");
         const now = (/* @__PURE__ */ new Date()).toISOString();
         const [row] = await db.insert(accounts).values({
@@ -1441,12 +2726,12 @@ var init_storage = __esm({
       }
       async getAccountByEmail(email) {
         await ensureReady();
-        const rows = await db.select().from(accounts).where((0, import_drizzle_orm.eq)(accounts.email, email.trim().toLowerCase()));
+        const rows = await db.select().from(accounts).where((0, import_drizzle_orm2.eq)(accounts.email, email.trim().toLowerCase()));
         return rows[0];
       }
       async getAccount(id) {
         await ensureReady();
-        const rows = await db.select().from(accounts).where((0, import_drizzle_orm.eq)(accounts.id, id));
+        const rows = await db.select().from(accounts).where((0, import_drizzle_orm2.eq)(accounts.id, id));
         const a = rows[0];
         return a ? this.toPublic(a) : void 0;
       }
@@ -1456,7 +2741,14 @@ var init_storage = __esm({
         if (data.displayName !== void 0) updateData.displayName = data.displayName;
         if (data.position !== void 0) updateData.position = data.position;
         if (Object.keys(updateData).length === 0) return this.getAccount(id);
-        const [row] = await db.update(accounts).set(updateData).where((0, import_drizzle_orm.eq)(accounts.id, id)).returning();
+        const [row] = await db.update(accounts).set(updateData).where((0, import_drizzle_orm2.eq)(accounts.id, id)).returning();
+        return row ? this.toPublic(row) : void 0;
+      }
+      // Persist a user's per-account dashboard customization. Passing `null`
+      // clears the row so the client falls back to role-based defaults.
+      async updateDashboardLayout(id, layout) {
+        await ensureReady();
+        const [row] = await db.update(accounts).set({ dashboardLayout: layout }).where((0, import_drizzle_orm2.eq)(accounts.id, id)).returning();
         return row ? this.toPublic(row) : void 0;
       }
       async updateAccountBilling(id, data) {
@@ -1469,12 +2761,60 @@ var init_storage = __esm({
         if (data.subscriptionBilling !== void 0) updateData.subscriptionBilling = data.subscriptionBilling;
         if (data.subscriptionCurrentPeriodEnd !== void 0) updateData.subscriptionCurrentPeriodEnd = data.subscriptionCurrentPeriodEnd;
         if (Object.keys(updateData).length === 0) return this.getAccount(id);
-        const [row] = await db.update(accounts).set(updateData).where((0, import_drizzle_orm.eq)(accounts.id, id)).returning();
+        const [row] = await db.update(accounts).set(updateData).where((0, import_drizzle_orm2.eq)(accounts.id, id)).returning();
         return row ? this.toPublic(row) : void 0;
+      }
+      // Field punches (mobile clock in/out). Kept dead simple: append-only stream
+      // of events. Rollup into weekly timesheets is a separate concern.
+      async createFieldPunch(data) {
+        await ensureReady();
+        const [row] = await db.insert(fieldPunches).values(data).returning();
+        return row;
+      }
+      async getRecentFieldPunches(accountId, limit = 20) {
+        await ensureReady();
+        const rows = await db.select().from(fieldPunches).where((0, import_drizzle_orm2.eq)(fieldPunches.accountId, accountId)).orderBy((0, import_drizzle_orm2.desc)(fieldPunches.createdAt)).limit(limit);
+        return rows;
+      }
+      async getOpenFieldPunch(accountId) {
+        const rows = await this.getRecentFieldPunches(accountId, 1);
+        if (rows.length === 0) return void 0;
+        const latest = rows[0];
+        if (latest.kind === "in" || latest.kind === "break_start") return latest;
+        return void 0;
+      }
+      async getFieldPunchByClientId(accountId, clientId) {
+        await ensureReady();
+        const rows = await db.select().from(fieldPunches).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(fieldPunches.accountId, accountId), (0, import_drizzle_orm2.eq)(fieldPunches.clientId, clientId))).limit(1);
+        return rows[0];
+      }
+      // Field observations — quick-capture safety/quality/rfi/issue entries.
+      async createFieldObservation(data) {
+        await ensureReady();
+        const [row] = await db.insert(fieldObservations).values(data).returning();
+        return row;
+      }
+      async getRecentFieldObservations(opts) {
+        await ensureReady();
+        const limit = opts.limit ?? 25;
+        const filters = [];
+        if (opts.accountId != null) filters.push((0, import_drizzle_orm2.eq)(fieldObservations.accountId, opts.accountId));
+        if (opts.organizationId != null) filters.push((0, import_drizzle_orm2.eq)(fieldObservations.organizationId, opts.organizationId));
+        if (opts.projectId != null) filters.push((0, import_drizzle_orm2.eq)(fieldObservations.projectId, opts.projectId));
+        const where = filters.length === 0 ? void 0 : filters.length === 1 ? filters[0] : (0, import_drizzle_orm2.and)(...filters);
+        let q = db.select().from(fieldObservations);
+        if (where) q = q.where(where);
+        const rows = await q.orderBy((0, import_drizzle_orm2.desc)(fieldObservations.createdAt)).limit(limit);
+        return rows;
+      }
+      async getFieldObservationByClientId(accountId, clientId) {
+        await ensureReady();
+        const rows = await db.select().from(fieldObservations).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(fieldObservations.accountId, accountId), (0, import_drizzle_orm2.eq)(fieldObservations.clientId, clientId))).limit(1);
+        return rows[0];
       }
       async getAccountByStripeCustomerId(customerId) {
         await ensureReady();
-        const rows = await db.select().from(accounts).where((0, import_drizzle_orm.eq)(accounts.stripeCustomerId, customerId));
+        const rows = await db.select().from(accounts).where((0, import_drizzle_orm2.eq)(accounts.stripeCustomerId, customerId));
         return rows[0];
       }
       async verifyPassword(email, password) {
@@ -1482,6 +2822,112 @@ var init_storage = __esm({
         if (!acc) return null;
         if (!this.verifyHash(password, acc.passwordHash)) return null;
         return this.toPublic(acc);
+      }
+      // Demo login — like createAccount but stamps demoExpiresAt and auto-approves so
+      // there's no admin approval step in the way of a prospect logging in.
+      async createDemoAccount(email, password, displayName, expiresAt) {
+        await ensureReady();
+        const normEmail = email.trim().toLowerCase();
+        const existingRows = await db.select().from(accounts).where((0, import_drizzle_orm2.eq)(accounts.email, normEmail));
+        if (existingRows[0]) throw new Error("Email already registered");
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        const [row] = await db.insert(accounts).values({
+          email: normEmail,
+          passwordHash: this.hashPassword(password),
+          displayName,
+          role: "member",
+          company: "TrussPath Demo",
+          createdAt: now,
+          approvalStatus: "approved",
+          approvedAt: now,
+          demoExpiresAt: expiresAt
+        }).returning();
+        return this.toPublic(row);
+      }
+      async listDemoAccounts() {
+        await ensureReady();
+        const rows = await db.select().from(accounts).where((0, import_drizzle_orm2.isNotNull)(accounts.demoExpiresAt));
+        return rows.map((r) => this.toPublic(r));
+      }
+      // Force a demo to expire now (so login + existing sessions stop working immediately).
+      async expireDemoAccount(id) {
+        await ensureReady();
+        const acc = (await db.select().from(accounts).where((0, import_drizzle_orm2.eq)(accounts.id, id)))[0];
+        if (!acc || !acc.demoExpiresAt) return void 0;
+        const [row] = await db.update(accounts).set({ demoExpiresAt: (/* @__PURE__ */ new Date(0)).toISOString() }).where((0, import_drizzle_orm2.eq)(accounts.id, id)).returning();
+        return row ? this.toPublic(row) : void 0;
+      }
+      // Hard-delete demo accounts whose expiry is more than `graceDays` in the past,
+      // along with the isolated demo orgs they own and every child row that lived
+      // inside them. Safety rails:
+      //   - only touches accounts with a non-null demo_expires_at
+      //   - only touches orgs that (a) the demo account is a member of AND
+      //     (b) contain no non-demo members
+      // This keeps the function safe to run on a cron / at startup without any
+      // chance of nuking a real customer org that happened to briefly host a demo
+      // seat.
+      async purgeExpiredDemos(graceDays) {
+        await ensureReady();
+        const cutoff = new Date(Date.now() - graceDays * 86400 * 1e3).toISOString();
+        const expiredAccounts = await sql2`
+      SELECT id FROM accounts
+      WHERE demo_expires_at IS NOT NULL
+        AND demo_expires_at < ${cutoff}
+    `;
+        if (!expiredAccounts.length) return { purgedAccountIds: [], purgedOrgIds: [] };
+        const accountIds = expiredAccounts.map((r) => r.id);
+        const orgsToPurge = await sql2`
+      SELECT o.id FROM organizations o
+      WHERE EXISTS (
+        SELECT 1 FROM memberships m
+        WHERE m.organization_id = o.id AND m.account_id = ANY(${accountIds}::int[])
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM memberships m2
+        WHERE m2.organization_id = o.id AND NOT (m2.account_id = ANY(${accountIds}::int[]))
+      )
+    `;
+        const orgIds = orgsToPurge.map((r) => r.id);
+        if (orgIds.length) {
+          const projectRows = await sql2`
+        SELECT id FROM projects WHERE organization_id = ANY(${orgIds}::int[])
+      `;
+          const projectIds = projectRows.map((r) => r.id);
+          if (projectIds.length) {
+            await sql2`DELETE FROM action_items WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM blueprints WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM change_orders WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM daily_logs WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM documents WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM drone_captures WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM jarvis_memory WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM messages WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM milestones WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM notes WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM photos WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM project_members WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM punch_items WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM rfis WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM submittals WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM tasks WHERE project_id = ANY(${projectIds}::int[])`;
+            await sql2`DELETE FROM timesheets WHERE project_id = ANY(${projectIds}::int[])`;
+          }
+          await sql2`DELETE FROM invites WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM team_members WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM contacts WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM equipment WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM company_documents WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM integrations WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM app_settings WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM projects WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM memberships WHERE organization_id = ANY(${orgIds}::int[])`;
+          await sql2`DELETE FROM organizations WHERE id = ANY(${orgIds}::int[])`;
+        }
+        await sql2`DELETE FROM sessions WHERE account_id = ANY(${accountIds}::int[])`;
+        await sql2`DELETE FROM password_reset_tokens WHERE account_id = ANY(${accountIds}::int[])`;
+        await sql2`DELETE FROM memberships WHERE account_id = ANY(${accountIds}::int[])`;
+        await sql2`DELETE FROM accounts WHERE id = ANY(${accountIds}::int[])`;
+        return { purgedAccountIds: accountIds, purgedOrgIds: orgIds };
       }
       async createPasswordResetToken(accountId) {
         await ensureReady();
@@ -1492,7 +2938,7 @@ var init_storage = __esm({
       }
       async getPasswordResetToken(token) {
         await ensureReady();
-        const rows = await db.select().from(passwordResetTokens).where((0, import_drizzle_orm.eq)(passwordResetTokens.token, token));
+        const rows = await db.select().from(passwordResetTokens).where((0, import_drizzle_orm2.eq)(passwordResetTokens.token, token));
         return rows[0];
       }
       async usePasswordResetToken(token) {
@@ -1501,12 +2947,12 @@ var init_storage = __esm({
         if (!row) return null;
         if (row.usedAt) return null;
         if (new Date(row.expiresAt) < /* @__PURE__ */ new Date()) return null;
-        const [updated] = await db.update(passwordResetTokens).set({ usedAt: (/* @__PURE__ */ new Date()).toISOString() }).where((0, import_drizzle_orm.eq)(passwordResetTokens.id, row.id)).returning();
+        const [updated] = await db.update(passwordResetTokens).set({ usedAt: (/* @__PURE__ */ new Date()).toISOString() }).where((0, import_drizzle_orm2.eq)(passwordResetTokens.id, row.id)).returning();
         return updated ?? null;
       }
       async updatePassword(accountId, newPassword) {
         await ensureReady();
-        await db.update(accounts).set({ passwordHash: this.hashPassword(newPassword) }).where((0, import_drizzle_orm.eq)(accounts.id, accountId));
+        await db.update(accounts).set({ passwordHash: this.hashPassword(newPassword) }).where((0, import_drizzle_orm2.eq)(accounts.id, accountId));
       }
       createSession(accountId) {
         const now = /* @__PURE__ */ new Date();
@@ -1572,14 +3018,14 @@ var init_storage = __esm({
           patch.approvedAt = null;
           patch.approvedBy = null;
         }
-        const [row] = await db.update(accounts).set(patch).where((0, import_drizzle_orm.eq)(accounts.id, id)).returning();
+        const [row] = await db.update(accounts).set(patch).where((0, import_drizzle_orm2.eq)(accounts.id, id)).returning();
         return row ? this.toPublic(row) : void 0;
       }
       /* --------------------------- Jarvis memory --------------------------- */
       async getJarvisMemories(projectId) {
         await ensureReady();
         if (projectId != null) {
-          return await db.select().from(jarvisMemory).where((0, import_drizzle_orm.eq)(jarvisMemory.projectId, projectId));
+          return await db.select().from(jarvisMemory).where((0, import_drizzle_orm2.eq)(jarvisMemory.projectId, projectId));
         }
         return await db.select().from(jarvisMemory);
       }
@@ -1618,34 +3064,127 @@ var init_storage = __esm({
         const [row] = await db.update(jarvisMemory).set({
           ...data,
           updatedAt: now
-        }).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id)).returning();
+        }).where((0, import_drizzle_orm2.eq)(jarvisMemory.id, id)).returning();
         return row;
       }
       async incrementJarvisMemoryHit(id) {
         await ensureReady();
-        const rows = await db.select().from(jarvisMemory).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id));
+        const rows = await db.select().from(jarvisMemory).where((0, import_drizzle_orm2.eq)(jarvisMemory.id, id));
         if (rows[0]) {
           await db.update(jarvisMemory).set({
             hitCount: (rows[0].hitCount || 0) + 1,
             updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-          }).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id));
+          }).where((0, import_drizzle_orm2.eq)(jarvisMemory.id, id));
         }
       }
       async deleteJarvisMemory(id) {
         await ensureReady();
-        await db.delete(jarvisMemory).where((0, import_drizzle_orm.eq)(jarvisMemory.id, id));
+        await db.delete(jarvisMemory).where((0, import_drizzle_orm2.eq)(jarvisMemory.id, id));
+      }
+      /* ---------------------- Project Timeline / event log --------------------- */
+      /**
+       * Append one row to the project timeline. Called from mutation routes
+       * (fire-and-forget — the caller doesn't await the result on the critical
+       * path). Never throws — timeline logging failure should never break a real
+       * mutation. Any DB error is swallowed and logged to console.
+       *
+       * Callers pass a minimal payload; we fill in defaults (occurredAt = now,
+       * meta = {}).
+       */
+      async recordEvent(data) {
+        try {
+          await ensureReady();
+          await db.insert(projectEvents).values({
+            projectId: data.projectId,
+            organizationId: data.organizationId ?? null,
+            actorAccountId: data.actorAccountId ?? null,
+            actorName: data.actorName ?? null,
+            kind: data.kind,
+            title: data.title,
+            subtitle: data.subtitle ?? null,
+            meta: data.meta ?? {},
+            sourceType: data.sourceType ?? null,
+            sourceId: data.sourceId ?? null,
+            occurredAt: data.occurredAt ?? (/* @__PURE__ */ new Date()).toISOString()
+          });
+        } catch (err) {
+          console.error("[recordEvent] failed:", err);
+        }
+      }
+      /**
+       * Read the timeline for one project with optional filters. Server-side
+       * pagination + kind filter + full-text-ish search over title/subtitle so
+       * large projects (thousands of events) stay quick.
+       */
+      async getProjectEvents(projectId, opts = {}) {
+        await ensureReady();
+        const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+        const kindClause = opts.kinds && opts.kinds.length > 0 ? sql2`AND kind = ANY(${opts.kinds})` : sql2``;
+        const beforeClause = opts.before ? sql2`AND occurred_at < ${opts.before}` : sql2``;
+        const searchClause = opts.q && opts.q.trim().length > 0 ? (() => {
+          const like = `%${opts.q.trim().toLowerCase()}%`;
+          return sql2`AND (LOWER(title) LIKE ${like} OR LOWER(COALESCE(subtitle, '')) LIKE ${like} OR LOWER(COALESCE(actor_name, '')) LIKE ${like})`;
+        })() : sql2``;
+        const rows = await sql2`
+      SELECT id, organization_id, project_id, actor_account_id, actor_name, kind,
+             title, subtitle, meta, source_type, source_id, occurred_at, created_at
+      FROM project_events
+      WHERE project_id = ${projectId}
+      ${kindClause}
+      ${beforeClause}
+      ${searchClause}
+      ORDER BY occurred_at DESC
+      LIMIT ${limit}
+    `;
+        return rows.map((r) => ({
+          id: r.id,
+          organizationId: r.organization_id,
+          projectId: r.project_id,
+          actorAccountId: r.actor_account_id,
+          actorName: r.actor_name,
+          kind: r.kind,
+          title: r.title,
+          subtitle: r.subtitle,
+          meta: r.meta ?? {},
+          sourceType: r.source_type,
+          sourceId: r.source_id,
+          occurredAt: typeof r.occurred_at === "string" ? r.occurred_at : new Date(r.occurred_at).toISOString(),
+          createdAt: typeof r.created_at === "string" ? r.created_at : new Date(r.created_at).toISOString()
+        }));
+      }
+      /** Kind counts for one project — used by the filter chips to show badges. */
+      async getProjectEventKindCounts(projectId) {
+        await ensureReady();
+        const rows = await sql2`
+      SELECT kind, COUNT(*)::int AS c
+      FROM project_events
+      WHERE project_id = ${projectId}
+      GROUP BY kind
+    `;
+        const out = {};
+        for (const r of rows) out[r.kind] = r.c;
+        return out;
       }
       /* ----------------------------- Timesheets ---------------------------- */
       async getTimesheets(projectId) {
         await ensureReady();
         if (projectId != null) {
-          return await db.select().from(timesheets).where((0, import_drizzle_orm.eq)(timesheets.projectId, projectId));
+          return await db.select().from(timesheets).where((0, import_drizzle_orm2.eq)(timesheets.projectId, projectId));
         }
         return await db.select().from(timesheets);
       }
+      async getTimesheetsForAccount(accountId) {
+        await ensureReady();
+        return await db.select().from(timesheets).where((0, import_drizzle_orm2.eq)(timesheets.accountId, accountId)).orderBy((0, import_drizzle_orm2.desc)(timesheets.weekStart));
+      }
       async getTimesheet(id) {
         await ensureReady();
-        const rows = await db.select().from(timesheets).where((0, import_drizzle_orm.eq)(timesheets.id, id));
+        const rows = await db.select().from(timesheets).where((0, import_drizzle_orm2.eq)(timesheets.id, id));
+        return rows[0];
+      }
+      async getTimesheetByAccountWeek(accountId, weekStart) {
+        await ensureReady();
+        const rows = await db.select().from(timesheets).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(timesheets.accountId, accountId), (0, import_drizzle_orm2.eq)(timesheets.weekStart, weekStart))).limit(1);
         return rows[0];
       }
       async createTimesheet(data) {
@@ -1656,17 +3195,17 @@ var init_storage = __esm({
       }
       async updateTimesheet(id, data) {
         await ensureReady();
-        const [row] = await db.update(timesheets).set({ ...data, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }).where((0, import_drizzle_orm.eq)(timesheets.id, id)).returning();
+        const [row] = await db.update(timesheets).set({ ...data, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }).where((0, import_drizzle_orm2.eq)(timesheets.id, id)).returning();
         return row;
       }
       async deleteTimesheet(id) {
         await ensureReady();
-        await db.delete(timesheets).where((0, import_drizzle_orm.eq)(timesheets.id, id));
+        await db.delete(timesheets).where((0, import_drizzle_orm2.eq)(timesheets.id, id));
       }
       /* --------------------------- Time entries ----------------------------- */
       async getTimeEntries(timesheetId) {
         await ensureReady();
-        return await db.select().from(timeEntries).where((0, import_drizzle_orm.eq)(timeEntries.timesheetId, timesheetId));
+        return await db.select().from(timeEntries).where((0, import_drizzle_orm2.eq)(timeEntries.timesheetId, timesheetId));
       }
       async createTimeEntry(data) {
         await ensureReady();
@@ -1675,20 +3214,50 @@ var init_storage = __esm({
       }
       async updateTimeEntry(id, data) {
         await ensureReady();
-        const [row] = await db.update(timeEntries).set(data).where((0, import_drizzle_orm.eq)(timeEntries.id, id)).returning();
+        const [row] = await db.update(timeEntries).set(data).where((0, import_drizzle_orm2.eq)(timeEntries.id, id)).returning();
         return row;
       }
       async deleteTimeEntry(id) {
         await ensureReady();
-        await db.delete(timeEntries).where((0, import_drizzle_orm.eq)(timeEntries.id, id));
+        await db.delete(timeEntries).where((0, import_drizzle_orm2.eq)(timeEntries.id, id));
       }
       async replaceTimeEntries(timesheetId, entries) {
         await ensureReady();
-        await db.delete(timeEntries).where((0, import_drizzle_orm.eq)(timeEntries.timesheetId, timesheetId));
+        await db.delete(timeEntries).where((0, import_drizzle_orm2.eq)(timeEntries.timesheetId, timesheetId));
         if (entries.length > 0) {
           const now = (/* @__PURE__ */ new Date()).toISOString();
           await db.insert(timeEntries).values(entries.map((e) => ({ ...e, timesheetId, createdAt: now })));
         }
+      }
+      // Upsert a single day's row inside a timesheet. Used by the punch→timesheet
+      // rollup so repeated clock-in/out cycles on the same day update one row.
+      async upsertDailyTimeEntry(timesheetId, entryDate, patch) {
+        await ensureReady();
+        const existing = await db.select().from(timeEntries).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(timeEntries.timesheetId, timesheetId), (0, import_drizzle_orm2.eq)(timeEntries.entryDate, entryDate))).limit(1);
+        if (existing[0]) {
+          const [row2] = await db.update(timeEntries).set(patch).where((0, import_drizzle_orm2.eq)(timeEntries.id, existing[0].id)).returning();
+          return row2;
+        }
+        const now = (/* @__PURE__ */ new Date()).toISOString();
+        const [row] = await db.insert(timeEntries).values({
+          timesheetId,
+          entryDate,
+          dayOfWeek: patch.dayOfWeek ?? new Date(entryDate).toLocaleDateString("en-US", { weekday: "long" }),
+          hoursWorked: patch.hoursWorked ?? "0",
+          clientName: patch.clientName ?? null,
+          projectName: patch.projectName ?? null,
+          activities: patch.activities ?? null,
+          createdAt: now
+        }).returning();
+        return row;
+      }
+      async getFieldPunchesForDay(accountId, dayStartIso, dayEndIso) {
+        await ensureReady();
+        return await db.select().from(fieldPunches).where((0, import_drizzle_orm2.and)(
+          (0, import_drizzle_orm2.eq)(fieldPunches.accountId, accountId),
+          (0, import_drizzle_orm2.gte)(fieldPunches.occurredAt, dayStartIso),
+          (0, import_drizzle_orm2.lt)(fieldPunches.occurredAt, dayEndIso)
+        )).orderBy(fieldPunches.occurredAt);
       }
       /* ----------------------------- Seed ------------------------------ */
       async seed() {
@@ -1736,28 +3305,28 @@ var init_storage = __esm({
         ];
         for (const x of tasksSeed) await db.insert(tasks).values(x);
         const rfisSeed = [
-          { projectId: p[0].id, number: "RFI-014", subject: "Clearance at med-gas panels \u2014 ICU", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-12", dueDate: "2026-07-23" },
-          { projectId: p[0].id, number: "RFI-015", subject: "Curtainwall anchor detail revision", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-15", dueDate: "2026-07-21" },
-          { projectId: p[0].id, number: "RFI-012", subject: "Slab opening for mechanical chase", status: "Answered", assigneeId: t[2].id, dateCreated: "2026-06-28", dueDate: "2026-07-10" },
-          { projectId: p[1].id, number: "RFI-031", subject: "Cooling tower load path clarification", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-16", dueDate: "2026-07-22" },
-          { projectId: p[1].id, number: "RFI-029", subject: "Fire-rated assembly at stair 2", status: "Draft", assigneeId: t[2].id, dateCreated: "2026-07-18", dueDate: "2026-07-25" },
-          { projectId: p[2].id, number: "RFI-006", subject: "Storm detention vault location", status: "Open", assigneeId: t[2].id, dateCreated: "2026-07-14", dueDate: "2026-07-24" }
+          { projectId: p[0].id, number: "RFI-014", subject: "Clearance at med-gas panels \u2014 ICU", trade: "Plumbing", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-12", dueDate: "2026-07-23" },
+          { projectId: p[0].id, number: "RFI-015", subject: "Curtainwall anchor detail revision", trade: "Curtain Wall", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-15", dueDate: "2026-07-21" },
+          { projectId: p[0].id, number: "RFI-012", subject: "Slab opening for mechanical chase", trade: "Concrete", status: "Answered", assigneeId: t[2].id, dateCreated: "2026-06-28", dueDate: "2026-07-10" },
+          { projectId: p[1].id, number: "RFI-031", subject: "Cooling tower load path clarification", trade: "Steel \u2014 Structural", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-16", dueDate: "2026-07-22" },
+          { projectId: p[1].id, number: "RFI-029", subject: "Fire-rated assembly at stair 2", trade: "Fireproofing", status: "Draft", assigneeId: t[2].id, dateCreated: "2026-07-18", dueDate: "2026-07-25" },
+          { projectId: p[2].id, number: "RFI-006", subject: "Storm detention vault location", trade: "Site Utilities", status: "Open", assigneeId: t[2].id, dateCreated: "2026-07-14", dueDate: "2026-07-24" }
         ];
         for (const x of rfisSeed) await db.insert(rfis).values(x);
         const subsSeed = [
-          { projectId: p[0].id, number: "SUB-042", subject: "Curtainwall shop drawings", type: "Shop Drawing", status: "Approved", assigneeId: t[2].id, dateSubmitted: "2026-05-10", dueDate: "2026-05-24" },
-          { projectId: p[0].id, number: "SUB-051", subject: "Med-gas piping \u2014 material certs", type: "Material", status: "Open", assigneeId: t[2].id, dateSubmitted: "2026-07-08", dueDate: "2026-07-22" },
-          { projectId: p[0].id, number: "SUB-049", subject: "Structural steel connections", type: "Shop Drawing", status: "Revise", assigneeId: t[2].id, dateSubmitted: "2026-06-20", dueDate: "2026-07-05" },
-          { projectId: p[1].id, number: "SUB-077", subject: "Cooling tower performance data", type: "Data", status: "Open", assigneeId: t[2].id, dateSubmitted: "2026-07-12", dueDate: "2026-07-26" },
-          { projectId: p[2].id, number: "SUB-012", subject: "Storm detention vault precast", type: "Shop Drawing", status: "Approved", assigneeId: t[2].id, dateSubmitted: "2026-06-15", dueDate: "2026-06-29" }
+          { projectId: p[0].id, number: "SUB-042", subject: "Curtainwall shop drawings", type: "Shop Drawing", trade: "Curtain Wall", status: "Approved", assigneeId: t[2].id, dateSubmitted: "2026-05-10", dueDate: "2026-05-24" },
+          { projectId: p[0].id, number: "SUB-051", subject: "Med-gas piping \u2014 material certs", type: "Material", trade: "Plumbing", status: "Open", assigneeId: t[2].id, dateSubmitted: "2026-07-08", dueDate: "2026-07-22" },
+          { projectId: p[0].id, number: "SUB-049", subject: "Structural steel connections", type: "Shop Drawing", trade: "Steel \u2014 Structural", status: "Revise", assigneeId: t[2].id, dateSubmitted: "2026-06-20", dueDate: "2026-07-05" },
+          { projectId: p[1].id, number: "SUB-077", subject: "Cooling tower performance data", type: "Data", trade: "HVAC", status: "Open", assigneeId: t[2].id, dateSubmitted: "2026-07-12", dueDate: "2026-07-26" },
+          { projectId: p[2].id, number: "SUB-012", subject: "Storm detention vault precast", type: "Shop Drawing", trade: "Site Utilities", status: "Approved", assigneeId: t[2].id, dateSubmitted: "2026-06-15", dueDate: "2026-06-29" }
         ];
         for (const x of subsSeed) await db.insert(submittals).values(x);
         const coSeed = [
-          { projectId: p[0].id, number: "CO-008", title: "Add 4th-floor terrace upgrade", status: "Approved", amount: 184e3, scheduleImpact: 5, dateIssued: "2026-06-12" },
-          { projectId: p[0].id, number: "CO-011", title: "Med-gas manifold expansion", status: "Pending", amount: 96e3, scheduleImpact: 3, dateIssued: "2026-07-09" },
-          { projectId: p[0].id, number: "CO-012", title: "Curtainwall IGU upgrade", status: "Pending", amount: 142e3, scheduleImpact: 0, dateIssued: "2026-07-15" },
-          { projectId: p[1].id, number: "CO-021", title: "Cooling tower re-spec", status: "Pending", amount: 21e4, scheduleImpact: 7, dateIssued: "2026-07-17" },
-          { projectId: p[1].id, number: "CO-019", title: "Lobby finish upgrade", status: "Approved", amount: 78e3, scheduleImpact: 0, dateIssued: "2026-06-28" }
+          { projectId: p[0].id, number: "CO-008", title: "Add 4th-floor terrace upgrade", trade: "General Conditions", status: "Approved", amount: 184e3, scheduleImpact: 5, dateIssued: "2026-06-12" },
+          { projectId: p[0].id, number: "CO-011", title: "Med-gas manifold expansion", trade: "Plumbing", status: "Pending", amount: 96e3, scheduleImpact: 3, dateIssued: "2026-07-09" },
+          { projectId: p[0].id, number: "CO-012", title: "Curtainwall IGU upgrade", trade: "Curtain Wall", status: "Pending", amount: 142e3, scheduleImpact: 0, dateIssued: "2026-07-15" },
+          { projectId: p[1].id, number: "CO-021", title: "Cooling tower re-spec", trade: "HVAC", status: "Pending", amount: 21e4, scheduleImpact: 7, dateIssued: "2026-07-17" },
+          { projectId: p[1].id, number: "CO-019", title: "Lobby finish upgrade", trade: "Painting", status: "Approved", amount: 78e3, scheduleImpact: 0, dateIssued: "2026-06-28" }
         ];
         for (const x of coSeed) await db.insert(changeOrders).values(x);
         const aiSeed = [
@@ -1776,12 +3345,12 @@ var init_storage = __esm({
         ];
         for (const l of logsSeed) await db.insert(dailyLogs).values(l);
         const punchSeed = [
-          { projectId: p[0].id, title: "Touch up drywall at Room 112 corner", location: "Level 1, Rm 112", trade: "Drywall", status: "Open", assigneeId: t[6].id },
-          { projectId: p[0].id, title: "Missing outlet cover plates \u2014 east corridor", location: "Level 1, Corridor E", trade: "Electrical", status: "Open", assigneeId: t[4].id },
-          { projectId: p[0].id, title: "Caulk joint at storefront door", location: "Main lobby", trade: "Glazing", status: "In Progress", assigneeId: null },
-          { projectId: p[1].id, title: "Paint touch-up stair 4 landings", location: "Stair 4", trade: "Painting", status: "Open", assigneeId: null },
-          { projectId: p[1].id, title: "Replace scratched door \u2014 Fl. 7 unit 712", location: "Fl. 7, Unit 712", trade: "Doors", status: "Open", assigneeId: t[6].id },
-          { projectId: p[2].id, title: "Re-grade swale at southeast corner", location: "Southeast lot", trade: "Civil", status: "In Progress", assigneeId: t[3].id }
+          { projectId: p[0].id, title: "Touch up drywall at Room 112 corner", location: "Level 1, Rm 112", trade: "Drywall", status: "Open", priority: "Medium", notes: null, assigneeId: t[6].id },
+          { projectId: p[0].id, title: "Missing outlet cover plates \u2014 east corridor", location: "Level 1, Corridor E", trade: "Electrical", status: "Open", priority: "Medium", notes: null, assigneeId: t[4].id },
+          { projectId: p[0].id, title: "Caulk joint at storefront door", location: "Main lobby", trade: "Glazing", status: "In Progress", priority: "Low", notes: null, assigneeId: null },
+          { projectId: p[1].id, title: "Paint touch-up stair 4 landings", location: "Stair 4", trade: "Painting", status: "Open", priority: "Medium", notes: null, assigneeId: null },
+          { projectId: p[1].id, title: "Replace scratched door \u2014 Fl. 7 unit 712", location: "Fl. 7, Unit 712", trade: "Doors", status: "Open", priority: "High", notes: null, assigneeId: t[6].id },
+          { projectId: p[2].id, title: "Re-grade swale at southeast corner", location: "Southeast lot", trade: "Civil", status: "In Progress", priority: "Medium", notes: null, assigneeId: t[3].id }
         ];
         for (const x of punchSeed) await db.insert(punchItems).values(x);
         const contactsSeed = [
@@ -1903,10 +3472,10 @@ var init_storage = __esm({
         ];
         for (const x of msgSeed) await db.insert(messages).values(x);
         const noteSeed = [
-          { projectId: p[0].id, body: "Concrete pour Friday 7am \u2014 3 trucks. Barricades reset Thu EOD.", color: "amber", x: 40, y: 40 },
-          { projectId: p[0].id, body: "Glazing RFI-015 is blocking south elevation. Escalate to architect today.", color: "rose", x: 300, y: 90 },
-          { projectId: p[0].id, body: "Owner wants progress photos of curtainwall by 3pm Thu.", color: "blue", x: 560, y: 50 },
-          { projectId: p[0].id, body: "Inspector confirmed for med-gas \u2014 keep L2 ICU clear.", color: "emerald", x: 120, y: 220 }
+          { projectId: p[0].id, body: "Concrete pour Friday 7am \u2014 3 trucks. Barricades reset Thu EOD.", color: "amber", x: 40, y: 40, replies: null },
+          { projectId: p[0].id, body: "Glazing RFI-015 is blocking south elevation. Escalate to architect today.", color: "rose", x: 300, y: 90, replies: null },
+          { projectId: p[0].id, body: "Owner wants progress photos of curtainwall by 3pm Thu.", color: "blue", x: 560, y: 50, replies: null },
+          { projectId: p[0].id, body: "Inspector confirmed for med-gas \u2014 keep L2 ICU clear.", color: "emerald", x: 120, y: 220, replies: null }
         ];
         for (const x of noteSeed) await db.insert(notes).values(x);
         const milestoneSeed = [
@@ -1952,197 +3521,17 @@ var init_storage = __esm({
   }
 });
 
-// shared/app-manifest.ts
-function hrefMatchesRoute(href, pattern) {
-  if (pattern === href) return true;
-  const seg = pattern.split("/");
-  const h = href.split("/");
-  if (seg.length !== h.length) return false;
-  return seg.every((s, i) => s.startsWith(":") || s === h[i]);
-}
-function isKnownRoute(href) {
-  return APP_ROUTES.some((p) => hrefMatchesRoute(href, p));
-}
-var APP_ROUTES, APP_NAV, LANDING_FEATURE_LINKS, APP_LINKS;
-var init_app_manifest = __esm({
-  "shared/app-manifest.ts"() {
-    "use strict";
-    APP_ROUTES = [
-      "/",
-      "/app",
-      "/projects",
-      "/projects/:id",
-      "/schedule",
-      "/gantt",
-      "/cpm",
-      "/integrations",
-      "/tasks",
-      "/action-items",
-      "/rfis",
-      "/submittals",
-      "/change-orders",
-      "/punch",
-      "/daily-logs",
-      "/photos",
-      "/documents",
-      "/company-documents",
-      "/blueprints",
-      "/equipment",
-      "/drone",
-      "/team",
-      "/contacts",
-      "/messages",
-      "/notes",
-      "/timesheets",
-      "/deleted-items",
-      "/settings"
-    ];
-    APP_NAV = [
-      {
-        title: "Overview",
-        items: [
-          { href: "/app", label: "Dashboard", icon: "LayoutDashboard" },
-          { href: "/notes", label: "Sticky Board", icon: "StickyNote" },
-          { href: "/timesheets", label: "Time Tracking", icon: "Clock" }
-        ]
-      },
-      {
-        title: "Planning",
-        items: [
-          { href: "/projects", label: "Projects", icon: "FolderKanban" },
-          { href: "/schedule", label: "Schedule", icon: "CalendarRange" },
-          { href: "/gantt", label: "Gantt", icon: "GanttChartSquare" },
-          { href: "/cpm", label: "CPM Diagram", icon: "Network" }
-        ]
-      },
-      {
-        title: "Workflows",
-        items: [
-          { href: "/tasks", label: "Tasks", icon: "ListChecks" },
-          { href: "/action-items", label: "Action Items", icon: "CheckSquare" },
-          { href: "/rfis", label: "RFIs", icon: "HelpCircle" },
-          { href: "/submittals", label: "Submittals", icon: "FileStack" },
-          { href: "/change-orders", label: "Change Orders", icon: "GitPullRequestArrow" },
-          { href: "/punch", label: "Punch List", icon: "CheckSquare" }
-        ]
-      },
-      {
-        title: "Field",
-        items: [
-          { href: "/daily-logs", label: "Daily Logs", icon: "ClipboardList" },
-          { href: "/photos", label: "Photo Log", icon: "Image" },
-          { href: "/documents", label: "Documents", icon: "FileText" },
-          { href: "/company-documents", label: "Company Documents", icon: "Building2" },
-          { href: "/blueprints", label: "Blueprints", icon: "PencilRuler" },
-          { href: "/equipment", label: "Fleet & Equipment", icon: "Wrench" }
-        ]
-      },
-      {
-        title: "Add-ons",
-        items: [
-          { href: "/drone", label: "Drone Captures", icon: "Plane" }
-        ]
-      },
-      {
-        title: "People",
-        items: [
-          { href: "/team", label: "Team", icon: "Users" },
-          { href: "/contacts", label: "Contacts", icon: "Contact" },
-          { href: "/messages", label: "Messages", icon: "MessageSquare" }
-        ]
-      },
-      {
-        title: "System",
-        items: [
-          { href: "/integrations", label: "Integrations", icon: "Plug" },
-          { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" },
-          { href: "/settings", label: "Settings", icon: "Settings" }
-        ]
-      }
-    ];
-    LANDING_FEATURE_LINKS = [
-      { label: "Daily Logs", href: "/daily-logs" },
-      { label: "RFIs & Submittals", href: "/rfis" },
-      { label: "Change Orders", href: "/change-orders" },
-      { label: "Punch Lists", href: "/punch" },
-      { label: "Schedule + Gantt", href: "/schedule" },
-      { label: "Photo Log", href: "/photos" },
-      { label: "Blueprints", href: "/blueprints" },
-      { label: "Drone Captures", href: "/drone" },
-      { label: "Fleet & Equipment", href: "/equipment" },
-      { label: "Documents", href: "/documents" },
-      { label: "Messages & Notes", href: "/messages" },
-      { label: "Jarvis AI", href: "/app" }
-    ];
-    APP_LINKS = [
-      ...APP_NAV.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, source: "nav" }))),
-      ...LANDING_FEATURE_LINKS.map((f) => ({ href: f.href, label: f.label, source: "landing" }))
-    ];
-  }
-});
-
-// server/health.ts
-async function runHealthScan() {
-  const brokenLinks = APP_LINKS.filter((l) => !isKnownRoute(l.href)).map((l) => ({ href: l.href, label: l.label, source: l.source }));
-  const projects2 = await storage.getProjects();
-  const pid2 = projects2[0]?.id;
-  const mods = [
-    ["Projects", async () => storage.getProjects()],
-    ["Tasks", async () => storage.getTasks(pid2)],
-    ["RFIs", async () => storage.getRfis(pid2)],
-    ["Submittals", async () => storage.getSubmittals(pid2)],
-    ["Change Orders", async () => storage.getChangeOrders(pid2)],
-    ["Action Items", async () => storage.getActionItems(pid2)],
-    ["Daily Logs", async () => storage.getDailyLogs(pid2)],
-    ["Punch Items", async () => storage.getPunchItems(pid2)],
-    ["Team", async () => storage.getTeam()],
-    ["Contacts", async () => storage.getContacts()],
-    ["Equipment", async () => storage.getEquipment(pid2)],
-    ["Photos", async () => storage.getPhotos(pid2)],
-    ["Documents", async () => storage.getDocuments(pid2)],
-    ["Blueprints", async () => storage.getBlueprints(pid2)],
-    ["Drone Captures", async () => storage.getDroneCaptures(pid2)],
-    ["Messages", async () => pid2 ? storage.getMessages(pid2) : []],
-    ["Notes", async () => storage.getNotes(pid2)],
-    ["Integrations", async () => storage.getIntegrations()]
-  ];
-  const moduleChecks = [];
-  for (const [name, fn] of mods) {
-    try {
-      const rows = await fn();
-      moduleChecks.push({ name, status: "ok", detail: `${rows.length} records` });
-    } catch (e) {
-      moduleChecks.push({ name, status: "fail", detail: e?.message ?? "error reading module" });
-    }
-  }
-  const failedModules = moduleChecks.filter((c) => c.status === "fail");
-  const ok = brokenLinks.length === 0 && failedModules.length === 0;
-  const summary = ok ? `All clear, sir. ${moduleChecks.length} modules healthy, ${APP_LINKS.length} links resolve to ${APP_ROUTES.length} registered routes \u2014 no broken items detected.` : `Found ${brokenLinks.length} broken link(s) and ${failedModules.length} failing module(s). Details below.`;
-  return {
-    scannedAt: (/* @__PURE__ */ new Date()).toISOString(),
-    ok,
-    brokenLinks,
-    moduleChecks,
-    routeCount: APP_ROUTES.length,
-    linkCount: APP_LINKS.length,
-    summary
-  };
-}
-var init_health = __esm({
-  "server/health.ts"() {
-    "use strict";
-    init_storage();
-    init_app_manifest();
-  }
-});
-
 // server/apis.ts
 var apis_exports = {};
 __export(apis_exports, {
+  getDailyLogWeather: () => getDailyLogWeather,
   getNearbyPlaces: () => getNearbyPlaces,
   getWeather: () => getWeather,
+  getWeatherOneLiner: () => getWeatherOneLiner,
   hasPlacesApi: () => hasPlacesApi,
-  hasWeatherApi: () => hasWeatherApi
+  hasWeatherApi: () => hasWeatherApi,
+  placeDetails: () => placeDetails,
+  placesAutocomplete: () => placesAutocomplete
 });
 async function geocodeOpenMeteo(address) {
   try {
@@ -2178,6 +3567,90 @@ async function geocodeGoogle(address) {
 async function geocode(address) {
   return await geocodeGoogle(address) || await geocodeOpenMeteo(address);
 }
+async function getWeatherOneLiner(address) {
+  const geo = await geocode(address);
+  if (!geo) return null;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&current=temperature_2m,wind_speed_10m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const cur = data?.current;
+    if (!cur) return null;
+    const temp = Math.round(cur.temperature_2m);
+    const wind = Math.round(cur.wind_speed_10m);
+    const desc3 = WEATHER_CODES[cur.weather_code] || "current conditions";
+    return `${temp}\xB0F, ${desc3}, ${wind} mph wind`;
+  } catch {
+    return null;
+  }
+}
+function weatherCodeToSlug(code, windMph, precipInches) {
+  if (code === 45 || code === 48) return "Fog";
+  if (code === 71 || code === 73 || code === 75 || code === 77 || code === 85 || code === 86) return "Snow";
+  if (code >= 51 && code <= 67 || code >= 80 && code <= 82 || code >= 95) return "Rain";
+  if (windMph >= 20 && precipInches < 0.05) return "Wind";
+  if (code === 3) return "Cloudy";
+  if (code === 2) return "Partly cloudy";
+  return "Sunny";
+}
+async function getDailyLogWeather(address, dateStr) {
+  const geo = await geocode(address);
+  if (!geo) return null;
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const target = dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : today;
+  try {
+    if (target === today) {
+      const url2 = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&current=temperature_2m,wind_speed_10m,precipitation,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+      const res2 = await fetch(url2);
+      if (!res2.ok) return null;
+      const data2 = await res2.json();
+      const cur = data2?.current;
+      if (!cur) return null;
+      const temp2 = Math.round(cur.temperature_2m);
+      const wind2 = Math.round(cur.wind_speed_10m);
+      const precip2 = Number(cur.precipitation ?? 0);
+      const code2 = Number(cur.weather_code ?? 0);
+      return {
+        weather: weatherCodeToSlug(code2, wind2, precip2),
+        temp: temp2,
+        meta: {
+          locationName: geo.name,
+          source: "today",
+          description: WEATHER_CODES[code2] || "current conditions",
+          windMph: wind2
+        }
+      };
+    }
+    const isPast = target < today;
+    const baseUrl = isPast ? "https://archive-api.open-meteo.com/v1/archive" : "https://api.open-meteo.com/v1/forecast";
+    const url = `${baseUrl}?latitude=${geo.lat}&longitude=${geo.lon}&start_date=${target}&end_date=${target}&daily=temperature_2m_mean,temperature_2m_max,wind_speed_10m_max,precipitation_sum,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const daily = data?.daily;
+    if (!daily?.time?.length) return null;
+    const meanTemp = Number(daily.temperature_2m_mean?.[0] ?? NaN);
+    const maxTemp = Number(daily.temperature_2m_max?.[0] ?? NaN);
+    const temp = Math.round(Number.isFinite(meanTemp) ? meanTemp : maxTemp);
+    const wind = Math.round(Number(daily.wind_speed_10m_max?.[0] ?? 0));
+    const precip = Number(daily.precipitation_sum?.[0] ?? 0);
+    const code = Number(daily.weather_code?.[0] ?? 0);
+    if (!Number.isFinite(temp)) return null;
+    return {
+      weather: weatherCodeToSlug(code, wind, precip),
+      temp,
+      meta: {
+        locationName: geo.name,
+        source: isPast ? "historical" : "forecast",
+        description: WEATHER_CODES[code] || (isPast ? "historical conditions" : "forecast"),
+        windMph: wind
+      }
+    };
+  } catch {
+    return null;
+  }
+}
 async function getWeather(address) {
   const geo = await geocode(address);
   if (!geo) return null;
@@ -2194,12 +3667,12 @@ async function getWeather(address) {
     const wind = Math.round(cur.wind_speed_10m);
     const precip = cur.precipitation;
     const humidity = Math.round(cur.relative_humidity_2m);
-    const desc2 = WEATHER_CODES[cur.weather_code] || "current conditions";
+    const desc3 = WEATHER_CODES[cur.weather_code] || "current conditions";
     const locationName = geo.name;
     let response = `Here's the weather at ${locationName} right now:
 
 `;
-    response += `It's ${temp} degrees and ${desc2}, feels like ${feelsLike} degrees. `;
+    response += `It's ${temp} degrees and ${desc3}, feels like ${feelsLike} degrees. `;
     response += `Wind's at ${wind} miles per hour`;
     if (precip > 0) response += `, with ${precip} inches of precipitation`;
     response += `. Humidity is at ${humidity} percent.
@@ -2283,6 +3756,65 @@ async function getNearbyPlaces(address, query) {
     return null;
   }
 }
+async function placesAutocomplete(input, sessionToken, opts = {}) {
+  if (!GOOGLE_MAPS_KEY) return [];
+  const trimmed = input.trim();
+  if (trimmed.length < 3) return [];
+  try {
+    const body = {
+      input: trimmed,
+      sessionToken,
+      // "address" primary type = street addresses only — no businesses, no POIs.
+      // That's what a "job site address" field wants.
+      includedPrimaryTypes: ["street_address", "premise", "subpremise", "route"]
+    };
+    if (opts.countryBias) {
+      body.includedRegionCodes = [opts.countryBias.toUpperCase()];
+    }
+    const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_KEY,
+        // Field mask keeps the response small — we only want the id + display text.
+        "X-Goog-FieldMask": "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat"
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const suggestions = data?.suggestions || [];
+    return suggestions.map((s) => s?.placePrediction).filter(Boolean).map((p) => ({
+      placeId: p.placeId,
+      description: p?.text?.text || "",
+      primaryText: p?.structuredFormat?.mainText?.text || p?.text?.text || "",
+      secondaryText: p?.structuredFormat?.secondaryText?.text || ""
+    }));
+  } catch {
+    return [];
+  }
+}
+async function placeDetails(placeId, sessionToken) {
+  if (!GOOGLE_MAPS_KEY || !placeId) return null;
+  try {
+    const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?sessionToken=${encodeURIComponent(sessionToken)}`;
+    const res = await fetch(url, {
+      headers: {
+        "X-Goog-Api-Key": GOOGLE_MAPS_KEY,
+        "X-Goog-FieldMask": "formattedAddress,location"
+      }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      formattedAddress: data?.formattedAddress || "",
+      lat: data?.location?.latitude ?? null,
+      lon: data?.location?.longitude ?? null
+    };
+  } catch {
+    return null;
+  }
+}
 function hasWeatherApi() {
   return true;
 }
@@ -2343,7 +3875,638 @@ var init_apis = __esm({
   }
 });
 
+// shared/app-manifest.ts
+function hrefMatchesRoute(href, pattern) {
+  const cleanHref = href.split("?")[0].split("#")[0];
+  if (pattern === cleanHref) return true;
+  const seg = pattern.split("/");
+  const h = cleanHref.split("/");
+  if (seg.length !== h.length) return false;
+  return seg.every((s, i) => s.startsWith(":") || s === h[i]);
+}
+function isKnownRoute(href) {
+  return APP_ROUTES.some((p) => hrefMatchesRoute(href, p));
+}
+var APP_ROUTES, APP_NAV, LANDING_FEATURE_LINKS, APP_LINKS;
+var init_app_manifest = __esm({
+  "shared/app-manifest.ts"() {
+    "use strict";
+    APP_ROUTES = [
+      "/",
+      "/app",
+      "/projects",
+      "/projects/:id",
+      "/schedule",
+      "/gantt",
+      "/cpm",
+      "/integrations",
+      "/tasks",
+      "/action-items",
+      "/rfis",
+      "/submittals",
+      "/change-orders",
+      "/punch",
+      "/daily-logs",
+      "/photos",
+      "/documents",
+      "/company-documents",
+      "/blueprints",
+      "/equipment",
+      "/drone",
+      "/team",
+      "/contacts",
+      "/messages",
+      "/notes",
+      "/timesheets",
+      "/deleted-items",
+      "/settings",
+      "/settings/team",
+      "/teams",
+      "/excel",
+      "/executive-os",
+      "/executive-os/mobilization",
+      "/executive-os/mobilization/:id",
+      "/field",
+      "/field/daily-log",
+      "/field/timecard",
+      "/field/photo",
+      "/field/observation",
+      "/field/punch"
+    ];
+    APP_NAV = [
+      {
+        title: "Home",
+        items: [
+          { href: "/app", label: "Dashboard", icon: "LayoutDashboard" },
+          { href: "/notes", label: "Sticky Board", icon: "StickyNote" }
+        ]
+      },
+      {
+        title: "Projects",
+        items: [
+          { href: "/projects", label: "Projects", icon: "FolderKanban" },
+          { href: "/schedule", label: "Schedule", icon: "CalendarRange" },
+          { href: "/gantt", label: "Gantt", icon: "GanttChartSquare" },
+          { href: "/cpm", label: "CPM Diagram", icon: "Network" }
+        ]
+      },
+      {
+        title: "Field Ops",
+        items: [
+          { href: "/daily-logs", label: "Daily Logs", icon: "ClipboardList" },
+          { href: "/photos", label: "Photo Log", icon: "Image" },
+          { href: "/punch", label: "Punch List", icon: "CheckSquare" },
+          { href: "/blueprints", label: "Blueprints", icon: "PencilRuler" },
+          { href: "/drone", label: "Drone Captures", icon: "Plane" },
+          { href: "/equipment", label: "Fleet & Equipment", icon: "Wrench" },
+          // Requests & Tasks — collapsed into Field Ops so PMs/supers see the
+          // paperwork they own next to the daily-log tools they use every morning.
+          { href: "/rfis", label: "RFIs", icon: "HelpCircle" },
+          { href: "/submittals", label: "Submittals", icon: "FileStack" },
+          { href: "/change-orders", label: "Change Orders", icon: "GitPullRequestArrow" },
+          { href: "/tasks", label: "Tasks", icon: "ListChecks" },
+          { href: "/action-items", label: "Action Items", icon: "CheckSquare" }
+        ]
+      },
+      {
+        title: "Documents",
+        items: [
+          { href: "/documents", label: "Project Documents", icon: "FileText" },
+          { href: "/company-documents", label: "Company Documents", icon: "Building2" }
+        ]
+      },
+      {
+        title: "People & Time",
+        items: [
+          { href: "/team", label: "Project Team", icon: "Users" },
+          { href: "/contacts", label: "Contacts", icon: "Contact" },
+          { href: "/messages", label: "Messages", icon: "MessageSquare" },
+          { href: "/timesheets", label: "Time Tracking", icon: "Clock" }
+        ]
+      },
+      {
+        title: "Apps & Admin",
+        items: [
+          { href: "/teams", label: "Microsoft Teams", icon: "Video" },
+          { href: "/excel", label: "Microsoft Excel", icon: "FileSpreadsheet" },
+          { href: "/integrations", label: "Integrations", icon: "Plug" },
+          { href: "/settings", label: "Settings", icon: "Settings" },
+          { href: "/settings/team", label: "Team & Access", icon: "ShieldCheck" },
+          { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" }
+        ]
+      },
+      {
+        // Executive OS — exec-only surface. Contents grow over time.
+        title: "Executive OS",
+        items: [
+          { href: "/executive-os", label: "Overview", icon: "Sparkles" },
+          { href: "/executive-os/mobilization", label: "Mobilization", icon: "Rocket" }
+        ]
+      }
+    ];
+    LANDING_FEATURE_LINKS = [
+      { label: "Daily Logs", href: "/daily-logs" },
+      { label: "RFIs & Submittals", href: "/rfis" },
+      { label: "Change Orders", href: "/change-orders" },
+      { label: "Punch Lists", href: "/punch" },
+      { label: "Schedule + Gantt", href: "/schedule" },
+      { label: "Photo Log", href: "/photos" },
+      { label: "Blueprints", href: "/blueprints" },
+      { label: "Drone Captures", href: "/drone" },
+      { label: "Fleet & Equipment", href: "/equipment" },
+      { label: "Documents", href: "/documents" },
+      { label: "Messages & Notes", href: "/messages" },
+      { label: "Jarvis AI", href: "/app" }
+    ];
+    APP_LINKS = [
+      ...APP_NAV.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, source: "nav" }))),
+      ...LANDING_FEATURE_LINKS.map((f) => ({ href: f.href, label: f.label, source: "landing" }))
+    ];
+  }
+});
+
+// server/health.ts
+async function runHealthScan() {
+  const brokenLinks = APP_LINKS.filter((l) => !isKnownRoute(l.href)).map((l) => ({ href: l.href, label: l.label, source: l.source }));
+  const projects2 = await storage.getProjects();
+  const pid2 = projects2[0]?.id;
+  const mods = [
+    ["Projects", async () => storage.getProjects()],
+    ["Tasks", async () => storage.getTasks(pid2)],
+    ["RFIs", async () => storage.getRfis(pid2)],
+    ["Submittals", async () => storage.getSubmittals(pid2)],
+    ["Change Orders", async () => storage.getChangeOrders(pid2)],
+    ["Action Items", async () => storage.getActionItems(pid2)],
+    ["Daily Logs", async () => storage.getDailyLogs(pid2)],
+    ["Punch Items", async () => storage.getPunchItems(pid2)],
+    ["Team", async () => storage.getTeam()],
+    ["Contacts", async () => storage.getContacts()],
+    ["Equipment", async () => storage.getEquipment(pid2)],
+    ["Photos", async () => storage.getPhotos(pid2)],
+    ["Documents", async () => storage.getDocuments(pid2)],
+    ["Blueprints", async () => storage.getBlueprints(pid2)],
+    ["Drone Captures", async () => storage.getDroneCaptures(pid2)],
+    ["Messages", async () => pid2 ? storage.getMessages(pid2) : []],
+    ["Notes", async () => storage.getNotes(pid2)],
+    ["Integrations", async () => storage.getIntegrations()]
+  ];
+  const moduleChecks = [];
+  for (const [name, fn] of mods) {
+    try {
+      const rows = await fn();
+      moduleChecks.push({ name, status: "ok", detail: `${rows.length} records` });
+    } catch (e) {
+      moduleChecks.push({ name, status: "fail", detail: e?.message ?? "error reading module" });
+    }
+  }
+  const failedModules = moduleChecks.filter((c) => c.status === "fail");
+  const ok = brokenLinks.length === 0 && failedModules.length === 0;
+  const summary = ok ? `All clear, sir. ${moduleChecks.length} modules healthy, ${APP_LINKS.length} links resolve to ${APP_ROUTES.length} registered routes \u2014 no broken items detected.` : `Found ${brokenLinks.length} broken link(s) and ${failedModules.length} failing module(s). Details below.`;
+  return {
+    scannedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    ok,
+    brokenLinks,
+    moduleChecks,
+    routeCount: APP_ROUTES.length,
+    linkCount: APP_LINKS.length,
+    summary
+  };
+}
+var init_health = __esm({
+  "server/health.ts"() {
+    "use strict";
+    init_storage();
+    init_app_manifest();
+  }
+});
+
+// server/lib/plans.ts
+function overageSeats(tier, activeSeatCount) {
+  return Math.max(0, activeSeatCount - PLANS[tier].includedSeats);
+}
+function buildSubscriptionItems(tier, billing, activeSeatCount) {
+  const p = PLANS[tier][billing === "annual" ? "annual" : "monthly"];
+  const overage = overageSeats(tier, activeSeatCount);
+  const items = [{ price: p.basePriceId, quantity: 1 }];
+  if (overage > 0) items.push({ price: p.seatPriceId, quantity: overage });
+  return items;
+}
+var PLANS, TRIAL_DAYS;
+var init_plans = __esm({
+  "server/lib/plans.ts"() {
+    "use strict";
+    PLANS = {
+      starter: {
+        tier: "starter",
+        productId: "prod_UxUDQoBfRA7HlE",
+        includedSeats: 3,
+        displayName: "Starter",
+        monthly: {
+          basePriceId: "price_1TxciGCL31xFtol411RaRcIk",
+          seatPriceId: "price_1TxciHCL31xFtol44WMoUekv",
+          baseAmount: 7900,
+          seatAmount: 1900
+        },
+        annual: {
+          basePriceId: "price_1TxciGCL31xFtol4VA0BpWuy",
+          seatPriceId: "price_1TxciHCL31xFtol42LWB9tXV",
+          baseAmount: 79e3,
+          seatAmount: 19e3
+        }
+      },
+      pro: {
+        tier: "pro",
+        productId: "prod_UxUDve9SUR7Yxc",
+        includedSeats: 5,
+        displayName: "Pro",
+        monthly: {
+          basePriceId: "price_1TxciHCL31xFtol444GXaJ0T",
+          seatPriceId: "price_1TxciHCL31xFtol4EX5ncqEY",
+          baseAmount: 14900,
+          seatAmount: 2900
+        },
+        annual: {
+          basePriceId: "price_1TxciHCL31xFtol4emF0X6T7",
+          seatPriceId: "price_1TxciHCL31xFtol4hkuk8X2s",
+          baseAmount: 149e3,
+          seatAmount: 29e3
+        }
+      },
+      enterprise: {
+        tier: "enterprise",
+        productId: "prod_UxUDrAi0ogQoOB",
+        includedSeats: 10,
+        displayName: "Enterprise",
+        monthly: {
+          basePriceId: "price_1TxciICL31xFtol4Mz6ijLVy",
+          seatPriceId: "price_1TxciICL31xFtol4x5JQB8ul",
+          baseAmount: 29900,
+          seatAmount: 3900
+        },
+        annual: {
+          basePriceId: "price_1TxciICL31xFtol4Vdnlg35b",
+          seatPriceId: "price_1TxciICL31xFtol4r63MpGMW",
+          baseAmount: 299e3,
+          seatAmount: 39e3
+        }
+      }
+    };
+    TRIAL_DAYS = 14;
+  }
+});
+
+// server/lib/orgs.ts
+var orgs_exports = {};
+__export(orgs_exports, {
+  INTEGRATION_KEYS: () => INTEGRATION_KEYS,
+  assignProjectMember: () => assignProjectMember,
+  bootstrapDemoOrgForAccount: () => bootstrapDemoOrgForAccount,
+  bootstrapOrganizationForAccount: () => bootstrapOrganizationForAccount,
+  can: () => can,
+  countActiveSeats: () => countActiveSeats,
+  createInvite: () => createInvite,
+  createMembership: () => createMembership,
+  createOrganization: () => createOrganization,
+  getInviteByToken: () => getInviteByToken,
+  getMembership: () => getMembership,
+  getMembershipForAccount: () => getMembershipForAccount,
+  getOrgByStripeCustomerId: () => getOrgByStripeCustomerId,
+  getOrganization: () => getOrganization,
+  getPrimaryMembership: () => getPrimaryMembership,
+  isIntegrationKey: () => isIntegrationKey,
+  isInviteRedeemable: () => isInviteRedeemable,
+  isValidTimezone: () => isValidTimezone,
+  listAssignedProjectIds: () => listAssignedProjectIds,
+  listMembershipsForOrg: () => listMembershipsForOrg,
+  listPendingInvites: () => listPendingInvites,
+  markInviteAccepted: () => markInviteAccepted,
+  removeMembership: () => removeMembership,
+  requireCap: () => requireCap,
+  resolveOrgTimezone: () => resolveOrgTimezone,
+  revokeInvite: () => revokeInvite,
+  syncSeatsForOrg: () => syncSeatsForOrg,
+  todayInTz: () => todayInTz,
+  updateMembershipRole: () => updateMembershipRole,
+  updateOrgBilling: () => updateOrgBilling,
+  updateOrgDisabledIntegrations: () => updateOrgDisabledIntegrations,
+  updateOrgTimezone: () => updateOrgTimezone
+});
+function isValidTimezone(tz) {
+  if (!tz || typeof tz !== "string") return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function createOrganization(input) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const slug = input.slug || makeSlug(input.name);
+  const tz = isValidTimezone(input.timezone) ? input.timezone : void 0;
+  const values = {
+    name: input.name,
+    slug,
+    ownerAccountId: input.ownerAccountId,
+    createdAt: now,
+    stripeCustomerId: input.stripeCustomerId ?? null,
+    stripeSubscriptionId: input.stripeSubscriptionId ?? null,
+    subscriptionStatus: input.subscriptionStatus ?? null,
+    subscriptionPlan: input.subscriptionPlan ?? null,
+    subscriptionBilling: input.subscriptionBilling ?? null,
+    trialEndsAt: input.trialEndsAt ?? null
+  };
+  if (tz) values.timezone = tz;
+  const [row] = await db.insert(organizations).values(values).returning();
+  return row;
+}
+async function updateOrgTimezone(orgId, tz) {
+  if (!isValidTimezone(tz)) return getOrganization(orgId);
+  const [row] = await db.update(organizations).set({ timezone: tz }).where((0, import_drizzle_orm3.eq)(organizations.id, orgId)).returning();
+  return row;
+}
+function isIntegrationKey(k) {
+  return typeof k === "string" && INTEGRATION_KEYS.includes(k);
+}
+async function updateOrgDisabledIntegrations(orgId, patch) {
+  const current = await getOrganization(orgId);
+  if (!current) return void 0;
+  const existing = current.disabledIntegrations ?? {};
+  const next = { ...existing };
+  for (const [k, v] of Object.entries(patch)) {
+    if (!isIntegrationKey(k)) continue;
+    if (v === true) next[k] = true;
+    else delete next[k];
+  }
+  const [row] = await db.update(organizations).set({ disabledIntegrations: next }).where((0, import_drizzle_orm3.eq)(organizations.id, orgId)).returning();
+  return row;
+}
+async function getOrganization(id) {
+  const rows = await db.select().from(organizations).where((0, import_drizzle_orm3.eq)(organizations.id, id));
+  return rows[0];
+}
+async function resolveOrgTimezone(organizationId) {
+  const FALLBACK = "America/Denver";
+  if (!organizationId) return FALLBACK;
+  try {
+    const org = await getOrganization(organizationId);
+    const tz = org?.timezone;
+    return isValidTimezone(tz) ? tz : FALLBACK;
+  } catch {
+    return FALLBACK;
+  }
+}
+function todayInTz(timezone) {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(/* @__PURE__ */ new Date());
+  } catch {
+    return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  }
+}
+async function updateOrgBilling(orgId, patch) {
+  const data = {};
+  for (const [k, v] of Object.entries(patch)) if (v !== void 0) data[k] = v;
+  if (Object.keys(data).length === 0) return getOrganization(orgId);
+  const [row] = await db.update(organizations).set(data).where((0, import_drizzle_orm3.eq)(organizations.id, orgId)).returning();
+  return row;
+}
+async function getOrgByStripeCustomerId(customerId) {
+  const rows = await db.select().from(organizations).where((0, import_drizzle_orm3.eq)(organizations.stripeCustomerId, customerId));
+  return rows[0];
+}
+async function createMembership(accountId, organizationId, role) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const [row] = await db.insert(memberships).values({
+    accountId,
+    organizationId,
+    role,
+    status: "active",
+    createdAt: now
+  }).returning();
+  return row;
+}
+async function getMembership(id) {
+  const rows = await db.select().from(memberships).where((0, import_drizzle_orm3.eq)(memberships.id, id));
+  return rows[0];
+}
+async function getMembershipForAccount(accountId, organizationId) {
+  const rows = await db.select().from(memberships).where((0, import_drizzle_orm3.and)(
+    (0, import_drizzle_orm3.eq)(memberships.accountId, accountId),
+    (0, import_drizzle_orm3.eq)(memberships.organizationId, organizationId)
+  ));
+  return rows[0];
+}
+async function getPrimaryMembership(accountId) {
+  const rows = await db.select().from(memberships).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(memberships.accountId, accountId), (0, import_drizzle_orm3.eq)(memberships.status, "active"))).orderBy(memberships.id);
+  return rows[0];
+}
+async function listMembershipsForOrg(organizationId) {
+  const rows = await db.select().from(memberships).where((0, import_drizzle_orm3.eq)(memberships.organizationId, organizationId));
+  if (rows.length === 0) return [];
+  const { accounts: accounts2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const out = [];
+  for (const m of rows) {
+    const [acc] = await db.select().from(accounts2).where((0, import_drizzle_orm3.eq)(accounts2.id, m.accountId));
+    out.push({ ...m, email: acc?.email, displayName: acc?.displayName });
+  }
+  return out;
+}
+async function updateMembershipRole(id, role) {
+  const [row] = await db.update(memberships).set({ role }).where((0, import_drizzle_orm3.eq)(memberships.id, id)).returning();
+  return row;
+}
+async function removeMembership(id) {
+  await db.update(memberships).set({ status: "removed" }).where((0, import_drizzle_orm3.eq)(memberships.id, id));
+}
+async function countActiveSeats(organizationId) {
+  const rows = await db.select().from(memberships).where((0, import_drizzle_orm3.and)(
+    (0, import_drizzle_orm3.eq)(memberships.organizationId, organizationId),
+    (0, import_drizzle_orm3.eq)(memberships.status, "active")
+  ));
+  return rows.length;
+}
+async function createInvite(input) {
+  const token = (0, import_node_crypto2.randomBytes)(24).toString("hex");
+  const now = /* @__PURE__ */ new Date();
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1e3).toISOString();
+  const [row] = await db.insert(invites).values({
+    token,
+    organizationId: input.organizationId,
+    email: input.email.trim().toLowerCase(),
+    role: input.role,
+    invitedByAccountId: input.invitedByAccountId,
+    createdAt: now.toISOString(),
+    expiresAt,
+    acceptedAt: null
+  }).returning();
+  return row;
+}
+async function getInviteByToken(token) {
+  const rows = await db.select().from(invites).where((0, import_drizzle_orm3.eq)(invites.token, token));
+  return rows[0];
+}
+async function listPendingInvites(organizationId) {
+  const rows = await db.select().from(invites).where((0, import_drizzle_orm3.eq)(invites.organizationId, organizationId)).orderBy((0, import_drizzle_orm3.desc)(invites.id));
+  return rows.filter((r) => !r.acceptedAt && new Date(r.expiresAt) > /* @__PURE__ */ new Date());
+}
+async function markInviteAccepted(id) {
+  await db.update(invites).set({ acceptedAt: (/* @__PURE__ */ new Date()).toISOString() }).where((0, import_drizzle_orm3.eq)(invites.id, id));
+}
+async function revokeInvite(id) {
+  await db.update(invites).set({ expiresAt: (/* @__PURE__ */ new Date(0)).toISOString() }).where((0, import_drizzle_orm3.eq)(invites.id, id));
+}
+function isInviteRedeemable(inv) {
+  if (inv.acceptedAt) return false;
+  return new Date(inv.expiresAt) > /* @__PURE__ */ new Date();
+}
+function can(role, capability) {
+  const caps = ROLE_CAPS[role];
+  return !!caps && !!caps[capability];
+}
+function requireCap(membership, capability) {
+  if (!membership) return { ok: false, status: 401, message: "No active membership" };
+  if (membership.status !== "active") return { ok: false, status: 403, message: "Membership inactive" };
+  if (!can(membership.role, capability)) {
+    return { ok: false, status: 403, message: `Your role (${membership.role}) does not have permission to ${capability}` };
+  }
+  return { ok: true };
+}
+async function assignProjectMember(projectId, membershipId) {
+  const existing = await db.select().from(projectMembers).where((0, import_drizzle_orm3.and)(
+    (0, import_drizzle_orm3.eq)(projectMembers.projectId, projectId),
+    (0, import_drizzle_orm3.eq)(projectMembers.membershipId, membershipId)
+  ));
+  if (existing[0]) return;
+  await db.insert(projectMembers).values({
+    projectId,
+    membershipId,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+async function listAssignedProjectIds(membershipId) {
+  const rows = await db.select().from(projectMembers).where((0, import_drizzle_orm3.eq)(projectMembers.membershipId, membershipId));
+  return rows.map((r) => r.projectId);
+}
+async function syncSeatsForOrg(stripe, organizationId) {
+  const org = await getOrganization(organizationId);
+  if (!org) return { synced: false, reason: "org_not_found" };
+  if (!org.stripeSubscriptionId) return { synced: false, reason: "no_subscription" };
+  if (!org.subscriptionPlan || !org.subscriptionBilling) return { synced: false, reason: "no_plan_metadata" };
+  const tier = org.subscriptionPlan;
+  const billing = org.subscriptionBilling;
+  const plan = PLANS[tier];
+  if (!plan) return { synced: false, reason: "unknown_plan" };
+  const seats = await countActiveSeats(organizationId);
+  const overageQty = Math.max(0, seats - plan.includedSeats);
+  const seatPriceId = plan[billing === "annual" ? "annual" : "monthly"].seatPriceId;
+  const sub = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
+  const seatItem = sub.items?.data?.find((i) => i.price?.id === seatPriceId);
+  if (overageQty === 0) {
+    if (seatItem) {
+      await stripe.subscriptionItems.del(seatItem.id, { proration_behavior: "always_invoice" });
+    }
+    return { synced: true, overageQty: 0 };
+  }
+  if (seatItem) {
+    if (seatItem.quantity !== overageQty) {
+      await stripe.subscriptionItems.update(seatItem.id, {
+        quantity: overageQty,
+        proration_behavior: "always_invoice"
+      });
+    }
+  } else {
+    await stripe.subscriptionItems.create({
+      subscription: org.stripeSubscriptionId,
+      price: seatPriceId,
+      quantity: overageQty,
+      proration_behavior: "always_invoice"
+    });
+  }
+  return { synced: true, overageQty };
+}
+async function bootstrapOrganizationForAccount(input) {
+  const org = await createOrganization({
+    name: input.orgName,
+    ownerAccountId: input.accountId,
+    subscriptionStatus: input.stripe ? void 0 : "trialing",
+    // pre-checkout state
+    subscriptionPlan: input.tier,
+    subscriptionBilling: input.billing,
+    timezone: input.timezone
+  });
+  await createMembership(input.accountId, org.id, "owner");
+  if (!input.stripe) {
+    return { organizationId: org.id };
+  }
+  const customer = await input.stripe.customers.create({
+    email: input.accountEmail,
+    metadata: { organizationId: String(org.id), plan: input.tier, billing: input.billing }
+  });
+  await updateOrgBilling(org.id, { stripeCustomerId: customer.id });
+  const items = buildSubscriptionItems(input.tier, input.billing, 1);
+  const checkoutSession = await input.stripe.checkout.sessions.create({
+    customer: customer.id,
+    mode: "subscription",
+    line_items: items.map((i) => ({ price: i.price, quantity: i.quantity })),
+    success_url: input.returnUrl || "https://trusspath.com/#/settings?checkout=success",
+    cancel_url: input.cancelUrl || "https://trusspath.com/#/paywall?checkout=cancelled",
+    payment_method_collection: "always",
+    // card required even for trial
+    subscription_data: {
+      trial_period_days: TRIAL_DAYS,
+      metadata: {
+        organizationId: String(org.id),
+        plan: input.tier,
+        billing: input.billing
+      }
+    },
+    metadata: { organizationId: String(org.id), plan: input.tier, billing: input.billing }
+  });
+  return { organizationId: org.id, checkoutUrl: checkoutSession.url || void 0 };
+}
+async function bootstrapDemoOrgForAccount(input) {
+  const org = await createOrganization({
+    name: input.orgName,
+    ownerAccountId: input.accountId,
+    subscriptionStatus: "trialing",
+    // demo orgs bypass paywall via this status
+    subscriptionPlan: "starter",
+    subscriptionBilling: "monthly"
+  });
+  await createMembership(input.accountId, org.id, "owner");
+  return { organizationId: org.id };
+}
+function makeSlug(name) {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const suffix = (0, import_node_crypto2.randomBytes)(3).toString("hex");
+  return `${base || "org"}-${suffix}`;
+}
+var import_node_crypto2, import_drizzle_orm3, INTEGRATION_KEYS;
+var init_orgs = __esm({
+  "server/lib/orgs.ts"() {
+    "use strict";
+    import_node_crypto2 = require("node:crypto");
+    init_storage();
+    init_schema();
+    import_drizzle_orm3 = require("drizzle-orm");
+    init_plans();
+    INTEGRATION_KEYS = [
+      "googleCalendar"
+    ];
+  }
+});
+
 // server/jarvis.ts
+function assertHasOpenAIKey() {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY not set");
+  }
+}
 function buildPersona(s = {}) {
   const term = s.addressTerm?.trim() || "sir";
   const tone = s.tone === "detailed" ? "detailed" : "concise";
@@ -2364,22 +4527,19 @@ You can LEARN from the user. When you don't know something, ask the user to tell
 When you don't know something, just say so \u2014 don't guess.
 ${length}`;
 }
-function today() {
-  return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-}
 function isOpen(status) {
   const s = (status || "").toLowerCase();
   return !["complete", "completed", "closed", "approved", "done"].includes(s);
 }
-function overdue(arr, field) {
-  const t = today();
-  return arr.filter((x) => x[field] && x[field] < t && isOpen(x.status));
+function overdue(arr, field, today) {
+  return arr.filter((x) => x[field] && x[field] < today && isOpen(x.status));
 }
-function dueToday(arr, field) {
-  const t = today();
-  return arr.filter((x) => x[field] === t);
+function dueToday(arr, field, today) {
+  return arr.filter((x) => x[field] === today);
 }
-async function buildContext(projectId) {
+async function buildContext(projectId, organizationId) {
+  const timezone = await resolveOrgTimezone(organizationId);
+  const today = todayInTz(timezone);
   const p = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
   const pid2 = p?.id;
   const tasks2 = await storage.getTasks(pid2);
@@ -2389,18 +4549,18 @@ async function buildContext(projectId) {
   const actions = await storage.getActionItems(pid2);
   const team = await storage.getTeam();
   const L = (arr, label, field) => {
-    const ov = overdue(arr, field).slice(0, 6);
-    const dt = dueToday(arr, field).slice(0, 6);
+    const ov = overdue(arr, field, today).slice(0, 6);
+    const dt = dueToday(arr, field, today).slice(0, 6);
     const open = arr.filter((x) => isOpen(x.status)).length;
     const lines = [];
-    lines.push(`${label}: ${arr.length} total, ${open} open, ${overdue(arr, field).length} overdue, ${dueToday(arr, field).length} due today`);
+    lines.push(`${label}: ${arr.length} total, ${open} open, ${overdue(arr, field, today).length} overdue, ${dueToday(arr, field, today).length} due today`);
     if (ov.length) lines.push("  OVERDUE: " + ov.map((x) => `${x.number || ""} ${x.title || x.subject || ""}`.trim()).join(" | "));
     if (dt.length) lines.push("  DUE TODAY: " + dt.map((x) => `${x.number || ""} ${x.title || x.subject || ""}`.trim()).join(" | "));
     return lines.join("\n");
   };
   const blocks = [
     `PROJECT: ${p?.name ?? "\u2014"} | status ${p?.status ?? "\u2014"} | ${p?.startDate ?? "?"} \u2192 ${p?.endDate ?? "?"}`,
-    `TODAY: ${today()}`,
+    `TODAY: ${today} (${timezone})`,
     L(tasks2, "TASKS", "dueDate"),
     L(rfis2, "RFIS", "dueDate"),
     L(subs, "SUBMITTALS", "dueDate"),
@@ -2421,8 +4581,9 @@ function formatScan(r) {
   if (failing.length) lines.push("FAILING MODULES: " + failing.map((c) => `${c.name} (${c.detail})`).join(" | "));
   return lines.join("\n");
 }
-async function jarvisChat(projectId, history) {
-  const { compact } = await buildContext(projectId);
+async function jarvisChat(projectId, history, organizationId) {
+  assertHasOpenAIKey();
+  const { compact } = await buildContext(projectId, organizationId);
   const settings = await storage.getSettings();
   const persona = buildPersona(settings);
   const client = new import_openai.default();
@@ -2478,8 +4639,9 @@ ${compact}${scanBlock}${liveApiBlock}`,
   });
   return { reply: resp.output_text ?? "" };
 }
-async function jarvisBrief(projectId) {
-  const context = await buildContext(projectId);
+async function jarvisBrief(projectId, organizationId) {
+  assertHasOpenAIKey();
+  const context = await buildContext(projectId, organizationId);
   const settings = await storage.getSettings();
   const persona = buildPersona(settings);
   const client = new import_openai.default();
@@ -2502,7 +4664,8 @@ var init_jarvis = __esm({
     import_openai = __toESM(require("openai"), 1);
     init_storage();
     init_health();
-    MODEL = "gpt_5_1";
+    init_orgs();
+    MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
     HEALTH_INTENT = /\b(broken|health|scan|not work|doesn'?t work|don'?t work|broken link|issues? in the app|what'?s broken|integrity)\b/i;
     SAFETY_BRIEF_INTENT = /\b(safety brief|safety briefing|toolbox talk|safety meeting|team safety|give me a safety|generate a safety|safety stand)\b/i;
   }
@@ -2518,29 +4681,189 @@ function matchPatterns(input, patterns) {
   }
   return null;
 }
-function buildLocalBrief(ctx) {
-  const lines = ctx.compact.split("\n");
-  const projectLine = lines[0] ?? "No active project found.";
-  const today2 = lines[1] ?? "";
-  const overdueLines = lines.filter((l) => l.includes("OVERDUE"));
-  const dueTodayLines = lines.filter((l) => l.includes("DUE TODAY"));
-  const priorities = [];
-  if (overdueLines.length) priorities.push(`You've got overdue items \u2014 ${overdueLines.length} ${overdueLines.length === 1 ? "category has" : "categories have"} work that's slipped past the due date`);
-  if (dueTodayLines.length) priorities.push("Some items are due today, so make sure the right people are on them");
-  if (!priorities.length) priorities.push("Nothing urgent \u2014 everything's on track");
-  const overdue2 = overdueLines.length ? overdueLines.join("\n") : "Nothing overdue, which is great.";
-  return `Here's your morning briefing.
+function fmtDaysLate(dateStr) {
+  const days = Math.max(0, Math.floor((Date.parse(YYYY_MM_DD()) - Date.parse(dateStr)) / 864e5));
+  if (days === 0) return "today";
+  if (days === 1) return "1 day late";
+  return `${days} days late`;
+}
+function pickOverdue(items, field) {
+  const today = YYYY_MM_DD();
+  return items.filter((x) => x[field] && x[field] < today && isOpen2(x.status)).sort((a, b) => String(a[field]).localeCompare(String(b[field])));
+}
+function pickDueToday(items, field) {
+  const today = YYYY_MM_DD();
+  return items.filter((x) => x[field] === today && isOpen2(x.status));
+}
+function itemLabel(x) {
+  const num = x.number ? `${x.number}` : "";
+  const title = (x.title || x.subject || x.description || "untitled").toString().trim();
+  return num ? `${num} \u2014 ${title}` : title;
+}
+function localHourAndDay(timezone) {
+  const now = /* @__PURE__ */ new Date();
+  const hourStr = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    hour12: false
+  }).format(now);
+  const hour = parseInt(hourStr, 10);
+  const day = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "long"
+  }).format(now);
+  return { hour: Number.isFinite(hour) ? hour : 12, day };
+}
+function weekdayGreeting(timezone = "America/Denver") {
+  const { hour: hr, day } = localHourAndDay(timezone);
+  if (hr < 5) return `Late night check-in, ${day.toLowerCase()}. Here's where things stand.`;
+  if (hr < 12) return `Good morning \u2014 here's your ${day} briefing.`;
+  if (hr < 17) return `Afternoon check-in for ${day}. Here's where the project stands.`;
+  return `Evening wrap on ${day}. Here's where the project stands.`;
+}
+function projectHealthLine(project, today) {
+  if (!project) return null;
+  const start = project.startDate;
+  const end = project.endDate;
+  if (!start || !end) return null;
+  const total = Math.max(1, (Date.parse(end) - Date.parse(start)) / 864e5);
+  const elapsed = Math.max(0, (Date.parse(today) - Date.parse(start)) / 864e5);
+  const pct2 = Math.min(100, Math.round(elapsed / total * 100));
+  const daysToEnd = Math.round((Date.parse(end) - Date.parse(today)) / 864e5);
+  if (daysToEnd < 0) return `You're past the scheduled end date (${end}) by ${Math.abs(daysToEnd)} days.`;
+  if (daysToEnd === 0) return `Today is the scheduled end date. Confirm closeout status.`;
+  if (pct2 < 5) return `Project just kicked off \u2014 you're about ${pct2}% through the contract duration, ${daysToEnd} days to end date.`;
+  return `You're roughly ${pct2}% through the contract duration, ${daysToEnd} days to end date (${end}).`;
+}
+function buildRecommendation(bucket) {
+  if (bucket.overdueRfis.length >= 2) {
+    return `Focus today \u2014 you've got ${bucket.overdueRfis.length} RFIs waiting on responses. Chase the oldest one (${itemLabel(bucket.overdueRfis[0])}) with the architect first; nothing else moves until questions get answered.`;
+  }
+  if (bucket.overdueSubs.length >= 2) {
+    return `Focus today \u2014 ${bucket.overdueSubs.length} submittals are past due. Push the oldest (${itemLabel(bucket.overdueSubs[0])}) through review; late submittals delay procurement.`;
+  }
+  if (bucket.overdueRfis[0]) {
+    return `Chase the overdue RFI ${itemLabel(bucket.overdueRfis[0])} \u2014 it's been sitting for ${fmtDaysLate(bucket.overdueRfis[0].dueDate)}.`;
+  }
+  if (bucket.overdueSubs[0]) {
+    return `Chase submittal ${itemLabel(bucket.overdueSubs[0])} \u2014 ${fmtDaysLate(bucket.overdueSubs[0].dueDate)} on the review turnaround.`;
+  }
+  if (bucket.overdueTasks[0]) {
+    return `Get ${itemLabel(bucket.overdueTasks[0])} reassigned or closed today \u2014 it's ${fmtDaysLate(bucket.overdueTasks[0].dueDate)}.`;
+  }
+  if (bucket.overdueActions[0]) {
+    return `Circle back on the overdue action item: ${itemLabel(bucket.overdueActions[0])} \u2014 ${fmtDaysLate(bucket.overdueActions[0].dueDate)}.`;
+  }
+  if (bucket.overdueCos[0]) {
+    return `Chase change order ${itemLabel(bucket.overdueCos[0])} for owner sign-off \u2014 unsigned COs block invoicing.`;
+  }
+  if (bucket.dueTodayTotal > 0) {
+    return `${bucket.dueTodayTotal} ${bucket.dueTodayTotal === 1 ? "item is" : "items are"} due today \u2014 confirm each owner has what they need before end of day.`;
+  }
+  if (bucket.nothingOverdue) {
+    return `Nothing overdue right now. Good time to look ahead \u2014 review upcoming milestones on the Schedule tab and confirm next week's task assignments.`;
+  }
+  return `Keep the crew focused on their assigned tasks today. Check the Schedule tab for upcoming milestones.`;
+}
+async function buildRichLocalBrief(projectId, organizationId) {
+  const timezone = await resolveOrgTimezone(organizationId);
+  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  if (!project) {
+    return `${weekdayGreeting(timezone)}
 
-${projectLine}
-${today2}
-
-Priorities:
-${priorities.map((p) => `- ${p}`).join("\n")}
-
-Overdue:
-${overdue2}
-
-One thing to stay on top of \u2014 check the Schedule tab for any milestones coming up, and make sure everyone on the team has their tasks assigned.`;
+No active project found yet. Head to the Projects tab and create one \u2014 once it's set up I can give you real briefings with overdue items, weather, and priorities.`;
+  }
+  const pid2 = project.id;
+  const today = todayInTz(timezone);
+  const [tasks2, rfis2, subs, cos, actions, team] = await Promise.all([
+    storage.getTasks(pid2),
+    storage.getRfis(pid2),
+    storage.getSubmittals(pid2),
+    storage.getChangeOrders(pid2),
+    storage.getActionItems(pid2),
+    storage.getTeam()
+  ]);
+  const overdueTasks = pickOverdue(tasks2, "dueDate");
+  const overdueRfis = pickOverdue(rfis2, "dueDate");
+  const overdueSubs = pickOverdue(subs, "dueDate");
+  const overdueCos = pickOverdue(cos, "dateIssued");
+  const overdueActions = pickOverdue(actions, "dueDate");
+  const dueTodayTasks = pickDueToday(tasks2, "dueDate");
+  const dueTodayRfis = pickDueToday(rfis2, "dueDate");
+  const dueTodaySubs = pickDueToday(subs, "dueDate");
+  const dueTodayActions = pickDueToday(actions, "dueDate");
+  const overdueTotal = overdueTasks.length + overdueRfis.length + overdueSubs.length + overdueCos.length + overdueActions.length;
+  const dueTodayTotal = dueTodayTasks.length + dueTodayRfis.length + dueTodaySubs.length + dueTodayActions.length;
+  let weatherLine = null;
+  if (project.address) {
+    try {
+      weatherLine = await getWeatherOneLiner(project.address);
+    } catch {
+    }
+  }
+  const lines = [];
+  lines.push(weekdayGreeting(timezone));
+  lines.push("");
+  const status = project.status ? ` (${project.status})` : "";
+  lines.push(`PROJECT: ${project.name}${status}`);
+  const health = projectHealthLine(project, today);
+  if (health) lines.push(health);
+  if (weatherLine) lines.push(`On site: ${weatherLine}.`);
+  lines.push("");
+  lines.push("PRIORITIES");
+  if (overdueTotal === 0 && dueTodayTotal === 0) {
+    lines.push("- Nothing overdue, nothing due today. Everything's on track.");
+  } else {
+    if (dueTodayTotal > 0) {
+      const dueBits = [];
+      if (dueTodayTasks.length) dueBits.push(`${dueTodayTasks.length} ${dueTodayTasks.length === 1 ? "task" : "tasks"}`);
+      if (dueTodayRfis.length) dueBits.push(`${dueTodayRfis.length} ${dueTodayRfis.length === 1 ? "RFI" : "RFIs"}`);
+      if (dueTodaySubs.length) dueBits.push(`${dueTodaySubs.length} ${dueTodaySubs.length === 1 ? "submittal" : "submittals"}`);
+      if (dueTodayActions.length) dueBits.push(`${dueTodayActions.length} action ${dueTodayActions.length === 1 ? "item" : "items"}`);
+      lines.push(`- Due today: ${dueBits.join(", ")}. Make sure owners have what they need.`);
+    }
+    if (overdueRfis.length) {
+      const top = overdueRfis.slice(0, 2).map(itemLabel).join("; ");
+      lines.push(`- ${overdueRfis.length} ${overdueRfis.length === 1 ? "RFI is" : "RFIs are"} overdue \u2014 oldest: ${top} (${fmtDaysLate(overdueRfis[0].dueDate)}).`);
+    }
+    if (overdueSubs.length) {
+      const top = overdueSubs.slice(0, 2).map(itemLabel).join("; ");
+      lines.push(`- ${overdueSubs.length} ${overdueSubs.length === 1 ? "submittal is" : "submittals are"} overdue \u2014 oldest: ${top} (${fmtDaysLate(overdueSubs[0].dueDate)}).`);
+    }
+    if (overdueTasks.length) {
+      const top = overdueTasks.slice(0, 2).map(itemLabel).join("; ");
+      lines.push(`- ${overdueTasks.length} ${overdueTasks.length === 1 ? "task is" : "tasks are"} past due \u2014 e.g. ${top}.`);
+    }
+    if (overdueActions.length) {
+      lines.push(`- ${overdueActions.length} action ${overdueActions.length === 1 ? "item is" : "items are"} overdue.`);
+    }
+    if (overdueCos.length) {
+      lines.push(`- ${overdueCos.length} change ${overdueCos.length === 1 ? "order" : "orders"} still pending sign-off.`);
+    }
+  }
+  lines.push("");
+  const openTasks = tasks2.filter((t) => isOpen2(t.status)).length;
+  const openRfis = rfis2.filter((r) => isOpen2(r.status)).length;
+  const openSubs = subs.filter((s) => isOpen2(s.status)).length;
+  const openCos = cos.filter((c) => isOpen2(c.status)).length;
+  lines.push("NUMBERS");
+  lines.push(`- Tasks: ${tasks2.length} total, ${openTasks} open`);
+  lines.push(`- RFIs: ${rfis2.length} total, ${openRfis} open`);
+  lines.push(`- Submittals: ${subs.length} total, ${openSubs} open`);
+  lines.push(`- Change orders: ${cos.length} total, ${openCos} open`);
+  lines.push(`- Team: ${team.length} ${team.length === 1 ? "member" : "members"}`);
+  lines.push("");
+  lines.push("RECOMMENDATION");
+  lines.push(buildRecommendation({
+    overdueRfis,
+    overdueSubs,
+    overdueTasks,
+    overdueActions,
+    overdueCos,
+    dueTodayTotal,
+    nothingOverdue: overdueTotal === 0
+  }));
+  return lines.join("\n");
 }
 function seasonalHazards() {
   const month = (/* @__PURE__ */ new Date()).getMonth();
@@ -2576,8 +4899,8 @@ function seasonalHazards() {
   }
   return hazards;
 }
-async function buildSafetyBrief(projectId) {
-  const ctx = await buildContext(projectId);
+async function buildSafetyBrief(projectId, organizationId) {
+  const ctx = await buildContext(projectId, organizationId);
   const lines = ctx.compact.split("\n");
   const projectLine = lines[0] ?? "No active project found.";
   const todayLine = lines[1] ?? "";
@@ -2660,7 +4983,7 @@ ${topic2.body}
   brief += `Questions? Ask your superintendent or site safety officer. Stay sharp out there.`;
   return brief;
 }
-async function localJarvisChat(projectId, history) {
+async function localJarvisChat(projectId, history, organizationId) {
   const lastUser = [...history].reverse().find((m) => m.role === "user")?.content ?? "";
   const lower = lastUser.toLowerCase().trim();
   const teachMatch = lower.match(/^(?:remember|note|store|save|for this site|jarvis[,\s]+remember|jarvis[,\s]+note|jarvis[,\s]+save)[\s:,]+(.+)/i);
@@ -2764,18 +5087,17 @@ If you've got a weather tip specific to your area, just say "remember that..." a
   }
   if (/\b(safety brief|safety briefing|toolbox talk|safety meeting|team safety|give me a safety|generate a safety|safety stand)\b/i.test(lower)) {
     try {
-      const brief = await buildSafetyBrief(projectId);
+      const brief = await buildSafetyBrief(projectId, organizationId);
       return { reply: brief };
     } catch {
       return { reply: "I tried generating a safety brief but ran into an issue. Make sure you have a project selected with an address set, and I'll pull live weather data into it too." };
     }
   }
   if (/\b(brief|briefing|status|update|summary|overview|morning|standup|what'?s happening|what'?s the status|overdue|what.?s due)\b/i.test(lower)) {
-    const ctx = await buildContext(projectId);
-    return { reply: buildLocalBrief(ctx) };
+    return { reply: await buildRichLocalBrief(projectId, organizationId) };
   }
   if (/\bhow many\b/i.test(lower)) {
-    const ctx = await buildContext(projectId);
+    const ctx = await buildContext(projectId, organizationId);
     const tasksLine = ctx.compact.split("\n").find((l) => l.startsWith("TASKS:"));
     const rfiLine = ctx.compact.split("\n").find((l) => l.startsWith("RFIS:"));
     const subLine = ctx.compact.split("\n").find((l) => l.startsWith("SUBMITTALS:"));
@@ -2863,7 +5185,7 @@ What would you like to know?`
 And if there's something I don't know, just tell me the answer and I'll remember it for next time. What would you like to know?`
   };
 }
-var CONSTRUCTION_QA, GREETING_PATTERNS, DAILY_SAFETY_TOPICS;
+var CONSTRUCTION_QA, GREETING_PATTERNS, YYYY_MM_DD, OPEN_STATUSES, isOpen2, DAILY_SAFETY_TOPICS;
 var init_jarvis_local = __esm({
   "server/jarvis-local.ts"() {
     "use strict";
@@ -2871,6 +5193,7 @@ var init_jarvis_local = __esm({
     init_jarvis();
     init_health();
     init_apis();
+    init_orgs();
     CONSTRUCTION_QA = [
       {
         keywords: ["what is rfi", "what's an rfi", "what is a rfi", "rfi mean", "define rfi"],
@@ -2993,6 +5316,9 @@ If you know some good spots near your site, just tell me \u2014 say something li
 
 What would you like to know?` }
     ];
+    YYYY_MM_DD = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    OPEN_STATUSES = /* @__PURE__ */ new Set(["open", "in_progress", "pending", "submitted", "under_review", "resubmitted", "active", "draft"]);
+    isOpen2 = (s) => !s || OPEN_STATUSES.has(String(s).toLowerCase());
     DAILY_SAFETY_TOPICS = [
       {
         title: "Fall protection",
@@ -3103,6 +5429,57 @@ async function sendSignupNotification(n) {
     return { ok: false, error: String(err) };
   }
 }
+async function sendInviteEmail(input) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;
+  const { toEmail, orgName, inviterName, role, inviteUrl } = input;
+  if (!apiKey) {
+    console.log(`[mailer] RESEND_API_KEY not set \u2014 skipping invite to ${toEmail}. Invite URL: ${inviteUrl}`);
+    return { ok: true, skipped: true };
+  }
+  const html = `<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
+    <div style="padding:16px 20px;background:#111;color:#fff;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;">You've been invited to TrussPath</div>
+    <div style="padding:24px 20px;">
+      <p style="font-size:15px;color:#111;margin:0 0 16px;"><strong>${escapeHtml(inviterName)}</strong> invited you to join <strong>${escapeHtml(orgName)}</strong> on TrussPath as a <strong>${escapeHtml(role)}</strong>.</p>
+      <p style="font-size:14px;color:#666;margin:0 0 24px;">Click the button below to accept the invite and set up your account. This link expires in 7 days.</p>
+      <a href="${escapeHtml(inviteUrl)}" style="display:inline-block;padding:12px 28px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Accept invite</a>
+      <p style="font-size:13px;color:#999;margin:24px 0 0;">If you didn't expect this, you can safely ignore this email.</p>
+    </div>
+    <div style="padding:12px 20px;color:#888;font-size:12px;border-top:1px solid #eee;">TrussPath \u2014 Field Project Management</div>
+  </div>
+</body></html>`;
+  const text2 = `${inviterName} invited you to join ${orgName} on TrussPath as a ${role}.
+
+Accept the invite here (link expires in 7 days):
+${inviteUrl}
+
+If you didn't expect this, you can safely ignore this email.`;
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from,
+        to: [toEmail],
+        subject: `${inviterName} invited you to ${orgName} on TrussPath`,
+        html,
+        text: text2
+      })
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      console.error(`[mailer] Resend ${resp.status}: ${body}`);
+      return { ok: false, error: `Resend ${resp.status}` };
+    }
+    console.log(`[mailer] Sent invite email to ${toEmail}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[mailer] Invite send failed:", err);
+    return { ok: false, error: String(err) };
+  }
+}
 async function sendPasswordResetEmail(toEmail, resetUrl) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;
@@ -3168,6 +5545,1596 @@ var init_mailer = __esm({
   }
 });
 
+// server/timesheet-auto.ts
+function weekStartMonday(iso) {
+  const d = new Date(iso);
+  const day = d.getUTCDay();
+  const back = (day + 6) % 7;
+  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - back));
+  return monday.toISOString().slice(0, 10);
+}
+function weekEndSunday(weekStartIso) {
+  const d = /* @__PURE__ */ new Date(weekStartIso + "T00:00:00Z");
+  const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 6));
+  return end.toISOString().slice(0, 10);
+}
+function dayBoundsUtc(iso) {
+  const d = new Date(iso);
+  const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+function computeHoursFromPunches(punches) {
+  let total = 0;
+  let openAt = null;
+  let breakAt = null;
+  for (const p of punches) {
+    const t = new Date(p.occurredAt).getTime();
+    if (!Number.isFinite(t)) continue;
+    switch (p.kind) {
+      case "in":
+        if (openAt == null) openAt = t;
+        break;
+      case "out":
+        if (openAt != null) {
+          total += Math.max(0, t - openAt);
+          openAt = null;
+        }
+        break;
+      case "break_start":
+        if (openAt != null && breakAt == null) {
+          total += Math.max(0, t - openAt);
+          breakAt = t;
+          openAt = null;
+        }
+        break;
+      case "break_end":
+        if (breakAt != null) {
+          openAt = t;
+          breakAt = null;
+        }
+        break;
+    }
+  }
+  if (openAt != null) total += Math.max(0, Date.now() - openAt);
+  return total / (1e3 * 60 * 60);
+}
+async function ensureTimesheetForWeek(params) {
+  const existing = await storage.getTimesheetByAccountWeek(params.accountId, params.weekStart);
+  if (existing) return existing;
+  return await storage.createTimesheet({
+    projectId: params.projectId,
+    accountId: params.accountId,
+    organizationId: params.organizationId ?? void 0,
+    employeeName: params.employeeName,
+    weekStart: params.weekStart,
+    weekEnd: weekEndSunday(params.weekStart),
+    totalHours: "0",
+    status: "draft",
+    employeeSignature: null,
+    employeeSubmittedAt: null,
+    managerSignature: null,
+    managerApprovedAt: null,
+    managerName: null,
+    managerEmail: null,
+    notes: null
+  });
+}
+async function rollupPunchToTimesheet(params) {
+  const { start, end } = dayBoundsUtc(params.occurredAt);
+  const dayPunches = await storage.getFieldPunchesForDay(params.accountId, start, end);
+  const hoursToday = computeHoursFromPunches(dayPunches);
+  const entryDate = start.slice(0, 10);
+  const dayOfWeek = (/* @__PURE__ */ new Date(entryDate + "T00:00:00Z")).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+  await storage.upsertDailyTimeEntry(params.timesheetId, entryDate, {
+    dayOfWeek,
+    hoursWorked: hoursToday.toFixed(2),
+    projectName: params.projectName ?? void 0
+  });
+  const allEntries = await storage.getTimeEntries(params.timesheetId);
+  const totalHours = allEntries.reduce((s, e) => s + (parseFloat(e.hoursWorked) || 0), 0);
+  await storage.updateTimesheet(params.timesheetId, { totalHours: totalHours.toFixed(2) });
+  return { hoursToday, totalHours };
+}
+async function findManagerForProject(project) {
+  if (!project?.superintendentId) return null;
+  return await storage.getTeamMember(project.superintendentId) ?? null;
+}
+async function runWeeklyRolloverIfDue() {
+  const now = Date.now();
+  if (now - lastRolloverAt < 30 * 60 * 1e3) return { rolled: 0 };
+  lastRolloverAt = now;
+  const todayIso = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const all = await storage.getTimesheets();
+  let rolled = 0;
+  for (const ts of all) {
+    if (!ts.accountId) continue;
+    if (ts.status !== "draft") continue;
+    if (ts.weekEnd >= todayIso) continue;
+    await storage.updateTimesheet(ts.id, { status: "needs-signature" });
+    rolled++;
+  }
+  if (rolled > 0) console.log(`[timesheets] rolled ${rolled} draft(s) to needs-signature`);
+  return { rolled };
+}
+var lastRolloverAt;
+var init_timesheet_auto = __esm({
+  "server/timesheet-auto.ts"() {
+    "use strict";
+    init_storage();
+    lastRolloverAt = 0;
+  }
+});
+
+// shared/project-event-kinds.ts
+var EVENT_KINDS, EVENT_KIND_META;
+var init_project_event_kinds = __esm({
+  "shared/project-event-kinds.ts"() {
+    "use strict";
+    EVENT_KINDS = {
+      // Time & attendance
+      TIMESHEET_CLOCKIN: "timesheet.clockin",
+      TIMESHEET_CLOCKOUT: "timesheet.clockout",
+      TIMESHEET_SUBMITTED: "timesheet.submitted",
+      TIMESHEET_APPROVED: "timesheet.approved",
+      // Field capture
+      PHOTO_UPLOADED: "photo.uploaded",
+      OBSERVATION_LOGGED: "observation.logged",
+      // Coordination items
+      RFI_CREATED: "rfi.created",
+      RFI_RESOLVED: "rfi.resolved",
+      CHANGE_ORDER_CREATED: "change_order.created",
+      CHANGE_ORDER_APPROVED: "change_order.approved",
+      PUNCH_CREATED: "punch.created",
+      PUNCH_CLOSED: "punch.closed",
+      // Reporting & docs
+      DAILY_LOG_SUBMITTED: "daily_log.submitted",
+      DOC_UPLOADED: "doc.uploaded",
+      BLUEPRINT_UPLOADED: "blueprint.uploaded",
+      DRONE_CAPTURED: "drone.captured",
+      // Task tracking
+      TASK_CREATED: "task.created",
+      TASK_COMPLETED: "task.completed",
+      // Project lifecycle
+      PROJECT_CREATED: "project.created",
+      MEMBER_ADDED: "member.added",
+      MILESTONE_REACHED: "milestone.reached",
+      EQUIPMENT_ADDED: "equipment.added",
+      MESSAGE_POSTED: "message.posted",
+      NOTE_ADDED: "note.added",
+      // Mobilization (Executive OS)
+      MOBILIZATION_ITEM_COMPLETED: "mobilization.item_completed",
+      MOBILIZATION_PERMIT_APPROVED: "mobilization.permit_approved",
+      MOBILIZATION_REPORT_GENERATED: "mobilization.report_generated"
+    };
+    EVENT_KIND_META = {
+      [EVENT_KINDS.TIMESHEET_CLOCKIN]: { label: "Clock in", category: "timesheet" },
+      [EVENT_KINDS.TIMESHEET_CLOCKOUT]: { label: "Clock out", category: "timesheet" },
+      [EVENT_KINDS.TIMESHEET_SUBMITTED]: { label: "Timesheet submitted", category: "timesheet" },
+      [EVENT_KINDS.TIMESHEET_APPROVED]: { label: "Timesheet approved", category: "timesheet" },
+      [EVENT_KINDS.PHOTO_UPLOADED]: { label: "Photo uploaded", category: "photo" },
+      [EVENT_KINDS.OBSERVATION_LOGGED]: { label: "Field observation", category: "field" },
+      [EVENT_KINDS.RFI_CREATED]: { label: "RFI submitted", category: "rfi" },
+      [EVENT_KINDS.RFI_RESOLVED]: { label: "RFI resolved", category: "rfi" },
+      [EVENT_KINDS.CHANGE_ORDER_CREATED]: { label: "Change Order created", category: "change_order" },
+      [EVENT_KINDS.CHANGE_ORDER_APPROVED]: { label: "Change Order approved", category: "change_order" },
+      [EVENT_KINDS.PUNCH_CREATED]: { label: "Punch item added", category: "punch" },
+      [EVENT_KINDS.PUNCH_CLOSED]: { label: "Punch item closed", category: "punch" },
+      [EVENT_KINDS.DAILY_LOG_SUBMITTED]: { label: "Daily log", category: "daily_log" },
+      [EVENT_KINDS.DOC_UPLOADED]: { label: "Document uploaded", category: "doc" },
+      [EVENT_KINDS.BLUEPRINT_UPLOADED]: { label: "Blueprint uploaded", category: "doc" },
+      [EVENT_KINDS.DRONE_CAPTURED]: { label: "Drone capture", category: "field" },
+      [EVENT_KINDS.TASK_CREATED]: { label: "Task created", category: "task" },
+      [EVENT_KINDS.TASK_COMPLETED]: { label: "Task completed", category: "task" },
+      [EVENT_KINDS.PROJECT_CREATED]: { label: "Project created", category: "project" },
+      [EVENT_KINDS.MEMBER_ADDED]: { label: "Team member added", category: "project" },
+      [EVENT_KINDS.MILESTONE_REACHED]: { label: "Milestone reached", category: "project" },
+      [EVENT_KINDS.EQUIPMENT_ADDED]: { label: "Equipment added", category: "project" },
+      [EVENT_KINDS.MESSAGE_POSTED]: { label: "Message posted", category: "project" },
+      [EVENT_KINDS.NOTE_ADDED]: { label: "Note added", category: "project" },
+      [EVENT_KINDS.MOBILIZATION_ITEM_COMPLETED]: { label: "Mobilization item completed", category: "project" },
+      [EVENT_KINDS.MOBILIZATION_PERMIT_APPROVED]: { label: "Permit approved", category: "project" },
+      [EVENT_KINDS.MOBILIZATION_REPORT_GENERATED]: { label: "Mobilization Plan generated", category: "doc" }
+    };
+  }
+});
+
+// server/mobilization-rollup.ts
+async function mobilizationRollup(projectId) {
+  const [plan, items, permits, equipmentRows, utilities, staff, subs, risks, allMilestones] = await Promise.all([
+    storage.getMobilizationPlan(projectId),
+    storage.getMobilizationItems(projectId),
+    storage.getMobilizationPermits(projectId),
+    storage.getMobilizationEquipment(projectId),
+    storage.getMobilizationUtilities(projectId),
+    storage.getMobilizationStaff(projectId),
+    storage.getMobilizationSubs(projectId),
+    storage.getMobilizationRisks(projectId),
+    storage.getMilestones(projectId)
+  ]);
+  const mobMilestones = allMilestones.filter((m) => m.kind === MOBILIZATION_MILESTONE_KIND);
+  const countable = items.filter((i) => i.status !== "na");
+  const doneCount = countable.filter((i) => i.status === "done").length;
+  const overallPct = pct(doneCount, countable.length);
+  const sectionPct = {};
+  for (const section of MOBILIZATION_SECTIONS) {
+    const inSection = countable.filter((i) => i.section === section);
+    sectionPct[section] = pct(inSection.filter((i) => i.status === "done").length, inSection.length);
+  }
+  const approved = permits.filter((p) => p.status === "Approved").length;
+  const notStarted = permits.filter((p) => p.status === "Not Started").length;
+  const blocked = permits.filter((p) => p.status === "Rejected" || p.status === "Expired").length;
+  const permitStatus = { approved, pending: permits.length - approved - notStarted - blocked, notStarted, blocked, total: permits.length };
+  const earthwork = mobMilestones.find((m) => m.title === EARTHWORK_MILESTONE_TITLE);
+  const milestoneDaysToEarthwork = daysUntil(earthwork?.date);
+  return {
+    seeded: !!plan,
+    plan,
+    items,
+    permits,
+    equipment: equipmentRows,
+    utilities,
+    staff,
+    subs,
+    risks,
+    milestones: mobMilestones,
+    overallPct,
+    sectionPct,
+    permitStatus,
+    equipmentOnSitePct: pct(equipmentRows.filter((e) => e.onSiteConfirmed).length, equipmentRows.length),
+    utilitiesInstalledPct: pct(utilities.filter((u) => !!u.installedDate).length, utilities.length),
+    staffOnboardedPct: pct(staff.filter((s) => s.orientationDone && s.drugTestDone && s.ppeIssued).length, staff.length),
+    subsReadyPct: pct(subs.filter((s) => s.insuranceOnFile && s.w9OnFile && s.msaSigned).length, subs.length),
+    risksOpen: risks.filter((r) => r.status === "open").length,
+    milestoneDaysToEarthwork,
+    health: computeHealth({ overallPct, hasBlockedPermit: blocked > 0, daysToEarthwork: milestoneDaysToEarthwork })
+  };
+}
+var init_mobilization_rollup = __esm({
+  "server/mobilization-rollup.ts"() {
+    "use strict";
+    init_storage();
+    init_mobilization_catalog();
+  }
+});
+
+// server/reports/engine.ts
+function formatMoney(n) {
+  if (n === null || n === void 0 || !Number.isFinite(n)) return "\u2014";
+  const neg = n < 0;
+  const [whole, cents] = Math.abs(n).toFixed(2).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${neg ? "-" : ""}$${grouped}.${cents}`;
+}
+function formatDate(iso) {
+  if (!iso) return "\u2014";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const mon = MONTHS[parseInt(m[2], 10) - 1];
+  if (!mon) return iso;
+  return `${mon} ${parseInt(m[3], 10)}, ${m[1]}`;
+}
+function toneColor(tone) {
+  switch (tone) {
+    case "green":
+      return PALETTE.green;
+    case "yellow":
+      return PALETTE.yellow;
+    case "red":
+      return PALETTE.red;
+    default:
+      return PALETTE.primary;
+  }
+}
+var import_pdfkit, PALETTE, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, CONTENT_W, HEADER_H, FOOTER_H, BODY_BOTTOM, MONTHS, HEALTH_LABEL, ReportBuilder;
+var init_engine = __esm({
+  "server/reports/engine.ts"() {
+    "use strict";
+    import_pdfkit = __toESM(require("pdfkit/js/pdfkit.standalone"), 1);
+    PALETTE = {
+      primary: "#0F172A",
+      accent: "#2563EB",
+      muted: "#64748B",
+      bgTint: "#F1F5F9",
+      green: "#16A34A",
+      yellow: "#D97706",
+      red: "#DC2626",
+      white: "#FFFFFF",
+      hairline: "#CBD5E1"
+    };
+    PAGE_WIDTH = 612;
+    PAGE_HEIGHT = 792;
+    MARGIN = 54;
+    CONTENT_W = PAGE_WIDTH - MARGIN * 2;
+    HEADER_H = 34;
+    FOOTER_H = 30;
+    BODY_BOTTOM = PAGE_HEIGHT - MARGIN - FOOTER_H;
+    MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    HEALTH_LABEL = {
+      green: "ON TRACK",
+      yellow: "AT RISK",
+      red: "BEHIND"
+    };
+    ReportBuilder = class {
+      doc;
+      meta;
+      generatedAt;
+      /** Cover art is drawn edge-to-edge, so chrome is suppressed for page 1. */
+      chromeEnabled = false;
+      drawingChrome = false;
+      pageNo = 0;
+      constructor(meta) {
+        this.meta = meta;
+        this.generatedAt = (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").slice(0, 16) + " UTC";
+        this.doc = new import_pdfkit.default({
+          size: "LETTER",
+          margins: { top: MARGIN + HEADER_H, bottom: MARGIN + FOOTER_H, left: MARGIN, right: MARGIN },
+          bufferPages: true,
+          autoFirstPage: true,
+          info: {
+            Title: `${meta.title} \u2014 ${meta.projectName}`,
+            Author: meta.preparedBy,
+            Creator: "TrussPath Executive OS"
+          }
+        });
+        this.doc.on("pageAdded", () => {
+          this.pageNo += 1;
+          if (this.chromeEnabled) this.drawChrome();
+        });
+        this.pageNo = 1;
+      }
+      pipe(stream) {
+        this.doc.pipe(stream);
+        return this;
+      }
+      end() {
+        this.doc.end();
+      }
+      // ---------------------------------------------------------------- chrome
+      drawChrome() {
+        if (this.drawingChrome) return;
+        this.drawingChrome = true;
+        const d = this.doc;
+        const y = MARGIN;
+        const savedBottom = d.page.margins.bottom;
+        d.page.margins.bottom = 0;
+        const savedFont = d._font;
+        const savedFontSize = d._fontSize;
+        const savedFill = d._fillColor;
+        d.save();
+        d.font("Helvetica").fontSize(8).fillColor(PALETTE.muted);
+        d.text(this.truncate(this.meta.projectName, 40), MARGIN, y, { width: CONTENT_W / 3, align: "left", lineBreak: false });
+        d.text(this.meta.title, MARGIN + CONTENT_W / 3, y, { width: CONTENT_W / 3, align: "center", lineBreak: false });
+        d.text(
+          `${this.meta.revision ?? "Rev 0"}  \xB7  Page ${this.pageNo}`,
+          MARGIN + CONTENT_W * 2 / 3,
+          y,
+          { width: CONTENT_W / 3, align: "right", lineBreak: false }
+        );
+        d.moveTo(MARGIN, y + 13).lineTo(PAGE_WIDTH - MARGIN, y + 13).lineWidth(0.5).strokeColor(PALETTE.hairline).stroke();
+        const fy = PAGE_HEIGHT - MARGIN - 12;
+        d.moveTo(MARGIN, fy - 6).lineTo(PAGE_WIDTH - MARGIN, fy - 6).lineWidth(0.5).strokeColor(PALETTE.hairline).stroke();
+        d.fontSize(7).fillColor(PALETTE.muted);
+        d.text(this.truncate(this.meta.preparedBy, 36), MARGIN, fy, { width: CONTENT_W / 3, align: "left", lineBreak: false });
+        d.text(this.generatedAt, MARGIN + CONTENT_W / 3, fy, { width: CONTENT_W / 3, align: "center", lineBreak: false });
+        d.text("TrussPath \u2014 Confidential", MARGIN + CONTENT_W * 2 / 3, fy, { width: CONTENT_W / 3, align: "right", lineBreak: false });
+        d.restore();
+        if (savedFont) d._font = savedFont;
+        d._fontSize = savedFontSize;
+        d._fillColor = null;
+        if (savedFill) d.fillColor(savedFill[0], savedFill[1]);
+        d.page.margins.bottom = savedBottom;
+        this.drawingChrome = false;
+        d.x = MARGIN;
+        d.y = MARGIN + HEADER_H;
+      }
+      truncate(s, max) {
+        return s.length > max ? s.slice(0, max - 1) + "\u2026" : s;
+      }
+      /** Break to a new page when `need` points won't fit in the remaining body. */
+      ensure(need) {
+        if (this.doc.y + need > BODY_BOTTOM) this.doc.addPage();
+      }
+      resetText() {
+        this.doc.fillColor(PALETTE.primary).font("Helvetica").fontSize(10);
+      }
+      // ------------------------------------------------------------ structural
+      coverPage(subtitle) {
+        const d = this.doc;
+        const bandH = PAGE_HEIGHT * 0.4;
+        const savedBottom = d.page.margins.bottom;
+        d.page.margins.bottom = 0;
+        d.rect(0, 0, PAGE_WIDTH, bandH).fill(PALETTE.primary);
+        d.fillColor(PALETTE.white).font("Helvetica-Bold").fontSize(13).text("TRUSSPATH", MARGIN, MARGIN + 6, { characterSpacing: 3 });
+        d.font("Helvetica").fontSize(9).fillColor("#94A3B8").text("EXECUTIVE OS", MARGIN, MARGIN + 26, { characterSpacing: 2 });
+        d.fillColor(PALETTE.white).font("Times-Bold").fontSize(38).text(this.meta.title.toUpperCase(), MARGIN, bandH - 150, { width: CONTENT_W });
+        if (subtitle) {
+          d.font("Helvetica").fontSize(12).fillColor("#CBD5E1").text(subtitle, MARGIN, d.y + 6, { width: CONTENT_W });
+        }
+        if (this.meta.phase) {
+          d.font("Helvetica-Bold").fontSize(9).fillColor(PALETTE.accent).text(`PHASE: ${this.meta.phase.toUpperCase()}`, MARGIN, bandH - 34, { characterSpacing: 1.5 });
+        }
+        let y = bandH + 42;
+        d.font("Helvetica-Bold").fontSize(9).fillColor(PALETTE.muted).text("PROJECT", MARGIN, y, { characterSpacing: 1.5 });
+        y += 18;
+        const rows = [
+          ["Project Number", this.meta.projectNumber || "\u2014"],
+          ["Project Name", this.meta.projectName || "\u2014"],
+          ["Owner / Client", this.meta.owner || "\u2014"],
+          ["General Contractor", this.meta.gcName || "\u2014"],
+          ["Address", this.meta.address || "\u2014"]
+        ];
+        if (this.meta.reportingPeriod) rows.push(["Reporting Period", this.meta.reportingPeriod]);
+        const labelW = 150;
+        for (const [k, v] of rows) {
+          d.font("Helvetica").fontSize(9).fillColor(PALETTE.muted).text(k, MARGIN, y, { width: labelW, lineBreak: false });
+          d.font("Helvetica-Bold").fontSize(10).fillColor(PALETTE.primary).text(v, MARGIN + labelW, y - 1, { width: CONTENT_W - labelW });
+          y = Math.max(d.y, y + 14) + 6;
+        }
+        let by = PAGE_HEIGHT * 0.8 - 6;
+        d.moveTo(MARGIN, by).lineTo(PAGE_WIDTH - MARGIN, by).lineWidth(0.5).strokeColor(PALETTE.hairline).stroke();
+        by += 14;
+        if (this.meta.health) {
+          const tone = this.meta.health;
+          const label = `HEALTH: ${HEALTH_LABEL[tone]}`;
+          const w = d.font("Helvetica-Bold").fontSize(9).widthOfString(label) + 20;
+          d.roundedRect(MARGIN, by, w, 18, 9).fill(toneColor(tone));
+          d.fillColor(PALETTE.white).font("Helvetica-Bold").fontSize(9).text(label, MARGIN + 10, by + 5, { lineBreak: false });
+          by += 28;
+        }
+        const foot = [
+          ["Revision", this.meta.revision ?? "Rev 0"],
+          ["Prepared By", this.meta.preparedByRole ? `${this.meta.preparedBy} \u2014 ${this.meta.preparedByRole}` : this.meta.preparedBy],
+          ["Issued", formatDate((/* @__PURE__ */ new Date()).toISOString().slice(0, 10))]
+        ];
+        if (this.meta.distribution?.length) foot.push(["Distribution", this.meta.distribution.join(", ")]);
+        for (const [k, v] of foot) {
+          d.font("Helvetica").fontSize(8).fillColor(PALETTE.muted).text(k, MARGIN, by, { width: 100, lineBreak: false });
+          d.font("Helvetica").fontSize(9).fillColor(PALETTE.primary).text(v, MARGIN + 100, by - 1, { width: CONTENT_W - 100 });
+          by = Math.max(d.y, by + 12) + 3;
+        }
+        d.page.margins.bottom = savedBottom;
+        this.chromeEnabled = true;
+        d.addPage();
+        return this;
+      }
+      sectionBreak() {
+        this.doc.addPage();
+        return this;
+      }
+      h1(text2) {
+        this.ensure(70);
+        const d = this.doc;
+        if (d.y > MARGIN + HEADER_H + 2) d.y += 12;
+        d.font("Helvetica-Bold").fontSize(16).fillColor(PALETTE.primary).text(text2, MARGIN, d.y, { width: CONTENT_W });
+        d.y += 3;
+        d.moveTo(MARGIN, d.y).lineTo(MARGIN + 46, d.y).lineWidth(2.5).strokeColor(PALETTE.accent).stroke();
+        d.y += 10;
+        this.resetText();
+        return this;
+      }
+      h2(text2) {
+        this.ensure(46);
+        const d = this.doc;
+        d.y += 8;
+        d.font("Helvetica-Bold").fontSize(11.5).fillColor(PALETTE.primary).text(text2, MARGIN, d.y, { width: CONTENT_W });
+        d.y += 5;
+        this.resetText();
+        return this;
+      }
+      h3(text2) {
+        this.ensure(34);
+        const d = this.doc;
+        d.y += 6;
+        d.font("Helvetica-Bold").fontSize(9.5).fillColor(PALETTE.muted).text(text2.toUpperCase(), MARGIN, d.y, { width: CONTENT_W, characterSpacing: 0.8 });
+        d.y += 4;
+        this.resetText();
+        return this;
+      }
+      p(text2, opts) {
+        if (!text2) return this;
+        this.ensure(26);
+        const d = this.doc;
+        d.font("Helvetica").fontSize(9.5).fillColor(opts?.muted ? PALETTE.muted : PALETTE.primary).text(text2, MARGIN, d.y, { width: CONTENT_W, align: "left", lineGap: 1.5 });
+        d.y += 5;
+        this.resetText();
+        return this;
+      }
+      /** Muted italic marker for data that needs a module we haven't shipped. */
+      unavailable(text2) {
+        this.ensure(20);
+        const d = this.doc;
+        d.font("Helvetica-Oblique").fontSize(9).fillColor(PALETTE.muted).text(`\u2014 unavailable \u2014 ${text2}`, MARGIN, d.y, { width: CONTENT_W });
+        d.y += 4;
+        this.resetText();
+        return this;
+      }
+      // ------------------------------------------------------------------ data
+      statRow(chips) {
+        if (!chips.length) return this;
+        const shown = chips.slice(0, 6);
+        this.ensure(58);
+        const d = this.doc;
+        const gap = 8;
+        const w = (CONTENT_W - gap * (shown.length - 1)) / shown.length;
+        const top = d.y;
+        const h = 46;
+        shown.forEach((c, i) => {
+          const x = MARGIN + i * (w + gap);
+          d.roundedRect(x, top, w, h, 4).fill(PALETTE.bgTint);
+          d.roundedRect(x, top, 3, h, 1.5).fill(toneColor(c.tone));
+          d.font("Helvetica").fontSize(7).fillColor(PALETTE.muted).text(c.label.toUpperCase(), x + 10, top + 8, { width: w - 16, characterSpacing: 0.5, lineBreak: false });
+          d.font("Helvetica-Bold").fontSize(14).fillColor(toneColor(c.tone)).text(c.value, x + 10, top + 21, { width: w - 16, lineBreak: false });
+        });
+        d.y = top + h + 10;
+        this.resetText();
+        return this;
+      }
+      keyValueGrid(items, cols = 2) {
+        if (!items.length) return this;
+        const d = this.doc;
+        const n = Math.max(1, Math.min(3, cols));
+        const gap = 14;
+        const colW = (CONTENT_W - gap * (n - 1)) / n;
+        for (let i = 0; i < items.length; i += n) {
+          const slice = items.slice(i, i + n);
+          let rowH = 0;
+          for (const [k, v] of slice) {
+            d.font("Helvetica").fontSize(8);
+            const kh = d.heightOfString(k, { width: colW });
+            d.font("Helvetica-Bold").fontSize(9.5);
+            const vh = d.heightOfString(v || "\u2014", { width: colW });
+            rowH = Math.max(rowH, kh + vh + 8);
+          }
+          this.ensure(rowH + 4);
+          const top = d.y;
+          slice.forEach(([k, v], j) => {
+            const x = MARGIN + j * (colW + gap);
+            d.font("Helvetica").fontSize(8).fillColor(PALETTE.muted).text(k, x, top, { width: colW });
+            d.font("Helvetica-Bold").fontSize(9.5).fillColor(PALETTE.primary).text(v || "\u2014", x, top + d.heightOfString(k, { width: colW }) + 1, { width: colW });
+          });
+          d.y = top + rowH;
+        }
+        d.y += 4;
+        this.resetText();
+        return this;
+      }
+      table(cols, rows) {
+        if (!cols.length) return this;
+        const d = this.doc;
+        const fixed = cols.reduce((s, c) => s + (c.width ?? 0), 0);
+        const flexCount = cols.filter((c) => !c.width).length;
+        const flexW = flexCount ? Math.max(40, (CONTENT_W - fixed) / flexCount) : 0;
+        const widths = cols.map((c) => c.width ?? flexW);
+        const padX = 5;
+        const drawHeader = () => {
+          this.ensure(30);
+          const top = d.y;
+          d.rect(MARGIN, top, CONTENT_W, 20).fill(PALETTE.bgTint);
+          cols.forEach((c, i) => {
+            const x = MARGIN + widths.slice(0, i).reduce((s, w) => s + w, 0);
+            d.font("Helvetica-Bold").fontSize(8).fillColor(PALETTE.primary).text(
+              c.header.toUpperCase(),
+              x + padX,
+              top + 6.5,
+              { width: widths[i] - padX * 2, align: c.align ?? "left", lineBreak: false, characterSpacing: 0.4 }
+            );
+          });
+          d.y = top + 20;
+        };
+        drawHeader();
+        if (!rows.length) {
+          d.font("Helvetica-Oblique").fontSize(9).fillColor(PALETTE.muted).text("No records.", MARGIN + padX, d.y + 6, { width: CONTENT_W - padX * 2 });
+          d.y += 22;
+          this.resetText();
+          return this;
+        }
+        for (const row of rows) {
+          d.font("Helvetica").fontSize(8.5);
+          let cellH = 0;
+          cols.forEach((_, i) => {
+            cellH = Math.max(cellH, d.heightOfString(row[i] ?? "\u2014", { width: widths[i] - padX * 2 }));
+          });
+          const rowH = cellH + 10;
+          if (d.y + rowH > BODY_BOTTOM) {
+            d.addPage();
+            drawHeader();
+          }
+          const top = d.y;
+          cols.forEach((c, i) => {
+            const x = MARGIN + widths.slice(0, i).reduce((s, w) => s + w, 0);
+            d.font("Helvetica").fontSize(8.5).fillColor(PALETTE.primary).text(row[i] ?? "\u2014", x + padX, top + 5, { width: widths[i] - padX * 2, align: c.align ?? "left" });
+          });
+          d.y = top + rowH;
+          d.moveTo(MARGIN, d.y).lineTo(MARGIN + CONTENT_W, d.y).lineWidth(0.5).strokeColor(PALETTE.hairline).stroke();
+        }
+        d.y += 8;
+        this.resetText();
+        return this;
+      }
+      bulletList(items) {
+        if (!items.length) {
+          return this.p("None recorded.", { muted: true });
+        }
+        const d = this.doc;
+        for (const item of items) {
+          d.font("Helvetica").fontSize(9.5);
+          const h = d.heightOfString(item, { width: CONTENT_W - 16 });
+          this.ensure(h + 6);
+          const top = d.y;
+          d.circle(MARGIN + 3, top + 4.5, 1.8).fill(PALETTE.accent);
+          d.fillColor(PALETTE.primary).text(item, MARGIN + 14, top, { width: CONTENT_W - 16, lineGap: 1 });
+          d.y = top + h + 4;
+        }
+        d.y += 4;
+        this.resetText();
+        return this;
+      }
+      checklist(items) {
+        if (!items.length) {
+          return this.p("No items in this section.", { muted: true });
+        }
+        const d = this.doc;
+        for (const item of items) {
+          d.font("Helvetica").fontSize(9.5);
+          const labelH = d.heightOfString(item.label, { width: CONTENT_W - 24 });
+          let subH = 0;
+          if (item.subtitle) {
+            d.font("Helvetica").fontSize(8);
+            subH = d.heightOfString(item.subtitle, { width: CONTENT_W - 24 }) + 1;
+          }
+          const rowH = Math.max(14, labelH + subH) + 5;
+          this.ensure(rowH + 2);
+          const top = d.y;
+          d.roundedRect(MARGIN, top + 1, 9, 9, 1.5).lineWidth(0.8).fillAndStroke(item.done ? PALETTE.green : PALETTE.white, item.done ? PALETTE.green : PALETTE.hairline);
+          if (item.done) {
+            d.save().lineWidth(1.2).strokeColor(PALETTE.white).moveTo(MARGIN + 2.2, top + 5.6).lineTo(MARGIN + 4, top + 7.6).lineTo(MARGIN + 6.9, top + 3.1).stroke().restore();
+          }
+          d.font("Helvetica").fontSize(9.5).fillColor(item.done ? PALETTE.muted : PALETTE.primary).text(item.label, MARGIN + 18, top, { width: CONTENT_W - 24 });
+          if (item.subtitle) {
+            d.font("Helvetica").fontSize(8).fillColor(PALETTE.muted).text(item.subtitle, MARGIN + 18, top + labelH + 1, { width: CONTENT_W - 24 });
+          }
+          d.y = top + rowH;
+        }
+        d.y += 4;
+        this.resetText();
+        return this;
+      }
+      progressBar(pct2, label) {
+        const clamped = Math.max(0, Math.min(100, Math.round(Number.isFinite(pct2) ? pct2 : 0)));
+        this.ensure(24);
+        const d = this.doc;
+        const barW = 200;
+        const barH = 8;
+        const top = d.y + 2;
+        let x = MARGIN;
+        if (label) {
+          d.font("Helvetica").fontSize(8.5).fillColor(PALETTE.muted).text(label, MARGIN, top - 1, { width: 150, lineBreak: false });
+          x = MARGIN + 158;
+        }
+        d.roundedRect(x, top, barW, barH, barH / 2).fill(PALETTE.bgTint);
+        if (clamped > 0) {
+          d.roundedRect(x, top, Math.max(barH, barW * clamped / 100), barH, barH / 2).fill(PALETTE.accent);
+        }
+        d.font("Helvetica-Bold").fontSize(8.5).fillColor(PALETTE.primary).text(`${clamped}%`, x + barW + 8, top - 1, { width: 40, lineBreak: false });
+        d.y = top + barH + 6;
+        this.resetText();
+        return this;
+      }
+      // --------------------------------------------------------------- signals
+      callout(text2, tone) {
+        const color = tone === "danger" ? PALETTE.red : tone === "warn" ? PALETTE.yellow : tone === "success" ? PALETTE.green : PALETTE.accent;
+        const d = this.doc;
+        d.font("Helvetica").fontSize(9);
+        const h = d.heightOfString(text2, { width: CONTENT_W - 30 }) + 16;
+        this.ensure(h + 6);
+        const top = d.y;
+        d.roundedRect(MARGIN, top, CONTENT_W, h, 3).fill(PALETTE.bgTint);
+        d.rect(MARGIN, top, 3, h).fill(color);
+        d.font("Helvetica").fontSize(9).fillColor(PALETTE.primary).text(text2, MARGIN + 14, top + 8, { width: CONTENT_W - 30 });
+        d.y = top + h + 8;
+        this.resetText();
+        return this;
+      }
+      // ---------------------------------------------------- executive sections
+      executiveSummary(opts) {
+        this.h1("Executive Summary");
+        const days = opts.daysToNextMilestone;
+        const daysVal = days === void 0 || days === null ? "\u2014" : days < 0 ? `${Math.abs(days)}d late` : `${days}d`;
+        this.statRow([
+          { label: "Current Phase", value: opts.currentPhase },
+          { label: "Health", value: HEALTH_LABEL[opts.health], tone: opts.health },
+          {
+            label: "Next Milestone",
+            value: daysVal,
+            tone: days === void 0 || days === null ? "default" : days < 0 ? "red" : days < 3 ? "yellow" : "default"
+          }
+        ]);
+        this.h3("Key Wins This Period");
+        this.bulletList(opts.keyWins);
+        this.h3("Top Risks");
+        this.bulletList(opts.topRisks);
+        this.h3("Top Open Issues");
+        this.bulletList(opts.topIssues);
+        this.h3("Decisions Required");
+        if (opts.decisionsRequired.length) {
+          this.callout(
+            "The following items need executive or owner sign-off before they can advance.",
+            "warn"
+          );
+          this.bulletList(opts.decisionsRequired);
+        } else {
+          this.p("No decisions are currently blocked pending executive sign-off.", { muted: true });
+        }
+        return this;
+      }
+      financialsSection(opts) {
+        this.h1("Financials");
+        this.statRow([
+          { label: "Original Contract", value: formatMoney(opts.originalContract) },
+          { label: "Approved COs", value: formatMoney(opts.approvedChangeOrders) },
+          { label: "Revised Contract", value: formatMoney(opts.revisedContract) }
+        ]);
+        const rows = [
+          ["Original contract value", formatMoney(opts.originalContract)],
+          ["Approved change orders", formatMoney(opts.approvedChangeOrders)],
+          ["Revised contract value", formatMoney(opts.revisedContract)],
+          ["Cost to date", formatMoney(opts.costToDate)],
+          ["Cost to complete", formatMoney(opts.costToComplete)],
+          ["Estimate at completion", formatMoney(opts.estimateAtCompletion)],
+          ["Variance", formatMoney(opts.variance)],
+          ["Contingency drawn", formatMoney(opts.contingencyDrawn)],
+          ["Contingency remaining", formatMoney(opts.contingencyRemaining)],
+          ["Pending change orders", opts.pendingChangeOrders === void 0 ? "\u2014" : String(opts.pendingChangeOrders)],
+          ["Pending pay applications", opts.pendingPayApps === void 0 ? "\u2014" : String(opts.pendingPayApps)]
+        ];
+        this.table(
+          [{ header: "Line Item", width: 300 }, { header: "Amount", align: "right" }],
+          rows
+        );
+        for (const u of opts.unavailableSections ?? []) this.unavailable(u);
+        return this;
+      }
+      scheduleSection(opts) {
+        this.h1("Schedule");
+        const behind = opts.daysAheadBehind < 0;
+        this.statRow([
+          { label: "Complete", value: `${Math.round(opts.percentComplete)}%` },
+          {
+            label: behind ? "Days Behind" : "Days Ahead",
+            value: String(Math.abs(opts.daysAheadBehind)),
+            tone: behind ? "red" : "green"
+          }
+        ]);
+        this.progressBar(opts.percentComplete, "Schedule complete");
+        this.keyValueGrid([
+          ["Baseline start", formatDate(opts.baselineStart)],
+          ["Baseline finish", formatDate(opts.baselineEnd)],
+          ["Current start", formatDate(opts.currentStart)],
+          ["Current finish", formatDate(opts.currentEnd)]
+        ], 2);
+        this.h2("Upcoming Milestones");
+        this.table(
+          [{ header: "Milestone" }, { header: "Target Date", width: 110 }, { header: "Status", width: 90 }],
+          opts.upcomingMilestones.map((m) => [m.name, formatDate(m.date), m.status])
+        );
+        if (opts.criticalPathNote) {
+          this.h2("Critical Path");
+          this.p(opts.criticalPathNote);
+        }
+        if (opts.delays?.length) {
+          this.h2("Delays & Recovery");
+          this.table(
+            [{ header: "Cause" }, { header: "Days", width: 55, align: "right" }, { header: "Recovery Plan", width: 200 }],
+            opts.delays.map((d) => [d.cause, String(d.days), d.recovery])
+          );
+        }
+        return this;
+      }
+      qualitySection(opts) {
+        this.h1("Quality");
+        this.statRow([
+          { label: "Open Punch Items", value: String(opts.openPunchItems), tone: opts.openPunchItems > 0 ? "yellow" : "green" },
+          { label: "Open NCRs", value: opts.openNcrs === void 0 ? "\u2014" : String(opts.openNcrs) },
+          { label: "Inspection Pass Rate", value: opts.inspectionPassRate === void 0 ? "\u2014" : `${Math.round(opts.inspectionPassRate)}%` }
+        ]);
+        if (opts.testingSummary) this.p(opts.testingSummary);
+        for (const u of opts.unavailableSections ?? []) this.unavailable(u);
+        return this;
+      }
+      safetySection(opts) {
+        this.h1("Safety");
+        this.statRow([
+          { label: "Incidents", value: String(opts.incidentsThisPeriod), tone: opts.incidentsThisPeriod > 0 ? "red" : "green" },
+          { label: "Near Misses", value: String(opts.nearMisses), tone: opts.nearMisses > 0 ? "yellow" : "green" },
+          { label: "Training Hours", value: opts.trainingHours === void 0 ? "\u2014" : String(opts.trainingHours) },
+          { label: "TRIR", value: opts.trir === void 0 ? "\u2014" : opts.trir.toFixed(2) },
+          { label: "DART", value: opts.dart === void 0 ? "\u2014" : opts.dart.toFixed(2) }
+        ]);
+        if (opts.correctiveActions?.length) {
+          this.h2("Corrective Actions");
+          this.bulletList(opts.correctiveActions);
+        }
+        for (const u of opts.unavailableSections ?? []) this.unavailable(u);
+        return this;
+      }
+      rfiSubmittalCoSection(opts) {
+        this.h1("RFIs, Submittals & Change Orders");
+        this.statRow([
+          { label: "Open RFIs", value: String(opts.openRfis), tone: opts.openRfis > 0 ? "yellow" : "green" },
+          { label: "Avg Response", value: opts.avgRfiResponseDays === void 0 ? "\u2014" : `${opts.avgRfiResponseDays.toFixed(1)}d` },
+          { label: "Open Submittals", value: String(opts.openSubmittals) },
+          { label: "Open COs", value: String(opts.openChangeOrders) },
+          { label: "Pending CO Value", value: formatMoney(opts.pendingChangeOrderValue) }
+        ]);
+        if (opts.topOpenRfis?.length) {
+          this.h2("Oldest Open RFIs");
+          this.table(
+            [{ header: "No.", width: 70 }, { header: "Subject" }, { header: "Due", width: 100 }],
+            opts.topOpenRfis.map((r) => [r.number, r.subject, formatDate(r.dueDate)])
+          );
+        }
+        return this;
+      }
+      riskRegisterSection(opts) {
+        this.h1("Risk Register");
+        this.table(
+          [
+            { header: "Risk" },
+            { header: "Likelihood", width: 62, align: "center" },
+            { header: "Impact", width: 52, align: "center" },
+            { header: "Mitigation", width: 140 },
+            { header: "Owner", width: 72 },
+            { header: "Status", width: 58, align: "center" }
+          ],
+          opts.risks.map((r) => [r.risk, r.likelihood, r.impact, r.mitigation, r.owner, r.status])
+        );
+        return this;
+      }
+      manpowerSection(opts) {
+        this.h1("Manpower");
+        this.statRow([
+          { label: "Total Headcount", value: String(opts.totalHeadcount) },
+          { label: "Total Hours", value: opts.totalHours.toFixed(1) },
+          { label: "Planned Hours", value: opts.plannedHours === void 0 ? "\u2014" : opts.plannedHours.toFixed(1) }
+        ]);
+        this.table(
+          [{ header: "Trade" }, { header: "Headcount", width: 90, align: "right" }, { header: "Hours", width: 90, align: "right" }],
+          opts.trades.map((t) => [t.trade, String(t.headcount), t.hoursThisPeriod.toFixed(1)])
+        );
+        return this;
+      }
+      lookAheadSection(opts) {
+        this.h1(`${opts.weeks}-Week Look Ahead`);
+        this.table(
+          [{ header: "Activity" }, { header: "Owner", width: 110 }, { header: "Start", width: 90 }, { header: "Blockers", width: 130 }],
+          opts.activities.map((a) => [a.activity, a.owner, formatDate(a.startDate), a.blockers ?? "\u2014"])
+        );
+        return this;
+      }
+      photosSection(opts) {
+        this.h1("Progress Photos");
+        if (opts.note) this.p(opts.note, { muted: true });
+        const d = this.doc;
+        const gap = 12;
+        const w = (CONTENT_W - gap) / 2;
+        const h = w * 0.62;
+        for (let i = 0; i < opts.captions.length; i += 2) {
+          const pair = opts.captions.slice(i, i + 2);
+          this.ensure(h + 26);
+          const top = d.y;
+          pair.forEach((caption, j) => {
+            const x = MARGIN + j * (w + gap);
+            d.roundedRect(x, top, w, h, 3).fill(PALETTE.bgTint);
+            d.font("Helvetica-Oblique").fontSize(8).fillColor(PALETTE.muted).text("Photo placeholder", x, top + h / 2 - 5, { width: w, align: "center", lineBreak: false });
+            d.font("Helvetica").fontSize(8).fillColor(PALETTE.primary).text(caption, x, top + h + 4, { width: w });
+          });
+          d.y = top + h + 24;
+        }
+        this.resetText();
+        return this;
+      }
+      signOffBlock(opts) {
+        this.h1("Approvals & Sign-Off");
+        this.p(
+          "By signing below, each party acknowledges review of this report and concurrence with its contents.",
+          { muted: true }
+        );
+        const d = this.doc;
+        const gap = 24;
+        const w = (CONTENT_W - gap) / 2;
+        for (let i = 0; i < opts.signers.length; i += 2) {
+          const pair = opts.signers.slice(i, i + 2);
+          this.ensure(72);
+          const top = d.y + 10;
+          pair.forEach((s, j) => {
+            const x = MARGIN + j * (w + gap);
+            d.moveTo(x, top + 26).lineTo(x + w, top + 26).lineWidth(0.8).strokeColor(PALETTE.primary).stroke();
+            if (s.name) {
+              d.font("Helvetica-Bold").fontSize(9).fillColor(PALETTE.primary).text(s.name, x, top + 31, { width: w, lineBreak: false });
+            }
+            d.font("Helvetica").fontSize(8).fillColor(PALETTE.muted).text(s.role, x, top + 42, { width: w, lineBreak: false });
+            d.font("Helvetica").fontSize(8).fillColor(PALETTE.muted).text(`Date: ${s.date ? formatDate(s.date) : "_______________"}`, x, top + 54, { width: w, lineBreak: false });
+          });
+          d.y = top + 74;
+        }
+        this.resetText();
+        return this;
+      }
+      appendix(sections) {
+        this.sectionBreak();
+        this.h1("Appendix");
+        for (const s of sections) {
+          this.h2(s.title);
+          this.p(s.body);
+        }
+        return this;
+      }
+    };
+  }
+});
+
+// server/reports/data-loaders.ts
+function norm(s) {
+  return (s ?? "").trim().toLowerCase();
+}
+function daysBetween(fromIso, toIso) {
+  if (!fromIso || !toIso) return null;
+  const a = Date.parse(fromIso);
+  const b = Date.parse(toIso);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return Math.round((b - a) / 864e5);
+}
+function isAfter(iso, since) {
+  if (!since) return true;
+  if (!iso) return false;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) && t >= since.getTime();
+}
+async function loadCoreProject(projectId) {
+  const project = await storage.getProject(projectId);
+  if (!project) throw new Error(`Project ${projectId} not found`);
+  let organization = null;
+  if (project.organizationId != null) {
+    const rows = await db.select().from(organizations).where((0, import_drizzle_orm4.eq)(organizations.id, project.organizationId)).limit(1);
+    organization = rows[0] ?? null;
+  }
+  return { project, organization, gcName: organization?.name || "\u2014" };
+}
+async function loadRfiRollup(projectId) {
+  const rfis2 = await storage.getRfis(projectId);
+  const open = rfis2.filter((r) => OPEN_RFI.has(norm(r.status)));
+  const spans = rfis2.filter((r) => !OPEN_RFI.has(norm(r.status))).map((r) => daysBetween(r.dateCreated, r.dueDate)).filter((n) => n !== null && n >= 0);
+  const avgResponseDays = spans.length ? spans.reduce((s, n) => s + n, 0) / spans.length : void 0;
+  const topOpen = [...open].sort((a, b) => (a.dueDate ?? "").localeCompare(b.dueDate ?? "")).slice(0, 5).map((r) => ({ number: r.number, subject: r.subject, dueDate: r.dueDate }));
+  return { openRfis: open.length, avgResponseDays, topOpen };
+}
+async function loadSubmittalRollup(projectId) {
+  const rows = await storage.getSubmittals(projectId);
+  return { openSubmittals: rows.filter((s) => OPEN_SUBMITTAL.has(norm(s.status))).length };
+}
+async function loadChangeOrderRollup(projectId) {
+  const rows = await storage.getChangeOrders(projectId);
+  let approvedTotal = 0;
+  let pendingCount = 0;
+  let pendingValue = 0;
+  for (const co of rows) {
+    const status = norm(co.status);
+    const amount = Number.isFinite(co.amount) ? co.amount : 0;
+    if (status === "approved" || status === "executed") approvedTotal += amount;
+    else if (OPEN_CO.has(status)) {
+      pendingCount += 1;
+      pendingValue += amount;
+    }
+  }
+  return { approvedTotal, pendingCount, pendingValue };
+}
+async function loadPunchRollup(projectId) {
+  const rows = await storage.getPunchItems(projectId);
+  return { openItems: rows.filter((p) => !CLOSED_PUNCH.has(norm(p.status))).length };
+}
+async function loadObservationRollup(projectId, since) {
+  const rows = await storage.getRecentFieldObservations({ projectId, limit: 500 });
+  let safetyIncidents = 0;
+  let nearMisses = 0;
+  let qualityIssues = 0;
+  for (const o of rows) {
+    if (!isAfter(o.occurredAt ?? o.createdAt, since)) continue;
+    const kind = norm(o.kind);
+    const severity = norm(o.severity);
+    if (kind === "safety") {
+      if (severity === "high" || severity === "urgent") safetyIncidents += 1;
+      else nearMisses += 1;
+    } else if (kind === "quality") {
+      qualityIssues += 1;
+    }
+  }
+  return { safetyIncidents, nearMisses, qualityIssues };
+}
+async function loadTimesheetRollup(projectId, since) {
+  const [sheets, team] = await Promise.all([
+    storage.getTimesheets(projectId),
+    storage.getTeam()
+  ]);
+  const tradeByName = new Map(team.map((m) => [norm(m.name), m.trade || "Unassigned"]));
+  const buckets = /* @__PURE__ */ new Map();
+  let totalHours = 0;
+  for (const ts of sheets) {
+    if (!isAfter(ts.weekStart, since)) continue;
+    const hours = parseFloat(ts.totalHours ?? "0");
+    if (!Number.isFinite(hours)) continue;
+    const trade = tradeByName.get(norm(ts.employeeName)) ?? "Unassigned";
+    const bucket = buckets.get(trade) ?? { hours: 0, people: /* @__PURE__ */ new Set() };
+    bucket.hours += hours;
+    bucket.people.add(norm(ts.employeeName));
+    buckets.set(trade, bucket);
+    totalHours += hours;
+  }
+  const byTrade = Array.from(buckets.entries()).map(([trade, b]) => ({ trade, headcount: b.people.size, hours: b.hours })).sort((a, b) => b.hours - a.hours);
+  return { totalHours, byTrade };
+}
+var import_drizzle_orm4, OPEN_RFI, OPEN_SUBMITTAL, OPEN_CO, CLOSED_PUNCH;
+var init_data_loaders = __esm({
+  "server/reports/data-loaders.ts"() {
+    "use strict";
+    import_drizzle_orm4 = require("drizzle-orm");
+    init_storage();
+    init_schema();
+    OPEN_RFI = /* @__PURE__ */ new Set(["open", "in review"]);
+    OPEN_SUBMITTAL = /* @__PURE__ */ new Set(["draft", "submitted", "in review"]);
+    OPEN_CO = /* @__PURE__ */ new Set(["draft", "pending"]);
+    CLOSED_PUNCH = /* @__PURE__ */ new Set(["closed", "complete", "completed", "done", "verified"]);
+  }
+});
+
+// server/reports/mobilization-plan.ts
+function findSigner(team, role) {
+  const aliases = ROLE_ALIASES[role] ?? [role.toLowerCase()];
+  const hit = team.find((m) => {
+    const r = (m.role ?? "").trim().toLowerCase();
+    return aliases.some((a) => r === a || r.includes(a));
+  });
+  return hit?.name ?? "";
+}
+function yesNo(v) {
+  return v ? "Yes" : "No";
+}
+function itemsIn(items, section) {
+  return items.filter((i) => i.section === section).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+}
+function itemSubtitle(item, teamMap) {
+  const parts = [];
+  if (item.ownerId != null) {
+    const owner = teamMap.get(item.ownerId);
+    if (owner) parts.push(owner.name);
+  }
+  if (item.targetDate) {
+    parts.push(`due ${formatDate(item.targetDate)}`);
+    const d = daysUntil(item.targetDate);
+    if (d !== null && d < 0 && item.status !== "done" && item.status !== "na") {
+      parts.push(`${Math.abs(d)}d overdue`);
+    }
+  }
+  if (item.status === "na") parts.push("N/A");
+  else if (item.status === "in_progress") parts.push("in progress");
+  return parts.length ? parts.join("  \xB7  ") : void 0;
+}
+function toChecklist(items, teamMap) {
+  return items.map((i) => ({
+    label: i.title,
+    done: i.status === "done",
+    subtitle: itemSubtitle(i, teamMap)
+  }));
+}
+async function generateMobilizationPlan(projectId, opts) {
+  const { res } = opts;
+  const [core, roll, team] = await Promise.all([
+    loadCoreProject(projectId),
+    mobilizationRollup(projectId),
+    storage.getTeam()
+  ]);
+  const { project, gcName } = core;
+  const teamMap = new Map(team.map((m) => [m.id, m]));
+  const since = project.startDate ? new Date(project.startDate) : void 0;
+  const [rfi, submittals2, cos, punch, obs, labor] = await Promise.all([
+    loadRfiRollup(projectId),
+    loadSubmittalRollup(projectId),
+    loadChangeOrderRollup(projectId),
+    loadPunchRollup(projectId),
+    loadObservationRollup(projectId, since),
+    loadTimesheetRollup(projectId, since)
+  ]);
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const meta = {
+    title: "Mobilization Plan",
+    projectName: project.name,
+    projectNumber: project.number,
+    owner: project.client,
+    gcName,
+    address: project.address,
+    reportingPeriod: `As of ${formatDate(today)}`,
+    preparedBy: opts.preparedBy,
+    preparedByRole: opts.preparedByRole,
+    distribution: ["CEO", "Owner", "Project Executive", "Project Manager"],
+    revision: opts.revision ?? "Rev 0",
+    health: roll.health,
+    phase: "Mobilization"
+  };
+  const filename = `Mobilization Plan \u2014 ${project.name} \u2014 ${today}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${filename.replace(/[^\x20-\x7E]/g, "-").replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(filename)}`
+  );
+  const r = new ReportBuilder(meta);
+  r.pipe(res);
+  r.coverPage(`${project.name} \xB7 ${project.number}`);
+  r.sectionBreak();
+  const daysToEarthwork = roll.milestoneDaysToEarthwork;
+  const openRisks = roll.risks.filter((x) => x.status === "open");
+  const topRisks = [...openRisks].sort((a, b) => (RISK_WEIGHT[b.likelihood] ?? 2) * (RISK_WEIGHT[b.impact] ?? 2) - (RISK_WEIGHT[a.likelihood] ?? 2) * (RISK_WEIGHT[a.impact] ?? 2)).slice(0, 3);
+  const blockedPermits = roll.permits.filter((p) => p.status === "Rejected" || p.status === "Expired");
+  const overdueItems = roll.items.filter((i) => {
+    if (i.status === "done" || i.status === "na" || !i.targetDate) return false;
+    const d = daysUntil(i.targetDate);
+    return d !== null && d < 0;
+  });
+  const keyWins = [];
+  const doneItems = roll.items.filter((i) => i.status === "done");
+  if (doneItems.length) keyWins.push(`${doneItems.length} mobilization checklist items complete (${roll.overallPct}% overall).`);
+  if (roll.permitStatus.approved > 0) keyWins.push(`${roll.permitStatus.approved} of ${roll.permitStatus.total} permits approved.`);
+  if (roll.equipmentOnSitePct > 0) keyWins.push(`${roll.equipmentOnSitePct}% of mobilization equipment confirmed on site.`);
+  if (roll.utilitiesInstalledPct > 0) keyWins.push(`${roll.utilitiesInstalledPct}% of temporary utilities installed.`);
+  if (roll.staffOnboardedPct > 0) keyWins.push(`${roll.staffOnboardedPct}% of assigned staff fully onboarded.`);
+  if (!keyWins.length) keyWins.push("Mobilization plan established; execution has not yet started.");
+  const topIssues = [
+    ...blockedPermits.map((p) => `Permit blocked \u2014 ${p.name}${p.agency ? ` (${p.agency})` : ""}: ${p.status}.`),
+    ...overdueItems.slice(0, 3).map((i) => {
+      const d = daysUntil(i.targetDate);
+      return `Overdue \u2014 ${i.title} (${i.section}), ${Math.abs(d ?? 0)} days past target.`;
+    })
+  ].slice(0, 3);
+  if (!topIssues.length) topIssues.push("No blocked permits or overdue mobilization items.");
+  const decisionsRequired = [
+    ...roll.items.filter((i) => {
+      if (i.status !== "in_progress" || !i.targetDate) return false;
+      const d = daysUntil(i.targetDate);
+      return d !== null && d < -OVERDUE_GRACE_DAYS;
+    }).map((i) => `${i.title} (${i.section}) is ${Math.abs(daysUntil(i.targetDate) ?? 0)} days past target and still in progress.`),
+    ...openRisks.filter((x) => x.impact === "high").map((x) => `High-impact open risk: ${x.risk}`)
+  ];
+  r.executiveSummary({
+    currentPhase: "Mobilization",
+    health: roll.health,
+    daysToNextMilestone: daysToEarthwork ?? void 0,
+    keyWins,
+    topRisks: topRisks.length ? topRisks.map((x) => `${x.risk} \u2014 likelihood ${x.likelihood}, impact ${x.impact}${x.mitigation ? `. Mitigation: ${x.mitigation}` : ""}`) : ["No open risks recorded."],
+    topIssues,
+    decisionsRequired
+  });
+  r.h2("Overall Mobilization Progress");
+  r.progressBar(roll.overallPct, "All sections");
+  r.h2("Progress by Section");
+  for (const section of MOBILIZATION_SECTIONS) {
+    r.progressBar(roll.sectionPct[section] ?? 0, section);
+  }
+  r.sectionBreak();
+  r.h1("1. Project Information");
+  r.keyValueGrid([
+    ["Project Name", project.name],
+    ["Project Number", project.number],
+    ["Owner / Client", project.client],
+    ["General Contractor", gcName],
+    ["Address", project.address],
+    ["Project Type", project.type],
+    ["Status", project.status],
+    ["Baseline Start", formatDate(project.startDate)],
+    ["Baseline Finish", formatDate(project.endDate)],
+    ["Contract Value", formatMoney(project.budget)],
+    ["Reported Progress", `${project.progress}%`],
+    ["Target Earthwork", daysToEarthwork === null ? "Not scheduled" : daysToEarthwork < 0 ? `${Math.abs(daysToEarthwork)} days late` : `In ${daysToEarthwork} days`]
+  ], 2);
+  r.h2("Section Checklist");
+  r.checklist(toChecklist(itemsIn(roll.items, "Project Information"), teamMap));
+  r.h1("2. Mobilization Objectives");
+  const objectives = itemsIn(roll.items, "Mobilization Objectives");
+  r.bulletList(objectives.map((i) => i.description ? `${i.title} \u2014 ${i.description}` : i.title));
+  r.h2("Status");
+  r.checklist(toChecklist(objectives, teamMap));
+  r.sectionBreak();
+  r.h1("3. Staffing Plan");
+  r.statRow([
+    { label: "Assigned Staff", value: String(roll.staff.length) },
+    { label: "Fully Onboarded", value: `${roll.staffOnboardedPct}%`, tone: roll.staffOnboardedPct >= 90 ? "green" : roll.staffOnboardedPct >= 60 ? "yellow" : "red" },
+    { label: "Subcontractors", value: String(roll.subs.length) },
+    { label: "Subs Ready", value: `${roll.subsReadyPct}%`, tone: roll.subsReadyPct >= 90 ? "green" : roll.subsReadyPct >= 60 ? "yellow" : "red" }
+  ]);
+  r.table(
+    [
+      { header: "Role", width: 92 },
+      { header: "Name", width: 96 },
+      { header: "Start", width: 74 },
+      { header: "Orient.", width: 44, align: "center" },
+      { header: "Drug Test", width: 52, align: "center" },
+      { header: "PPE", width: 34, align: "center" },
+      { header: "Notes" }
+    ],
+    roll.staff.map((s) => {
+      const m = teamMap.get(s.teamMemberId);
+      return [
+        m?.role ?? "\u2014",
+        m?.name ?? `#${s.teamMemberId}`,
+        formatDate(s.startDate),
+        yesNo(s.orientationDone),
+        yesNo(s.drugTestDone),
+        yesNo(s.ppeIssued),
+        s.notes ?? "\u2014"
+      ];
+    })
+  );
+  r.h2("Subcontractor Onboarding");
+  r.table(
+    [
+      { header: "Trade", width: 86 },
+      { header: "Company" },
+      { header: "Contact", width: 84 },
+      { header: "Ins.", width: 34, align: "center" },
+      { header: "W-9", width: 34, align: "center" },
+      { header: "MSA", width: 34, align: "center" },
+      { header: "On Site", width: 74 }
+    ],
+    roll.subs.map((s) => [
+      s.trade,
+      s.company,
+      s.contactName ?? "\u2014",
+      yesNo(s.insuranceOnFile),
+      yesNo(s.w9OnFile),
+      yesNo(s.msaSigned),
+      formatDate(s.onSiteDate)
+    ])
+  );
+  r.h2("Staffing Checklist");
+  r.checklist(toChecklist(itemsIn(roll.items, "Staffing Plan"), teamMap));
+  r.sectionBreak();
+  r.h1("4. Site Setup");
+  r.checklist(toChecklist(itemsIn(roll.items, "Site Setup"), teamMap));
+  r.h1("5. Temporary Utilities");
+  r.statRow([
+    { label: "Utilities Tracked", value: String(roll.utilities.length) },
+    { label: "Installed", value: `${roll.utilitiesInstalledPct}%`, tone: roll.utilitiesInstalledPct >= 90 ? "green" : "yellow" }
+  ]);
+  r.table(
+    [
+      { header: "Utility", width: 82 },
+      { header: "Provider", width: 100 },
+      { header: "Requested", width: 76 },
+      { header: "Installed", width: 76 },
+      { header: "Account #", width: 74 },
+      { header: "Notes" }
+    ],
+    roll.utilities.map((u) => [
+      UTILITY_KIND_LABELS[u.kind] ?? u.kind,
+      u.provider ?? "\u2014",
+      formatDate(u.requestedDate),
+      formatDate(u.installedDate),
+      u.accountNumber ?? "\u2014",
+      u.notes ?? "\u2014"
+    ])
+  );
+  r.h2("Utilities Checklist");
+  r.checklist(toChecklist(itemsIn(roll.items, "Temporary Utilities"), teamMap));
+  r.sectionBreak();
+  r.h1("6. Equipment Mobilization");
+  r.statRow([
+    { label: "Equipment Tracked", value: String(roll.equipment.length) },
+    { label: "On Site", value: `${roll.equipmentOnSitePct}%`, tone: roll.equipmentOnSitePct >= 90 ? "green" : "yellow" }
+  ]);
+  r.table(
+    [
+      { header: "Equipment" },
+      { header: "Vendor", width: 96 },
+      { header: "Arrival", width: 76 },
+      { header: "On Site?", width: 52, align: "center" },
+      { header: "Departure", width: 76 },
+      { header: "Notes", width: 96 }
+    ],
+    roll.equipment.map((e) => [
+      e.name,
+      e.vendor ?? "\u2014",
+      formatDate(e.arrivalDate),
+      yesNo(e.onSiteConfirmed),
+      formatDate(e.departureDate),
+      e.notes ?? "\u2014"
+    ])
+  );
+  r.h2("Equipment Checklist");
+  r.checklist(toChecklist(itemsIn(roll.items, "Equipment Mobilization"), teamMap));
+  r.sectionBreak();
+  r.h1("7. Permits");
+  r.statRow([
+    { label: "Approved", value: String(roll.permitStatus.approved), tone: "green" },
+    { label: "Pending", value: String(roll.permitStatus.pending), tone: roll.permitStatus.pending > 0 ? "yellow" : "default" },
+    { label: "Not Started", value: String(roll.permitStatus.notStarted) },
+    { label: "Blocked", value: String(roll.permitStatus.blocked), tone: roll.permitStatus.blocked > 0 ? "red" : "green" },
+    { label: "Total", value: String(roll.permitStatus.total) }
+  ]);
+  if (blockedPermits.length) {
+    r.callout(
+      `${blockedPermits.length} permit${blockedPermits.length === 1 ? " is" : "s are"} rejected or expired and will block earthwork until resolved.`,
+      "danger"
+    );
+  }
+  r.table(
+    [
+      { header: "Permit" },
+      { header: "Agency", width: 92 },
+      { header: "Permit #", width: 74 },
+      { header: "Status", width: 62, align: "center" },
+      { header: "Applied", width: 70 },
+      { header: "Approved", width: 70 },
+      { header: "Expires", width: 70 }
+    ],
+    roll.permits.map((p) => [
+      p.name,
+      p.agency ?? "\u2014",
+      p.permitNumber ?? "\u2014",
+      p.status,
+      formatDate(p.appliedDate),
+      formatDate(p.approvedDate),
+      formatDate(p.expirationDate)
+    ])
+  );
+  r.h2("Permits Checklist");
+  r.checklist(toChecklist(itemsIn(roll.items, "Permits"), teamMap));
+  r.h1("8. Procurement \u2014 Long-Lead Items");
+  r.checklist(toChecklist(itemsIn(roll.items, "Procurement"), teamMap));
+  r.sectionBreak();
+  r.h1("9. Safety Mobilization");
+  r.statRow([
+    { label: "Incidents", value: String(obs.safetyIncidents), tone: obs.safetyIncidents > 0 ? "red" : "green" },
+    { label: "Near Misses", value: String(obs.nearMisses), tone: obs.nearMisses > 0 ? "yellow" : "green" },
+    { label: "Quality Issues", value: String(obs.qualityIssues) }
+  ]);
+  r.p(
+    `Field observations logged since project start (${formatDate(project.startDate)}). High and urgent safety observations are counted as incidents; all other safety observations are treated as near misses.`,
+    { muted: true }
+  );
+  r.checklist(toChecklist(itemsIn(roll.items, "Safety Mobilization"), teamMap));
+  r.h1("10. Environmental Plan");
+  r.checklist(toChecklist(itemsIn(roll.items, "Environmental Plan"), teamMap));
+  r.sectionBreak();
+  r.h1("11. Communications Plan");
+  r.checklist(toChecklist(itemsIn(roll.items, "Communications Plan"), teamMap));
+  r.h1("12. Logistics Plan");
+  r.checklist(toChecklist(itemsIn(roll.items, "Logistics Plan"), teamMap));
+  r.sectionBreak();
+  r.h1("13. Schedule");
+  const sortedMilestones = [...roll.milestones].sort((a, b) => a.date.localeCompare(b.date));
+  const ntp = sortedMilestones[0];
+  r.table(
+    [
+      { header: "Milestone" },
+      { header: "Target Date", width: 96 },
+      { header: "Status", width: 80 },
+      { header: "Days from NTP", width: 90, align: "right" }
+    ],
+    sortedMilestones.map((m) => {
+      const offset = ntp ? Math.round((Date.parse(m.date) - Date.parse(ntp.date)) / 864e5) : null;
+      return [m.title, formatDate(m.date), m.status, offset === null || !Number.isFinite(offset) ? "\u2014" : String(offset)];
+    })
+  );
+  const earthwork = sortedMilestones.find((m) => m.title === EARTHWORK_MILESTONE_TITLE);
+  const upcoming = sortedMilestones.filter((m) => m.date >= today).slice(0, 6).map((m) => ({ name: m.title, date: m.date, status: m.status }));
+  r.scheduleSection({
+    baselineStart: project.startDate,
+    baselineEnd: project.endDate,
+    currentStart: ntp?.date ?? project.startDate,
+    currentEnd: earthwork?.date ?? project.endDate,
+    percentComplete: roll.overallPct,
+    // Positive = ahead. Earthwork already in the past with work outstanding
+    // reads as days behind.
+    daysAheadBehind: daysToEarthwork ?? 0,
+    upcomingMilestones: upcoming,
+    criticalPathNote: "Mobilization critical path runs Notice to Proceed \u2192 permits approved \u2192 temporary power energized \u2192 site office operational \u2192 earthwork. Permit approval is the usual gating constraint."
+  });
+  r.sectionBreak();
+  r.h1("14. Risk Register");
+  r.riskRegisterSection({
+    risks: roll.risks.map((x) => ({
+      risk: x.risk,
+      likelihood: x.likelihood,
+      impact: x.impact,
+      mitigation: x.mitigation ?? "\u2014",
+      owner: x.ownerId != null ? teamMap.get(x.ownerId)?.name ?? `#${x.ownerId}` : "\u2014",
+      status: x.status
+    }))
+  });
+  r.h2("Risk Register Checklist");
+  r.checklist(toChecklist(itemsIn(roll.items, "Risk Register"), teamMap));
+  r.sectionBreak();
+  r.h1("15. Final Mobilization Checklist");
+  r.p("Go / no-go items. All must be complete before field work begins.");
+  r.progressBar(roll.sectionPct["Mobilization Checklist"] ?? 0, "Go / no-go complete");
+  r.checklist(toChecklist(itemsIn(roll.items, "Mobilization Checklist"), teamMap));
+  r.h2("Overall Readiness");
+  r.progressBar(roll.overallPct, "All sections");
+  r.sectionBreak();
+  const revisedContract = project.budget + cos.approvedTotal;
+  r.financialsSection({
+    originalContract: project.budget,
+    approvedChangeOrders: cos.approvedTotal,
+    revisedContract,
+    pendingChangeOrders: cos.pendingCount,
+    unavailableSections: [
+      "Cost to date, cost to complete, and estimate at completion \u2014 pending Cost Control module.",
+      "Contingency tracking \u2014 pending Cost Control module.",
+      "Pay application status \u2014 pending Billing module.",
+      "Cash flow curve \u2014 pending Cost Control module."
+    ]
+  });
+  r.sectionBreak();
+  r.qualitySection({
+    openPunchItems: punch.openItems,
+    unavailableSections: [
+      "Non-conformance reports \u2014 pending Quality module.",
+      "Inspection pass rate and testing log \u2014 pending Quality module."
+    ]
+  });
+  r.safetySection({
+    incidentsThisPeriod: obs.safetyIncidents,
+    nearMisses: obs.nearMisses,
+    unavailableSections: [
+      "Training hours \u2014 pending Safety module.",
+      "TRIR and DART rates \u2014 pending Safety module.",
+      "Corrective action log \u2014 pending Safety module."
+    ]
+  });
+  r.sectionBreak();
+  r.rfiSubmittalCoSection({
+    openRfis: rfi.openRfis,
+    avgRfiResponseDays: rfi.avgResponseDays,
+    topOpenRfis: rfi.topOpen,
+    openSubmittals: submittals2.openSubmittals,
+    openChangeOrders: cos.pendingCount,
+    pendingChangeOrderValue: cos.pendingValue
+  });
+  r.manpowerSection({
+    trades: labor.byTrade.map((t) => ({ trade: t.trade, headcount: t.headcount, hoursThisPeriod: t.hours })),
+    totalHeadcount: labor.byTrade.reduce((s, t) => s + t.headcount, 0),
+    totalHours: labor.totalHours
+  });
+  const lookAhead = sortedMilestones.filter((m) => {
+    const d = daysUntil(m.date);
+    return d !== null && d >= 0 && d <= 21;
+  }).map((m) => ({
+    activity: m.title,
+    owner: findSigner(team, "Superintendent") || "Unassigned",
+    startDate: m.date,
+    blockers: blockedPermits.length ? "Permit approval outstanding" : void 0
+  }));
+  r.sectionBreak();
+  r.lookAheadSection({ weeks: 3, activities: lookAhead });
+  r.p(
+    "Look-ahead is derived from mobilization milestones falling in the next 21 days. Activity-level detail will populate from the Schedule module.",
+    { muted: true }
+  );
+  r.photosSection({
+    captions: ["Site entrance & signage", "Temporary power drop", "Site office / trailer", "Laydown yard"],
+    note: "Photo capture from the field kit is not yet wired into report generation; placeholders shown for the standard mobilization shots."
+  });
+  r.sectionBreak();
+  r.signOffBlock({
+    signers: SIGNER_ROLES.map((role) => ({ role, name: findSigner(team, role) }))
+  });
+  r.appendix(
+    MOBILIZATION_SECTIONS.map((section) => ({
+      title: section,
+      body: DEFAULT_MOBILIZATION_ITEMS[section].map((i, n) => `${n + 1}. ${i.title}${i.description ? ` \u2014 ${i.description}` : ""}`).join("\n")
+    }))
+  );
+  r.end();
+}
+var OVERDUE_GRACE_DAYS, RISK_WEIGHT, SIGNER_ROLES, ROLE_ALIASES;
+var init_mobilization_plan = __esm({
+  "server/reports/mobilization-plan.ts"() {
+    "use strict";
+    init_storage();
+    init_mobilization_rollup();
+    init_engine();
+    init_data_loaders();
+    init_mobilization_catalog();
+    OVERDUE_GRACE_DAYS = 5;
+    RISK_WEIGHT = { low: 1, med: 2, high: 3 };
+    SIGNER_ROLES = [
+      "Chief Executive Officer",
+      "Project Executive",
+      "Project Manager",
+      "Superintendent",
+      "Safety Manager"
+    ];
+    ROLE_ALIASES = {
+      "Chief Executive Officer": ["ceo", "chief executive"],
+      "Project Executive": ["project executive", "exec", "px"],
+      "Project Manager": ["project manager", "pm", "project mgr"],
+      "Superintendent": ["superintendent", "super", "supt"],
+      "Safety Manager": ["safety manager", "safety", "ehs"]
+    };
+  }
+});
+
+// server/lib/mt-middleware.ts
+function isMembershipOptional(path2) {
+  if (NO_MEMBERSHIP_REQUIRED.has(path2)) return true;
+  return NO_MEMBERSHIP_PREFIXES.some((p) => path2.startsWith(p));
+}
+async function resolveMembership(req, res, next) {
+  const p = req.path || req.url?.split("?")[0] || "";
+  if (!p.startsWith("/api")) return next();
+  if (!req.account) return next();
+  const requestedOrgHeader = req.headers?.["x-organization-id"];
+  const requestedOrgId = requestedOrgHeader ? parseInt(String(requestedOrgHeader), 10) : NaN;
+  let membership = null;
+  if (Number.isFinite(requestedOrgId)) {
+    const { getMembershipForAccount: getMembershipForAccount2 } = await Promise.resolve().then(() => (init_orgs(), orgs_exports));
+    membership = await getMembershipForAccount2(req.account.id, requestedOrgId) ?? null;
+  } else {
+    membership = await getPrimaryMembership(req.account.id) ?? null;
+  }
+  if (membership) {
+    req.membership = membership;
+    req.organizationId = membership.organizationId;
+    req.organization = await getOrganization(membership.organizationId);
+  }
+  if (!isMembershipOptional(p) && !membership) {
+    if (req.account.role !== "owner") {
+      return res.status(403).json({
+        message: "You are not a member of any organization. Ask your admin to invite you."
+      });
+    }
+  }
+  if (!isMembershipOptional(p) && req.organization && req.account.role !== "owner" && !isOrgInGoodStanding(req.organization)) {
+    return res.status(402).json({
+      message: "This organization's subscription is inactive. Please renew billing to continue.",
+      reason: "org_subscription_inactive",
+      subscriptionStatus: req.organization.subscriptionStatus
+    });
+  }
+  next();
+}
+function requireCap2(capability) {
+  return function(req, res, next) {
+    const m = req.membership;
+    if (!m) return res.status(403).json({ message: "No active membership" });
+    if (!can(m.role, capability)) {
+      return res.status(403).json({
+        message: `Your role (${m.role}) does not have permission for ${capability}.`
+      });
+    }
+    next();
+  };
+}
+var NO_MEMBERSHIP_REQUIRED, NO_MEMBERSHIP_PREFIXES;
+var init_mt_middleware = __esm({
+  "server/lib/mt-middleware.ts"() {
+    "use strict";
+    init_schema();
+    init_orgs();
+    NO_MEMBERSHIP_REQUIRED = /* @__PURE__ */ new Set([
+      "/api/auth/me",
+      "/api/auth/profile",
+      "/api/billing/checkout",
+      "/api/billing/portal",
+      "/api/billing/status",
+      "/api/stripe/webhook",
+      "/api/subscribe",
+      "/api/demo-request",
+      "/api/orgs"
+      // POST creates first org for the current user
+    ]);
+    NO_MEMBERSHIP_PREFIXES = ["/api/admin/", "/api/auth/"];
+  }
+});
+
 // server/routes.ts
 var routes_exports = {};
 __export(routes_exports, {
@@ -3175,6 +7142,32 @@ __export(routes_exports, {
 });
 function pid(req) {
   return req.query.projectId ? parseInt(req.query.projectId, 10) : void 0;
+}
+function logEvent(req, args) {
+  if (!args.projectId) return;
+  const actor = req?.account;
+  Promise.resolve(storage.recordEvent({
+    projectId: args.projectId,
+    organizationId: req?.organizationId ?? null,
+    actorAccountId: actor?.id ?? null,
+    actorName: actor?.name ?? actor?.email ?? null,
+    kind: args.kind,
+    title: args.title,
+    subtitle: args.subtitle ?? null,
+    meta: args.meta ?? {},
+    sourceType: args.sourceType,
+    sourceId: args.sourceId ?? null,
+    occurredAt: args.occurredAt
+  })).catch(() => {
+  });
+}
+function generateReadablePassword(len = 16) {
+  const alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
 }
 function parseCookies(header) {
   const out = {};
@@ -3226,30 +7219,31 @@ function authRateLimit(req, res, next) {
   }
   next();
 }
-function isPaywallExempt(p) {
-  return PAYWALL_EXEMPT_API_PREFIXES.some((prefix) => p.startsWith(prefix));
+function isPublicApi(path2, method) {
+  if (PUBLIC_API.has(path2)) return true;
+  if (method === "GET" && PUBLIC_API_PREFIXES.some((p) => path2.startsWith(p))) return true;
+  return false;
 }
 async function authMiddleware(req, res, next) {
   const p = req.path || req.url?.split("?")[0] || "";
   if (!p.startsWith("/api")) return next();
-  if (PUBLIC_API.has(p)) return next();
+  if (isPublicApi(p, req.method || "GET")) return next();
   const cookies = parseCookies(req.headers?.cookie);
   const bearer = req.headers?.authorization?.replace(/^Bearer\s+/i, "") ?? "";
   const queryToken = typeof req.query?.token === "string" ? req.query.token : "";
   const token = cookies[SESSION_COOKIE] || bearer || queryToken;
   const s = token ? await storage.getSession(token) : null;
   if (!s) return res.status(401).json({ message: "Unauthorized" });
+  if (isDemoExpired(s.account)) {
+    try {
+      await storage.destroySession(token);
+    } catch {
+    }
+    clearSessionCookie(res);
+    return res.status(401).json({ message: "This demo login has expired.", reason: "demo_expired" });
+  }
   req.account = s.account;
   req.sessionToken = token;
-  if (!isPaywallExempt(p) && !isAccountInGoodStanding(s.account)) {
-    const reason = s.account.approvalStatus !== "approved" ? "pending_approval" : "subscription_inactive";
-    return res.status(402).json({
-      message: reason === "pending_approval" ? "Your account is awaiting admin approval." : "An active subscription is required to use TrussPath.",
-      reason,
-      approvalStatus: s.account.approvalStatus,
-      subscriptionStatus: s.account.subscriptionStatus || null
-    });
-  }
   next();
 }
 function requireOwner(req, res, next) {
@@ -3257,6 +7251,11 @@ function requireOwner(req, res, next) {
   if (!acc) return res.status(401).json({ message: "Unauthorized" });
   if (acc.role !== "owner") return res.status(403).json({ message: "Owner access required" });
   next();
+}
+function getPrimaryOwnerId() {
+  const raw = process.env.PRIMARY_OWNER_ID;
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) ? n : 0;
 }
 function hydrateSeedPhotos() {
   if (photoHydrated) return;
@@ -3328,35 +7327,115 @@ async function registerRoutes(_httpServer, app2) {
     next();
   });
   app2.use(authMiddleware);
+  app2.use(resolveMembership);
+  async function requireProjectAccess(req, res, projectId) {
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      res.status(404).json({ message: "Project not found" });
+      return null;
+    }
+    if (req.account?.role === "owner") return project;
+    if (!req.organizationId || project.organizationId !== req.organizationId) {
+      res.status(404).json({ message: "Project not found" });
+      return null;
+    }
+    return project;
+  }
+  function withOrg(req, data) {
+    return { ...data, organizationId: req.organizationId ?? null };
+  }
+  async function scopeProjectQuery(req, res, next) {
+    if (req.account?.role === "owner") return next();
+    const q = req.query?.projectId;
+    if (q !== void 0 && q !== "") {
+      const pid2 = parseInt(String(q), 10);
+      if (!Number.isFinite(pid2)) return res.status(400).json({ message: "Invalid projectId" });
+      const project = await storage.getProject(pid2);
+      if (!project || req.organizationId && project.organizationId !== req.organizationId) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      return next();
+    }
+    if (req.organizationId) {
+      const orgProjects = await storage.getProjects(req.organizationId);
+      req._orgProjectIds = new Set(orgProjects.map((p) => p.id));
+    }
+    next();
+  }
+  function filterByOrgProjects(req, rows) {
+    if (req.account?.role === "owner") return rows;
+    if (!req._orgProjectIds) return rows;
+    return rows.filter((r) => r.projectId == null || req._orgProjectIds.has(r.projectId));
+  }
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const StripeCtor = stripeKey ? require("stripe") : null;
+  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2025-03-31.basil" }) : null;
+  const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
   app2.post("/api/auth/signup", authRateLimit, async (req, res) => {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    const { email, password, displayName, company } = parsed.data;
+    const { email, password, displayName, company, plan, billing, inviteToken, timezone } = parsed.data;
+    const APP_URL2 = process.env.VITE_API_BASE || "https://trusspath.com";
     try {
+      if (inviteToken) {
+        const invite = await getInviteByToken(inviteToken);
+        if (!invite || !isInviteRedeemable(invite)) {
+          return res.status(400).json({ message: "Invite is invalid or expired" });
+        }
+        if (invite.email.toLowerCase() !== email.trim().toLowerCase()) {
+          return res.status(400).json({ message: "Signup email must match the invite email" });
+        }
+        const account2 = await storage.createAccount(email, password, displayName, company);
+        await createMembership(account2.id, invite.organizationId, invite.role);
+        await markInviteAccepted(invite.id);
+        try {
+          if (stripe) await syncSeatsForOrg(stripe, invite.organizationId);
+        } catch (e) {
+          console.error("[signup:invite] seat sync failed:", e);
+        }
+        const session2 = await storage.createSession(account2.id);
+        setSessionCookie(res, session2.id);
+        return res.status(201).json({ account: account2, token: session2.id, joinedOrganizationId: invite.organizationId });
+      }
       const account = await storage.createAccount(email, password, displayName, company);
+      let checkoutUrl;
+      const chosenPlan = plan || "starter";
+      const chosenBilling = billing || "monthly";
+      const bootstrap = await bootstrapOrganizationForAccount({
+        accountId: account.id,
+        accountEmail: email,
+        orgName: company || `${displayName}'s Org`,
+        tier: chosenPlan,
+        billing: chosenBilling,
+        stripe: stripe || void 0,
+        returnUrl: `${APP_URL2}/#/settings?checkout=success`,
+        cancelUrl: `${APP_URL2}/#/paywall?checkout=cancelled`,
+        timezone
+      });
+      checkoutUrl = bootstrap.checkoutUrl;
       const session = await storage.createSession(account.id);
       setSessionCookie(res, session.id);
-      const APP_URL2 = process.env.VITE_API_BASE || "https://trusspath.com";
       void sendSignupNotification({
         kind: "signup",
-        subject: `[Action needed] Approve TrussPath account \u2014 ${displayName} (${email})`,
-        banner: {
-          label: "Awaiting your approval \u2014 this account is locked out until you approve it.",
-          tone: "warning"
-        },
+        subject: `New TrussPath signup \u2014 ${displayName} (${email})`,
         fields: {
           Name: displayName,
           Email: email,
           Company: company,
-          "Signed up": (/* @__PURE__ */ new Date()).toISOString(),
-          Status: "pending approval"
+          Plan: chosenPlan,
+          Billing: chosenBilling,
+          Organization: `id=${bootstrap.organizationId}`,
+          "Signed up": (/* @__PURE__ */ new Date()).toISOString()
         },
-        cta: {
-          label: "Review in admin console",
-          url: `${APP_URL2}/#/admin/signups`
-        }
+        cta: { label: "Review in admin console", url: `${APP_URL2}/#/admin/signups` }
       });
-      res.status(201).json({ account, token: session.id });
+      res.status(201).json({
+        account,
+        token: session.id,
+        organizationId: bootstrap.organizationId,
+        checkoutUrl
+      });
     } catch (e) {
       const msg = e?.message || "Signup failed";
       const status = /already/i.test(msg) ? 409 : 500;
@@ -3369,6 +7448,9 @@ async function registerRoutes(_httpServer, app2) {
     const { email, password } = parsed.data;
     const account = await storage.verifyPassword(email, password);
     if (!account) return res.status(401).json({ message: "Invalid email or password" });
+    if (isDemoExpired(account)) {
+      return res.status(401).json({ message: "This demo login has expired.", reason: "demo_expired" });
+    }
     const session = await storage.createSession(account.id);
     setSessionCookie(res, session.id);
     res.json({ account, token: session.id });
@@ -3427,11 +7509,187 @@ async function registerRoutes(_httpServer, app2) {
     if (!updated) return res.status(404).json({ message: "Account not found" });
     res.json({ account: updated });
   });
-  app2.get("/api/team", async (_req, res) => res.json(await storage.getTeam()));
+  app2.get("/api/me/dashboard-layout", async (req, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const acc = req.account;
+    res.json({ layout: acc.dashboardLayout ?? null });
+  });
+  app2.put("/api/me/dashboard-layout", async (req, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const body = req.body || {};
+    if (body.layout === null) {
+      await storage.updateDashboardLayout(req.account.id, null);
+      return res.json({ layout: null });
+    }
+    const raw = body.layout;
+    if (!raw || !Array.isArray(raw.widgets)) {
+      return res.status(400).json({ error: "layout.widgets[] required" });
+    }
+    const validSizes = /* @__PURE__ */ new Set(["sm", "md", "lg", "xl"]);
+    const seen = /* @__PURE__ */ new Set();
+    const widgets = [];
+    for (const w of raw.widgets) {
+      if (!w || typeof w.id !== "string" || w.id.length === 0) continue;
+      if (seen.has(w.id)) continue;
+      seen.add(w.id);
+      const size = validSizes.has(w.size) ? w.size : "md";
+      widgets.push({ id: w.id, size, hidden: !!w.hidden });
+    }
+    const capped = { widgets: widgets.slice(0, 64) };
+    await storage.updateDashboardLayout(req.account.id, capped);
+    res.json({ layout: capped });
+  });
+  app2.get("/api/field/punches", async (req, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const limit = Math.max(1, Math.min(50, Number(req.query?.limit) || 20));
+    const rows = await storage.getRecentFieldPunches(req.account.id, limit);
+    const open = await storage.getOpenFieldPunch(req.account.id);
+    res.json({ punches: rows, open: open ?? null });
+  });
+  app2.post("/api/field/punches", async (req, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const kind = String(req.body?.kind || "");
+    if (!/^(in|out|break_start|break_end)$/.test(kind)) {
+      return res.status(400).json({ error: "kind must be one of in | out | break_start | break_end" });
+    }
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+    const clientId = req.body?.clientId ? String(req.body.clientId).slice(0, 64) : null;
+    if (clientId) {
+      const existing = await storage.getFieldPunchByClientId(req.account.id, clientId);
+      if (existing) return res.status(200).json({ punch: existing, deduped: true });
+    }
+    const lat = req.body?.lat != null ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null ? Number(req.body.lng) : null;
+    const accuracyM = req.body?.accuracyM != null ? Number(req.body.accuracyM) : null;
+    const note = req.body?.note ? String(req.body.note).slice(0, 500) : null;
+    const occurredAt = req.body?.occurredAt ? String(req.body.occurredAt) : (/* @__PURE__ */ new Date()).toISOString();
+    const punch = await storage.createFieldPunch({
+      accountId: req.account.id,
+      organizationId: req.organizationId ?? null,
+      projectId,
+      kind,
+      occurredAt,
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      accuracyM: Number.isFinite(accuracyM) ? accuracyM : null,
+      note,
+      clientId
+    });
+    let timesheetId = null;
+    let hoursToday = null;
+    let totalHours = null;
+    try {
+      const weekStart = weekStartMonday(occurredAt);
+      const project = await storage.getProject(projectId);
+      const ts = await ensureTimesheetForWeek({
+        accountId: req.account.id,
+        organizationId: req.organizationId ?? null,
+        projectId,
+        employeeName: req.account.name || req.account.email || `Account ${req.account.id}`,
+        weekStart
+      });
+      timesheetId = ts.id;
+      if (kind === "out" || kind === "break_end" || kind === "break_start") {
+        const rolled = await rollupPunchToTimesheet({
+          accountId: req.account.id,
+          timesheetId: ts.id,
+          occurredAt,
+          projectName: project?.name ?? null
+        });
+        hoursToday = rolled.hoursToday;
+        totalHours = rolled.totalHours;
+      }
+    } catch (err) {
+      console.warn("[field/punches] auto-timesheet failed:", err?.message ?? err);
+    }
+    if (kind === "in" || kind === "out") {
+      logEvent(req, {
+        projectId,
+        kind: kind === "in" ? EVENT_KINDS.TIMESHEET_CLOCKIN : EVENT_KINDS.TIMESHEET_CLOCKOUT,
+        title: kind === "in" ? `Clocked in\xA0on site` : `Clocked out`,
+        subtitle: Number.isFinite(lat) && Number.isFinite(lng) ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : void 0,
+        sourceType: "field_punch",
+        sourceId: punch.id,
+        meta: {
+          hoursToday,
+          totalHours,
+          note: note || void 0,
+          accuracyM
+        },
+        occurredAt
+      });
+    }
+    res.status(201).json({ punch, timesheetId, hoursToday, totalHours });
+  });
+  app2.get("/api/field/observations", async (req, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const limit = Math.max(1, Math.min(100, Number(req.query?.limit) || 25));
+    const projectId = req.query?.projectId ? Number(req.query.projectId) : void 0;
+    const rows = await storage.getRecentFieldObservations({
+      organizationId: req.organizationId ?? void 0,
+      projectId: Number.isFinite(projectId) ? projectId : void 0,
+      limit
+    });
+    res.json({ observations: rows });
+  });
+  app2.post("/api/field/observations", async (req, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const kind = String(req.body?.kind || "");
+    if (!/^(safety|quality|rfi|issue)$/.test(kind)) {
+      return res.status(400).json({ error: "kind must be one of safety | quality | rfi | issue" });
+    }
+    const severity = String(req.body?.severity || "normal");
+    if (!/^(low|normal|high|urgent)$/.test(severity)) {
+      return res.status(400).json({ error: "severity must be one of low | normal | high | urgent" });
+    }
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+    const title = req.body?.title ? String(req.body.title).slice(0, 200).trim() : "";
+    if (!title) return res.status(400).json({ error: "title required" });
+    const clientId = req.body?.clientId ? String(req.body.clientId).slice(0, 64) : null;
+    if (clientId) {
+      const existing = await storage.getFieldObservationByClientId(req.account.id, clientId);
+      if (existing) return res.status(200).json({ observation: existing, deduped: true });
+    }
+    const body = req.body?.body ? String(req.body.body).slice(0, 2e3) : null;
+    const lat = req.body?.lat != null ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null ? Number(req.body.lng) : null;
+    const accuracyM = req.body?.accuracyM != null ? Number(req.body.accuracyM) : null;
+    const photoId = req.body?.photoId != null ? Number(req.body.photoId) : null;
+    const occurredAt = req.body?.occurredAt ? String(req.body.occurredAt) : (/* @__PURE__ */ new Date()).toISOString();
+    const observation = await storage.createFieldObservation({
+      accountId: req.account.id,
+      organizationId: req.organizationId ?? null,
+      projectId,
+      kind,
+      severity,
+      title,
+      body,
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
+      accuracyM: Number.isFinite(accuracyM) ? accuracyM : null,
+      photoId: Number.isFinite(photoId) ? photoId : null,
+      occurredAt,
+      clientId
+    });
+    logEvent(req, {
+      projectId,
+      kind: EVENT_KINDS.OBSERVATION_LOGGED,
+      title: `${kind.charAt(0).toUpperCase() + kind.slice(1)} observation \u2014 ${title}`,
+      subtitle: body ? body.slice(0, 120) : void 0,
+      sourceType: "field_observation",
+      sourceId: observation.id,
+      meta: { obsKind: kind, severity, photoId: observation.photoId ?? null },
+      occurredAt
+    });
+    res.status(201).json({ observation });
+  });
+  app2.get("/api/team", async (req, res) => res.json(await storage.getTeam(req.organizationId)));
   app2.post("/api/team", async (req, res) => {
     const parsed = insertTeamSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createTeamMember(parsed.data));
+    res.status(201).json(await storage.createTeamMember(withOrg(req, parsed.data)));
   });
   app2.patch("/api/team/:id", async (req, res) => {
     const parsed = insertTeamSchema.partial().safeParse(req.body);
@@ -3444,50 +7702,163 @@ async function registerRoutes(_httpServer, app2) {
     await storage.softDeleteEntity("team-members", parseInt(req.params.id, 10));
     res.status(204).end();
   });
-  app2.get("/api/projects", async (_req, res) => res.json(await storage.getProjects()));
+  app2.get("/api/weather/for-project/:id", async (req, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Bad project id" });
+    const project = await requireProjectAccess(req, res, projectId);
+    if (!project) return;
+    if (!project.address || !project.address.trim()) {
+      return res.status(404).json({ message: "Project has no address to look up weather for." });
+    }
+    const dateStr = typeof req.query.date === "string" ? req.query.date : void 0;
+    const result = await getDailyLogWeather(project.address, dateStr);
+    if (!result) {
+      return res.status(404).json({ message: "Weather lookup failed. You can still enter conditions manually." });
+    }
+    res.set("Cache-Control", "private, max-age=900");
+    res.json(result);
+  });
+  app2.get("/api/places/autocomplete", async (req, res) => {
+    const q = typeof req.query.q === "string" ? req.query.q : "";
+    const session = typeof req.query.session === "string" ? req.query.session : "";
+    const country = typeof req.query.country === "string" ? req.query.country : void 0;
+    if (!hasPlacesApi()) return res.json({ suggestions: [], available: false });
+    if (!q.trim() || !session) return res.json({ suggestions: [], available: true });
+    const suggestions = await placesAutocomplete(q, session, { countryBias: country });
+    res.set("Cache-Control", "private, max-age=30");
+    res.json({ suggestions, available: true });
+  });
+  app2.get("/api/places/details", async (req, res) => {
+    const placeId = typeof req.query.placeId === "string" ? req.query.placeId : "";
+    const session = typeof req.query.session === "string" ? req.query.session : "";
+    if (!hasPlacesApi()) return res.status(404).json({ message: "Places API not configured" });
+    if (!placeId || !session) return res.status(400).json({ message: "placeId and session required" });
+    const details = await placeDetails(placeId, session);
+    if (!details) return res.status(404).json({ message: "Place not found" });
+    res.json(details);
+  });
+  app2.get("/api/projects", async (req, res) => res.json(await storage.getProjects(req.organizationId)));
   app2.get("/api/projects/:id", async (req, res) => {
-    const project = await storage.getProject(parseInt(req.params.id, 10));
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    const project = await requireProjectAccess(req, res, parseInt(req.params.id, 10));
+    if (!project) return;
     res.json(project);
+  });
+  app2.get("/api/projects/:id/events", async (req, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    const project = await requireProjectAccess(req, res, projectId);
+    if (!project) return;
+    const rawKinds = typeof req.query.kinds === "string" ? req.query.kinds : "";
+    const kinds = rawKinds ? rawKinds.split(",").map((s) => s.trim()).filter(Boolean) : void 0;
+    const events = await storage.getProjectEvents(projectId, {
+      q: typeof req.query.q === "string" ? req.query.q : void 0,
+      kinds,
+      limit: req.query.limit ? Math.min(parseInt(String(req.query.limit), 10) || 100, 500) : 100,
+      before: typeof req.query.before === "string" ? req.query.before : void 0
+    });
+    const counts = await storage.getProjectEventKindCounts(projectId);
+    res.json({ events, counts });
   });
   app2.post("/api/projects", async (req, res) => {
     const parsed = insertProjectSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createProject(parsed.data));
+    const created = await storage.createProject(withOrg(req, parsed.data));
+    try {
+      await storage.seedMobilization(created.id, created.startDate);
+    } catch (e) {
+      console.error("[mobilization] seed failed for project", created.id, e);
+    }
+    logEvent(req, {
+      projectId: created.id,
+      kind: EVENT_KINDS.PROJECT_CREATED,
+      title: `Project created \u2014 ${created.name}`,
+      sourceType: "project",
+      sourceId: created.id,
+      meta: { status: created.status, address: created.address ?? null }
+    });
+    res.status(201).json(created);
   });
   app2.patch("/api/projects/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
+    const existing = await requireProjectAccess(req, res, id);
+    if (!existing) return;
     const updated = await storage.updateProject(id, req.body);
     if (!updated) return res.status(404).json({ message: "Project not found" });
     res.json(updated);
   });
-  app2.get("/api/tasks", async (req, res) => res.json(await storage.getTasks(pid(req))));
+  app2.get("/api/tasks", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getTasks(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/tasks", async (req, res) => {
     const parsed = insertTaskSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createTask(parsed.data));
+    const created = await storage.createTask(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.TASK_CREATED,
+      title: `Task created \u2014 ${created.title}`,
+      sourceType: "task",
+      sourceId: created.id,
+      meta: { status: created.status, priority: created.priority ?? null, assigneeId: created.assigneeId ?? null }
+    });
+    res.status(201).json(created);
   });
   app2.patch("/api/tasks/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
     const updated = await storage.updateTaskStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Task not found" });
+    if (/^(done|complete|completed|closed)$/i.test(status)) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.TASK_COMPLETED,
+        title: `Task completed \u2014 ${updated.title}`,
+        sourceType: "task",
+        sourceId: updated.id,
+        meta: { status }
+      });
+    }
     res.json(updated);
   });
-  app2.get("/api/rfis", async (req, res) => res.json(await storage.getRfis(pid(req))));
+  app2.get("/api/rfis", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getRfis(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/rfis", async (req, res) => {
     const parsed = insertRfiSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createRfi(parsed.data));
+    const created = await storage.createRfi(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.RFI_CREATED,
+      title: `${created.number} submitted \u2014 ${created.subject}`,
+      sourceType: "rfi",
+      sourceId: created.id,
+      meta: { number: created.number, status: created.status }
+    });
+    res.status(201).json(created);
   });
   app2.patch("/api/rfis/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
     const updated = await storage.updateRfiStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "RFI not found" });
+    if (/^(closed|resolved|answered|complete|completed)$/i.test(status)) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.RFI_RESOLVED,
+        title: `${updated.number} resolved \u2014 ${updated.subject}`,
+        sourceType: "rfi",
+        sourceId: updated.id,
+        meta: { number: updated.number, status }
+      });
+    }
     res.json(updated);
   });
-  app2.get("/api/submittals", async (req, res) => res.json(await storage.getSubmittals(pid(req))));
+  app2.get("/api/submittals", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getSubmittals(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/submittals", async (req, res) => {
     const parsed = insertSubmittalSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -3500,20 +7871,45 @@ async function registerRoutes(_httpServer, app2) {
     if (!updated) return res.status(404).json({ message: "Submittal not found" });
     res.json(updated);
   });
-  app2.get("/api/change-orders", async (req, res) => res.json(await storage.getChangeOrders(pid(req))));
+  app2.get("/api/change-orders", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getChangeOrders(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/change-orders", async (req, res) => {
     const parsed = insertChangeOrderSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createChangeOrder(parsed.data));
+    const created = await storage.createChangeOrder(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.CHANGE_ORDER_CREATED,
+      title: `${created.number} requested \u2014 ${created.title}`,
+      sourceType: "change_order",
+      sourceId: created.id,
+      meta: { number: created.number, amount: created.amount ?? null, status: created.status }
+    });
+    res.status(201).json(created);
   });
   app2.patch("/api/change-orders/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
     const updated = await storage.updateChangeOrderStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Change order not found" });
+    if (/^(approved|accepted|executed)$/i.test(status)) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.CHANGE_ORDER_APPROVED,
+        title: `${updated.number} approved`,
+        sourceType: "change_order",
+        sourceId: updated.id,
+        meta: { number: updated.number, amount: updated.amount ?? null, status }
+      });
+    }
     res.json(updated);
   });
-  app2.get("/api/action-items", async (req, res) => res.json(await storage.getActionItems(pid(req))));
+  app2.get("/api/action-items", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getActionItems(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/action-items", async (req, res) => {
     const parsed = insertActionItemSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
@@ -3526,11 +7922,24 @@ async function registerRoutes(_httpServer, app2) {
     if (!updated) return res.status(404).json({ message: "Action item not found" });
     res.json(updated);
   });
-  app2.get("/api/daily-logs", async (req, res) => res.json(await storage.getDailyLogs(pid(req))));
+  app2.get("/api/daily-logs", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getDailyLogs(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/daily-logs", async (req, res) => {
     const parsed = insertDailyLogSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createDailyLog(parsed.data));
+    const created = await storage.createDailyLog(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DAILY_LOG_SUBMITTED,
+      title: `Daily log submitted \u2014 ${created.date}`,
+      sourceType: "daily_log",
+      sourceId: created.id,
+      meta: { date: created.date, weather: created.weather ?? null, temp: created.temp ?? null, crewCount: created.crewCount ?? null },
+      occurredAt: created.date ? new Date(created.date).toISOString() : void 0
+    });
+    res.status(201).json(created);
   });
   app2.patch("/api/daily-logs/:id", async (req, res) => {
     const parsed = insertDailyLogSchema.partial().safeParse(req.body);
@@ -3543,24 +7952,95 @@ async function registerRoutes(_httpServer, app2) {
     await storage.softDeleteEntity("daily-logs", parseInt(req.params.id, 10));
     res.status(204).end();
   });
-  app2.get("/api/punch", async (req, res) => res.json(await storage.getPunchItems(pid(req))));
+  app2.get("/api/punch", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getPunchItems(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/punch", async (req, res) => {
     const parsed = insertPunchItemSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createPunchItem(parsed.data));
+    const created = await storage.createPunchItem(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PUNCH_CREATED,
+      title: `Punch item added \u2014 ${created.title}`,
+      subtitle: created.location ?? void 0,
+      sourceType: "punch",
+      sourceId: created.id,
+      meta: { trade: created.trade, status: created.status }
+    });
+    res.status(201).json(created);
+  });
+  const fieldPunchItemIdemp = /* @__PURE__ */ new Map();
+  const IDEMP_TTL_MS = 60 * 60 * 1e3;
+  app2.post("/api/field/punch-items", async (req, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+    const title = req.body?.title ? String(req.body.title).slice(0, 200).trim() : "";
+    if (!title) return res.status(400).json({ error: "title required" });
+    const location = req.body?.location ? String(req.body.location).slice(0, 200) : "";
+    const trade = req.body?.trade ? String(req.body.trade).slice(0, 80) : "General";
+    const status = req.body?.status ? String(req.body.status).slice(0, 40) : "Open";
+    const notes2 = req.body?.notes ? String(req.body.notes).slice(0, 4e3).trim() || void 0 : void 0;
+    const clientId = req.body?.clientId ? String(req.body.clientId).slice(0, 64) : null;
+    const now = Date.now();
+    fieldPunchItemIdemp.forEach((v, k) => {
+      if (now - v.ts > IDEMP_TTL_MS) fieldPunchItemIdemp.delete(k);
+    });
+    const idempKey = clientId ? `${req.account.id}:${clientId}` : null;
+    if (idempKey) {
+      const existing = fieldPunchItemIdemp.get(idempKey);
+      if (existing) {
+        const rows = await storage.getPunchItems(projectId);
+        const found = rows.find((r) => r.id === existing.id);
+        if (found) return res.status(200).json({ punchItem: found, deduped: true });
+      }
+    }
+    const created = await storage.createPunchItem({
+      projectId,
+      title,
+      location,
+      trade,
+      status,
+      notes: notes2,
+      assigneeId: req.body?.assigneeId != null ? Number(req.body.assigneeId) : void 0
+    });
+    if (idempKey) fieldPunchItemIdemp.set(idempKey, { id: created.id, ts: now });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PUNCH_CREATED,
+      title: `Punch item added \u2014 ${created.title}`,
+      subtitle: created.location ?? void 0,
+      sourceType: "punch",
+      sourceId: created.id,
+      meta: { trade: created.trade, status: created.status, source: "field" }
+    });
+    res.status(201).json({ punchItem: created });
   });
   app2.patch("/api/punch/:id/status", async (req, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
     const updated = await storage.updatePunchStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Punch item not found" });
+    if (/^(closed|complete|completed|resolved|done)$/i.test(status)) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.PUNCH_CLOSED,
+        title: `Punch item closed \u2014 ${updated.title}`,
+        subtitle: updated.location ?? void 0,
+        sourceType: "punch",
+        sourceId: updated.id,
+        meta: { trade: updated.trade, status }
+      });
+    }
     res.json(updated);
   });
-  app2.get("/api/contacts", async (_req, res) => res.json(await storage.getContacts()));
+  app2.get("/api/contacts", async (req, res) => res.json(await storage.getContacts(req.organizationId)));
   app2.post("/api/contacts", async (req, res) => {
     const parsed = insertContactSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createContact(parsed.data));
+    res.status(201).json(await storage.createContact(withOrg(req, parsed.data)));
   });
   app2.patch("/api/contacts/:id", async (req, res) => {
     const parsed = insertContactSchema.partial().safeParse(req.body);
@@ -3573,17 +8053,139 @@ async function registerRoutes(_httpServer, app2) {
     await storage.softDeleteEntity("contacts", parseInt(req.params.id, 10));
     res.status(204).end();
   });
-  app2.get("/api/equipment", async (req, res) => res.json(await storage.getEquipment(pid(req))));
+  app2.get("/api/equipment", async (req, res) => res.json(await storage.getEquipment(pid(req), req.organizationId)));
   app2.post("/api/equipment", async (req, res) => {
     const parsed = insertEquipmentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createEquipment(parsed.data));
+    const created = await storage.createEquipment(withOrg(req, parsed.data));
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.EQUIPMENT_ADDED,
+      title: `Equipment added \u2014 ${created.name}`,
+      sourceType: "equipment",
+      sourceId: created.id,
+      meta: { type: created.type, status: created.status }
+    });
+    res.status(201).json(created);
   });
-  app2.get("/api/photos", async (req, res) => res.json(await storage.getPhotos(pid(req))));
+  app2.patch("/api/equipment/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    const parsed = insertEquipmentSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const updated = await storage.updateEquipment(id, parsed.data);
+    if (!updated) return res.status(404).json({ message: "Equipment not found." });
+    res.json(updated);
+  });
+  app2.delete("/api/equipment/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    await storage.deleteEquipment(id);
+    res.status(204).end();
+  });
+  app2.get("/api/equipment/:id/maintenance", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    res.json(await storage.getMaintenanceLogs(id));
+  });
+  app2.post("/api/equipment/:id/maintenance", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    const parsed = insertMaintenanceLogSchema.safeParse({ ...req.body, equipmentId: id });
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const loggedById = req.account?.id ?? null;
+    const created = await storage.addMaintenanceLog({ ...parsed.data, loggedById });
+    if (parsed.data.mileage != null) {
+      const existing = await storage.getEquipmentById(id);
+      if (existing && (existing.currentMileage == null || parsed.data.mileage > existing.currentMileage)) {
+        await storage.updateEquipment(id, { currentMileage: parsed.data.mileage });
+      }
+    }
+    res.status(201).json(created);
+  });
+  app2.delete("/api/maintenance/:id", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    await storage.deleteMaintenanceLog(id);
+    res.status(204).end();
+  });
+  app2.get("/api/photos", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getPhotos(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/photos", async (req, res) => {
     const parsed = insertPhotoSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createPhoto(parsed.data));
+    const created = await storage.createPhoto(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PHOTO_UPLOADED,
+      title: `Photo uploaded${created.caption ? " \u2014 " + created.caption : ""}`,
+      subtitle: created.location ?? void 0,
+      sourceType: "photo",
+      sourceId: created.id,
+      meta: { date: created.date ?? null }
+    });
+    res.status(201).json(created);
+  });
+  app2.post("/api/photos/upload-base64", async (req, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+    const dataUrl = String(req.body?.image || "");
+    const m = /^data:([-\w.+]+\/[-\w.+]+);base64,(.+)$/i.exec(dataUrl);
+    if (!m) return res.status(400).json({ error: "image must be a data URL (data:image/*;base64,...)" });
+    const mime = m[1].toLowerCase();
+    if (!IMAGE_MIME.has(mime)) return res.status(400).json({ error: "unsupported image type" });
+    let buf;
+    try {
+      buf = Buffer.from(m[2], "base64");
+    } catch {
+      return res.status(400).json({ error: "invalid base64" });
+    }
+    if (buf.length === 0) return res.status(400).json({ error: "empty image" });
+    if (buf.length > 20 * 1024 * 1024) return res.status(413).json({ error: "image too large (20mb cap)" });
+    const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1] || "bin";
+    const filename = `field-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    try {
+      import_node_fs2.default.mkdirSync(PHOTO_DIR, { recursive: true });
+    } catch {
+    }
+    const abs = import_node_path2.default.resolve(PHOTO_DIR, filename);
+    import_node_fs2.default.writeFileSync(abs, buf);
+    const lat = req.body?.lat != null ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null ? Number(req.body.lng) : null;
+    const labelBits = [];
+    if (req.body?.locationLabel) labelBits.push(String(req.body.locationLabel).slice(0, 80));
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      labelBits.push(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    }
+    const location = labelBits.join(" \xB7 ");
+    const caption = req.body?.caption ? String(req.body.caption).slice(0, 240) : `Field photo ${(/* @__PURE__ */ new Date()).toLocaleString()}`;
+    const date = req.body?.date ? String(req.body.date).slice(0, 10) : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const hue = Math.floor(Math.random() * 360);
+    const created = await storage.createPhoto({
+      projectId,
+      caption,
+      location,
+      takenById: req.account?.id ?? void 0,
+      date,
+      hue,
+      storedFileName: filename,
+      originalFileName: filename,
+      mimeType: mime,
+      fileSizeBytes: buf.length
+    });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PHOTO_UPLOADED,
+      title: `Photo uploaded${created.caption ? " \u2014 " + created.caption : ""}`,
+      subtitle: created.location ?? void 0,
+      sourceType: "photo",
+      sourceId: created.id,
+      meta: { date: created.date ?? null, source: "field", lat, lng }
+    });
+    res.status(201).json(created);
   });
   app2.post("/api/photos/upload", photoUpload.single("file"), async (req, res) => {
     const file = req.file;
@@ -3607,6 +8209,15 @@ async function registerRoutes(_httpServer, app2) {
       mimeType: file.mimetype,
       fileSizeBytes: file.size
     });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PHOTO_UPLOADED,
+      title: `Photo uploaded${created.caption ? " \u2014 " + created.caption : ""}`,
+      subtitle: created.location ?? void 0,
+      sourceType: "photo",
+      sourceId: created.id,
+      meta: { date: created.date ?? null, filename: file.originalname }
+    });
     res.status(201).json(created);
   });
   app2.get("/api/photos/:id/file", async (req, res) => {
@@ -3627,11 +8238,23 @@ async function registerRoutes(_httpServer, app2) {
     await storage.softDeleteEntity("photos", id);
     res.status(204).end();
   });
-  app2.get("/api/documents", async (req, res) => res.json(await storage.getDocuments(pid(req))));
+  app2.get("/api/documents", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getDocuments(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/documents", async (req, res) => {
     const parsed = insertDocumentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createDocument(parsed.data));
+    const created = await storage.createDocument(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DOC_UPLOADED,
+      title: `Document uploaded \u2014 ${created.name}`,
+      sourceType: "document",
+      sourceId: created.id,
+      meta: { type: created.type, size: created.size }
+    });
+    res.status(201).json(created);
   });
   app2.post("/api/documents/upload", upload.single("file"), async (req, res) => {
     const file = req.file;
@@ -3653,6 +8276,14 @@ async function registerRoutes(_httpServer, app2) {
       originalFileName: file.originalname,
       mimeType: file.mimetype,
       fileSizeBytes: file.size
+    });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DOC_UPLOADED,
+      title: `Document uploaded \u2014 ${created.name}`,
+      sourceType: "document",
+      sourceId: created.id,
+      meta: { type: created.type, size: created.size, filename: file.originalname }
     });
     res.status(201).json(created);
   });
@@ -3684,11 +8315,11 @@ async function registerRoutes(_httpServer, app2) {
       cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
     }
   }) });
-  app2.get("/api/company-documents", async (_req, res) => res.json(await storage.getCompanyDocuments()));
+  app2.get("/api/company-documents", async (req, res) => res.json(await storage.getCompanyDocuments(req.organizationId)));
   app2.post("/api/company-documents", async (req, res) => {
     const parsed = insertCompanyDocumentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createCompanyDocument(parsed.data));
+    res.status(201).json(await storage.createCompanyDocument(withOrg(req, parsed.data)));
   });
   app2.post("/api/company-documents/upload", companyUpload.single("file"), async (req, res) => {
     const file = req.file;
@@ -3746,33 +8377,271 @@ async function registerRoutes(_httpServer, app2) {
     await storage.softDeleteEntity("company-documents", id);
     res.status(204).end();
   });
-  app2.get("/api/blueprints", async (req, res) => res.json(await storage.getBlueprints(pid(req))));
+  app2.get("/api/blueprints", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getBlueprints(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/blueprints", async (req, res) => {
     const parsed = insertBlueprintSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createBlueprint(parsed.data));
+    const created = await storage.createBlueprint(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.BLUEPRINT_UPLOADED,
+      title: `Blueprint uploaded \u2014 ${created.title}`,
+      sourceType: "blueprint",
+      sourceId: created.id,
+      meta: { discipline: created.discipline, revision: created.revision, sheetNumber: created.sheetNumber }
+    });
+    res.status(201).json(created);
   });
-  app2.get("/api/drone-captures", async (req, res) => res.json(await storage.getDroneCaptures(pid(req))));
+  app2.get("/api/drone-captures", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getDroneCaptures(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/drone-captures", async (req, res) => {
     const parsed = insertDroneCaptureSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createDroneCapture(parsed.data));
+    const created = await storage.createDroneCapture(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DRONE_CAPTURED,
+      title: `Drone capture \u2014 ${created.title}`,
+      sourceType: "drone_capture",
+      sourceId: created.id,
+      meta: { captureType: created.captureType, status: created.status, area: created.area }
+    });
+    res.status(201).json(created);
   });
-  app2.get("/api/milestones", async (req, res) => res.json(await storage.getMilestones(pid(req))));
+  app2.get("/api/milestones", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getMilestones(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/milestones", async (req, res) => {
     const parsed = insertMilestoneSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createMilestone(parsed.data));
+    const created = await storage.createMilestone(parsed.data);
+    if (/^complete/i.test(created.status ?? "")) {
+      logEvent(req, {
+        projectId: created.projectId,
+        kind: EVENT_KINDS.MILESTONE_REACHED,
+        title: `Milestone reached \u2014 ${created.title}`,
+        sourceType: "milestone",
+        sourceId: created.id,
+        meta: { kind: created.kind, date: created.date, status: created.status }
+      });
+    }
+    res.status(201).json(created);
   });
   app2.patch("/api/milestones/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const updated = await storage.updateMilestone(id, req.body ?? {});
     if (!updated) return res.status(404).json({ message: "not found" });
+    if (/^complete/i.test(String(req.body?.status ?? ""))) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.MILESTONE_REACHED,
+        title: `Milestone reached \u2014 ${updated.title}`,
+        sourceType: "milestone",
+        sourceId: updated.id,
+        meta: { kind: updated.kind, date: updated.date, status: updated.status }
+      });
+    }
     res.json(updated);
   });
   app2.delete("/api/milestones/:id", async (req, res) => {
     await storage.softDeleteEntity("milestones", parseInt(req.params.id, 10));
     res.status(204).end();
+  });
+  app2.get("/api/projects/:id/mobilization", async (req, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!await requireProjectAccess(req, res, projectId)) return;
+    const r = await mobilizationRollup(projectId);
+    res.json({
+      plan: r.plan ?? null,
+      items: r.items,
+      permits: r.permits,
+      equipment: r.equipment,
+      utilities: r.utilities,
+      staff: r.staff,
+      subs: r.subs,
+      risks: r.risks,
+      milestones: r.milestones,
+      seeded: r.seeded
+    });
+  });
+  app2.get("/api/projects/:id/mobilization/health", async (req, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!await requireProjectAccess(req, res, projectId)) return;
+    const r = await mobilizationRollup(projectId);
+    res.json({
+      overallPct: r.overallPct,
+      sectionPct: r.sectionPct,
+      permitStatus: r.permitStatus,
+      equipmentOnSitePct: r.equipmentOnSitePct,
+      utilitiesInstalledPct: r.utilitiesInstalledPct,
+      staffOnboardedPct: r.staffOnboardedPct,
+      subsReadyPct: r.subsReadyPct,
+      risksOpen: r.risksOpen,
+      milestoneDaysToEarthwork: r.milestoneDaysToEarthwork,
+      health: r.health,
+      seeded: r.seeded
+    });
+  });
+  app2.get("/api/projects/:id/mobilization/report", async (req, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!await requireProjectAccess(req, res, projectId)) return;
+    const revision = req.query.revision?.trim() || "Rev 0";
+    const preparedBy = req.query.preparedBy?.trim() || req.account?.displayName || "Project Team";
+    try {
+      await generateMobilizationPlan(projectId, { preparedBy, revision, res });
+    } catch (err) {
+      console.error("[mobilization/report] generation failed", err);
+      if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
+      else res.end();
+      return;
+    }
+    logEvent(req, {
+      projectId,
+      kind: EVENT_KINDS.MOBILIZATION_REPORT_GENERATED,
+      title: "Mobilization Plan generated",
+      subtitle: `${revision} \u2014 prepared by ${preparedBy}`,
+      meta: { revision, preparedBy },
+      sourceType: "mobilization_plan"
+    });
+  });
+  app2.post("/api/projects/:id/mobilization/seed", async (req, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const project = await requireProjectAccess(req, res, projectId);
+    if (!project) return;
+    await storage.seedMobilization(projectId, project.startDate);
+    res.status(201).json({ ok: true });
+  });
+  const MOBILIZATION_RESOURCES = [
+    {
+      path: "items",
+      schema: insertMobilizationItemSchema,
+      create: storage.createMobilizationItem.bind(storage),
+      update: storage.updateMobilizationItem.bind(storage),
+      remove: storage.deleteMobilizationItem.bind(storage),
+      onUpdate: (req, row, patch) => {
+        if (patch.status !== "done") return;
+        logEvent(req, {
+          projectId: row.projectId,
+          kind: EVENT_KINDS.MOBILIZATION_ITEM_COMPLETED,
+          title: `Mobilization \u2014 ${row.title}`,
+          subtitle: row.section,
+          sourceType: "mobilization_item",
+          sourceId: row.id,
+          meta: { section: row.section }
+        });
+      }
+    },
+    {
+      path: "permits",
+      schema: insertMobilizationPermitSchema,
+      create: storage.createMobilizationPermit.bind(storage),
+      update: storage.updateMobilizationPermit.bind(storage),
+      remove: storage.deleteMobilizationPermit.bind(storage),
+      onUpdate: (req, row, patch) => {
+        if (patch.status !== "Approved") return;
+        logEvent(req, {
+          projectId: row.projectId,
+          kind: EVENT_KINDS.MOBILIZATION_PERMIT_APPROVED,
+          title: `Permit approved \u2014 ${row.name}`,
+          subtitle: row.agency ?? null,
+          sourceType: "mobilization_permit",
+          sourceId: row.id,
+          meta: { permitNumber: row.permitNumber, agency: row.agency }
+        });
+      }
+    },
+    {
+      path: "equipment",
+      schema: insertMobilizationEquipmentSchema,
+      create: storage.createMobilizationEquipment.bind(storage),
+      update: storage.updateMobilizationEquipment.bind(storage),
+      remove: storage.deleteMobilizationEquipment.bind(storage)
+    },
+    {
+      path: "utilities",
+      schema: insertMobilizationUtilitySchema,
+      create: storage.createMobilizationUtility.bind(storage),
+      update: storage.updateMobilizationUtility.bind(storage),
+      remove: storage.deleteMobilizationUtility.bind(storage)
+    },
+    {
+      path: "staff",
+      schema: insertMobilizationStaffSchema,
+      create: storage.createMobilizationStaff.bind(storage),
+      update: storage.updateMobilizationStaff.bind(storage),
+      remove: storage.deleteMobilizationStaff.bind(storage)
+    },
+    {
+      path: "subs",
+      schema: insertMobilizationSubSchema,
+      create: storage.createMobilizationSub.bind(storage),
+      update: storage.updateMobilizationSub.bind(storage),
+      remove: storage.deleteMobilizationSub.bind(storage)
+    },
+    {
+      path: "risks",
+      schema: insertMobilizationRiskSchema,
+      create: storage.createMobilizationRisk.bind(storage),
+      update: storage.updateMobilizationRisk.bind(storage),
+      remove: storage.deleteMobilizationRisk.bind(storage)
+    }
+  ];
+  for (const resource of MOBILIZATION_RESOURCES) {
+    app2.post(`/api/projects/:id/mobilization/${resource.path}`, async (req, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+      if (!await requireProjectAccess(req, res, projectId)) return;
+      const parsed = resource.schema.safeParse({ ...req.body ?? {}, projectId });
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+      const created = await resource.create(parsed.data);
+      res.status(201).json(created);
+    });
+    app2.patch(`/api/projects/:id/mobilization/${resource.path}/:rowId`, async (req, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const rowId = parseInt(req.params.rowId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
+      if (!await requireProjectAccess(req, res, projectId)) return;
+      const { projectId: _ignored, id: _id, ...patch } = req.body ?? {};
+      const updated = await resource.update(rowId, patch);
+      if (!updated || updated.projectId !== projectId) return res.status(404).json({ message: "Not found" });
+      resource.onUpdate?.(req, updated, patch);
+      res.json(updated);
+    });
+    app2.delete(`/api/projects/:id/mobilization/${resource.path}/:rowId`, async (req, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const rowId = parseInt(req.params.rowId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
+      if (!await requireProjectAccess(req, res, projectId)) return;
+      await resource.remove(rowId);
+      res.status(204).end();
+    });
+  }
+  app2.get("/api/executive-os/mobilization", async (req, res) => {
+    const orgProjects = req.account?.role === "owner" ? await storage.getProjects() : await storage.getProjects(req.organizationId ?? void 0);
+    const rows = await Promise.all(orgProjects.map(async (p) => {
+      const r = await mobilizationRollup(p.id);
+      return {
+        projectId: p.id,
+        projectName: p.name,
+        seeded: r.seeded,
+        overallPct: r.overallPct,
+        health: r.health,
+        daysToEarthwork: r.milestoneDaysToEarthwork,
+        permitStatus: r.permitStatus,
+        risksOpen: r.risksOpen
+      };
+    }));
+    res.json(rows);
   });
   app2.post("/api/drone-captures/upload", droneUpload.single("file"), async (req, res) => {
     const file = req.file;
@@ -3802,6 +8671,14 @@ async function registerRoutes(_httpServer, app2) {
       mimeType: file.mimetype,
       fileSizeBytes: file.size
     });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DRONE_CAPTURED,
+      title: `Drone capture \u2014 ${created.title}`,
+      sourceType: "drone_capture",
+      sourceId: created.id,
+      meta: { captureType: created.captureType, area: created.area, filename: file.originalname }
+    });
     res.status(201).json(created);
   });
   app2.get("/api/drone-captures/:id/file", async (req, res) => {
@@ -3827,13 +8704,34 @@ async function registerRoutes(_httpServer, app2) {
   app2.post("/api/messages", async (req, res) => {
     const parsed = insertMessageSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createMessage(parsed.data));
+    const created = await storage.createMessage(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.MESSAGE_POSTED,
+      title: `Message posted`,
+      subtitle: created.body ? created.body.slice(0, 120) : void 0,
+      sourceType: "message",
+      sourceId: created.id
+    });
+    res.status(201).json(created);
   });
-  app2.get("/api/notes", async (req, res) => res.json(await storage.getNotes(pid(req))));
+  app2.get("/api/notes", scopeProjectQuery, async (req, res) => {
+    const rows = await storage.getNotes(pid(req));
+    res.json(filterByOrgProjects(req, rows));
+  });
   app2.post("/api/notes", async (req, res) => {
     const parsed = insertNoteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createNote(parsed.data));
+    const created = await storage.createNote(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.NOTE_ADDED,
+      title: `Note added`,
+      subtitle: created.body ? created.body.slice(0, 120) : void 0,
+      sourceType: "note",
+      sourceId: created.id
+    });
+    res.status(201).json(created);
   });
   app2.patch("/api/notes/:id", async (req, res) => {
     const x = Number(req.body?.x);
@@ -3846,6 +8744,37 @@ async function registerRoutes(_httpServer, app2) {
   app2.delete("/api/notes/:id", async (req, res) => {
     await storage.softDeleteEntity("notes", parseInt(req.params.id, 10));
     res.status(204).end();
+  });
+  app2.post("/api/notes/:id/replies", async (req, res) => {
+    try {
+      if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+      const id = parseInt(req.params.id, 10);
+      const body = String(req.body?.body ?? "").trim();
+      if (!body) return res.status(400).json({ message: "Reply body required" });
+      if (body.length > 500) return res.status(400).json({ message: "Reply too long (500 char max)" });
+      const existing = await storage.getNoteById(id);
+      if (!existing) return res.status(404).json({ message: "Note not found" });
+      const displayName = String(req.account.displayName ?? req.account.email ?? "Someone");
+      const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("") || displayName.slice(0, 2).toUpperCase();
+      let arr = [];
+      try {
+        arr = existing.replies ? JSON.parse(existing.replies) : [];
+        if (!Array.isArray(arr)) arr = [];
+      } catch {
+        arr = [];
+      }
+      arr.push({
+        author: displayName,
+        initials,
+        body,
+        at: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      const updated = await storage.updateNote(id, { replies: JSON.stringify(arr) });
+      res.json(updated);
+    } catch (err) {
+      console.error("[notes] reply error:", err);
+      res.status(500).json({ message: "Failed to add reply" });
+    }
   });
   app2.get("/api/integrations", async (_req, res) => {
     res.json(await storage.getIntegrations());
@@ -3869,16 +8798,6 @@ async function registerRoutes(_httpServer, app2) {
   app2.post("/api/integrations/:key/test", async (_req, res) => {
     res.json({ ok: true, message: "Connection verified" });
   });
-  const stripeKey = process.env.STRIPE_SECRET_KEY;
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  const StripeCtor = stripeKey ? require("stripe") : null;
-  const stripe = stripeKey ? new StripeCtor(stripeKey, { apiVersion: "2025-03-31.basil" }) : null;
-  const PRICE_MAP = {
-    starter: { monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY, annual: process.env.STRIPE_PRICE_STARTER_ANNUAL },
-    pro: { monthly: process.env.STRIPE_PRICE_PRO_MONTHLY, annual: process.env.STRIPE_PRICE_PRO_ANNUAL },
-    enterprise: { monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY, annual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL }
-  };
-  const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
   app2.post("/api/stripe/webhook", async (req, res) => {
     if (!stripe || !webhookSecret) return res.status(503).json({ error: "Stripe not configured" });
     const sig = req.headers["stripe-signature"];
@@ -3889,60 +8808,73 @@ async function registerRoutes(_httpServer, app2) {
       return res.status(400).send(`Webhook Error: ${e.message}`);
     }
     try {
+      const orgFromEvent = async (obj) => {
+        const customerId = obj?.customer || null;
+        const metaOrg = obj?.metadata?.organizationId || obj?.subscription_details?.metadata?.organizationId;
+        let orgId = metaOrg ? parseInt(String(metaOrg), 10) : null;
+        if (!orgId && customerId) {
+          const org = await getOrgByStripeCustomerId(customerId);
+          if (org) orgId = org.id;
+        }
+        return { orgId: orgId ?? null, customerId };
+      };
       switch (event.type) {
         case "checkout.session.completed": {
           const session = event.data.object;
-          const customerId = session.customer;
-          const subscriptionId = session.subscription;
-          if (customerId) {
-            const account = await storage.getAccountByStripeCustomerId(customerId);
-            if (account) {
-              await storage.updateAccountBilling(account.id, {
-                stripeCustomerId: customerId,
-                stripeSubscriptionId: subscriptionId,
-                subscriptionStatus: "active"
-              });
-            }
+          const { orgId, customerId } = await orgFromEvent(session);
+          if (orgId) {
+            await updateOrgBilling(orgId, {
+              stripeCustomerId: customerId ?? void 0,
+              stripeSubscriptionId: session.subscription || void 0,
+              subscriptionStatus: "trialing"
+              // real status arrives on subscription.updated
+            });
           }
           break;
         }
         case "customer.subscription.updated":
         case "customer.subscription.created": {
           const sub = event.data.object;
-          const customerId = sub.customer;
-          const account = await storage.getAccountByStripeCustomerId(customerId);
-          if (account) {
-            const planKey = sub.items?.data?.[0]?.price?.lookup_key || "";
-            const planMatch = planKey.match(/^(starter|pro|enterprise)/);
-            await storage.updateAccountBilling(account.id, {
-              stripeCustomerId: customerId,
+          const { orgId, customerId } = await orgFromEvent(sub);
+          if (orgId) {
+            let planTier;
+            let billingKind;
+            for (const it of sub.items?.data || []) {
+              const md = it.price?.metadata || {};
+              if (md.kind === "base") {
+                planTier = md.plan;
+                billingKind = md.interval || (it.price?.recurring?.interval === "year" ? "annual" : "monthly");
+                break;
+              }
+            }
+            await updateOrgBilling(orgId, {
+              stripeCustomerId: customerId ?? void 0,
               stripeSubscriptionId: sub.id,
               subscriptionStatus: sub.status,
               subscriptionCurrentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1e3).toISOString() : void 0,
-              subscriptionPlan: planMatch ? planMatch[1] : void 0
+              subscriptionPlan: planTier,
+              subscriptionBilling: billingKind,
+              trialEndsAt: sub.trial_end ? new Date(sub.trial_end * 1e3).toISOString() : void 0,
+              // True when the user scheduled a cancel from the portal. The sub
+              // stays active until subscriptionCurrentPeriodEnd, then Stripe
+              // fires subscription.deleted and we mark status=canceled.
+              cancelAtPeriodEnd: !!sub.cancel_at_period_end
             });
           }
           break;
         }
         case "customer.subscription.deleted": {
           const sub = event.data.object;
-          const customerId = sub.customer;
-          const account = await storage.getAccountByStripeCustomerId(customerId);
-          if (account) {
-            await storage.updateAccountBilling(account.id, {
-              subscriptionStatus: "canceled",
-              stripeSubscriptionId: null
-            });
+          const { orgId } = await orgFromEvent(sub);
+          if (orgId) {
+            await updateOrgBilling(orgId, { subscriptionStatus: "canceled", cancelAtPeriodEnd: false });
           }
           break;
         }
         case "invoice.payment_failed": {
           const invoice = event.data.object;
-          const customerId = invoice.customer;
-          const account = await storage.getAccountByStripeCustomerId(customerId);
-          if (account) {
-            await storage.updateAccountBilling(account.id, { subscriptionStatus: "past_due" });
-          }
+          const { orgId } = await orgFromEvent(invoice);
+          if (orgId) await updateOrgBilling(orgId, { subscriptionStatus: "past_due" });
           break;
         }
       }
@@ -3952,69 +8884,24 @@ async function registerRoutes(_httpServer, app2) {
       res.status(500).json({ error: "Webhook handler failed" });
     }
   });
-  app2.post("/api/billing/checkout", async (req, res) => {
-    const { plan, billing, email, company } = req.body;
-    if (!plan || !billing || !email) return res.status(400).json({ error: "Missing plan, billing, or email" });
-    if (!stripe) {
-      try {
-        await storage.createSubscriber({ email, plan, billing, company });
-      } catch {
-      }
-      void sendSignupNotification({
-        kind: "subscriber",
-        subject: `New TrussPath subscriber \u2014 ${email}`,
-        fields: {
-          Email: email,
-          Company: company,
-          Plan: plan,
-          Billing: billing,
-          "Note": "Stripe not yet configured \u2014 captured as lead",
-          "Signed up": (/* @__PURE__ */ new Date()).toISOString()
-        }
-      });
-      return res.status(202).json({
-        message: "Billing isn't configured yet, but we've saved your spot. We'll be in touch soon!",
-        captured: true
-      });
-    }
-    const priceId = PRICE_MAP[plan]?.[billing];
-    if (!priceId) return res.status(400).json({ error: `No price configured for ${plan} (${billing}). Set STRIPE_PRICE_* env vars.` });
-    try {
-      const existingAccount = await storage.getAccountByEmail(email);
-      let customerId = existingAccount?.stripeCustomerId || void 0;
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email,
-          metadata: { plan, billing, company: company || "" }
-        });
-        customerId = customer.id;
-        if (existingAccount) {
-          await storage.updateAccountBilling(existingAccount.id, { stripeCustomerId: customerId });
-        }
-      }
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        mode: "subscription",
-        line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${APP_URL}/#/paywall?checkout=success`,
-        cancel_url: `${APP_URL}/#/paywall?checkout=cancelled`,
-        metadata: { plan, billing, email },
-        subscription_data: { metadata: { plan, billing } }
-      });
-      res.json({ url: session.url });
-    } catch (e) {
-      console.error("[stripe checkout] error:", e);
-      res.status(500).json({ error: e?.message || "Failed to create checkout session" });
-    }
+  app2.post("/api/billing/checkout", async (_req, res) => {
+    res.status(410).json({
+      error: "This checkout endpoint has been retired. Please sign up at /signup.",
+      redirect: "/signup"
+    });
   });
   app2.post("/api/billing/portal", async (req, res) => {
     if (!stripe) return res.status(503).json({ error: "Billing is not configured" });
-    const account = req.account;
-    if (!account) return res.status(401).json({ error: "Not authenticated" });
-    if (!account.stripeCustomerId) return res.status(400).json({ error: "No billing account found" });
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) return res.status(400).json({ error: "No active organization" });
+    if (req.membership?.role !== "owner" && req.account.role !== "owner") {
+      return res.status(403).json({ error: "Only owners can manage billing" });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (!org?.stripeCustomerId) return res.status(400).json({ error: "No billing account found for this org" });
     try {
       const session = await stripe.billingPortal.sessions.create({
-        customer: account.stripeCustomerId,
+        customer: org.stripeCustomerId,
         return_url: `${APP_URL}/#/settings`
       });
       res.json({ url: session.url });
@@ -4023,15 +8910,99 @@ async function registerRoutes(_httpServer, app2) {
       res.status(500).json({ error: e?.message || "Failed to create portal session" });
     }
   });
+  app2.get("/api/billing/invoices", async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: "Billing is not configured" });
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) return res.status(400).json({ error: "No active organization" });
+    if (req.membership?.role !== "owner" && req.account.role !== "owner") {
+      return res.status(403).json({ error: "Only owners can view invoices" });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (!org?.stripeCustomerId) return res.json({ invoices: [] });
+    try {
+      const list = await stripe.invoices.list({ customer: org.stripeCustomerId, limit: 12 });
+      const invoices = list.data.map((inv) => ({
+        id: inv.id,
+        number: inv.number,
+        status: inv.status,
+        // draft | open | paid | uncollectible | void
+        amountDue: inv.amount_due,
+        amountPaid: inv.amount_paid,
+        currency: inv.currency,
+        created: inv.created ? new Date(inv.created * 1e3).toISOString() : null,
+        periodStart: inv.period_start ? new Date(inv.period_start * 1e3).toISOString() : null,
+        periodEnd: inv.period_end ? new Date(inv.period_end * 1e3).toISOString() : null,
+        hostedInvoiceUrl: inv.hosted_invoice_url ?? null,
+        invoicePdf: inv.invoice_pdf ?? null
+      }));
+      res.json({ invoices });
+    } catch (e) {
+      console.error("[stripe invoices] error:", e);
+      res.status(500).json({ error: e?.message || "Failed to load invoices" });
+    }
+  });
+  app2.get("/api/billing/upcoming", async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: "Billing is not configured" });
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) return res.status(400).json({ error: "No active organization" });
+    if (req.membership?.role !== "owner" && req.account.role !== "owner") {
+      return res.status(403).json({ error: "Only owners can view upcoming charges" });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (!org?.stripeCustomerId || !org.stripeSubscriptionId) return res.json({ upcoming: null });
+    try {
+      let inv = null;
+      try {
+        inv = await stripe.invoices.createPreview({ customer: org.stripeCustomerId, subscription: org.stripeSubscriptionId });
+      } catch {
+        try {
+          inv = await stripe.invoices.retrieveUpcoming({ customer: org.stripeCustomerId, subscription: org.stripeSubscriptionId });
+        } catch {
+          inv = null;
+        }
+      }
+      if (!inv) return res.json({ upcoming: null });
+      res.json({
+        upcoming: {
+          amountDue: inv.amount_due,
+          currency: inv.currency,
+          periodStart: inv.period_start ? new Date(inv.period_start * 1e3).toISOString() : null,
+          periodEnd: inv.period_end ? new Date(inv.period_end * 1e3).toISOString() : null,
+          // Best-effort next-charge date. Stripe puts it on next_payment_attempt for
+          // trialing subs; otherwise it's roughly period_end.
+          nextPaymentAttempt: inv.next_payment_attempt ? new Date(inv.next_payment_attempt * 1e3).toISOString() : null,
+          lineCount: Array.isArray(inv.lines?.data) ? inv.lines.data.length : 0
+        }
+      });
+    } catch (e) {
+      const msg = String(e?.message || "");
+      if (msg.includes("upcoming")) return res.json({ upcoming: null });
+      console.error("[stripe upcoming] error:", e);
+      res.status(500).json({ error: msg || "Failed to load upcoming invoice" });
+    }
+  });
   app2.get("/api/billing/status", async (req, res) => {
-    const account = req.account;
-    if (!account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    if (!req.organizationId) {
+      return res.json({ plan: null, status: null, billing: null, currentPeriodEnd: null, hasCustomer: false });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (!org) return res.status(404).json({ error: "Organization not found" });
+    const seats = await countActiveSeats(org.id);
+    const plan = org.subscriptionPlan ? PLANS[org.subscriptionPlan] : null;
     res.json({
-      plan: account.subscriptionPlan || null,
-      status: account.subscriptionStatus || null,
-      billing: account.subscriptionBilling || null,
-      currentPeriodEnd: account.subscriptionCurrentPeriodEnd || null,
-      hasCustomer: !!account.stripeCustomerId
+      plan: org.subscriptionPlan || null,
+      status: org.subscriptionStatus || null,
+      billing: org.subscriptionBilling || null,
+      currentPeriodEnd: org.subscriptionCurrentPeriodEnd || null,
+      trialEndsAt: org.trialEndsAt || null,
+      cancelAtPeriodEnd: !!org.cancelAtPeriodEnd,
+      hasCustomer: !!org.stripeCustomerId,
+      seats: {
+        active: seats,
+        included: plan?.includedSeats ?? null,
+        overage: plan ? Math.max(0, seats - plan.includedSeats) : null
+      }
     });
   });
   app2.get("/api/deleted-items", async (_req, res) => {
@@ -4113,19 +9084,90 @@ async function registerRoutes(_httpServer, app2) {
     if (id === req.account.id && status !== "approved") {
       return res.status(400).json({ message: "You can't remove your own access from here." });
     }
+    const primaryOwnerId = getPrimaryOwnerId();
+    if (primaryOwnerId && id === primaryOwnerId && req.account.id !== primaryOwnerId) {
+      return res.status(403).json({ message: "You can't modify the primary owner account." });
+    }
     const updated = await storage.setAccountApproval(id, status, req.account.id);
     if (!updated) return res.status(404).json({ message: "Account not found" });
     res.json({ account: updated });
   });
+  app2.get("/api/admin/demo-accounts", requireOwner, async (_req, res) => {
+    const rows = await storage.listDemoAccounts();
+    res.json({ demoAccounts: rows });
+  });
+  app2.post("/api/admin/demo-accounts", requireOwner, async (req, res) => {
+    const label = typeof req.body?.label === "string" && req.body.label.trim() ? String(req.body.label).trim().slice(0, 60) : "";
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const email = `demo-${suffix}@trusspath.app`;
+    const password = generateReadablePassword(16);
+    const displayName = label || `Demo User ${suffix}`;
+    const orgName = label ? `${label} (Demo)` : `TrussPath Demo ${suffix}`;
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1e3).toISOString();
+    try {
+      const account = await storage.createDemoAccount(email, password, displayName, expiresAt);
+      const { organizationId } = await bootstrapDemoOrgForAccount({
+        accountId: account.id,
+        orgName
+      });
+      try {
+        await storage.createProject({
+          organizationId,
+          name: "Demo: Warehouse Renovation",
+          number: "DEMO-001",
+          client: "Acme Distribution",
+          type: "Renovation",
+          status: "In Progress",
+          address: "1234 Demo St, Denver, CO",
+          startDate: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+          endDate: new Date(Date.now() + 90 * 86400 * 1e3).toISOString().slice(0, 10),
+          budget: 85e4,
+          spent: 275e3,
+          progress: 32
+        });
+      } catch (seedErr) {
+        console.error("[demo] seed project failed (non-fatal):", seedErr);
+      }
+      res.status(201).json({
+        account,
+        organizationId,
+        credentials: { email, password },
+        // shown once in the UI so owner can hand off
+        expiresAt
+      });
+    } catch (e) {
+      const msg = e?.message || "Failed to create demo account";
+      const status = /already/i.test(msg) ? 409 : 500;
+      res.status(status).json({ message: msg });
+    }
+  });
+  app2.post("/api/admin/demo-accounts/:id/expire", requireOwner, async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid account id" });
+    const updated = await storage.expireDemoAccount(id);
+    if (!updated) return res.status(404).json({ message: "Demo account not found" });
+    res.json({ account: updated });
+  });
+  app2.post("/api/admin/demo-accounts/purge", requireOwner, async (req, res) => {
+    const rawGrace = req.body?.graceDays;
+    const graceDays = Number.isFinite(Number(rawGrace)) && Number(rawGrace) >= 0 ? Math.min(365, Number(rawGrace)) : 7;
+    try {
+      const result = await storage.purgeExpiredDemos(graceDays);
+      res.json({ graceDays, ...result });
+    } catch (err) {
+      console.error("[demo-purge] failed:", err?.message ?? err);
+      res.status(500).json({ message: "Purge failed", error: err?.message ?? String(err) });
+    }
+  });
   app2.get("/api/jarvis/brief", async (req, res) => {
     try {
       try {
-        const result = await jarvisBrief(pid(req));
-        res.json(result);
+        const result = await jarvisBrief(pid(req), req.organizationId);
+        res.json({ ...result, mode: "llm" });
       } catch (llmErr) {
         console.log("[jarvis] LLM brief failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
-        const ctx = await buildContext(pid(req));
-        res.json({ brief: buildLocalBrief(ctx), context: ctx });
+        const brief = await buildRichLocalBrief(pid(req), req.organizationId);
+        res.json({ brief, mode: "local" });
       }
     } catch (err) {
       console.error("[jarvis] brief error:", err);
@@ -4136,12 +9178,12 @@ async function registerRoutes(_httpServer, app2) {
     try {
       const history = Array.isArray(req.body?.messages) ? req.body.messages : [];
       try {
-        const result = await jarvisChat(pid(req), history);
-        res.json(result);
+        const result = await jarvisChat(pid(req), history, req.organizationId);
+        res.json({ ...result, mode: "llm" });
       } catch (llmErr) {
         console.log("[jarvis] LLM chat failed, using local engine:", llmErr instanceof Error ? llmErr.message : String(llmErr));
-        const result = await localJarvisChat(pid(req), history);
-        res.json(result);
+        const result = await localJarvisChat(pid(req), history, req.organizationId);
+        res.json({ ...result, mode: "local" });
       }
     } catch (err) {
       console.error("[jarvis] chat error:", err);
@@ -4159,12 +9201,136 @@ async function registerRoutes(_httpServer, app2) {
   });
   app2.get("/api/timesheets", async (req, res) => {
     try {
+      runWeeklyRolloverIfDue().catch(() => {
+      });
+      const scope = String(req.query?.scope || "");
+      if (scope === "me") {
+        if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+        const rows2 = await storage.getTimesheetsForAccount(req.account.id);
+        return res.json(rows2);
+      }
       const projectId = req.query.projectId ? Number(req.query.projectId) : void 0;
       const rows = await storage.getTimesheets(projectId);
       res.json(rows);
     } catch (err) {
       console.error("[timesheets] list error:", err);
       res.status(500).json({ message: "Failed to list timesheets" });
+    }
+  });
+  app2.get("/api/timesheets/me/current", async (req, res) => {
+    try {
+      if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+      const weekStart = weekStartMonday((/* @__PURE__ */ new Date()).toISOString());
+      let ts = await storage.getTimesheetByAccountWeek(req.account.id, weekStart);
+      if (!ts) {
+        const projects2 = await storage.getProjects();
+        const project = projects2[0];
+        ts = await ensureTimesheetForWeek({
+          accountId: req.account.id,
+          organizationId: req.organizationId ?? null,
+          projectId: project?.id ?? 0,
+          employeeName: req.account.name || req.account.email || `Account ${req.account.id}`,
+          weekStart
+        });
+      }
+      const entries = await storage.getTimeEntries(ts.id);
+      res.json({ ...ts, entries });
+    } catch (err) {
+      console.error("[timesheets] me/current error:", err);
+      res.status(500).json({ message: "Failed to load current timesheet" });
+    }
+  });
+  app2.post("/api/timesheets/:id/submit-employee", async (req, res) => {
+    try {
+      if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+      const id = Number(req.params.id);
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      if (ts.accountId && ts.accountId !== req.account.id) {
+        return res.status(403).json({ message: "Not your timesheet" });
+      }
+      const signature = String(req.body?.signature || req.account.name || req.account.email || "Signed").slice(0, 200);
+      const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+      const project = ts.projectId ? await storage.getProject(ts.projectId) : void 0;
+      const manager = await findManagerForProject(project);
+      const updated = await storage.updateTimesheet(id, {
+        status: "pending-approval",
+        employeeSignature: signature,
+        employeeSubmittedAt: nowIso,
+        managerName: manager?.name ?? null,
+        managerEmail: manager?.email ?? null
+      });
+      logEvent(req, {
+        projectId: ts.projectId ?? void 0,
+        kind: EVENT_KINDS.TIMESHEET_SUBMITTED,
+        title: `Timesheet submitted \u2014 ${updated?.employeeName ?? "Employee"} (${updated?.weekStart} \u2192 ${updated?.weekEnd})`,
+        sourceType: "timesheet",
+        sourceId: id,
+        meta: { weekStart: updated?.weekStart, weekEnd: updated?.weekEnd, totalHours: updated?.totalHours }
+      });
+      if (manager?.email && process.env.RESEND_API_KEY) {
+        (async () => {
+          try {
+            const linkBase = process.env.PUBLIC_BASE_URL || "https://www.trusspath.com";
+            const resp = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                from: "TrussPath <noreply@trusspath.com>",
+                to: manager.email,
+                subject: `Timesheet awaiting your approval \u2014 ${updated?.employeeName ?? "Employee"} (${updated?.weekStart} \u2192 ${updated?.weekEnd})`,
+                html: `<p>${updated?.employeeName ?? "An employee"} submitted their weekly timesheet for your countersignature.</p>
+                       <p><strong>Week:</strong> ${updated?.weekStart} \u2013 ${updated?.weekEnd}<br/>
+                          <strong>Hours:</strong> ${updated?.totalHours ?? 0}</p>
+                       <p><a href="${linkBase}/timesheets?open=${id}">Review &amp; approve</a></p>`
+              })
+            });
+            if (!resp.ok) console.warn("[timesheets] manager notify status", resp.status);
+          } catch (e) {
+            console.warn("[timesheets] manager notify failed:", e?.message ?? e);
+          }
+        })();
+      }
+      res.json(updated);
+    } catch (err) {
+      console.error("[timesheets] submit-employee error:", err);
+      res.status(500).json({ message: "Failed to submit timesheet" });
+    }
+  });
+  app2.post("/api/timesheets/:id/approve-manager", async (req, res) => {
+    try {
+      if (!req.account?.id) return res.status(401).json({ message: "Unauthenticated" });
+      const id = Number(req.params.id);
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+      const isPrivileged = req.orgRole === "owner" || req.orgRole === "admin";
+      if (!isPrivileged) {
+        const project = ts.projectId ? await storage.getProject(ts.projectId) : void 0;
+        const manager = await findManagerForProject(project);
+        const matchByEmail = !!manager?.email && manager.email.toLowerCase() === (req.account.email ?? "").toLowerCase();
+        if (!matchByEmail) return res.status(403).json({ message: "Only the assigned superintendent can approve" });
+      }
+      const signature = String(req.body?.signature || req.account.name || req.account.email || "Approved").slice(0, 200);
+      const updated = await storage.updateTimesheet(id, {
+        status: "approved",
+        managerSignature: signature,
+        managerApprovedAt: (/* @__PURE__ */ new Date()).toISOString()
+      });
+      logEvent(req, {
+        projectId: ts.projectId ?? void 0,
+        kind: EVENT_KINDS.TIMESHEET_APPROVED,
+        title: `Timesheet approved \u2014 ${updated?.employeeName ?? "Employee"} (${updated?.weekStart} \u2192 ${updated?.weekEnd})`,
+        sourceType: "timesheet",
+        sourceId: id,
+        meta: { weekStart: updated?.weekStart, weekEnd: updated?.weekEnd, totalHours: updated?.totalHours }
+      });
+      res.json(updated);
+    } catch (err) {
+      console.error("[timesheets] approve-manager error:", err);
+      res.status(500).json({ message: "Failed to approve timesheet" });
     }
   });
   app2.get("/api/timesheets/:id", async (req, res) => {
@@ -4191,6 +9357,16 @@ async function registerRoutes(_httpServer, app2) {
   app2.patch("/api/timesheets/:id", async (req, res) => {
     try {
       const id = Number(req.params.id);
+      if (Object.prototype.hasOwnProperty.call(req.body ?? {}, "managerSignature") && req.body.managerSignature) {
+        const existing = await storage.getTimesheet(id);
+        if (!existing) return res.status(404).json({ message: "Timesheet not found" });
+        if (!existing.sentAt) {
+          return res.status(400).json({
+            message: "Timesheet must be sent to a Project Executive before a manager signature can be recorded.",
+            code: "MANAGER_SIGNATURE_REQUIRES_SEND"
+          });
+        }
+      }
       const updated = await storage.updateTimesheet(id, req.body);
       if (!updated) return res.status(404).json({ message: "Timesheet not found" });
       res.json(updated);
@@ -4271,6 +9447,20 @@ async function registerRoutes(_httpServer, app2) {
       const id = Number(req.params.id);
       const { email } = req.body;
       if (!email) return res.status(400).json({ message: "Email is required" });
+      const team = await storage.getTeam();
+      const recipient = team.find((t) => (t.email ?? "").toLowerCase() === String(email).toLowerCase());
+      if (!recipient) {
+        return res.status(400).json({
+          message: "Recipient is not on your team. Timesheets can only be sent to a Project Executive listed in your team roster.",
+          code: "RECIPIENT_NOT_FOUND"
+        });
+      }
+      if (recipient.accessLevel !== "project_executive") {
+        return res.status(400).json({
+          message: `${recipient.name} is not a Project Executive. Only Project Executives can approve timesheets.`,
+          code: "RECIPIENT_NOT_PROJECT_EXECUTIVE"
+        });
+      }
       const ts = await storage.getTimesheet(id);
       if (!ts) return res.status(404).json({ message: "Timesheet not found" });
       const entries = await storage.getTimeEntries(id);
@@ -4313,7 +9503,17 @@ async function registerRoutes(_httpServer, app2) {
           console.error("[timesheets] email error:", emailErr);
         }
       }
-      res.json({ sent: true, email, message: "Timesheet saved to docs and sent" });
+      const stamped = await storage.updateTimesheet(id, {
+        sentAt: (/* @__PURE__ */ new Date()).toISOString(),
+        sentTo: recipient.email ?? email
+      });
+      res.json({
+        sent: true,
+        email,
+        recipientName: recipient.name,
+        timesheet: stamped,
+        message: `Timesheet saved to docs and sent to ${recipient.name}`
+      });
     } catch (err) {
       console.error("[timesheets] send error:", err);
       res.status(500).json({ message: "Failed to send timesheet" });
@@ -4358,9 +9558,198 @@ async function registerRoutes(_httpServer, app2) {
     await storage.wipeAllData();
     res.json({ ok: true, wipedAt: (/* @__PURE__ */ new Date()).toISOString() });
   });
+  app2.get("/api/org/current", async (req, res) => {
+    if (!req.organizationId) return res.status(404).json({ message: "No active organization" });
+    const org = await getOrganization(req.organizationId);
+    if (!org) return res.status(404).json({ message: "Organization not found" });
+    const seats = await countActiveSeats(org.id);
+    const plan = org.subscriptionPlan ? PLANS[org.subscriptionPlan] : null;
+    const billing = org.subscriptionBilling === "annual" ? "annual" : "monthly";
+    const pending = await listPendingInvites(org.id);
+    res.json({
+      organization: org,
+      membership: req.membership,
+      seats: {
+        active: seats,
+        included: plan?.includedSeats ?? null,
+        overage: plan ? Math.max(0, seats - plan.includedSeats) : null,
+        pendingInvites: pending.length
+      },
+      pricing: plan ? {
+        tier: plan.tier,
+        displayName: plan.displayName,
+        billing,
+        includedSeats: plan.includedSeats,
+        seatAmountCents: plan[billing].seatAmount,
+        baseAmountCents: plan[billing].baseAmount
+      } : null
+    });
+  });
+  app2.patch("/api/org/current", requireCap2("manageMembers"), async (req, res) => {
+    if (!req.organizationId) return res.status(404).json({ message: "No active organization" });
+    const body = req.body || {};
+    const patch = {};
+    if (typeof body.timezone === "string") {
+      if (!isValidTimezone(body.timezone)) {
+        return res.status(400).json({ message: "Invalid timezone. Use an IANA name like 'America/Denver'." });
+      }
+      patch.timezone = body.timezone;
+    }
+    if (body.disabledIntegrations && typeof body.disabledIntegrations === "object") {
+      const clean = {};
+      for (const [k, v] of Object.entries(body.disabledIntegrations)) {
+        if (isIntegrationKey(k) && typeof v === "boolean") clean[k] = v;
+      }
+      if (Object.keys(clean).length > 0) patch.disabledIntegrations = clean;
+    }
+    if (Object.keys(patch).length === 0) return res.status(400).json({ message: "No supported fields to update" });
+    let updated = await getOrganization(req.organizationId);
+    if (patch.timezone) updated = await updateOrgTimezone(req.organizationId, patch.timezone);
+    if (patch.disabledIntegrations) updated = await updateOrgDisabledIntegrations(req.organizationId, patch.disabledIntegrations);
+    if (!updated) return res.status(404).json({ message: "Organization not found" });
+    res.json({ organization: updated });
+  });
+  app2.get("/api/org/members", requireCap2("manageMembers"), async (req, res) => {
+    const rows = await listMembershipsForOrg(req.organizationId);
+    res.json({ members: rows });
+  });
+  app2.post("/api/org/members/:id/role", requireCap2("manageMembers"), async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const newRole = req.body?.role;
+    if (!newRole || !ORG_ROLES.includes(newRole)) return res.status(400).json({ message: "Invalid role" });
+    const target = await getMembership(id);
+    if (!target || target.organizationId !== req.organizationId) {
+      return res.status(404).json({ message: "Member not found in this org" });
+    }
+    if ((newRole === "owner" || target.role === "owner") && req.membership.role !== "owner") {
+      return res.status(403).json({ message: "Only owners can change owner roles" });
+    }
+    if (target.role === "owner" && newRole !== "owner") {
+      const org = await getOrganization(req.organizationId);
+      if (org?.ownerAccountId === target.accountId) {
+        return res.status(403).json({ message: "Cannot demote the primary owner" });
+      }
+    }
+    const updated = await updateMembershipRole(id, newRole);
+    res.json({ membership: updated });
+  });
+  app2.delete("/api/org/members/:id", requireCap2("manageMembers"), async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const target = await getMembership(id);
+    if (!target || target.organizationId !== req.organizationId) {
+      return res.status(404).json({ message: "Member not found in this org" });
+    }
+    if (target.role === "owner" && req.membership.role !== "owner") {
+      return res.status(403).json({ message: "Only owners can remove other owners" });
+    }
+    const org = await getOrganization(req.organizationId);
+    if (org?.ownerAccountId === target.accountId) {
+      return res.status(403).json({ message: "Cannot remove the primary owner. Transfer ownership first." });
+    }
+    await removeMembership(id);
+    if (stripe) syncSeatsForOrg(stripe, req.organizationId).catch((e) => console.error("[members:delete] seat sync failed:", e));
+    res.json({ ok: true });
+  });
+  app2.get("/api/org/invites", requireCap2("manageMembers"), async (req, res) => {
+    const rows = await listPendingInvites(req.organizationId);
+    res.json({ invites: rows });
+  });
+  app2.post("/api/org/invites", requireCap2("manageMembers"), async (req, res) => {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const role = String(req.body?.role || "pm");
+    if (!email || !/@/.test(email)) return res.status(400).json({ message: "Valid email required" });
+    if (!ORG_ROLES.includes(role)) return res.status(400).json({ message: "Invalid role" });
+    if (role === "owner" && req.membership.role !== "owner") {
+      return res.status(403).json({ message: "Only owners can invite other owners" });
+    }
+    const existing = await storage.getAccountByEmail(email);
+    if (existing) {
+      const m = await getMembershipForAccount(existing.id, req.organizationId);
+      if (m && m.status === "active") {
+        return res.status(409).json({ message: "This user is already a member of your org" });
+      }
+    }
+    const invite = await createInvite({
+      organizationId: req.organizationId,
+      email,
+      role,
+      invitedByAccountId: req.account.id
+    });
+    const org = await getOrganization(req.organizationId);
+    const inviteUrl = `${APP_URL}/#/invite/${invite.token}`;
+    void sendInviteEmail({
+      toEmail: email,
+      orgName: org?.name || "TrussPath",
+      inviterName: req.account.displayName || req.account.email,
+      role,
+      inviteUrl
+    });
+    res.status(201).json({ invite, inviteUrl });
+  });
+  app2.delete("/api/org/invites/:id", requireCap2("manageMembers"), async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const rows = await listPendingInvites(req.organizationId);
+    if (!rows.find((r) => r.id === id)) {
+      return res.status(404).json({ message: "Invite not found" });
+    }
+    await revokeInvite(id);
+    res.json({ ok: true });
+  });
+  app2.get("/api/invites/:token", async (req, res) => {
+    const invite = await getInviteByToken(req.params.token);
+    if (!invite || !isInviteRedeemable(invite)) {
+      return res.status(404).json({ message: "Invite not found or expired" });
+    }
+    const org = await getOrganization(invite.organizationId);
+    res.json({
+      email: invite.email,
+      role: invite.role,
+      orgName: org?.name || "TrussPath",
+      expiresAt: invite.expiresAt
+    });
+  });
+  app2.post("/api/invites/:token/accept", async (req, res) => {
+    if (!req.account) return res.status(401).json({ message: "Not authenticated" });
+    const invite = await getInviteByToken(req.params.token);
+    if (!invite || !isInviteRedeemable(invite)) {
+      return res.status(400).json({ message: "Invite not found or expired" });
+    }
+    if (invite.email.toLowerCase() !== req.account.email.toLowerCase()) {
+      return res.status(403).json({ message: "Your email doesn't match the invite" });
+    }
+    const existing = await getMembershipForAccount(req.account.id, invite.organizationId);
+    if (existing && existing.status === "active") {
+      await markInviteAccepted(invite.id);
+      return res.json({ ok: true, membership: existing });
+    }
+    const membership = await createMembership(req.account.id, invite.organizationId, invite.role);
+    await markInviteAccepted(invite.id);
+    if (stripe) syncSeatsForOrg(stripe, invite.organizationId).catch((e) => console.error("[invite:accept] seat sync failed:", e));
+    res.json({ ok: true, membership });
+  });
+  {
+    let lastPurgeAt = 0;
+    const runPurge = () => {
+      const now = Date.now();
+      if (now - lastPurgeAt < 60 * 60 * 1e3) return;
+      lastPurgeAt = now;
+      storage.purgeExpiredDemos(7).then((r) => {
+        if (r.purgedAccountIds.length) {
+          console.log(`[demo-purge] auto-swept ${r.purgedAccountIds.length} account(s), ${r.purgedOrgIds.length} org(s)`);
+        }
+      }).catch((e) => {
+        console.log("[demo-purge] auto-sweep skipped:", e?.message ?? e);
+      });
+    };
+    setTimeout(runPurge, 5e3).unref?.();
+    app2.use("/api/admin/demo-accounts", (_req, _res, next) => {
+      runPurge();
+      next();
+    });
+  }
   return _httpServer;
 }
-var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, authAttempts, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW, PUBLIC_API, PAYWALL_EXEMPT_API_PREFIXES, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
+var import_node_path2, import_node_fs2, import_multer, SESSION_COOKIE, SESSION_MAX_AGE_SEC, authAttempts, AUTH_RATE_LIMIT, AUTH_RATE_WINDOW, PUBLIC_API, PUBLIC_API_PREFIXES, UPLOAD_DIR, ALLOWED_MIME, upload, PHOTO_DIR, photoHydrated, IMAGE_MIME, photoUpload, DRONE_DIR, droneUpload;
 var init_routes = __esm({
   "server/routes.ts"() {
     "use strict";
@@ -4368,12 +9757,19 @@ var init_routes = __esm({
     import_node_fs2 = __toESM(require("node:fs"), 1);
     import_multer = __toESM(require("multer"), 1);
     init_storage();
+    init_apis();
     init_jarvis();
     init_jarvis_local();
-    init_jarvis();
     init_health();
     init_mailer();
+    init_timesheet_auto();
     init_schema();
+    init_project_event_kinds();
+    init_mobilization_rollup();
+    init_mobilization_plan();
+    init_plans();
+    init_orgs();
+    init_mt_middleware();
     SESSION_COOKIE = "tp_session";
     SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
     authAttempts = /* @__PURE__ */ new Map();
@@ -4392,10 +9788,9 @@ var init_routes = __esm({
       "/api/subscribe",
       "/api/demo-request"
     ]);
-    PAYWALL_EXEMPT_API_PREFIXES = [
-      "/api/auth/",
-      "/api/billing/",
-      "/api/stripe/"
+    PUBLIC_API_PREFIXES = [
+      "/api/invites/"
+      // GET only — accept requires auth so it runs through normal middleware
     ];
     UPLOAD_DIR = process.env.VERCEL ? "/tmp/uploads/documents" : import_node_path2.default.resolve(process.cwd(), "uploads/documents");
     try {
