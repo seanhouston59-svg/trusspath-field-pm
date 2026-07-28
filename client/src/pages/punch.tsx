@@ -6,7 +6,8 @@ import { PunchList } from "@/components/tables";
 import { PunchBoard } from "@/components/punch-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import {
-  PUNCH_ITEM_TEMPLATES, PUNCH_TRADES, PUNCH_PRIORITIES, PUNCH_OTHER,
+  PUNCH_TRADES, PUNCH_PRIORITIES,
+  itemsForTrade, tradeForItem,
 } from "@/lib/punch-catalog";
 import { ListToolbar, type View } from "@/components/list-toolbar";
 import { usePunchItems, useTeamMap, useProjects, useTeam, useCreatePunchItem, useUpdatePunchStatus } from "@/hooks/use-data";
@@ -44,40 +45,34 @@ export default function PunchPage() {
     });
   }, [items, projectFilter, assigneeFilter]);
 
-  // Item + trade are drop-downs sourced from a shared catalog. Picking
-  // "Other…" reveals a plain text input right below so users can still enter
-  // anything unusual without being boxed in by the preset list.
-  const itemOptions = [
-    ...PUNCH_ITEM_TEMPLATES.map((v) => ({ value: v, label: v })),
-    { value: PUNCH_OTHER, label: "Other… (type in)" },
-  ];
-  const tradeOptions = [
-    ...PUNCH_TRADES.map((v) => ({ value: v, label: v })),
-    { value: PUNCH_OTHER, label: "Other… (type in)" },
-  ];
+  // Combo boxes for Item + Trade: users can type freely OR pick from the
+  // filtered dropdown. Item and Trade are linked \u2014 picking an item auto-
+  // fills the trade tagged on that template, and picking a trade narrows the
+  // item list to that discipline. See client/src/lib/punch-catalog.ts.
   const priorityOptions = PUNCH_PRIORITIES.map((v) => ({ value: v, label: v }));
+  const tradeOptions = PUNCH_TRADES.map((v) => ({ value: v, label: v }));
 
-  const fields: FieldDef[] = [
+  const baseFields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
     { name: "priority", label: "Priority", type: "select", options: priorityOptions, required: true, half: true },
-    { name: "titleChoice", label: "Item", type: "select", options: itemOptions, required: true, placeholder: "Pick a common item…" },
-    { name: "titleCustom", label: "Item (custom)", type: "text", placeholder: "Describe the item…" },
+    { name: "title", label: "Item", type: "combo", required: true, placeholder: "Type or pick an item\u2026" },
     { name: "location", label: "Location", type: "text", required: true, half: true, placeholder: "Level 1, Rm 112" },
-    { name: "tradeChoice", label: "Trade", type: "select", options: tradeOptions, required: true, half: true },
-    { name: "tradeCustom", label: "Trade (custom)", type: "text", half: true, placeholder: "Specify trade…" },
+    { name: "trade", label: "Trade", type: "combo", options: tradeOptions, required: true, half: true, placeholder: "Type or pick a trade\u2026" },
     { name: "status", label: "Status", type: "select", options: ["Open", "In Progress", "Complete"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "assigneeId", label: "Assignee", type: "select", options: teamOptions, half: true },
   ];
 
-  // Hide the custom text fields unless the user picked "Other…" for that
-  // dropdown. Keeps the form compact for the 95% case while preserving the
-  // escape hatch.
-  const visibleFields = (values: Record<string, string | number>): FieldDef[] =>
-    fields.filter((f) => {
-      if (f.name === "titleCustom") return values.titleChoice === PUNCH_OTHER;
-      if (f.name === "tradeCustom") return values.tradeChoice === PUNCH_OTHER;
-      return true;
-    });
+  // Item options are re-derived every render based on the current Trade
+  // value. If the user hasn't picked a trade yet, or picked something we
+  // don't recognize, we show every item.
+  const fieldsForValues = (values: Record<string, string | number>): FieldDef[] => {
+    const currentTrade = String(values.trade ?? "");
+    const itemTemplates = itemsForTrade(currentTrade);
+    const itemOptions = itemTemplates.map((t) => ({ value: t.label, label: t.label }));
+    return baseFields.map((f) =>
+      f.name === "title" ? { ...f, options: itemOptions } : f
+    );
+  };
 
   return (
     <Layout
@@ -92,34 +87,34 @@ export default function PunchPage() {
         open={open}
         onOpenChange={setOpen}
         title="New Punch Item"
-        fields={fields}
-        fieldsForValues={visibleFields}
+        fields={baseFields}
+        fieldsForValues={fieldsForValues}
+        // When the user picks an item that has a known trade, auto-fill Trade
+        // (only if Trade is empty, so we never stomp on an explicit choice).
+        onFieldChange={(name, value, next) => {
+          if (name === "title" && !String(next.trade ?? "").trim()) {
+            const trade = tradeForItem(String(value));
+            if (trade) return { trade };
+          }
+          return;
+        }}
         defaults={{
           status: "Open", assigneeId: "0", priority: "Medium",
-          titleChoice: "", titleCustom: "", tradeChoice: "", tradeCustom: "",
+          title: "", trade: "",
         }}
         submitLabel="Create Item"
         isPending={create.isPending}
-        onSubmit={(v) => {
-          // Fold the dropdown + "Other…" custom text into the single string
-          // the API expects. If the user picked "Other…" but typed nothing,
-          // fall back to the label so we never send an empty title/trade.
-          const title = v.titleChoice === PUNCH_OTHER
-            ? String(v.titleCustom || "").trim() || "Other"
-            : String(v.titleChoice || "").trim();
-          const trade = v.tradeChoice === PUNCH_OTHER
-            ? String(v.tradeCustom || "").trim() || "Other"
-            : String(v.tradeChoice || "").trim();
-          return create.mutateAsync({
+        onSubmit={(v) =>
+          create.mutateAsync({
             projectId: Number(v.projectId),
-            title,
+            title: String(v.title).trim(),
             location: String(v.location),
-            trade,
+            trade: String(v.trade).trim(),
             status: String(v.status),
             priority: String(v.priority || "Medium"),
             assigneeId: v.assigneeId === "0" ? undefined : Number(v.assigneeId),
-          });
-        }}
+          })
+        }
       />
 
       <ListToolbar

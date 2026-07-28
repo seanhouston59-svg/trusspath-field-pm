@@ -1,127 +1,147 @@
 // Standard picklists for the New Punch Item dialog.
-// Keep these sorted A-Z within groups so the dropdown scans predictably.
-// Users can always pick "Other\u2026" to type in something bespoke.
+// Each item template is tagged to the trade that typically owns the fix, so
+// the UI can auto-fill Trade when an item is picked and, going the other
+// direction, narrow the item list once a Trade is chosen.
+//
+// Trade strings here MUST match entries in PUNCH_TRADES exactly.
 
-export const PUNCH_OTHER = "__other__";
+export type PunchItemTemplate = { label: string; trade: string };
 
-// Common punch item templates. Structured as "<verb> <noun>" so a super can
-// pick one and refine in the description if needed. Grouped mentally by
-// discipline but rendered flat \u2014 the dropdown gets long, that's fine.
-export const PUNCH_ITEM_TEMPLATES: string[] = [
-  // Concrete / structural
-  "Chip and patch concrete spall",
-  "Grind smooth uneven slab",
-  "Grout base plate",
-  "Repair concrete crack",
-  "Repair exposed rebar",
+// Common punch item templates, sorted alphabetically inside each trade group
+// for reviewability. The runtime UI sorts and filters as needed.
+export const PUNCH_ITEM_TEMPLATES: PunchItemTemplate[] = [
+  // Concrete
+  { label: "Chip and patch concrete spall", trade: "Concrete" },
+  { label: "Grind smooth uneven slab", trade: "Concrete" },
+  { label: "Grout base plate", trade: "Concrete" },
+  { label: "Level uneven floor", trade: "Concrete" },
+  { label: "Repair concrete crack", trade: "Concrete" },
+  { label: "Repair exposed rebar", trade: "Concrete" },
 
-  // Framing / drywall
-  "Fix drywall damage",
-  "Level uneven wall",
-  "Reframe misaligned wall",
-  "Repair drywall corner bead",
-  "Touch up drywall texture",
+  // Drywall
+  { label: "Fix drywall damage", trade: "Drywall" },
+  { label: "Level uneven wall", trade: "Drywall" },
+  { label: "Repair drywall corner bead", trade: "Drywall" },
+  { label: "Touch up drywall texture", trade: "Drywall" },
 
-  // Doors, windows, hardware
-  "Adjust door alignment",
-  "Adjust door closer",
-  "Install door hardware",
-  "Install missing door stop",
-  "Rehang misaligned door",
-  "Repair damaged door frame",
-  "Replace broken door hardware",
-  "Replace broken window",
-  "Replace damaged door",
-  "Reseal window",
+  // Framing — Wood / Steel
+  { label: "Reframe misaligned wall", trade: "Framing \u2014 Wood" },
+  { label: "Straighten bowed stud", trade: "Framing \u2014 Wood" },
 
-  // Paint & finishes
-  "Caulk gap",
-  "Match paint color",
-  "Refinish scuffed surface",
-  "Reseal joint",
-  "Retouch paint",
-  "Sand and repaint",
-  "Strip and refinish trim",
+  // Doors, Frames & Hardware
+  { label: "Adjust door alignment", trade: "Doors, Frames & Hardware" },
+  { label: "Adjust door closer", trade: "Doors, Frames & Hardware" },
+  { label: "Install door hardware", trade: "Doors, Frames & Hardware" },
+  { label: "Install missing door stop", trade: "Doors, Frames & Hardware" },
+  { label: "Rehang misaligned door", trade: "Doors, Frames & Hardware" },
+  { label: "Repair damaged door frame", trade: "Doors, Frames & Hardware" },
+  { label: "Replace broken door hardware", trade: "Doors, Frames & Hardware" },
+  { label: "Replace damaged door", trade: "Doors, Frames & Hardware" },
+
+  // Windows / Glass
+  { label: "Replace broken window", trade: "Windows" },
+  { label: "Reseal window", trade: "Windows" },
+  { label: "Clean glass", trade: "Glass & Glazing" },
+
+  // Painting
+  { label: "Match paint color", trade: "Painting" },
+  { label: "Refinish scuffed surface", trade: "Painting" },
+  { label: "Retouch paint", trade: "Painting" },
+  { label: "Sand and repaint", trade: "Painting" },
+  { label: "Strip and refinish trim", trade: "Painting" },
+  { label: "Touch up finishes", trade: "Painting" },
+
+  // Caulking & Sealants
+  { label: "Caulk fixture to counter", trade: "Caulking & Sealants" },
+  { label: "Caulk gap", trade: "Caulking & Sealants" },
+  { label: "Reseal exterior joint", trade: "Caulking & Sealants" },
+  { label: "Reseal joint", trade: "Caulking & Sealants" },
 
   // Flooring
-  "Level uneven floor",
-  "Regrout tile",
-  "Replace cracked tile",
-  "Replace damaged flooring",
-  "Reseat loose tile",
-  "Reseat transition strip",
-  "Stretch or replace carpet",
+  { label: "Regrout tile", trade: "Flooring \u2014 Tile" },
+  { label: "Replace cracked tile", trade: "Flooring \u2014 Tile" },
+  { label: "Reseat loose tile", trade: "Flooring \u2014 Tile" },
+  { label: "Replace damaged flooring", trade: "Flooring \u2014 Resilient" },
+  { label: "Reseat transition strip", trade: "Flooring \u2014 Resilient" },
+  { label: "Stretch or replace carpet", trade: "Flooring \u2014 Carpet" },
 
-  // Ceiling
-  "Realign ceiling grid",
-  "Replace ceiling tile",
-  "Repair ceiling stain",
+  // Cabinets & Millwork
+  { label: "Adjust cabinet door", trade: "Cabinets & Millwork" },
+  { label: "Realign millwork joint", trade: "Cabinets & Millwork" },
+  { label: "Repair damaged trim", trade: "Carpentry \u2014 Finish" },
 
-  // MEP \u2014 mechanical
-  "Adjust HVAC diffuser",
-  "Balance HVAC airflow",
-  "Insulate exposed duct",
-  "Repair damaged ductwork",
-  "Replace damaged HVAC filter",
-  "Replace missing diffuser",
+  // Ceiling / Acoustical
+  { label: "Realign ceiling grid", trade: "Ceiling" },
+  { label: "Replace ceiling tile", trade: "Ceiling" },
+  { label: "Repair ceiling stain", trade: "Ceiling" },
 
-  // MEP \u2014 electrical
-  "Cover open junction box",
-  "Fix loose outlet",
-  "Install missing cover plate",
-  "Label electrical panel",
-  "Reaim recessed light",
-  "Replace burned-out lamp",
-  "Replace damaged fixture",
-  "Replace faulty switch",
-  "Reroute exposed conduit",
-  "Terminate loose wiring",
+  // HVAC
+  { label: "Adjust HVAC diffuser", trade: "HVAC" },
+  { label: "Balance HVAC airflow", trade: "HVAC" },
+  { label: "Insulate exposed duct", trade: "HVAC" },
+  { label: "Repair damaged ductwork", trade: "HVAC" },
+  { label: "Replace damaged HVAC filter", trade: "HVAC" },
+  { label: "Replace missing diffuser", trade: "HVAC" },
 
-  // MEP \u2014 plumbing
-  "Adjust plumbing trim",
-  "Caulk fixture to counter",
-  "Fix leaking fixture",
-  "Install missing escutcheon",
-  "Repair damaged pipe",
-  "Replace damaged fixture",
-  "Reset toilet",
-  "Reset trap",
+  // Electrical
+  { label: "Cover open junction box", trade: "Electrical" },
+  { label: "Fix loose outlet", trade: "Electrical" },
+  { label: "Install missing cover plate", trade: "Electrical" },
+  { label: "Label electrical panel", trade: "Electrical" },
+  { label: "Replace faulty switch", trade: "Electrical" },
+  { label: "Reroute exposed conduit", trade: "Electrical" },
+  { label: "Terminate loose wiring", trade: "Electrical" },
 
-  // Fire / life safety
-  "Install missing exit sign",
-  "Install missing fire caulking",
-  "Replace damaged sprinkler head",
-  "Test fire alarm device",
+  // Lighting
+  { label: "Reaim recessed light", trade: "Lighting" },
+  { label: "Replace burned-out lamp", trade: "Lighting" },
+  { label: "Replace damaged fixture", trade: "Lighting" },
 
-  // Envelope / roofing
-  "Repair damaged flashing",
-  "Repair damaged roof membrane",
-  "Reseal exterior joint",
-  "Reseal roof penetration",
-  "Replace damaged siding",
+  // Plumbing
+  { label: "Adjust plumbing trim", trade: "Plumbing" },
+  { label: "Fix leaking fixture", trade: "Plumbing" },
+  { label: "Install missing escutcheon", trade: "Plumbing" },
+  { label: "Repair damaged pipe", trade: "Plumbing" },
+  { label: "Replace damaged plumbing fixture", trade: "Plumbing" },
+  { label: "Reset toilet", trade: "Plumbing" },
+  { label: "Reset trap", trade: "Plumbing" },
 
-  // Site / exterior
-  "Clean construction debris",
-  "Regrade site drainage",
-  "Reinstall damaged fencing",
-  "Repair damaged asphalt",
-  "Repair damaged curb",
-  "Replace damaged landscape",
-  "Restripe parking lot",
+  // Fire Protection / Life Safety
+  { label: "Install missing exit sign", trade: "Fire Alarm" },
+  { label: "Test fire alarm device", trade: "Fire Alarm" },
+  { label: "Install missing fire caulking", trade: "Fireproofing" },
+  { label: "Replace damaged sprinkler head", trade: "Fire Protection / Sprinkler" },
 
-  // Cleanup / general
-  "Clean glass",
-  "Complete final cleaning",
-  "Deep clean bathroom fixtures",
-  "Remove construction adhesive",
-  "Remove protective film",
-  "Touch up finishes",
+  // Roofing / Envelope
+  { label: "Repair damaged flashing", trade: "Roofing" },
+  { label: "Repair damaged roof membrane", trade: "Roofing" },
+  { label: "Reseal roof penetration", trade: "Roofing" },
+  { label: "Replace damaged siding", trade: "Waterproofing" },
 
-  // Documentation / commissioning
-  "Complete equipment commissioning",
-  "Provide missing O&M manual",
-  "Provide warranty documentation",
-  "Update as-built drawings",
+  // Masonry / Stone
+  { label: "Repoint masonry joint", trade: "Masonry" },
+  { label: "Repair damaged stone", trade: "Stone" },
+
+  // Site / Landscape
+  { label: "Regrade site drainage", trade: "Earthwork" },
+  { label: "Repair damaged asphalt", trade: "Asphalt" },
+  { label: "Repair damaged curb", trade: "Concrete" },
+  { label: "Restripe parking lot", trade: "Asphalt" },
+  { label: "Reinstall damaged fencing", trade: "Fencing" },
+  { label: "Replace damaged landscape", trade: "Landscaping" },
+
+  // Cleaning
+  { label: "Clean construction debris", trade: "Cleaning" },
+  { label: "Complete final cleaning", trade: "Cleaning" },
+  { label: "Deep clean bathroom fixtures", trade: "Cleaning" },
+  { label: "Remove construction adhesive", trade: "Cleaning" },
+  { label: "Remove protective film", trade: "Cleaning" },
+
+  // Commissioning / Docs
+  { label: "Complete equipment commissioning", trade: "Commissioning" },
+  { label: "Provide missing O&M manual", trade: "Commissioning" },
+  { label: "Provide warranty documentation", trade: "Commissioning" },
+  { label: "Update as-built drawings", trade: "General Conditions" },
 ];
 
 // Canonical CSI-adjacent trade list. Ordered alphabetically for scanability.
@@ -179,3 +199,28 @@ export const PUNCH_TRADES: string[] = [
 
 // Priority is short and standardized.
 export const PUNCH_PRIORITIES: string[] = ["Critical", "High", "Medium", "Low"];
+
+// Kept for backward compatibility with existing imports; the combo box UI
+// no longer needs an explicit "Other" sentinel because free-typing is the
+// escape hatch.
+export const PUNCH_OTHER = "__other__";
+
+// Helper: given the current trade text (may be free-typed or empty), return
+// the item labels that make sense to show. If nothing is picked yet, return
+// all templates. If the trade doesn't match any known template, return all
+// templates too (don't leave the user staring at an empty list).
+export function itemsForTrade(trade: string): PunchItemTemplate[] {
+  const t = trade.trim().toLowerCase();
+  if (!t) return PUNCH_ITEM_TEMPLATES;
+  const matches = PUNCH_ITEM_TEMPLATES.filter((it) => it.trade.toLowerCase() === t);
+  return matches.length > 0 ? matches : PUNCH_ITEM_TEMPLATES;
+}
+
+// Helper: given an item label the user picked/typed, return the trade tagged
+// on that template (empty string if it's a free-typed / unknown item).
+export function tradeForItem(item: string): string {
+  const t = item.trim().toLowerCase();
+  if (!t) return "";
+  const hit = PUNCH_ITEM_TEMPLATES.find((it) => it.label.toLowerCase() === t);
+  return hit?.trade ?? "";
+}

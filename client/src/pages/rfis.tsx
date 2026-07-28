@@ -4,6 +4,8 @@ import { Layout } from "@/components/layout";
 import { GhostState, GhostRfiRows } from "@/components/ghost-state";
 import { RfiTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
+import { PUNCH_TRADES } from "@/lib/punch-catalog";
+import { subjectsForTrade, tradeForRfiSubject } from "@/lib/rfi-catalog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
@@ -60,15 +62,31 @@ export default function RfisPage() {
 
   const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 
-  const fields: FieldDef[] = [
+  // Subject + Trade are combo boxes sourced from a shared catalog. Picking a
+  // subject auto-fills Trade (when Trade is empty), and picking a Trade
+  // narrows the Subject list. Users can free-type into either field.
+  const tradeOptions = PUNCH_TRADES.map((v) => ({ value: v, label: v }));
+
+  const baseFields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
     { name: "number", label: "RFI #", type: "text", placeholder: "RFI-001", required: true, half: true },
-    { name: "subject", label: "Subject", type: "text", required: true, placeholder: "Clarify structural steel connection detail at grid C-4" },
+    { name: "subject", label: "Subject", type: "combo", required: true, placeholder: "Type or pick a subject…" },
+    { name: "trade", label: "Trade", type: "combo", options: tradeOptions, half: true, placeholder: "Type or pick a trade…" },
     { name: "status", label: "Status", type: "select", options: ["Open", "In Review", "Answered", "Closed"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "assigneeId", label: "Assignee", type: "select", options: teamOptions, half: true },
     { name: "dateCreated", label: "Date Created", type: "date", required: true, half: true },
     { name: "dueDate", label: "Due Date", type: "date", required: true, half: true },
   ];
+
+  // Rebuild the Subject option list every render based on the current Trade
+  // value so the two dropdowns stay linked.
+  const fieldsForValues = (values: Record<string, string | number>): FieldDef[] => {
+    const currentTrade = String(values.trade ?? "");
+    const subjectOptions = subjectsForTrade(currentTrade).map((s) => ({ value: s.label, label: s.label }));
+    return baseFields.map((f) =>
+      f.name === "subject" ? { ...f, options: subjectOptions } : f
+    );
+  };
 
   const peopleOptions = [
     { value: "0", label: "Unassigned" },
@@ -88,8 +106,17 @@ export default function RfisPage() {
         open={open}
         onOpenChange={setOpen}
         title="New RFI"
-        fields={fields}
-        defaults={{ status: "Open", assigneeId: "0" }}
+        fields={baseFields}
+        fieldsForValues={fieldsForValues}
+        // Picking a known subject auto-fills Trade (only if Trade is empty).
+        onFieldChange={(name, value, next) => {
+          if (name === "subject" && !String(next.trade ?? "").trim()) {
+            const trade = tradeForRfiSubject(String(value));
+            if (trade) return { trade };
+          }
+          return;
+        }}
+        defaults={{ status: "Open", assigneeId: "0", subject: "", trade: "" }}
         submitLabel="Create RFI"
         isPending={create.isPending}
         onSubmit={(v) =>
@@ -97,6 +124,7 @@ export default function RfisPage() {
             projectId: Number(v.projectId),
             number: String(v.number),
             subject: String(v.subject),
+            trade: String(v.trade || "").trim() || undefined,
             status: String(v.status),
             assigneeId: v.assigneeId === "0" ? undefined : Number(v.assigneeId),
             dateCreated: String(v.dateCreated),
@@ -204,6 +232,7 @@ export default function RfisPage() {
             isStatusPending={updateStatus.isPending}
             fields={[
               { label: "Assignee", value: a?.name ?? "Unassigned" },
+              { label: "Trade", value: selected.trade || "—" },
               { label: "Project", value: projectName(selected.projectId) },
               { label: "Date created", value: shortDate(selected.dateCreated), mono: true },
               { label: "Due date", value: shortDate(selected.dueDate), mono: true },

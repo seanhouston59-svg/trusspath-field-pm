@@ -166,6 +166,9 @@ export const rfis = pgTable("rfis", {
   assigneeId: integer("assignee_id"),
   dateCreated: text("date_created").notNull(),
   dueDate: text("due_date").notNull(),
+  // Optional trade tag — auto-filled from the RFI subject catalog when the
+  // user picks a known subject, editable freely otherwise.
+  trade: text("trade"),
 });
 
 /* ----------------------------- Submittals ------------------------------ */
@@ -191,6 +194,9 @@ export const changeOrders = pgTable("change_orders", {
   amount: doublePrecision("amount").notNull(),
   scheduleImpact: integer("schedule_impact").notNull(),
   dateIssued: text("date_issued").notNull(),
+  // Optional trade tag — auto-filled from the CO title catalog when the
+  // user picks a known title, editable freely otherwise.
+  trade: text("trade"),
 });
 
 /* ---------------------------- Action items ----------------------------- */

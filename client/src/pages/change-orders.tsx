@@ -4,6 +4,8 @@ import { Layout } from "@/components/layout";
 import { GhostState, GhostChangeOrderRows } from "@/components/ghost-state";
 import { ChangeOrderTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
+import { PUNCH_TRADES } from "@/lib/punch-catalog";
+import { titlesForTrade, tradeForCoTitle } from "@/lib/co-catalog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
@@ -49,15 +51,29 @@ export default function ChangeOrdersPage() {
 
   const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 
-  const fields: FieldDef[] = [
+  // Title + Trade are combo boxes sourced from a shared catalog. Picking a
+  // title auto-fills Trade (when Trade is empty), and picking a Trade
+  // narrows the Title list. Free-typing works on both.
+  const tradeOptions = PUNCH_TRADES.map((v) => ({ value: v, label: v }));
+
+  const baseFields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
     { name: "number", label: "CO Number", type: "text", placeholder: "CO-001", required: true, half: true },
-    { name: "title", label: "Title", type: "text", required: true, placeholder: "Upgrade slab reinforcement to epoxy coating" },
+    { name: "title", label: "Title", type: "combo", required: true, placeholder: "Type or pick a change order title…" },
+    { name: "trade", label: "Trade", type: "combo", options: tradeOptions, half: true, placeholder: "Type or pick a trade…" },
     { name: "status", label: "Status", type: "select", options: ["Draft", "Pending", "Approved", "Rejected", "Executed"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "amount", label: "Amount ($)", type: "number", required: true, half: true },
     { name: "scheduleImpact", label: "Schedule Impact (days)", type: "number", required: true, half: true },
     { name: "dateIssued", label: "Date Issued", type: "date", required: true, half: true },
   ];
+
+  const fieldsForValues = (values: Record<string, string | number>): FieldDef[] => {
+    const currentTrade = String(values.trade ?? "");
+    const titleOptions = titlesForTrade(currentTrade).map((c) => ({ value: c.label, label: c.label }));
+    return baseFields.map((f) =>
+      f.name === "title" ? { ...f, options: titleOptions } : f
+    );
+  };
 
   return (
     <Layout
@@ -72,8 +88,17 @@ export default function ChangeOrdersPage() {
         open={open}
         onOpenChange={setOpen}
         title="New Change Order"
-        fields={fields}
-        defaults={{ status: "Draft", amount: 0, scheduleImpact: 0 }}
+        fields={baseFields}
+        fieldsForValues={fieldsForValues}
+        // Picking a known title auto-fills Trade (only if Trade is empty).
+        onFieldChange={(name, value, next) => {
+          if (name === "title" && !String(next.trade ?? "").trim()) {
+            const trade = tradeForCoTitle(String(value));
+            if (trade) return { trade };
+          }
+          return;
+        }}
+        defaults={{ status: "Draft", amount: 0, scheduleImpact: 0, title: "", trade: "" }}
         submitLabel="Create Change Order"
         isPending={create.isPending}
         onSubmit={(v) =>
@@ -81,6 +106,7 @@ export default function ChangeOrdersPage() {
             projectId: Number(v.projectId),
             number: String(v.number),
             title: String(v.title),
+            trade: String(v.trade || "").trim() || undefined,
             status: String(v.status),
             amount: Number(v.amount),
             scheduleImpact: Number(v.scheduleImpact),
@@ -189,6 +215,7 @@ export default function ChangeOrdersPage() {
           fields={[
             { label: "Amount", value: <span className={selected.amount >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>{selected.amount >= 0 ? "+" : ""}{formatCurrency(selected.amount)}</span>, mono: true },
             { label: "Schedule impact", value: `${selected.scheduleImpact > 0 ? "+" : ""}${selected.scheduleImpact} day${Math.abs(selected.scheduleImpact) === 1 ? "" : "s"}`, mono: true },
+            { label: "Trade", value: selected.trade || "—" },
             { label: "Project", value: projectName(selected.projectId), full: true },
             { label: "Date issued", value: shortDate(selected.dateIssued), mono: true },
           ]}

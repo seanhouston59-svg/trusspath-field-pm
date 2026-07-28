@@ -309,6 +309,8 @@ async function migrate() {
   await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS mime_type TEXT`;
   await sql`ALTER TABLE drone_captures ADD COLUMN IF NOT EXISTS file_size_bytes INTEGER`;
   await sql`ALTER TABLE punch_items ADD COLUMN IF NOT EXISTS priority TEXT`;
+  await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS trade TEXT`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS trade TEXT`;
 
   // Heal access_level for seed rows still at the default 'project_manager'.
   await sql`UPDATE team_members SET access_level = CASE
@@ -2197,12 +2199,12 @@ class DatabaseStorage implements IStorage {
     for (const x of tasksSeed) await db.insert(tasks).values(x);
 
     const rfisSeed: Omit<Rfi, "id">[] = [
-      { projectId: p[0].id, number: "RFI-014", subject: "Clearance at med-gas panels — ICU", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-12", dueDate: "2026-07-23" },
-      { projectId: p[0].id, number: "RFI-015", subject: "Curtainwall anchor detail revision", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-15", dueDate: "2026-07-21" },
-      { projectId: p[0].id, number: "RFI-012", subject: "Slab opening for mechanical chase", status: "Answered", assigneeId: t[2].id, dateCreated: "2026-06-28", dueDate: "2026-07-10" },
-      { projectId: p[1].id, number: "RFI-031", subject: "Cooling tower load path clarification", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-16", dueDate: "2026-07-22" },
-      { projectId: p[1].id, number: "RFI-029", subject: "Fire-rated assembly at stair 2", status: "Draft", assigneeId: t[2].id, dateCreated: "2026-07-18", dueDate: "2026-07-25" },
-      { projectId: p[2].id, number: "RFI-006", subject: "Storm detention vault location", status: "Open", assigneeId: t[2].id, dateCreated: "2026-07-14", dueDate: "2026-07-24" },
+      { projectId: p[0].id, number: "RFI-014", subject: "Clearance at med-gas panels — ICU", trade: "Plumbing", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-12", dueDate: "2026-07-23" },
+      { projectId: p[0].id, number: "RFI-015", subject: "Curtainwall anchor detail revision", trade: "Curtain Wall", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-15", dueDate: "2026-07-21" },
+      { projectId: p[0].id, number: "RFI-012", subject: "Slab opening for mechanical chase", trade: "Concrete", status: "Answered", assigneeId: t[2].id, dateCreated: "2026-06-28", dueDate: "2026-07-10" },
+      { projectId: p[1].id, number: "RFI-031", subject: "Cooling tower load path clarification", trade: "Steel — Structural", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-16", dueDate: "2026-07-22" },
+      { projectId: p[1].id, number: "RFI-029", subject: "Fire-rated assembly at stair 2", trade: "Fireproofing", status: "Draft", assigneeId: t[2].id, dateCreated: "2026-07-18", dueDate: "2026-07-25" },
+      { projectId: p[2].id, number: "RFI-006", subject: "Storm detention vault location", trade: "Site Utilities", status: "Open", assigneeId: t[2].id, dateCreated: "2026-07-14", dueDate: "2026-07-24" },
     ];
     for (const x of rfisSeed) await db.insert(rfis).values(x);
 
@@ -2216,11 +2218,11 @@ class DatabaseStorage implements IStorage {
     for (const x of subsSeed) await db.insert(submittals).values(x);
 
     const coSeed: Omit<ChangeOrder, "id">[] = [
-      { projectId: p[0].id, number: "CO-008", title: "Add 4th-floor terrace upgrade", status: "Approved", amount: 184000, scheduleImpact: 5, dateIssued: "2026-06-12" },
-      { projectId: p[0].id, number: "CO-011", title: "Med-gas manifold expansion", status: "Pending", amount: 96000, scheduleImpact: 3, dateIssued: "2026-07-09" },
-      { projectId: p[0].id, number: "CO-012", title: "Curtainwall IGU upgrade", status: "Pending", amount: 142000, scheduleImpact: 0, dateIssued: "2026-07-15" },
-      { projectId: p[1].id, number: "CO-021", title: "Cooling tower re-spec", status: "Pending", amount: 210000, scheduleImpact: 7, dateIssued: "2026-07-17" },
-      { projectId: p[1].id, number: "CO-019", title: "Lobby finish upgrade", status: "Approved", amount: 78000, scheduleImpact: 0, dateIssued: "2026-06-28" },
+      { projectId: p[0].id, number: "CO-008", title: "Add 4th-floor terrace upgrade", trade: "General Conditions", status: "Approved", amount: 184000, scheduleImpact: 5, dateIssued: "2026-06-12" },
+      { projectId: p[0].id, number: "CO-011", title: "Med-gas manifold expansion", trade: "Plumbing", status: "Pending", amount: 96000, scheduleImpact: 3, dateIssued: "2026-07-09" },
+      { projectId: p[0].id, number: "CO-012", title: "Curtainwall IGU upgrade", trade: "Curtain Wall", status: "Pending", amount: 142000, scheduleImpact: 0, dateIssued: "2026-07-15" },
+      { projectId: p[1].id, number: "CO-021", title: "Cooling tower re-spec", trade: "HVAC", status: "Pending", amount: 210000, scheduleImpact: 7, dateIssued: "2026-07-17" },
+      { projectId: p[1].id, number: "CO-019", title: "Lobby finish upgrade", trade: "Painting", status: "Approved", amount: 78000, scheduleImpact: 0, dateIssued: "2026-06-28" },
     ];
     for (const x of coSeed) await db.insert(changeOrders).values(x);
 
