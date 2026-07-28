@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { toDateKey, groupEntriesByDay, computeDayTotals, sumHours } from "@/lib/timesheet-week";
 import type { Timesheet, TimeEntry, Project } from "@shared/schema";
 import timesheetLogoUrl from "@/../public/timesheet-logo.jpeg";
 
@@ -58,10 +59,6 @@ function statusColor(status: string): string {
     case "rejected": return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
     default: return "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
   }
-}
-
-function dayKey(dateStr: string): string {
-  return dateStr || "";
 }
 
 /* ---------- data hooks ---------- */
@@ -269,9 +266,9 @@ function CreateTimesheetDialog({
   onCreate: (data: any) => void;
   loading: boolean;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toDateKey(new Date());
   const weekInfo = getWeekRange(today);
-  const weekStart = weekInfo.start.toISOString().slice(0, 10);
+  const weekStart = toDateKey(weekInfo.start);
 
   const [employeeName, setEmployeeName] = useState("");
   const [projectId, setProjectId] = useState<string>(projects[0]?.id?.toString() ?? "");
@@ -281,7 +278,7 @@ function CreateTimesheetDialog({
     const d = new Date(weekStartVal + "T00:00:00");
     const end = new Date(d);
     end.setDate(d.getDate() + 6);
-    return end.toISOString().slice(0, 10);
+    return toDateKey(end);
   }, [weekStartVal]);
 
   const handleCreate = () => {
@@ -398,9 +395,7 @@ function TimesheetEditor({
     const drafts: EntryDraft[] = [];
 
     for (const entry of ts.entries ?? []) {
-      const dayIdx = weekInfo.dates.findIndex(
-        (d) => d.toISOString().slice(0, 10) === entry.entryDate
-      );
+      const dayIdx = weekInfo.dates.findIndex((d) => toDateKey(d) === entry.entryDate);
       drafts.push({
         id: entry.id,
         entryDate: entry.entryDate,
@@ -413,8 +408,8 @@ function TimesheetEditor({
     }
 
     // Default selected day to today if in this week, else Monday
-    const today = new Date().toISOString().slice(0, 10);
-    const todayIdx = weekInfo.dates.findIndex((d) => d.toISOString().slice(0, 10) === today);
+    const today = toDateKey(new Date());
+    const todayIdx = weekInfo.dates.findIndex((d) => toDateKey(d) === today);
     setSelectedDay(todayIdx >= 0 ? todayIdx : 1);
 
     setEntries(drafts);
@@ -429,35 +424,22 @@ function TimesheetEditor({
 
   const weekInfo = ts ? getWeekRange(ts.weekStart) : null;
   const weekDates = weekInfo?.dates ?? [];
+  const weekKey = weekDates.map(toDateKey).join(",");
 
-  // Group entries by day
-  const entriesByDay = useMemo(() => {
-    const groups: EntryDraft[][] = [[], [], [], [], [], [], []];
-    for (const entry of entries) {
-      if (!weekInfo) continue;
-      const idx = weekInfo.dates.findIndex(
-        (d) => d.toISOString().slice(0, 10) === entry.entryDate
-      );
-      if (idx >= 0) groups[idx].push(entry);
-      else groups[1].push(entry); // fallback to Monday
-    }
-    return groups;
-  }, [entries, weekInfo]);
+  // Group entries by day — drives the day tabs, the day header and the Weekly Summary cards.
+  const entriesByDay = useMemo(
+    () => groupEntriesByDay(entries, weekDates),
+    [entries, weekKey],
+  );
 
-  const dayTotals = useMemo(() => {
-    return entriesByDay.map((dayEntries) =>
-      dayEntries.reduce((sum, e) => sum + (parseFloat(e.hoursWorked) || 0), 0).toFixed(2)
-    );
-  }, [entriesByDay]);
+  const dayTotals = useMemo(() => computeDayTotals(entriesByDay), [entriesByDay]);
 
-  const totalHours = useMemo(() => {
-    return entries.reduce((sum, e) => sum + (parseFloat(e.hoursWorked) || 0), 0).toFixed(2);
-  }, [entries]);
+  const totalHours = useMemo(() => sumHours(entries).toFixed(2), [entries]);
 
   // Add entry for selected day
   const addEntryForDay = () => {
     if (!newEntry.hoursWorked && !newEntry.clientName && !newEntry.activities) return;
-    const dateStr = weekDates[selectedDay]?.toISOString().slice(0, 10) ?? ts!.weekStart;
+    const dateStr = weekDates[selectedDay] ? toDateKey(weekDates[selectedDay]) : ts!.weekStart;
     const draft: EntryDraft = {
       entryDate: dateStr,
       dayOfWeek: DAYS[selectedDay],
