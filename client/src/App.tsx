@@ -80,6 +80,8 @@ import MobilizationPortfolio from "@/pages/executive-os/mobilization-portfolio";
 import MobilizationDetail from "@/pages/executive-os/mobilization-detail";
 import ProjectSetupPortfolio from "@/pages/executive-os/project-setup-portfolio";
 import ProjectSetupDetail from "@/pages/executive-os/project-setup-detail";
+import PreConstructionPortfolio from "@/pages/executive-os/pre-construction-portfolio";
+import PreConstructionDetail from "@/pages/executive-os/pre-construction-detail";
 import InviteAcceptPage from "@/pages/invite-accept";
 import FieldHub from "@/pages/field/hub";
 import FieldDailyLog from "@/pages/field/daily-log";
@@ -125,6 +127,8 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/executive-os": ExecutiveOs,
   "/executive-os/project-setup": ProjectSetupPortfolio,
   "/executive-os/project-setup/:id": ProjectSetupDetail,
+  "/executive-os/pre-construction": PreConstructionPortfolio,
+  "/executive-os/pre-construction/:id": PreConstructionDetail,
   "/executive-os/mobilization": MobilizationPortfolio,
   "/executive-os/mobilization/:id": MobilizationDetail,
   "/field": FieldHub,

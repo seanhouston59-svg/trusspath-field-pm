@@ -218,8 +218,10 @@ function GenerateReportDialog({ projectId, seeded }: { projectId: number; seeded
   );
 }
 
-/** Warns when the upstream Project Setup module is incomplete. Never blocks —
- *  a PM can always mobilize; the banner just makes the cost visible. */
+/** Warns when an upstream module (Project Setup or Pre-Construction) is
+ *  incomplete. Never blocks — a PM can always mobilize; the banner just makes
+ *  the cost visible. The gate returns one flat warnings array with no source
+ *  attribution, so both upstream modules get a link rather than guessing. */
 function SetupGateBanner({ projectId }: { projectId: number | undefined }) {
   const { data: gate } = useMobilizationGate(projectId);
   if (!gate?.warnings.length) return null;
@@ -232,18 +234,26 @@ function SetupGateBanner({ projectId }: { projectId: number | undefined }) {
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-            Project Setup is not complete
+            Upstream work is not complete
           </p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-amber-700/90 dark:text-amber-300/90">
             {gate.warnings.map((w) => <li key={w}>{w}</li>)}
           </ul>
         </div>
-        <Link
-          href={`/executive-os/project-setup/${projectId}`}
-          className="shrink-0 whitespace-nowrap text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
-        >
-          View Project Setup →
-        </Link>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Link
+            href={`/executive-os/project-setup/${projectId}`}
+            className="whitespace-nowrap text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
+          >
+            View Project Setup →
+          </Link>
+          <Link
+            href={`/executive-os/pre-construction/${projectId}`}
+            className="whitespace-nowrap text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
+          >
+            View Pre-Construction →
+          </Link>
+        </div>
       </div>
     </div>
   );
