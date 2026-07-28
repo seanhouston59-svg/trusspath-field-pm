@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, CloudSun, Cloud, CloudFog, CloudRain, Snowflake, Sun, Wind, Users, ClipboardList, CheckCircle2, WifiOff, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { ArrowLeft, CloudSun, Cloud, CloudFog, CloudRain, Snowflake, Sun, Wind, Users, ClipboardList, CheckCircle2, WifiOff, Loader2, RefreshCw, AlertCircle, Sparkles } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useProjects, useProjectWeather, type DailyLogWeatherResponse } from "@/hooks/use-data";
 import { useAuth } from "@/lib/auth";
 import { queueRequest, subscribeQueue } from "@/lib/offline-queue";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { WORK_SUMMARY_TEMPLATES, WORK_SUMMARY_TRADES } from "@/lib/work-summary-catalog";
 
 /**
  * Mobile daily log — foreman-optimized quick entry.
@@ -76,6 +78,8 @@ export default function FieldDailyLog() {
   const [temp, setTemp] = useState<number>(70);
   const [crewCount, setCrewCount] = useState<number>(4);
   const [summary, setSummary] = useState("");
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templateTrade, setTemplateTrade] = useState<string>("General");
   const [submitting, setSubmitting] = useState(false);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [queueSize, setQueueSize] = useState(0);
@@ -323,7 +327,17 @@ export default function FieldDailyLog() {
 
           {/* Summary */}
           <div>
-            <Label className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">What got done</Label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <Label className="block text-xs font-semibold uppercase text-muted-foreground">What got done</Label>
+              <button
+                type="button"
+                onClick={() => setTemplatesOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                data-testid="field-log-templates-open"
+              >
+                <Sparkles className="size-3.5" /> Templates
+              </button>
+            </div>
             <Textarea
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
@@ -332,8 +346,88 @@ export default function FieldDailyLog() {
               data-testid="field-log-summary"
               className="text-base"
             />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Tip: pick a template to insert starter text, then fill in the bracketed bits.
+            </p>
           </div>
         </div>
+
+        {/* Work summary templates — mobile bottom sheet */}
+        <Sheet open={templatesOpen} onOpenChange={setTemplatesOpen}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl p-0">
+            <SheetHeader className="border-b border-border px-4 py-3 text-left">
+              <SheetTitle className="flex items-center gap-2 text-lg">
+                <Sparkles className="size-5 text-primary" /> Work summary templates
+              </SheetTitle>
+              <SheetDescription className="text-xs">
+                Tap one to insert. It replaces the current text.
+              </SheetDescription>
+            </SheetHeader>
+
+            {/* Trade filter tabs */}
+            <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
+              <div className="flex gap-1.5 overflow-x-auto">
+                {WORK_SUMMARY_TRADES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTemplateTrade(t)}
+                    className={cn(
+                      "shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                      templateTrade === t
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background hover:bg-accent",
+                    )}
+                    data-testid={`field-log-template-trade-${t.toLowerCase()}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Template list */}
+            <ul className="divide-y divide-border">
+              {WORK_SUMMARY_TEMPLATES.filter((t) => t.trade === templateTrade).map((t) => (
+                <li key={t.label}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSummary(t.text);
+                      setTemplatesOpen(false);
+                    }}
+                    className="flex w-full flex-col items-start gap-1 px-4 py-3 text-left hover:bg-accent"
+                    data-testid={`field-log-template-${t.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                  >
+                    <span className="text-sm font-semibold">{t.label}</span>
+                    <span className="line-clamp-2 text-xs text-muted-foreground">{t.text}</span>
+                  </button>
+                </li>
+              ))}
+              {WORK_SUMMARY_TEMPLATES.filter((t) => t.trade === templateTrade).length === 0 && (
+                <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  No templates in this category yet.
+                </li>
+              )}
+            </ul>
+
+            {summary.trim() && (
+              <div className="border-t border-border bg-muted/30 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Append instead of replace — useful when combining trades.
+                    // (Only shown when the box already has text.)
+                  }}
+                  className="hidden"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Tapping a template replaces the current text. Copy anything you’ve written before switching.
+                </p>
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
 
         {/* Sticky submit */}
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur">

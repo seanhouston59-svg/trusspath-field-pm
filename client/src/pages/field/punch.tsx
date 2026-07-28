@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, ClipboardList, Loader2, CheckCircle2, WifiOff, Circle, CheckCircle } from "lucide-react";
+import { ArrowLeft, ClipboardList, Loader2, CheckCircle2, WifiOff, Circle, CheckCircle, X } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { queueRequest, subscribeQueue } from "@/lib/offline-queue";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { PunchItem } from "@shared/schema";
+import { PUNCH_ITEM_TEMPLATES, tradeForItem } from "@/lib/punch-catalog";
 
 /**
  * Field punch item flow. Two things in one page:
@@ -29,6 +30,28 @@ const TRADES = [
   "Plumbing", "HVAC", "Paint", "Flooring", "Roofing",
 ];
 
+// Field-kit trades are a short list; the shared punch-catalog uses full-name
+// trades (e.g. "Steel — Structural"). Map catalog trades onto the tile list so
+// picking a template still selects a sensible tile.
+const FIELD_TRADE_MAP: Record<string, string> = {
+  "Framing — Steel": "Framing",
+  "Framing — Wood": "Framing",
+  "Carpentry — Rough": "Framing",
+  "Carpentry — Finish": "Framing",
+  "Steel — Structural": "Framing",
+  "Metals — Miscellaneous": "Framing",
+  "Painting": "Paint",
+  "Flooring — Resilient": "Flooring",
+  "Flooring — Carpet": "Flooring",
+  "Flooring — Tile": "Flooring",
+  "Flooring — Wood": "Flooring",
+};
+function mapToFieldTrade(catalogTrade: string): string {
+  if (!catalogTrade) return "";
+  if (TRADES.includes(catalogTrade)) return catalogTrade;
+  return FIELD_TRADE_MAP[catalogTrade] ?? "";
+}
+
 export default function FieldPunch() {
   const { data: projects = [] } = useProjects();
   const { toast } = useToast();
@@ -40,6 +63,8 @@ export default function FieldPunch() {
   }, []);
   const [projectId, setProjectId] = useState<number | null>(initialProjectId);
   const [title, setTitle] = useState("");
+  const [titleOpen, setTitleOpen] = useState(false);
+  const titleWrapRef = useRef<HTMLDivElement | null>(null);
   const [location, setLocation] = useState("");
   const [trade, setTrade] = useState("General");
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +85,35 @@ export default function FieldPunch() {
   useEffect(() => {
     if (projectId == null && projects.length > 0) setProjectId(projects[0].id);
   }, [projects, projectId]);
+
+  // Close the title suggestion list when tapping outside the wrapper (mobile
+  // keyboards don’t always fire blur reliably, so we listen to pointerdown).
+  useEffect(() => {
+    if (!titleOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (!titleWrapRef.current) return;
+      if (!titleWrapRef.current.contains(e.target as Node)) setTitleOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [titleOpen]);
+
+  // Filter title suggestions off the shared punch catalog. When the input is
+  // empty (but focused) show a curated first batch; otherwise substring-match.
+  const titleSuggestions = useMemo(() => {
+    const q = title.trim().toLowerCase();
+    const source = PUNCH_ITEM_TEMPLATES;
+    if (!q) return source.slice(0, 40);
+    return source.filter((t) => t.label.toLowerCase().includes(q)).slice(0, 40);
+  }, [title]);
+
+  const applyTitleSuggestion = (label: string) => {
+    setTitle(label);
+    const catalogTrade = tradeForItem(label);
+    const fieldTrade = mapToFieldTrade(catalogTrade);
+    if (fieldTrade && trade === "General") setTrade(fieldTrade);
+    setTitleOpen(false);
+  };
 
   useEffect(() => {
     if (projectId == null) return;
@@ -190,6 +244,7 @@ export default function FieldPunch() {
 
   const resetForm = () => {
     setTitle("");
+    setTitleOpen(false);
     setLocation("");
     setTrade("General");
   };
@@ -245,16 +300,67 @@ export default function FieldPunch() {
         {/* Add new */}
         <div className="mt-6 rounded-2xl border-2 border-border bg-card p-4">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Add item</h2>
-          <div>
-            <Label className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">Title</Label>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Paint touch-up on north wall"
-              className="h-12 text-base"
-              maxLength={200}
-              data-testid="field-punch-title"
-            />
+          <div ref={titleWrapRef} className="relative">
+            <Label className="mb-1.5 flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground">
+              <span>Title</span>
+              <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/70">
+                Type or pick a common item
+              </span>
+            </Label>
+            <div className="relative">
+              <Input
+                value={title}
+                onChange={(e) => { setTitle(e.target.value); setTitleOpen(true); }}
+                onFocus={() => setTitleOpen(true)}
+                placeholder="Paint touch-up on north wall"
+                className="h-12 pr-9 text-base"
+                maxLength={200}
+                data-testid="field-punch-title"
+                autoComplete="off"
+              />
+              {title && (
+                <button
+                  type="button"
+                  onClick={() => { setTitle(""); setTitleOpen(true); }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                  aria-label="Clear title"
+                  data-testid="field-punch-title-clear"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
+            {titleOpen && titleSuggestions.length > 0 && (
+              <div
+                className="mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-border bg-popover shadow-lg"
+                data-testid="field-punch-title-suggestions"
+                // Prevent tap-to-select from firing blur before onClick lands.
+                onPointerDown={(e) => e.preventDefault()}
+              >
+                <ul className="divide-y divide-border">
+                  {titleSuggestions.map((t) => (
+                    <li key={t.label}>
+                      <button
+                        type="button"
+                        onClick={() => applyTitleSuggestion(t.label)}
+                        className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent"
+                        data-testid={`field-punch-title-suggestion-${t.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                      >
+                        <span className="text-sm font-medium leading-snug">{t.label}</span>
+                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t.trade}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {titleOpen && titleSuggestions.length === 0 && title.trim() && (
+              <div className="mt-1.5 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                No matches. “<span className="font-semibold">{title}</span>” will be used as-is.
+              </div>
+            )}
           </div>
           <div className="mt-3">
             <Label className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">Location</Label>
