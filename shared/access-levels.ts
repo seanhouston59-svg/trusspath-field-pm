@@ -59,6 +59,8 @@ const R = {
   executiveOs: "/executive-os",
   executiveOsProjectSetup: "/executive-os/project-setup",
   executiveOsProjectSetupDetail: "/executive-os/project-setup/:id",
+  executiveOsPreConstruction: "/executive-os/pre-construction",
+  executiveOsPreConstructionDetail: "/executive-os/pre-construction/:id",
   executiveOsMobilization: "/executive-os/mobilization",
   executiveOsMobilizationDetail: "/executive-os/mobilization/:id",
   adminSignups: "/admin/signups",
