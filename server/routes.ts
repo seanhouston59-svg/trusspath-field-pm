@@ -2767,6 +2767,27 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ deleted: true });
   });
 
+  /**
+   * Portfolio rollup across every project + every lean module for the caller's
+   * org. Powers the Executive OS landing page's per-project health strip.
+   *
+   * Returns { projects, rollups } separately so the client can iterate every
+   * project even when it has zero lean-module activity yet (empty projects
+   * still deserve a card, they just render as "not started" across the strip).
+   */
+  app.get("/api/executive-os/lean-rollup", async (req: any, res) => {
+    const orgProjects = req.account?.role === "owner"
+      // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —
+      // the single OWNER_EMAIL admin account sees every tenant by design.
+      ? await storage.getProjects()
+      // Org-scoped: prevents a null-org account from reading every tenant's
+      // portfolio. `?? null` (not `?? undefined`) keeps this fail-closed.
+      : await storage.getProjects(req.organizationId ?? null);
+    const projectIds = orgProjects.map((p: Project) => p.id);
+    const rollups = await storage.getLeanModuleRollup(projectIds);
+    res.json({ projects: orgProjects, rollups });
+  });
+
   app.get("/api/executive-os/pre-construction", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
       // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —

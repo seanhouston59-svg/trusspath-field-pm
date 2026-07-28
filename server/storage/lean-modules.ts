@@ -10,7 +10,7 @@
  * rows can be migrated out of these two tables into the new schema and its
  * slug removed from LEAN_MODULES.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { leanModuleItems, leanModuleState } from "@shared/schema";
 import type {
   InsertLeanModuleItem,
@@ -136,6 +136,117 @@ export class LeanModulesRepo {
       )
       .returning();
     return rows[0] ?? null;
+  }
+
+  /**
+   * Portfolio rollup across every lean module for a set of projects.
+   *
+   * Returns one entry per (projectId, moduleId) that has *any* activity —
+   * either a state row or one or more items. This is intentional: an empty
+   * (project, module) pair does not consume a row here, so a 30-project org
+   * with only Safety filled in returns 30 rows, not 30 \u00d7 19 = 570.
+   *
+   * The client fills the missing pairs with a synthetic `not_started` shape.
+   * All shape decisions live on the client to keep the payload small; the DB
+   * only reports what actually exists.
+   */
+  async getRollupForProjects(projectIds: number[]): Promise<Array<{
+    projectId: number;
+    moduleId: string;
+    status: string;
+    ownerName: string | null;
+    targetCompleteDate: string | null;
+    updatedAt: string | null;
+    itemsTotal: number;
+    itemsOpen: number;
+    itemsOverdue: number;
+    itemsAtRisk: number;
+  }>> {
+    if (projectIds.length === 0) return [];
+    await ensureReady();
+
+    // 1) Every state row for these projects.
+    const stateRows = await db
+      .select()
+      .from(leanModuleState)
+      .where(inArray(leanModuleState.projectId, projectIds));
+
+    // 2) Every item row for these projects. We aggregate in JS rather than SQL
+    //    because we're already loading a small set (dozens \u00d7 dozens at worst)
+    //    and it keeps the query portable across the ORM without a raw \`sql\`
+    //    fragment for GROUP BY / COUNT / FILTER.
+    const itemRows = await db
+      .select({
+        projectId: leanModuleItems.projectId,
+        moduleId: leanModuleItems.moduleId,
+        status: leanModuleItems.status,
+        dueDate: leanModuleItems.dueDate,
+      })
+      .from(leanModuleItems)
+      .where(inArray(leanModuleItems.projectId, projectIds));
+
+    // Key each (project, module) pair.
+    type Bucket = {
+      projectId: number;
+      moduleId: string;
+      status: string;
+      ownerName: string | null;
+      targetCompleteDate: string | null;
+      updatedAt: string | null;
+      itemsTotal: number;
+      itemsOpen: number;
+      itemsOverdue: number;
+      itemsAtRisk: number;
+    };
+    const key = (p: number, m: string) => `${p}\u0000${m}`;
+    const buckets = new Map<string, Bucket>();
+
+    for (const s of stateRows) {
+      buckets.set(key(s.projectId, s.moduleId), {
+        projectId: s.projectId,
+        moduleId: s.moduleId,
+        status: s.status,
+        ownerName: s.ownerName,
+        targetCompleteDate: s.targetCompleteDate,
+        updatedAt: s.updatedAt ?? null,
+        itemsTotal: 0,
+        itemsOpen: 0,
+        itemsOverdue: 0,
+        itemsAtRisk: 0,
+      });
+    }
+
+    // ISO date compare works lexicographically for YYYY-MM-DD strings.
+    const today = new Date().toISOString().slice(0, 10);
+
+    for (const it of itemRows) {
+      const k = key(it.projectId, it.moduleId);
+      let b = buckets.get(k);
+      if (!b) {
+        // Items exist without a state row \u2014 shouldn't happen because
+        // createItem calls ensureState, but be robust for legacy data.
+        b = {
+          projectId: it.projectId,
+          moduleId: it.moduleId,
+          status: "not_started",
+          ownerName: null,
+          targetCompleteDate: null,
+          updatedAt: null,
+          itemsTotal: 0,
+          itemsOpen: 0,
+          itemsOverdue: 0,
+          itemsAtRisk: 0,
+        };
+        buckets.set(k, b);
+      }
+      b.itemsTotal += 1;
+      const isDone = it.status === "complete" || it.status === "n_a";
+      if (!isDone) b.itemsOpen += 1;
+      if (it.status === "at_risk") b.itemsAtRisk += 1;
+      if (!isDone && it.dueDate && it.dueDate < today) b.itemsOverdue += 1;
+    }
+
+    return Array.from(buckets.values());
   }
 
   async deleteItem(id: number, projectId: number, moduleId: string): Promise<boolean> {

@@ -217,6 +217,24 @@ export interface IStorage {
   createLeanModuleItem(data: InsertLeanModuleItem): Promise<LeanModuleItem>;
   updateLeanModuleItem(id: number, projectId: number, moduleId: string, patch: Partial<InsertLeanModuleItem>): Promise<LeanModuleItem | null>;
   deleteLeanModuleItem(id: number, projectId: number, moduleId: string): Promise<boolean>;
+  /**
+   * Bulk portfolio rollup. Returns one entry per (projectId, moduleId) that
+   * has activity. Routes filter `projectIds` to the caller's org first — this
+   * method is intentionally unaware of org scoping so it can be reused by any
+   * caller that already has authorization to see the projects it passes.
+   */
+  getLeanModuleRollup(projectIds: number[]): Promise<Array<{
+    projectId: number;
+    moduleId: string;
+    status: string;
+    ownerName: string | null;
+    targetCompleteDate: string | null;
+    updatedAt: string | null;
+    itemsTotal: number;
+    itemsOpen: number;
+    itemsOverdue: number;
+    itemsAtRisk: number;
+  }>>;
 
   getMessages(projectId: number): Promise<Message[]>;
   createMessage(data: InsertMessage): Promise<Message>;
