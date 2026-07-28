@@ -57,6 +57,8 @@ const R = {
   settings: "/settings",
   settingsTeam: "/settings/team",
   executiveOs: "/executive-os",
+  executiveOsMobilization: "/executive-os/mobilization",
+  executiveOsMobilizationDetail: "/executive-os/mobilization/:id",
   adminSignups: "/admin/signups",
   // Mobile field kit (PWA) routes
   field: "/field",
@@ -99,7 +101,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     order: 2,
     canManageTeam: true, canManageSettings: false, canManageIntegrations: true,
     canViewFinancials: true, canDelete: true, canCreateEdit: true, canResetData: false,
-    allowedRoutes: ALL.filter((r) => r !== R.settings && r !== R.settingsTeam && r !== R.adminSignups && r !== R.executiveOs),
+    allowedRoutes: ALL.filter((r) => r !== R.settings && r !== R.settingsTeam && r !== R.adminSignups && !r.startsWith(R.executiveOs)),
   },
   {
     slug: "superintendent",

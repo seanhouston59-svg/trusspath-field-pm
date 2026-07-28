@@ -699,6 +699,115 @@ export const timeEntries = pgTable("time_entries", {
   createdAt: text("created_at").notNull(),
 });
 
+/* ----------------------------- Mobilization ------------------------------ */
+// Executive OS > Mobilization. One plan per project; every other table hangs
+// off project_id directly so a tab can be queried without joining the plan.
+// The mobilization milestone timeline reuses the shared `milestones` table
+// with kind="mobilization" rather than duplicating a schedule table here.
+// Section names and default rows come from shared/mobilization-catalog.ts.
+
+export const mobilizationPlans = pgTable("mobilization_plans", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().unique(),
+  status: text("status").notNull().default("planning"), // planning | in_progress | complete
+  targetStartDate: text("target_start_date").notNull(),
+  startedAt: text("started_at"),
+  completedAt: text("completed_at"),
+  notes: text("notes"),
+});
+
+export const mobilizationItems = pgTable("mobilization_items", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  section: text("section").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  ownerId: integer("owner_id"), // team_members.id
+  targetDate: text("target_date"),
+  status: text("status").notNull().default("not_started"), // not_started | in_progress | done | na
+  completedAt: text("completed_at"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  notes: text("notes"),
+});
+
+export const mobilizationPermits = pgTable("mobilization_permits", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  name: text("name").notNull(),
+  agency: text("agency"),
+  permitNumber: text("permit_number"),
+  status: text("status").notNull().default("Not Started"), // Not Started | Applied | Approved | Rejected | Expired
+  appliedDate: text("applied_date"),
+  approvedDate: text("approved_date"),
+  expirationDate: text("expiration_date"),
+  notes: text("notes"),
+});
+
+export const mobilizationEquipment = pgTable("mobilization_equipment", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  name: text("name").notNull(),
+  vendor: text("vendor"),
+  arrivalDate: text("arrival_date"),
+  onSiteConfirmed: boolean("on_site_confirmed").notNull().default(false),
+  departureDate: text("departure_date"),
+  notes: text("notes"),
+});
+
+export const mobilizationUtilities = pgTable("mobilization_utilities", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  kind: text("kind").notNull(), // power | water | internet | wifi | cameras | security | lighting | hvac | other
+  provider: text("provider"),
+  requestedDate: text("requested_date"),
+  installedDate: text("installed_date"),
+  accountNumber: text("account_number"),
+  meterNumber: text("meter_number"),
+  notes: text("notes"),
+});
+
+// Staff onboarding is a join onto team_members — the person already exists in
+// the org roster, this row adds the per-project mobilization state.
+export const mobilizationStaff = pgTable("mobilization_staff", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  teamMemberId: integer("team_member_id").notNull(), // team_members.id
+  startDate: text("start_date"),
+  orientationDone: boolean("orientation_done").notNull().default(false),
+  drugTestDone: boolean("drug_test_done").notNull().default(false),
+  ppeIssued: boolean("ppe_issued").notNull().default(false),
+  notes: text("notes"),
+});
+
+// Subs are tracked standalone (not via contacts) because mobilization needs
+// compliance flags that only matter for the duration of onboarding.
+export const mobilizationSubs = pgTable("mobilization_subs", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  trade: text("trade").notNull(),
+  company: text("company").notNull(),
+  contactName: text("contact_name"),
+  phone: text("phone"),
+  email: text("email"),
+  insuranceOnFile: boolean("insurance_on_file").notNull().default(false),
+  w9OnFile: boolean("w9_on_file").notNull().default(false),
+  msaSigned: boolean("msa_signed").notNull().default(false),
+  onSiteDate: text("on_site_date"),
+  notes: text("notes"),
+});
+
+export const mobilizationRisks = pgTable("mobilization_risks", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  risk: text("risk").notNull(),
+  likelihood: text("likelihood").notNull().default("med"), // low | med | high
+  impact: text("impact").notNull().default("med"), // low | med | high
+  mitigation: text("mitigation"),
+  ownerId: integer("owner_id"), // team_members.id
+  status: text("status").notNull().default("open"), // open | monitoring | mitigated | closed
+  notes: text("notes"),
+});
+
 /* ------------------------------ Insert schemas -------------------------- */
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
@@ -725,6 +834,33 @@ export const insertJarvisMemorySchema = createInsertSchema(jarvisMemory).omit({ 
 export const insertTimesheetSchema = createInsertSchema(timesheets).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTimeEntrySchema = createInsertSchema(timeEntries).omit({ id: true, createdAt: true });
 export const insertMilestoneSchema = createInsertSchema(milestones).omit({ id: true });
+
+/* -------- Mobilization insert schemas + types -------- */
+export const insertMobilizationPlanSchema = createInsertSchema(mobilizationPlans).omit({ id: true });
+export const insertMobilizationItemSchema = createInsertSchema(mobilizationItems).omit({ id: true });
+export const insertMobilizationPermitSchema = createInsertSchema(mobilizationPermits).omit({ id: true });
+export const insertMobilizationEquipmentSchema = createInsertSchema(mobilizationEquipment).omit({ id: true });
+export const insertMobilizationUtilitySchema = createInsertSchema(mobilizationUtilities).omit({ id: true });
+export const insertMobilizationStaffSchema = createInsertSchema(mobilizationStaff).omit({ id: true });
+export const insertMobilizationSubSchema = createInsertSchema(mobilizationSubs).omit({ id: true });
+export const insertMobilizationRiskSchema = createInsertSchema(mobilizationRisks).omit({ id: true });
+
+export type MobilizationPlan = typeof mobilizationPlans.$inferSelect;
+export type InsertMobilizationPlan = typeof mobilizationPlans.$inferInsert;
+export type MobilizationItem = typeof mobilizationItems.$inferSelect;
+export type InsertMobilizationItem = typeof mobilizationItems.$inferInsert;
+export type MobilizationPermit = typeof mobilizationPermits.$inferSelect;
+export type InsertMobilizationPermit = typeof mobilizationPermits.$inferInsert;
+export type MobilizationEquipment = typeof mobilizationEquipment.$inferSelect;
+export type InsertMobilizationEquipment = typeof mobilizationEquipment.$inferInsert;
+export type MobilizationUtility = typeof mobilizationUtilities.$inferSelect;
+export type InsertMobilizationUtility = typeof mobilizationUtilities.$inferInsert;
+export type MobilizationStaff = typeof mobilizationStaff.$inferSelect;
+export type InsertMobilizationStaff = typeof mobilizationStaff.$inferInsert;
+export type MobilizationSub = typeof mobilizationSubs.$inferSelect;
+export type InsertMobilizationSub = typeof mobilizationSubs.$inferInsert;
+export type MobilizationRisk = typeof mobilizationRisks.$inferSelect;
+export type InsertMobilizationRisk = typeof mobilizationRisks.$inferInsert;
 export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
 export type AppSettingsRow = typeof appSettings.$inferSelect;
 

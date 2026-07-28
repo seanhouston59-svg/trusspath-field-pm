@@ -17,6 +17,9 @@ import {
   insertPunchItemSchema, insertContactSchema, insertEquipmentSchema, insertMaintenanceLogSchema,
   insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMessageSchema, insertNoteSchema, insertMilestoneSchema,
   insertTeamSchema,
+  insertMobilizationItemSchema, insertMobilizationPermitSchema, insertMobilizationEquipmentSchema,
+  insertMobilizationUtilitySchema, insertMobilizationStaffSchema, insertMobilizationSubSchema,
+  insertMobilizationRiskSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
   isAccountInGoodStanding, isSubscriptionActive, isDemoExpired,
@@ -24,6 +27,10 @@ import {
   type Project,
 } from "@shared/schema";
 import { EVENT_KINDS } from "@shared/project-event-kinds";
+import {
+  MOBILIZATION_SECTIONS, MOBILIZATION_MILESTONE_KIND, EARTHWORK_MILESTONE_TITLE,
+  computeHealth, daysUntil, pct,
+} from "@shared/mobilization-catalog";
 import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
 import {
   bootstrapOrganizationForAccount, bootstrapDemoOrgForAccount,
@@ -946,6 +953,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const parsed = insertProjectSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     const created = await storage.createProject(withOrg(req, parsed.data));
+    // Every new project starts with a mobilization plan: 15-section checklist,
+    // the standard permits, and the NTP-to-earthwork milestone timeline.
+    // Best-effort — a seeding failure must not fail the project create.
+    try {
+      await storage.seedMobilization(created.id, created.startDate);
+    } catch (e) {
+      console.error("[mobilization] seed failed for project", created.id, e);
+    }
     logEvent(req, {
       projectId: created.id,
       kind: EVENT_KINDS.PROJECT_CREATED,
@@ -1691,6 +1706,244 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.delete("/api/milestones/:id", async (req, res) => {
     await storage.softDeleteEntity("milestones", parseInt(req.params.id, 10));
     res.status(204).end();
+  });
+
+  /* ========================= Mobilization (Executive OS) =========================
+   * Every route is nested under /api/projects/:id/mobilization so access is
+   * gated by requireProjectAccess — there is no org-wide mobilization list
+   * except the portfolio rollup at the bottom, which derives its project set
+   * from the caller's org.
+   */
+
+  // Rolls a project's mobilization state into the numbers both the health
+  // endpoint and the portfolio cards render. Kept in one place so a project
+  // can never show a different % or colour in two views.
+  async function mobilizationRollup(projectId: number) {
+    const [plan, items, permits, equipmentRows, utilities, staff, subs, risks, allMilestones] = await Promise.all([
+      storage.getMobilizationPlan(projectId),
+      storage.getMobilizationItems(projectId),
+      storage.getMobilizationPermits(projectId),
+      storage.getMobilizationEquipment(projectId),
+      storage.getMobilizationUtilities(projectId),
+      storage.getMobilizationStaff(projectId),
+      storage.getMobilizationSubs(projectId),
+      storage.getMobilizationRisks(projectId),
+      storage.getMilestones(projectId),
+    ]);
+    const mobMilestones = allMilestones.filter((m) => m.kind === MOBILIZATION_MILESTONE_KIND);
+
+    // "na" items drop out of the denominator — marking something not-applicable
+    // should raise the percentage, not permanently cap it.
+    const countable = items.filter((i) => i.status !== "na");
+    const doneCount = countable.filter((i) => i.status === "done").length;
+    const overallPct = pct(doneCount, countable.length);
+
+    const sectionPct: Record<string, number> = {};
+    for (const section of MOBILIZATION_SECTIONS) {
+      const inSection = countable.filter((i) => i.section === section);
+      sectionPct[section] = pct(inSection.filter((i) => i.status === "done").length, inSection.length);
+    }
+
+    const approved = permits.filter((p) => p.status === "Approved").length;
+    const notStarted = permits.filter((p) => p.status === "Not Started").length;
+    const blocked = permits.filter((p) => p.status === "Rejected" || p.status === "Expired").length;
+    const permitStatus = { approved, pending: permits.length - approved - notStarted - blocked, notStarted, blocked, total: permits.length };
+
+    const earthwork = mobMilestones.find((m) => m.title === EARTHWORK_MILESTONE_TITLE);
+    const milestoneDaysToEarthwork = daysUntil(earthwork?.date);
+
+    return {
+      seeded: !!plan,
+      plan, items, permits, equipment: equipmentRows, utilities, staff, subs, risks,
+      milestones: mobMilestones,
+      overallPct,
+      sectionPct,
+      permitStatus,
+      equipmentOnSitePct: pct(equipmentRows.filter((e) => e.onSiteConfirmed).length, equipmentRows.length),
+      utilitiesInstalledPct: pct(utilities.filter((u) => !!u.installedDate).length, utilities.length),
+      staffOnboardedPct: pct(staff.filter((s) => s.orientationDone && s.drugTestDone && s.ppeIssued).length, staff.length),
+      subsReadyPct: pct(subs.filter((s) => s.insuranceOnFile && s.w9OnFile && s.msaSigned).length, subs.length),
+      risksOpen: risks.filter((r) => r.status === "open").length,
+      milestoneDaysToEarthwork,
+      health: computeHealth({ overallPct, hasBlockedPermit: blocked > 0, daysToEarthwork: milestoneDaysToEarthwork }),
+    };
+  }
+
+  // Full plan bundle for the detail page — one request feeds all eight tabs.
+  app.get("/api/projects/:id/mobilization", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const r = await mobilizationRollup(projectId);
+    res.json({
+      plan: r.plan ?? null, items: r.items, permits: r.permits, equipment: r.equipment,
+      utilities: r.utilities, staff: r.staff, subs: r.subs, risks: r.risks,
+      milestones: r.milestones, seeded: r.seeded,
+    });
+  });
+
+  app.get("/api/projects/:id/mobilization/health", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const r = await mobilizationRollup(projectId);
+    res.json({
+      overallPct: r.overallPct, sectionPct: r.sectionPct, permitStatus: r.permitStatus,
+      equipmentOnSitePct: r.equipmentOnSitePct, utilitiesInstalledPct: r.utilitiesInstalledPct,
+      staffOnboardedPct: r.staffOnboardedPct, subsReadyPct: r.subsReadyPct,
+      risksOpen: r.risksOpen, milestoneDaysToEarthwork: r.milestoneDaysToEarthwork,
+      health: r.health, seeded: r.seeded,
+    });
+  });
+
+  // Seed on demand — lets a project created before this module shipped get its
+  // checklist without a backfill migration. No-ops when a plan already exists.
+  app.post("/api/projects/:id/mobilization/seed", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const project = await requireProjectAccess(req, res, projectId);
+    if (!project) return;
+    await storage.seedMobilization(projectId, project.startDate);
+    res.status(201).json({ ok: true });
+  });
+
+  /**
+   * The six trackers (plus items) are structurally identical: list is served by
+   * the bundle route above, and each supports create / patch / delete scoped to
+   * the parent project. Registering them from one table keeps the six resources
+   * from drifting apart as fields get added. `onUpdate` is the hook for the two
+   * resources that emit Project Timeline events on a state transition.
+   */
+  const MOBILIZATION_RESOURCES: {
+    path: string;
+    schema: { safeParse: (v: unknown) => any };
+    create: (data: any) => Promise<any>;
+    update: (id: number, data: any) => Promise<any>;
+    remove: (id: number) => Promise<void>;
+    onUpdate?: (req: any, row: any, patch: any) => void;
+  }[] = [
+    {
+      path: "items", schema: insertMobilizationItemSchema,
+      create: storage.createMobilizationItem.bind(storage),
+      update: storage.updateMobilizationItem.bind(storage),
+      remove: storage.deleteMobilizationItem.bind(storage),
+      onUpdate: (req, row, patch) => {
+        if (patch.status !== "done") return;
+        logEvent(req, {
+          projectId: row.projectId,
+          kind: EVENT_KINDS.MOBILIZATION_ITEM_COMPLETED,
+          title: `Mobilization — ${row.title}`,
+          subtitle: row.section,
+          sourceType: "mobilization_item",
+          sourceId: row.id,
+          meta: { section: row.section },
+        });
+      },
+    },
+    {
+      path: "permits", schema: insertMobilizationPermitSchema,
+      create: storage.createMobilizationPermit.bind(storage),
+      update: storage.updateMobilizationPermit.bind(storage),
+      remove: storage.deleteMobilizationPermit.bind(storage),
+      onUpdate: (req, row, patch) => {
+        if (patch.status !== "Approved") return;
+        logEvent(req, {
+          projectId: row.projectId,
+          kind: EVENT_KINDS.MOBILIZATION_PERMIT_APPROVED,
+          title: `Permit approved — ${row.name}`,
+          subtitle: row.agency ?? null,
+          sourceType: "mobilization_permit",
+          sourceId: row.id,
+          meta: { permitNumber: row.permitNumber, agency: row.agency },
+        });
+      },
+    },
+    {
+      path: "equipment", schema: insertMobilizationEquipmentSchema,
+      create: storage.createMobilizationEquipment.bind(storage),
+      update: storage.updateMobilizationEquipment.bind(storage),
+      remove: storage.deleteMobilizationEquipment.bind(storage),
+    },
+    {
+      path: "utilities", schema: insertMobilizationUtilitySchema,
+      create: storage.createMobilizationUtility.bind(storage),
+      update: storage.updateMobilizationUtility.bind(storage),
+      remove: storage.deleteMobilizationUtility.bind(storage),
+    },
+    {
+      path: "staff", schema: insertMobilizationStaffSchema,
+      create: storage.createMobilizationStaff.bind(storage),
+      update: storage.updateMobilizationStaff.bind(storage),
+      remove: storage.deleteMobilizationStaff.bind(storage),
+    },
+    {
+      path: "subs", schema: insertMobilizationSubSchema,
+      create: storage.createMobilizationSub.bind(storage),
+      update: storage.updateMobilizationSub.bind(storage),
+      remove: storage.deleteMobilizationSub.bind(storage),
+    },
+    {
+      path: "risks", schema: insertMobilizationRiskSchema,
+      create: storage.createMobilizationRisk.bind(storage),
+      update: storage.updateMobilizationRisk.bind(storage),
+      remove: storage.deleteMobilizationRisk.bind(storage),
+    },
+  ];
+
+  for (const resource of MOBILIZATION_RESOURCES) {
+    app.post(`/api/projects/:id/mobilization/${resource.path}`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      // projectId always comes from the URL — a body value would let a caller
+      // write into a project they can't see.
+      const parsed = resource.schema.safeParse({ ...(req.body ?? {}), projectId });
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+      const created = await resource.create(parsed.data as any);
+      res.status(201).json(created);
+    });
+
+    app.patch(`/api/projects/:id/mobilization/${resource.path}/:rowId`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const rowId = parseInt(req.params.rowId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      const { projectId: _ignored, id: _id, ...patch } = req.body ?? {};
+      const updated = await resource.update(rowId, patch);
+      if (!updated || updated.projectId !== projectId) return res.status(404).json({ message: "Not found" });
+      resource.onUpdate?.(req, updated, patch);
+      res.json(updated);
+    });
+
+    app.delete(`/api/projects/:id/mobilization/${resource.path}/:rowId`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const rowId = parseInt(req.params.rowId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      await resource.remove(rowId);
+      res.status(204).end();
+    });
+  }
+
+  // Portfolio rollup across every project the caller can see.
+  app.get("/api/executive-os/mobilization", async (req: any, res) => {
+    const orgProjects = req.account?.role === "owner"
+      ? await storage.getProjects()
+      : await storage.getProjects(req.organizationId ?? undefined);
+    const rows = await Promise.all(orgProjects.map(async (p: Project) => {
+      const r = await mobilizationRollup(p.id);
+      return {
+        projectId: p.id,
+        projectName: p.name,
+        seeded: r.seeded,
+        overallPct: r.overallPct,
+        health: r.health,
+        daysToEarthwork: r.milestoneDaysToEarthwork,
+        permitStatus: r.permitStatus,
+        risksOpen: r.risksOpen,
+      };
+    }));
+    res.json(rows);
   });
 
   // Drone capture file upload (multipart: metadata + image in one request)

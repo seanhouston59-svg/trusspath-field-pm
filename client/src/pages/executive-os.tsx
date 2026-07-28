@@ -1,6 +1,7 @@
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Rocket, ChevronRight } from "lucide-react";
 
 /**
  * Executive OS \u2014 placeholder landing.
@@ -27,11 +28,28 @@ export default function ExecutiveOs() {
               </p>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <Link
+              href="/executive-os/mobilization"
+              className="group flex items-center gap-4 rounded-lg border border-primary/30 bg-background p-4 shadow-sm transition-colors hover:border-primary hover:bg-primary/5"
+              data-testid="exec-os-mobilization-link"
+            >
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                <Rocket className="size-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-base font-bold">Mobilization</div>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Readiness across every project \u2014 checklist, permits, equipment,
+                  utilities, onboarding, milestones, and risks from Notice to
+                  Proceed through the first day of earthwork.
+                </p>
+              </div>
+              <ChevronRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </Link>
+
             <div className="rounded-md border border-dashed border-primary/30 bg-background/60 p-4 text-sm text-muted-foreground">
-              Coming soon. Modules will be added here as they\u2019re built \u2014
-              start with portfolio dashboards, then financial rollups and
-              board packets.
+              More modules coming soon \u2014 financial rollups and board packets are next.
             </div>
           </CardContent>
         </Card>

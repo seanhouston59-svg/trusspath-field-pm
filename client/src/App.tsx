@@ -76,6 +76,8 @@ import Cpm from "@/pages/cpm";
 import Paywall from "@/pages/paywall";
 import TeamSettingsPage from "@/pages/team-settings";
 import ExecutiveOs from "@/pages/executive-os";
+import MobilizationPortfolio from "@/pages/executive-os/mobilization-portfolio";
+import MobilizationDetail from "@/pages/executive-os/mobilization-detail";
 import InviteAcceptPage from "@/pages/invite-accept";
 import FieldHub from "@/pages/field/hub";
 import FieldDailyLog from "@/pages/field/daily-log";
@@ -119,6 +121,8 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/settings": SettingsPage,
   "/settings/team": TeamSettingsPage,
   "/executive-os": ExecutiveOs,
+  "/executive-os/mobilization": MobilizationPortfolio,
+  "/executive-os/mobilization/:id": MobilizationDetail,
   "/field": FieldHub,
   "/field/daily-log": FieldDailyLog,
   "/field/timecard": FieldTimecard,

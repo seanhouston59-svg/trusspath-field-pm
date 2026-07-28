@@ -12,6 +12,8 @@ import {
   fieldPunches,
   fieldObservations,
   projectEvents,
+  mobilizationPlans, mobilizationItems, mobilizationPermits, mobilizationEquipment,
+  mobilizationUtilities, mobilizationStaff, mobilizationSubs, mobilizationRisks,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -33,7 +35,19 @@ import type {
   FieldPunch, InsertFieldPunch,
   FieldObservation, InsertFieldObservation,
   ProjectEvent, InsertProjectEvent,
+  MobilizationPlan, InsertMobilizationPlan,
+  MobilizationItem, InsertMobilizationItem,
+  MobilizationPermit, InsertMobilizationPermit,
+  MobilizationEquipment, InsertMobilizationEquipment,
+  MobilizationUtility, InsertMobilizationUtility,
+  MobilizationStaff, InsertMobilizationStaff,
+  MobilizationSub, InsertMobilizationSub,
+  MobilizationRisk, InsertMobilizationRisk,
 } from '@shared/schema';
+import {
+  MOBILIZATION_SECTIONS, DEFAULT_MOBILIZATION_ITEMS, DEFAULT_PERMITS,
+  DEFAULT_MILESTONE_OFFSETS, MOBILIZATION_MILESTONE_KIND, addDays,
+} from '@shared/mobilization-catalog';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, desc, and, isNotNull, gte, lt } from "drizzle-orm";
@@ -375,6 +389,101 @@ async function migrate() {
     activities TEXT,
     created_at TEXT NOT NULL
   )`;
+
+  // Mobilization (Executive OS). One plan per project; the rest hang off
+  // project_id. Timeline rows live in `milestones` with kind='mobilization'.
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_plans (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'planning',
+    target_start_date TEXT NOT NULL,
+    started_at TEXT,
+    completed_at TEXT,
+    notes TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_items (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    section TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    owner_id INTEGER,
+    target_date TEXT,
+    status TEXT NOT NULL DEFAULT 'not_started',
+    completed_at TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    notes TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_permits (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    agency TEXT,
+    permit_number TEXT,
+    status TEXT NOT NULL DEFAULT 'Not Started',
+    applied_date TEXT,
+    approved_date TEXT,
+    expiration_date TEXT,
+    notes TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_equipment (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    vendor TEXT,
+    arrival_date TEXT,
+    on_site_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    departure_date TEXT,
+    notes TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_utilities (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    provider TEXT,
+    requested_date TEXT,
+    installed_date TEXT,
+    account_number TEXT,
+    meter_number TEXT,
+    notes TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_staff (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    team_member_id INTEGER NOT NULL,
+    start_date TEXT,
+    orientation_done BOOLEAN NOT NULL DEFAULT FALSE,
+    drug_test_done BOOLEAN NOT NULL DEFAULT FALSE,
+    ppe_issued BOOLEAN NOT NULL DEFAULT FALSE,
+    notes TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_subs (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    trade TEXT NOT NULL,
+    company TEXT NOT NULL,
+    contact_name TEXT,
+    phone TEXT,
+    email TEXT,
+    insurance_on_file BOOLEAN NOT NULL DEFAULT FALSE,
+    w9_on_file BOOLEAN NOT NULL DEFAULT FALSE,
+    msa_signed BOOLEAN NOT NULL DEFAULT FALSE,
+    on_site_date TEXT,
+    notes TEXT
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_risks (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    risk TEXT NOT NULL,
+    likelihood TEXT NOT NULL DEFAULT 'med',
+    impact TEXT NOT NULL DEFAULT 'med',
+    mitigation TEXT,
+    owner_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'open',
+    notes TEXT
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS mobilization_items_project_idx ON mobilization_items (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS mobilization_permits_project_idx ON mobilization_permits (project_id)`;
 
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
@@ -749,6 +858,40 @@ export interface IStorage {
   createMilestone(data: InsertMilestone): Promise<Milestone>;
   updateMilestone(id: number, data: Partial<InsertMilestone>): Promise<Milestone | undefined>;
   deleteMilestone(id: number): Promise<void>;
+
+  // ----- Mobilization (Executive OS) -----
+  seedMobilization(projectId: number, startDate?: string | null): Promise<void>;
+  getMobilizationPlan(projectId: number): Promise<MobilizationPlan | undefined>;
+  upsertMobilizationPlan(projectId: number, data: Partial<InsertMobilizationPlan>): Promise<MobilizationPlan>;
+  getMobilizationItems(projectId: number): Promise<MobilizationItem[]>;
+  createMobilizationItem(data: InsertMobilizationItem): Promise<MobilizationItem>;
+  updateMobilizationItem(id: number, data: Partial<InsertMobilizationItem>): Promise<MobilizationItem | undefined>;
+  deleteMobilizationItem(id: number): Promise<void>;
+  getMobilizationPermits(projectId: number): Promise<MobilizationPermit[]>;
+  createMobilizationPermit(data: InsertMobilizationPermit): Promise<MobilizationPermit>;
+  updateMobilizationPermit(id: number, data: Partial<InsertMobilizationPermit>): Promise<MobilizationPermit | undefined>;
+  deleteMobilizationPermit(id: number): Promise<void>;
+  getMobilizationEquipment(projectId: number): Promise<MobilizationEquipment[]>;
+  createMobilizationEquipment(data: InsertMobilizationEquipment): Promise<MobilizationEquipment>;
+  updateMobilizationEquipment(id: number, data: Partial<InsertMobilizationEquipment>): Promise<MobilizationEquipment | undefined>;
+  deleteMobilizationEquipment(id: number): Promise<void>;
+  getMobilizationUtilities(projectId: number): Promise<MobilizationUtility[]>;
+  createMobilizationUtility(data: InsertMobilizationUtility): Promise<MobilizationUtility>;
+  updateMobilizationUtility(id: number, data: Partial<InsertMobilizationUtility>): Promise<MobilizationUtility | undefined>;
+  deleteMobilizationUtility(id: number): Promise<void>;
+  getMobilizationStaff(projectId: number): Promise<MobilizationStaff[]>;
+  createMobilizationStaff(data: InsertMobilizationStaff): Promise<MobilizationStaff>;
+  updateMobilizationStaff(id: number, data: Partial<InsertMobilizationStaff>): Promise<MobilizationStaff | undefined>;
+  deleteMobilizationStaff(id: number): Promise<void>;
+  getMobilizationSubs(projectId: number): Promise<MobilizationSub[]>;
+  createMobilizationSub(data: InsertMobilizationSub): Promise<MobilizationSub>;
+  updateMobilizationSub(id: number, data: Partial<InsertMobilizationSub>): Promise<MobilizationSub | undefined>;
+  deleteMobilizationSub(id: number): Promise<void>;
+  getMobilizationRisks(projectId: number): Promise<MobilizationRisk[]>;
+  createMobilizationRisk(data: InsertMobilizationRisk): Promise<MobilizationRisk>;
+  updateMobilizationRisk(id: number, data: Partial<InsertMobilizationRisk>): Promise<MobilizationRisk | undefined>;
+  deleteMobilizationRisk(id: number): Promise<void>;
+
   getMessages(projectId: number): Promise<Message[]>;
   createMessage(data: InsertMessage): Promise<Message>;
   getNotes(projectId?: number): Promise<Note[]>;
@@ -1286,6 +1429,219 @@ class DatabaseStorage implements IStorage {
     await ensureReady();
     await db.delete(milestones).where(eq(milestones.id, id));
   }
+
+  /* --------------------------- Mobilization --------------------------- */
+  // Seeds a fresh project's mobilization plan: the plan row, the full
+  // 15-section checklist, the 7 standard permits, and the milestone timeline.
+  // Equipment/utilities/subs/risks are intentionally NOT seeded — those are
+  // project-specific and get added by hand. Idempotent: bails if a plan
+  // already exists, so a retried project create can't double-seed.
+  async seedMobilization(projectId: number, startDate?: string | null): Promise<void> {
+    await ensureReady();
+    const existing = await this.getMobilizationPlan(projectId);
+    if (existing) return;
+
+    const target = addDays(startDate, 0);
+    await db.insert(mobilizationPlans).values({
+      projectId,
+      status: "planning",
+      targetStartDate: target,
+    });
+
+    const items: InsertMobilizationItem[] = [];
+    MOBILIZATION_SECTIONS.forEach((section) => {
+      DEFAULT_MOBILIZATION_ITEMS[section].forEach((item, i) => {
+        items.push({
+          projectId,
+          section,
+          title: item.title,
+          description: item.description ?? null,
+          status: "not_started",
+          sortOrder: i,
+        });
+      });
+    });
+    if (items.length > 0) await db.insert(mobilizationItems).values(items);
+
+    await db.insert(mobilizationPermits).values(
+      DEFAULT_PERMITS.map((p) => ({
+        projectId,
+        name: p.name,
+        agency: p.agency,
+        status: "Not Started" as const,
+      })),
+    );
+
+    await db.insert(milestones).values(
+      DEFAULT_MILESTONE_OFFSETS.map((m) => ({
+        projectId,
+        title: m.title,
+        date: addDays(startDate, m.dayOffset),
+        kind: MOBILIZATION_MILESTONE_KIND,
+        status: "pending",
+      })),
+    );
+  }
+
+  async getMobilizationPlan(projectId: number): Promise<MobilizationPlan | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(mobilizationPlans).where(eq(mobilizationPlans.projectId, projectId));
+    return rows[0];
+  }
+  async upsertMobilizationPlan(projectId: number, data: Partial<InsertMobilizationPlan>): Promise<MobilizationPlan> {
+    await ensureReady();
+    const existing = await this.getMobilizationPlan(projectId);
+    if (!existing) {
+      const [row] = await db.insert(mobilizationPlans).values({
+        projectId,
+        status: data.status ?? "planning",
+        targetStartDate: data.targetStartDate ?? addDays(null, 0),
+        startedAt: data.startedAt ?? null,
+        completedAt: data.completedAt ?? null,
+        notes: data.notes ?? null,
+      }).returning();
+      return row;
+    }
+    const { projectId: _ignored, ...patch } = data;
+    if (Object.keys(patch).length === 0) return existing;
+    const [row] = await db.update(mobilizationPlans).set(patch)
+      .where(eq(mobilizationPlans.projectId, projectId)).returning();
+    return row;
+  }
+
+  async getMobilizationItems(projectId: number): Promise<MobilizationItem[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationItems).where(eq(mobilizationItems.projectId, projectId));
+  }
+  async createMobilizationItem(data: InsertMobilizationItem): Promise<MobilizationItem> {
+    await ensureReady();
+    const [row] = await db.insert(mobilizationItems).values(data).returning();
+    return row;
+  }
+  async updateMobilizationItem(id: number, data: Partial<InsertMobilizationItem>): Promise<MobilizationItem | undefined> {
+    await ensureReady();
+    const [row] = await db.update(mobilizationItems).set(data).where(eq(mobilizationItems.id, id)).returning();
+    return row;
+  }
+  async deleteMobilizationItem(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(mobilizationItems).where(eq(mobilizationItems.id, id));
+  }
+
+  async getMobilizationPermits(projectId: number): Promise<MobilizationPermit[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationPermits).where(eq(mobilizationPermits.projectId, projectId));
+  }
+  async createMobilizationPermit(data: InsertMobilizationPermit): Promise<MobilizationPermit> {
+    await ensureReady();
+    const [row] = await db.insert(mobilizationPermits).values(data).returning();
+    return row;
+  }
+  async updateMobilizationPermit(id: number, data: Partial<InsertMobilizationPermit>): Promise<MobilizationPermit | undefined> {
+    await ensureReady();
+    const [row] = await db.update(mobilizationPermits).set(data).where(eq(mobilizationPermits.id, id)).returning();
+    return row;
+  }
+  async deleteMobilizationPermit(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(mobilizationPermits).where(eq(mobilizationPermits.id, id));
+  }
+
+  async getMobilizationEquipment(projectId: number): Promise<MobilizationEquipment[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationEquipment).where(eq(mobilizationEquipment.projectId, projectId));
+  }
+  async createMobilizationEquipment(data: InsertMobilizationEquipment): Promise<MobilizationEquipment> {
+    await ensureReady();
+    const [row] = await db.insert(mobilizationEquipment).values(data).returning();
+    return row;
+  }
+  async updateMobilizationEquipment(id: number, data: Partial<InsertMobilizationEquipment>): Promise<MobilizationEquipment | undefined> {
+    await ensureReady();
+    const [row] = await db.update(mobilizationEquipment).set(data).where(eq(mobilizationEquipment.id, id)).returning();
+    return row;
+  }
+  async deleteMobilizationEquipment(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(mobilizationEquipment).where(eq(mobilizationEquipment.id, id));
+  }
+
+  async getMobilizationUtilities(projectId: number): Promise<MobilizationUtility[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationUtilities).where(eq(mobilizationUtilities.projectId, projectId));
+  }
+  async createMobilizationUtility(data: InsertMobilizationUtility): Promise<MobilizationUtility> {
+    await ensureReady();
+    const [row] = await db.insert(mobilizationUtilities).values(data).returning();
+    return row;
+  }
+  async updateMobilizationUtility(id: number, data: Partial<InsertMobilizationUtility>): Promise<MobilizationUtility | undefined> {
+    await ensureReady();
+    const [row] = await db.update(mobilizationUtilities).set(data).where(eq(mobilizationUtilities.id, id)).returning();
+    return row;
+  }
+  async deleteMobilizationUtility(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(mobilizationUtilities).where(eq(mobilizationUtilities.id, id));
+  }
+
+  async getMobilizationStaff(projectId: number): Promise<MobilizationStaff[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationStaff).where(eq(mobilizationStaff.projectId, projectId));
+  }
+  async createMobilizationStaff(data: InsertMobilizationStaff): Promise<MobilizationStaff> {
+    await ensureReady();
+    const [row] = await db.insert(mobilizationStaff).values(data).returning();
+    return row;
+  }
+  async updateMobilizationStaff(id: number, data: Partial<InsertMobilizationStaff>): Promise<MobilizationStaff | undefined> {
+    await ensureReady();
+    const [row] = await db.update(mobilizationStaff).set(data).where(eq(mobilizationStaff.id, id)).returning();
+    return row;
+  }
+  async deleteMobilizationStaff(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(mobilizationStaff).where(eq(mobilizationStaff.id, id));
+  }
+
+  async getMobilizationSubs(projectId: number): Promise<MobilizationSub[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationSubs).where(eq(mobilizationSubs.projectId, projectId));
+  }
+  async createMobilizationSub(data: InsertMobilizationSub): Promise<MobilizationSub> {
+    await ensureReady();
+    const [row] = await db.insert(mobilizationSubs).values(data).returning();
+    return row;
+  }
+  async updateMobilizationSub(id: number, data: Partial<InsertMobilizationSub>): Promise<MobilizationSub | undefined> {
+    await ensureReady();
+    const [row] = await db.update(mobilizationSubs).set(data).where(eq(mobilizationSubs.id, id)).returning();
+    return row;
+  }
+  async deleteMobilizationSub(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(mobilizationSubs).where(eq(mobilizationSubs.id, id));
+  }
+
+  async getMobilizationRisks(projectId: number): Promise<MobilizationRisk[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationRisks).where(eq(mobilizationRisks.projectId, projectId));
+  }
+  async createMobilizationRisk(data: InsertMobilizationRisk): Promise<MobilizationRisk> {
+    await ensureReady();
+    const [row] = await db.insert(mobilizationRisks).values(data).returning();
+    return row;
+  }
+  async updateMobilizationRisk(id: number, data: Partial<InsertMobilizationRisk>): Promise<MobilizationRisk | undefined> {
+    await ensureReady();
+    const [row] = await db.update(mobilizationRisks).set(data).where(eq(mobilizationRisks.id, id)).returning();
+    return row;
+  }
+  async deleteMobilizationRisk(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(mobilizationRisks).where(eq(mobilizationRisks.id, id));
+  }
+
   async getMessages(projectId: number): Promise<Message[]> {
     await ensureReady();
     return await db.select().from(messages).where(eq(messages.projectId, projectId));

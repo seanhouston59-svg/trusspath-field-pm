@@ -1,0 +1,262 @@
+import { useState } from "react";
+import { Link, useRoute } from "wouter";
+import { ArrowLeft, Rocket } from "lucide-react";
+import { Layout } from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar } from "@/components/bits";
+import {
+  ProgressRing, HealthChip, PermitStatusBadge, YesNoBadge, EmptyState,
+} from "@/components/mobilization/bits";
+import { TrackerTab, type TrackerField } from "@/components/mobilization/tracker-tab";
+import { ChecklistTab } from "@/components/mobilization/checklist-tab";
+import { DashboardTab } from "@/components/mobilization/dashboard-tab";
+import { TimelineTab } from "@/components/mobilization/timeline-tab";
+import { useProject, useTeam } from "@/hooks/use-data";
+import { useMobilization, useMobilizationHealth, useSeedMobilization } from "@/hooks/use-mobilization";
+import {
+  PERMIT_STATUSES, UTILITY_KINDS, UTILITY_KIND_LABELS, RISK_SCALES, RISK_STATUSES,
+} from "@shared/mobilization-catalog";
+import type {
+  MobilizationPermit, MobilizationEquipment, MobilizationUtility,
+  MobilizationStaff, MobilizationSub, MobilizationRisk, TeamMember,
+} from "@shared/schema";
+
+const TABS = [
+  { value: "dashboard", label: "Dashboard" },
+  { value: "checklist", label: "Checklist" },
+  { value: "permits", label: "Permits" },
+  { value: "equipment", label: "Equipment" },
+  { value: "utilities", label: "Utilities" },
+  { value: "staff", label: "Staff & Subs" },
+  { value: "timeline", label: "Timeline" },
+  { value: "risks", label: "Risks" },
+];
+
+const permitFields: TrackerField<MobilizationPermit>[] = [
+  { key: "name", label: "Permit", type: "text", required: true },
+  { key: "agency", label: "Agency", type: "text" },
+  { key: "permitNumber", label: "Number", type: "text" },
+  { key: "status", label: "Status", type: "select", options: PERMIT_STATUSES, required: true, cell: (r) => <PermitStatusBadge status={r.status} /> },
+  { key: "appliedDate", label: "Applied", type: "date" },
+  { key: "approvedDate", label: "Approved", type: "date" },
+  { key: "expirationDate", label: "Expires", type: "date" },
+  { key: "notes", label: "Notes", type: "textarea", hideInTable: true },
+];
+
+const equipmentFields: TrackerField<MobilizationEquipment>[] = [
+  { key: "name", label: "Equipment", type: "text", required: true },
+  { key: "vendor", label: "Vendor", type: "text" },
+  { key: "arrivalDate", label: "Arrival", type: "date" },
+  { key: "onSiteConfirmed", label: "On site confirmed", type: "bool", cell: (r) => <YesNoBadge value={r.onSiteConfirmed} /> },
+  { key: "departureDate", label: "Departure", type: "date" },
+  { key: "notes", label: "Notes", type: "textarea", hideInTable: true },
+];
+
+const utilityFields: TrackerField<MobilizationUtility>[] = [
+  {
+    key: "kind", label: "Utility", type: "select", options: UTILITY_KINDS, required: true,
+    cell: (r) => UTILITY_KIND_LABELS[r.kind as keyof typeof UTILITY_KIND_LABELS] ?? r.kind,
+  },
+  { key: "provider", label: "Provider", type: "text" },
+  { key: "requestedDate", label: "Requested", type: "date" },
+  { key: "installedDate", label: "Installed", type: "date" },
+  { key: "accountNumber", label: "Account #", type: "text" },
+  { key: "meterNumber", label: "Meter #", type: "text" },
+  { key: "notes", label: "Notes", type: "textarea", hideInTable: true },
+];
+
+const subFields: TrackerField<MobilizationSub>[] = [
+  { key: "trade", label: "Trade", type: "text", required: true },
+  { key: "company", label: "Company", type: "text", required: true },
+  { key: "contactName", label: "Contact", type: "text" },
+  { key: "phone", label: "Phone", type: "text" },
+  { key: "email", label: "Email", type: "text", hideInTable: true },
+  { key: "insuranceOnFile", label: "Insurance", type: "bool", cell: (r) => <YesNoBadge value={r.insuranceOnFile} /> },
+  { key: "w9OnFile", label: "W-9", type: "bool", cell: (r) => <YesNoBadge value={r.w9OnFile} /> },
+  { key: "msaSigned", label: "MSA", type: "bool", cell: (r) => <YesNoBadge value={r.msaSigned} /> },
+  { key: "onSiteDate", label: "On site", type: "date" },
+  { key: "notes", label: "Notes", type: "textarea", hideInTable: true },
+];
+
+function staffFields(team: TeamMember[], teamMap: Map<number, TeamMember>): TrackerField<MobilizationStaff>[] {
+  return [
+    {
+      key: "teamMemberId", label: "Team member", type: "select", required: true, numeric: true,
+      choices: team.map((m) => ({ value: String(m.id), label: `${m.name} — ${m.role}` })),
+      cell: (r) => {
+        const m = teamMap.get(r.teamMemberId);
+        return m
+          ? <span className="flex items-center gap-2"><Avatar initials={m.initials} color={m.color} size={22} />{m.name}</span>
+          : `#${r.teamMemberId}`;
+      },
+    },
+    { key: "startDate", label: "Start date", type: "date" },
+    { key: "orientationDone", label: "Orientation", type: "bool", cell: (r) => <YesNoBadge value={r.orientationDone} /> },
+    { key: "drugTestDone", label: "Drug test", type: "bool", cell: (r) => <YesNoBadge value={r.drugTestDone} /> },
+    { key: "ppeIssued", label: "PPE issued", type: "bool", cell: (r) => <YesNoBadge value={r.ppeIssued} /> },
+    { key: "notes", label: "Notes", type: "textarea", hideInTable: true },
+  ];
+}
+
+function riskFields(team: TeamMember[], teamMap: Map<number, TeamMember>): TrackerField<MobilizationRisk>[] {
+  return [
+    { key: "risk", label: "Risk", type: "textarea", required: true },
+    { key: "likelihood", label: "Likelihood", type: "select", options: RISK_SCALES, required: true },
+    { key: "impact", label: "Impact", type: "select", options: RISK_SCALES, required: true },
+    { key: "mitigation", label: "Mitigation", type: "textarea" },
+    {
+      key: "ownerId", label: "Owner", type: "select", numeric: true,
+      choices: team.map((m) => ({ value: String(m.id), label: m.name })),
+      cell: (r) => (r.ownerId ? teamMap.get(r.ownerId)?.name ?? `#${r.ownerId}` : "—"),
+    },
+    { key: "status", label: "Status", type: "select", options: RISK_STATUSES, required: true },
+    { key: "notes", label: "Notes", type: "textarea", hideInTable: true },
+  ];
+}
+
+export default function MobilizationDetail() {
+  const [, params] = useRoute("/executive-os/mobilization/:id");
+  const projectId = params?.id ? parseInt(params.id, 10) : undefined;
+  const [tab, setTab] = useState("dashboard");
+
+  const { data: project } = useProject(projectId);
+  const { data: team = [] } = useTeam();
+  const { data: bundle, isLoading } = useMobilization(projectId);
+  const { data: health } = useMobilizationHealth(projectId);
+  const seed = useSeedMobilization(projectId);
+
+  const teamMap = new Map(team.map((m) => [m.id, m]));
+
+  return (
+    <Layout title="Mobilization">
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <Link href="/executive-os/mobilization" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" /> All projects
+        </Link>
+
+        <div className="sticky top-0 z-20 -mx-4 mb-4 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
+          <div className="flex items-center gap-4">
+            {health
+              ? <ProgressRing value={health.overallPct} tone={health.health} />
+              : <Skeleton className="size-16 rounded-full" />}
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Rocket className="size-4 shrink-0 text-primary" />
+                <h1 className="truncate font-display text-lg font-bold">{project?.name ?? "Project"}</h1>
+                {health && bundle?.seeded && <HealthChip tone={health.health} />}
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {project?.address ?? "Mobilization readiness"}
+                {health?.milestoneDaysToEarthwork !== null && health?.milestoneDaysToEarthwork !== undefined && (
+                  <span className="ml-2">
+                    · {health.milestoneDaysToEarthwork < 0
+                      ? `Earthwork ${Math.abs(health.milestoneDaysToEarthwork)}d late`
+                      : `Earthwork in ${health.milestoneDaysToEarthwork}d`}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {isLoading || !bundle || !health ? (
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : !bundle.seeded ? (
+          <EmptyState
+            message="This project was created before the Mobilization module shipped, so it has no plan yet."
+            action={
+              <Button onClick={() => seed.mutate()} disabled={seed.isPending}>
+                {seed.isPending ? "Seeding…" : "Create mobilization plan"}
+              </Button>
+            }
+          />
+        ) : (
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start gap-1">
+              {TABS.map((t) => (
+                <TabsTrigger key={t.value} value={t.value} data-testid={`mob-tab-${t.value}`}>
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <TabsContent value="dashboard">
+              <DashboardTab health={health} />
+            </TabsContent>
+
+            <TabsContent value="checklist">
+              <ChecklistTab items={bundle.items} team={team} projectId={projectId} onJumpToTab={setTab} />
+            </TabsContent>
+
+            <TabsContent value="permits">
+              <TrackerTab
+                projectId={projectId} resource="permits" rows={bundle.permits}
+                fields={permitFields} addLabel="Add permit"
+                emptyMessage="No permits tracked yet."
+              />
+            </TabsContent>
+
+            <TabsContent value="equipment">
+              <TrackerTab
+                projectId={projectId} resource="equipment" rows={bundle.equipment}
+                fields={equipmentFields} addLabel="Add equipment"
+                emptyMessage="No equipment scheduled to mobilize yet."
+              />
+            </TabsContent>
+
+            <TabsContent value="utilities">
+              <TrackerTab
+                projectId={projectId} resource="utilities" rows={bundle.utilities}
+                fields={utilityFields} addLabel="Add utility"
+                emptyMessage="No temporary utilities requested yet."
+              />
+            </TabsContent>
+
+            <TabsContent value="staff">
+              <div className="space-y-8">
+                <section>
+                  <h2 className="mb-2 font-display text-sm font-bold">Staff onboarding</h2>
+                  <TrackerTab
+                    projectId={projectId} resource="staff" rows={bundle.staff}
+                    fields={staffFields(team, teamMap)} addLabel="Add staff"
+                    emptyMessage="No staff onboarded to this project yet."
+                  />
+                </section>
+                <section>
+                  <h2 className="mb-2 font-display text-sm font-bold">Subcontractor onboarding</h2>
+                  <TrackerTab
+                    projectId={projectId} resource="subs" rows={bundle.subs}
+                    fields={subFields} addLabel="Add subcontractor"
+                    emptyMessage="No subcontractors onboarded yet."
+                  />
+                </section>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="timeline">
+              <TimelineTab
+                milestones={bundle.milestones}
+                onSeed={() => seed.mutate()}
+                seeding={seed.isPending}
+                seeded={bundle.seeded}
+              />
+            </TabsContent>
+
+            <TabsContent value="risks">
+              <TrackerTab
+                projectId={projectId} resource="risks" rows={bundle.risks}
+                fields={riskFields(team, teamMap)} addLabel="Add risk"
+                emptyMessage="No risks logged yet."
+              />
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
+    </Layout>
+  );
+}

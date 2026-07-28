@@ -8,7 +8,7 @@ import {
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
   LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2, Smartphone,
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2, ChevronRight,
-  Video, FileSpreadsheet, Sparkles,
+  Video, FileSpreadsheet, Sparkles, Rocket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -36,7 +36,7 @@ const ICONS: Record<string, any> = {
   GanttChartSquare, Plug, PencilRuler, Plane, Settings: SettingsIcon, Trash2, Network,
   ShieldCheck, Smartphone,
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2,
-  Video, FileSpreadsheet, Sparkles,
+  Video, FileSpreadsheet, Sparkles, Rocket,
 };
 
 // Collapse state is persisted per-group in localStorage. Missing entries
