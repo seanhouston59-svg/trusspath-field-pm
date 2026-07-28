@@ -249,6 +249,7 @@ export class DatabaseStorage implements IStorage {
   createMessage: IStorage["createMessage"] = (...a) => this.messages.createMessage(...a);
   getNotes: IStorage["getNotes"] = (...a) => this.messages.getNotes(...a);
   createNote: IStorage["createNote"] = (...a) => this.messages.createNote(...a);
+  getNotesForOrg: IStorage["getNotesForOrg"] = (...a) => this.messages.getNotesForOrg(...a);
   updateNotePosition: IStorage["updateNotePosition"] = (...a) => this.messages.updateNotePosition(...a);
   getNoteById: IStorage["getNoteById"] = (...a) => this.messages.getNoteById(...a);
   updateNote: IStorage["updateNote"] = (...a) => this.messages.updateNote(...a);

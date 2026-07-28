@@ -402,27 +402,38 @@ export function useCreateMessage(projectId: number) {
   });
 }
 
-export function useNotes(projectId?: number) {
+// Sticky Board is org-wide: server returns every note/sticker in the caller's
+// organization regardless of project. We keep the projectId parameter as an
+// optional tag (unused by the current UI) so callers that still pass it stay
+// compatible; the fetch itself is unfiltered.
+export function useNotes(_projectId?: number) {
   return useQuery<Note[]>({
-    queryKey: ["/api/notes", { projectId }],
+    queryKey: ["/api/notes"],
     queryFn: async () => {
-      const qs = projectId !== undefined ? `?projectId=${projectId}` : "";
-      const res = await apiRequest("GET", `/api/notes${qs}`);
+      const res = await apiRequest("GET", `/api/notes`);
       return res.json();
     },
+    // Poll the board so multiple users in the org see each other's notes
+    // (and stickers) appear within ~10s of being created. The ding-on-new
+    // hook (see useStickyDing) relies on this cadence.
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   });
 }
 
-export function useCreateNote(projectId: number) {
+// Notes are org-wide; projectId is an optional tag the caller can attach
+// but the server no longer requires it for scoping.
+export function useCreateNote(projectId?: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ body, color }: { body: string; color: string }) => {
+    mutationFn: async ({ body, color, type, x, y }: { body: string; color: string; type?: "note" | "sticker"; x?: number; y?: number }) => {
       const res = await apiRequest("POST", `/api/notes`, {
-        projectId,
+        projectId: projectId ?? null,
         body,
         color,
-        x: 300 + Math.round(Math.random() * 380),
-        y: 30 + Math.round(Math.random() * 220),
+        type: type ?? "note",
+        x: x ?? 300 + Math.round(Math.random() * 380),
+        y: y ?? 30 + Math.round(Math.random() * 220),
       });
       return res.json();
     },

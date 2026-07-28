@@ -251,6 +251,7 @@ export interface IStorage {
   createMessage(data: InsertMessage): Promise<Message>;
   getNotes(projectId?: number): Promise<Note[]>;
   createNote(data: InsertNote): Promise<Note>;
+  getNotesForOrg(organizationId?: number): Promise<Note[]>;
   updateNotePosition(id: number, x: number, y: number): Promise<Note | undefined>;
   getNoteById(id: number): Promise<Note | undefined>;
   updateNote(id: number, patch: Partial<Note>): Promise<Note | undefined>;

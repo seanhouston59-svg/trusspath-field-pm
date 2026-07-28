@@ -22,6 +22,16 @@ export class MessagesRepo {
     return await db.select().from(notes);
   }
 
+  // Sticky Board is org-wide: every note/sticker with a matching
+  // organization_id is visible to every user in that org, regardless of
+  // which project it was originally attached to. Owner scope (no org id)
+  // returns all notes across every org.
+  async getNotesForOrg(organizationId?: number): Promise<Note[]> {
+    await ensureReady();
+    if (organizationId === undefined) return await db.select().from(notes);
+    return await db.select().from(notes).where(eq(notes.organizationId, organizationId));
+  }
+
   async createNote(data: InsertNote): Promise<Note> {
     await ensureReady();
     const [row] = await db.insert(notes).values(data).returning();

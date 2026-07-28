@@ -1,9 +1,69 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, X, CornerDownRight } from "lucide-react";
+import { Plus, X, CornerDownRight, Sparkles } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { useNotes, useCreateNote, useUpdateNotePosition, useDeleteNote, useAddNoteReply, useProjects } from "@/hooks/use-data";
+import { useNotes, useCreateNote, useUpdateNotePosition, useDeleteNote, useAddNoteReply } from "@/hooks/use-data";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+
+// Sticker library — decorative-only emoji you pin to the corkboard.
+// Grouped into three tabs the picker cycles through. Each sticker's `emoji`
+// is stored as the note's `body` when created (with `type='sticker'`), so
+// no separate table or endpoint is needed. Labels are picker-only tooltips;
+// they are NOT persisted on the sticker itself so the emoji stays large
+// and decorative on the board.
+type StickerCategory = { key: string; label: string; stickers: { emoji: string; label: string }[] };
+const STICKER_CATEGORIES: StickerCategory[] = [
+  {
+    key: "birthdays",
+    label: "Birthdays",
+    stickers: [
+      { emoji: "🎂", label: "Birthday cake" },
+      { emoji: "🎈", label: "Balloon" },
+      { emoji: "🎉", label: "Party popper" },
+      { emoji: "🎊", label: "Confetti" },
+      { emoji: "🥳", label: "Party face" },
+      { emoji: "🎁", label: "Gift" },
+      { emoji: "🍰", label: "Cake slice" },
+      { emoji: "🧁", label: "Cupcake" },
+      { emoji: "🍾", label: "Champagne" },
+      { emoji: "⭐", label: "Star" },
+    ],
+  },
+  {
+    key: "events",
+    label: "Events",
+    stickers: [
+      { emoji: "🏗️", label: "Groundbreaking" },
+      { emoji: "🔨", label: "Milestone" },
+      { emoji: "🏆", label: "Trophy" },
+      { emoji: "🍽️", label: "Team dinner" },
+      { emoji: "🍻", label: "Beers" },
+      { emoji: "🚀", label: "Launch" },
+      { emoji: "📅", label: "Meeting" },
+      { emoji: "🔥", label: "Fire" },
+      { emoji: "💡", label: "Idea" },
+      { emoji: "👏", label: "Kudos" },
+    ],
+  },
+  {
+    key: "holidays",
+    label: "Holidays",
+    stickers: [
+      { emoji: "🎅", label: "Santa" },
+      { emoji: "🎄", label: "Christmas tree" },
+      { emoji: "🎃", label: "Jack-o-lantern" },
+      { emoji: "👻", label: "Ghost" },
+      { emoji: "🦃", label: "Turkey" },
+      { emoji: "🍂", label: "Fall leaf" },
+      { emoji: "🇺🇸", label: "USA" },
+      { emoji: "🎇", label: "Fireworks" },
+      { emoji: "❄️", label: "Snowflake" },
+      { emoji: "💝", label: "Valentine" },
+      { emoji: "☘️", label: "Shamrock" },
+      { emoji: "🐣", label: "Easter" },
+    ],
+  },
+];
 
 // Shape of a parsed reply. Persisted on the server as a JSON string in
 // notes.replies. Missing/invalid JSON → empty list (see parseReplies).
@@ -65,15 +125,11 @@ const CORK_BG =
 const CORK_BG_SIZE = "14px 14px, 18px 18px, 22px 22px, 16px 16px, 100% 100%, 100% 100%";
 
 export default function NotesPage() {
-  const { data: projects = [] } = useProjects();
-  // Sticky notes are attached to a project. Previously we filtered to non-Planning
-  // projects only, which meant a brand-new org (all projects in Planning) had no
-  // selectable projects and 'Add Note' silently no-op'd. Show every project.
-  const selectable = projects;
-  const [projectId, setProjectId] = useState<number | undefined>(undefined);
-  const pid = projectId ?? selectable[0]?.id;
-  const { data: notes = [] } = useNotes(pid);
-  const create = useCreateNote(pid ?? 0);
+  // Sticky Board is org-wide: one universal corkboard shared by every user
+  // in the organization. No project selector; the server scopes notes by the
+  // caller's org (see /api/notes handler + storage.getNotesForOrg).
+  const { data: notes = [] } = useNotes();
+  const create = useCreateNote();
   const updatePos = useUpdateNotePosition();
   const del = useDeleteNote();
   const addReply = useAddNoteReply();
@@ -81,6 +137,10 @@ export default function NotesPage() {
 
   const [color, setColor] = useState("amber");
   const [draft, setDraft] = useState("");
+  // Sticker picker is a small popover next to the composer. When open, users
+  // click any emoji tile to instantly pin it on a random spot on the board.
+  const [stickerPickerOpen, setStickerPickerOpen] = useState(false);
+  const [stickerCategory, setStickerCategory] = useState<string>(STICKER_CATEGORIES[0].key);
   const [drag, setDrag] = useState<{ id: number; x: number; y: number; offX: number; offY: number } | null>(null);
   // Track the corkboard's current inner width so note sizing + clamping stay
   // responsive to viewport changes (rotation, split-screen, resize).
@@ -182,12 +242,8 @@ export default function NotesPage() {
 
   const addNote = () => {
     if (!draft.trim()) return;
-    if (pid === undefined) {
-      toast({ title: "Pick a project first", description: "Sticky notes attach to a project. Create one under Projects to start jotting." });
-      return;
-    }
     create.mutate(
-      { body: draft.trim(), color },
+      { body: draft.trim(), color, type: "note" },
       {
         onError: (err: any) => {
           toast({ title: "Couldn't add note", description: err?.message ?? "Unknown error" });
@@ -197,26 +253,36 @@ export default function NotesPage() {
     setDraft("");
   };
 
+  // Pin a decorative sticker on the corkboard. Position is a random spot
+  // inside the current board bounds (respecting the JARVIS reserve) so
+  // stickers don't all pile up in the same corner. `color` is unused for
+  // stickers but the schema still requires it — send a harmless default.
+  const addSticker = (emoji: string) => {
+    const w = boardRef.current?.clientWidth ?? 800;
+    const h = boardRef.current?.clientHeight ?? 500;
+    const stickerSize = 96;
+    const randX = Math.round(Math.random() * Math.max(0, w - stickerSize));
+    const randY = Math.round(Math.random() * Math.max(0, h - stickerSize - 60));
+    create.mutate(
+      { body: emoji, color: "amber", type: "sticker", x: randX, y: randY },
+      {
+        onError: (err: any) => {
+          toast({ title: "Couldn't add sticker", description: err?.message ?? "Unknown error" });
+        },
+      },
+    );
+    setStickerPickerOpen(false);
+  };
+
+  // Split notes vs stickers up front. Notes get the 2-column mobile grid;
+  // stickers keep their stored x/y so a Halloween pumpkin someone placed in
+  // the top-right stays roughly there (clamped to the visible frame).
+  const stickyNotes = notes.filter((n: any) => (n.type ?? "note") !== "sticker");
+  const stickers = notes.filter((n: any) => (n.type ?? "note") === "sticker");
+  const activeCategory = STICKER_CATEGORIES.find((c) => c.key === stickerCategory) ?? STICKER_CATEGORIES[0];
+
   return (
     <Layout title="Sticky Board">
-      {/* project selector + composer */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Project:</span>
-        {selectable.length === 0 && (
-          <span className="text-xs text-muted-foreground">No projects yet — create one first to attach notes.</span>
-        )}
-        {selectable.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setProjectId(p.id)}
-            data-testid={`note-project-${p.id}`}
-            className={cn("rounded-full border px-3 py-1 text-xs font-medium transition-colors", pid === p.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted")}
-          >
-            {p.name.split(" ")[0]}
-          </button>
-        ))}
-      </div>
-
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
         <div className="flex items-center gap-1.5">
           {COLOR_KEYS.map((k) => (
@@ -246,7 +312,70 @@ export default function NotesPage() {
         >
           <Plus className="size-4" /> {create.isPending ? "Adding…" : "Add Note"}
         </button>
-        <span className="ml-auto text-xs text-muted-foreground">Drag notes to reposition · {notes.length} notes</span>
+        {/* Sticker picker: a popover with 3 categories — Birthdays, Events,
+            Holidays. Clicking any emoji pins it as a decorative sticker on
+            the corkboard at a random position. */}
+        <div className="relative">
+          <button
+            onClick={() => setStickerPickerOpen((v) => !v)}
+            data-testid="button-open-stickers"
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors",
+              stickerPickerOpen ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/40 text-foreground hover:bg-muted",
+            )}
+            aria-label="Add sticker"
+            aria-expanded={stickerPickerOpen}
+          >
+            <Sparkles className="size-4" /> Stickers
+          </button>
+          {stickerPickerOpen && (
+            <>
+              {/* Click-outside guard so the popover closes when you tap the
+                  page. Sits BELOW the popover in the z-order. */}
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setStickerPickerOpen(false)}
+                data-testid="sticker-picker-scrim"
+              />
+              <div
+                className="absolute right-0 top-11 z-40 w-72 rounded-lg border border-border bg-popover p-3 shadow-lg"
+                data-testid="sticker-picker"
+              >
+                <div className="mb-2 flex gap-1">
+                  {STICKER_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.key}
+                      onClick={() => setStickerCategory(cat.key)}
+                      data-testid={`sticker-cat-${cat.key}`}
+                      className={cn(
+                        "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                        stickerCategory === cat.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                      )}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-5 gap-1">
+                  {activeCategory.stickers.map((s) => (
+                    <button
+                      key={s.emoji}
+                      onClick={() => addSticker(s.emoji)}
+                      title={s.label}
+                      aria-label={s.label}
+                      data-testid={`sticker-${s.emoji}`}
+                      className="flex aspect-square items-center justify-center rounded-md text-2xl transition-colors hover:bg-muted"
+                    >
+                      {s.emoji}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">Everyone in your org sees the board.</p>
+              </div>
+            </>
+          )}
+        </div>
+        <span className="ml-auto text-xs text-muted-foreground">Drag to reposition · {stickyNotes.length} notes · {stickers.length} stickers</span>
       </div>
 
       {/* corkboard */}
@@ -276,7 +405,7 @@ export default function NotesPage() {
             Empty corkboard. Add your first sticky above.
           </div>
         )}
-        {notes.map((n, i) => {
+        {stickyNotes.map((n, i) => {
           const c = NOTE_COLORS[n.color] ?? NOTE_COLORS.amber;
           const isDragging = drag?.id === n.id;
           // On mobile-sized boards, reflow every note into a single centered
@@ -414,6 +543,75 @@ export default function NotesPage() {
                   Post
                 </button>
               </div>
+            </div>
+          );
+        })}
+
+        {/* Stickers — decorative emoji pinned to the board. Draggable, tap
+            to remove. Sized larger than a favicon so they read as real party
+            stickers. Uses their own drag closure that shares `drag` state
+            with the notes above (same setter, same clamp). */}
+        {stickers.map((n) => {
+          const isDragging = drag?.id === n.id;
+          const STICKER_SIZE = isMobileBoard ? 72 : 88;
+          // Stickers keep their stored (x, y). We still clamp so a sticker
+          // pinned at x=1000 on a wide screen doesn't hang off a phone.
+          const w = boardRef.current?.clientWidth ?? boardW;
+          const h = boardRef.current?.clientHeight ?? 0;
+          const maxX = Math.max(0, w - STICKER_SIZE);
+          const maxY = Math.max(0, h - STICKER_SIZE - FAB_RESERVE);
+          const clampedX = Math.max(0, Math.min(maxX, n.x));
+          const clampedY = Math.max(0, Math.min(maxY, n.y));
+          const x = isDragging ? drag!.x : clampedX;
+          const y = isDragging ? drag!.y : clampedY;
+          const rot = ((n.id * 41) % 15) - 7; // -7°..+7° for playful tilt
+          return (
+            <div
+              key={`s-${n.id}`}
+              onPointerDown={(e) => {
+                const boardRect = boardRef.current?.getBoundingClientRect();
+                if (!boardRect) return;
+                const pointerBoardX = e.clientX - boardRect.left;
+                const pointerBoardY = e.clientY - boardRect.top;
+                setDrag({
+                  id: n.id,
+                  x: clampedX, y: clampedY,
+                  offX: pointerBoardX - clampedX,
+                  offY: pointerBoardY - clampedY,
+                });
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                del.mutate(n.id);
+                toast({ title: "Sticker removed" });
+              }}
+              className="group absolute flex cursor-grab select-none items-center justify-center touch-none text-4xl leading-none active:cursor-grabbing"
+              style={{
+                left: x,
+                top: y,
+                width: STICKER_SIZE,
+                height: STICKER_SIZE,
+                fontSize: isMobileBoard ? "48px" : "60px",
+                opacity: isDragging ? 0.9 : 1,
+                zIndex: isDragging ? 25 : 10,
+                transform: `rotate(${isDragging ? 0 : rot}deg)`,
+                filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
+              }}
+              title="Double-click to remove"
+              data-testid={`sticker-instance-${n.id}`}
+            >
+              <span aria-hidden>{n.body}</span>
+              {/* Delete button appears on hover (or always on touch). */}
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); del.mutate(n.id); toast({ title: "Sticker removed" }); }}
+                aria-label="Remove sticker"
+                data-testid={`button-delete-sticker-${n.id}`}
+                className="absolute -right-1 -top-1 hidden size-5 items-center justify-center rounded-full bg-black/60 text-white transition-opacity group-hover:flex"
+              >
+                <X className="size-3" />
+              </button>
             </div>
           );
         })}

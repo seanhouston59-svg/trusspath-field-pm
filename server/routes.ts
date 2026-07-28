@@ -3074,18 +3074,33 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Notes (sticky)
-  app.get("/api/notes", scopeProjectQuery, async (req: any, res) => {
-    const rows = await storage.getNotes(pid(req));
-    res.json(filterByOrgProjects(req, rows));
+  // Sticky Board is org-wide: every user in an org sees the same corkboard.
+  // We list by organization_id, not by project. Legacy rows without an
+  // organization_id are backfilled at migration; new rows always carry one.
+  app.get("/api/notes", async (req: any, res) => {
+    if (req.account?.role === "owner") {
+      res.json(await storage.getNotesForOrg(undefined));
+      return;
+    }
+    if (!req.organizationId) return res.json([]);
+    res.json(await storage.getNotesForOrg(req.organizationId));
   });
   app.post("/api/notes", async (req: any, res) => {
-    const parsed = insertNoteSchema.safeParse(req.body);
+    // Ignore any client-supplied organizationId/createdById; always stamp
+    // from the authenticated session. Body/color/x/y/type come through the
+    // insert schema. projectId is accepted for optional tagging but not
+    // required.
+    const parsed = insertNoteSchema.safeParse({
+      ...req.body,
+      organizationId: req.organizationId ?? null,
+      createdById: req.account?.id ?? null,
+    });
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
     const created = await storage.createNote(parsed.data);
     logEvent(req, {
       projectId: created.projectId,
       kind: EVENT_KINDS.NOTE_ADDED,
-      title: `Note added`,
+      title: (created as any).type === "sticker" ? `Sticker added` : `Note added`,
       subtitle: created.body ? created.body.slice(0, 120) : undefined,
       sourceType: "note",
       sourceId: created.id,

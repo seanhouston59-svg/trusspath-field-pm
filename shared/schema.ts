@@ -415,7 +415,14 @@ export const messages = pgTable("messages", {
 /* ----------------------------- Sticky notes --------------------------- */
 export const notes = pgTable("notes", {
   id: serial("id").primaryKey(),
+  // Notes are org-wide: everyone in an org sees the same corkboard. projectId
+  // is kept for backward compatibility with older rows and for future
+  // project-tagging, but is no longer required or used for filtering.
+  organizationId: integer("organization_id"),
   projectId: integer("project_id"),
+  // Account that created the note. Used to skip "ding on new note" for the
+  // author's own notes and to display who posted a sticker.
+  createdById: integer("created_by_id"),
   body: text("body").notNull(),
   color: text("color").notNull(),
   x: integer("x").notNull(),
@@ -424,6 +431,11 @@ export const notes = pgTable("notes", {
   // Null / empty = no replies. Written to inline on the sticky itself so the note
   // becomes a mini conversation. See POST /api/notes/:id/replies.
   replies: text("replies"),
+  // 'note' (default) = regular sticky with header bar, replies, delete X.
+  // 'sticker' = decorative-only emoji pinned to the board. Body holds the
+  // emoji character; color/replies are ignored for stickers. Nullable so
+  // existing rows without the column read as 'note'.
+  type: text("type").default("note"),
 });
 
 export const integrations = pgTable("integrations", {
@@ -1360,7 +1372,13 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({ id: tru
 export const insertCompanyDocumentSchema = createInsertSchema(companyDocuments).omit({ id: true });
 export const insertDeletedItemSchema = createInsertSchema(deletedItems).omit({ id: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
-export const insertNoteSchema = createInsertSchema(notes).omit({ id: true });
+// Note inserts: organizationId + createdById are stamped by the server from
+// the authenticated session; projectId is an optional tag; type defaults to
+// 'note'. All four are optional at the schema layer so seed helpers and
+// migrations can create rows without knowing about them.
+export const insertNoteSchema = createInsertSchema(notes)
+  .omit({ id: true })
+  .partial({ organizationId: true, projectId: true, createdById: true, type: true, replies: true });
 export const insertIntegrationSchema = createInsertSchema(integrations).omit({ id: true });
 export const insertBlueprintSchema = createInsertSchema(blueprints).omit({ id: true });
 export const insertDroneCaptureSchema = createInsertSchema(droneCaptures).omit({ id: true });

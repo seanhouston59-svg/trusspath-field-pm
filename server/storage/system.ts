@@ -299,11 +299,16 @@ export class SystemRepo {
     ];
     for (const x of msgSeed) await db.insert(messages).values(x);
 
+    // Seed notes for the demo project. Stamped with the org id so the
+    // universal (org-wide) corkboard shows them; type='note' distinguishes
+    // them from decorative stickers. createdById is null because these are
+    // system-seeded, not authored by any specific team member.
+    const seedOrgId = p[0].organizationId;
     const noteSeed: Omit<Note, "id">[] = [
-      { projectId: p[0].id, body: "Concrete pour Friday 7am — 3 trucks. Barricades reset Thu EOD.", color: "amber", x: 40, y: 40, replies: null },
-      { projectId: p[0].id, body: "Glazing RFI-015 is blocking south elevation. Escalate to architect today.", color: "rose", x: 300, y: 90, replies: null },
-      { projectId: p[0].id, body: "Owner wants progress photos of curtainwall by 3pm Thu.", color: "blue", x: 560, y: 50, replies: null },
-      { projectId: p[0].id, body: "Inspector confirmed for med-gas — keep L2 ICU clear.", color: "emerald", x: 120, y: 220, replies: null },
+      { organizationId: seedOrgId, projectId: p[0].id, createdById: null, type: "note", body: "Concrete pour Friday 7am — 3 trucks. Barricades reset Thu EOD.", color: "amber", x: 40, y: 40, replies: null },
+      { organizationId: seedOrgId, projectId: p[0].id, createdById: null, type: "note", body: "Glazing RFI-015 is blocking south elevation. Escalate to architect today.", color: "rose", x: 300, y: 90, replies: null },
+      { organizationId: seedOrgId, projectId: p[0].id, createdById: null, type: "note", body: "Owner wants progress photos of curtainwall by 3pm Thu.", color: "blue", x: 560, y: 50, replies: null },
+      { organizationId: seedOrgId, projectId: p[0].id, createdById: null, type: "note", body: "Inspector confirmed for med-gas — keep L2 ICU clear.", color: "emerald", x: 120, y: 220, replies: null },
     ];
     for (const x of noteSeed) await db.insert(notes).values(x);
 

@@ -27,6 +27,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { APP_ROUTES } from "@shared/app-manifest";
 import { AccessProvider, useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { useStickyDing } from "@/hooks/use-sticky-ding";
 import { useBillingStatus } from "@/hooks/use-data";
 import { setPendingRedirect } from "@/lib/queryClient";
 import type { AccessLevel } from "@shared/access-levels";
@@ -203,6 +204,11 @@ function AccessRestricted() {
 function AccessGate() {
   const [loc] = useLocation();
   const { isAllowed } = useAccess();
+  // Play a soft ding whenever a new sticky note or sticker appears on the
+  // org's shared corkboard. Mounted here (inside the auth wall) so we don't
+  // poll for anonymous users and so the hook has a session identity to skip
+  // self-authored notes.
+  useStickyDing();
   if (!isAllowed(loc)) return <AccessRestricted />;
   return <AppRouter />;
 }
