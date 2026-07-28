@@ -83,6 +83,8 @@ import ProjectSetupPortfolio from "@/pages/executive-os/project-setup-portfolio"
 import ProjectSetupDetail from "@/pages/executive-os/project-setup-detail";
 import PreConstructionPortfolio from "@/pages/executive-os/pre-construction-portfolio";
 import PreConstructionDetail from "@/pages/executive-os/pre-construction-detail";
+import FinancialsPortfolio from "@/pages/executive-os/financials-portfolio";
+import BoardPackets from "@/pages/executive-os/board-packets";
 import { LEAN_MODULES } from "@shared/lean-modules-catalog";
 import { LeanModuleDetailPage, LeanModulePortfolioPage } from "@/pages/executive-os/lean-module";
 import InviteAcceptPage from "@/pages/invite-accept";
@@ -134,6 +136,8 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/executive-os/pre-construction/:id": PreConstructionDetail,
   "/executive-os/mobilization": MobilizationPortfolio,
   "/executive-os/mobilization/:id": MobilizationDetail,
+  // Financials + Board Packets: explicit mappings live in ROUTE_OVERRIDES below
+  // so they win over the LEAN_MODULES generic fallback. See the note there.
   // Modules 4-22 all render the shared lean module page (portfolio + detail).
   // The moduleId is bound per slug so each URL renders the correct catalog
   // entry (title, blurb, categories). When a module graduates to a purpose-
@@ -149,6 +153,16 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
       ];
     }),
   ),
+  // Explicit overrides for graduated exec-os modules. These MUST come after
+  // the LEAN_MODULES.flatMap spread above so they win the key collision on
+  // /executive-os/financials. Board packets is a fresh route with no lean-
+  // module analog, but lives here to keep the graduated modules together.
+  "/executive-os/financials": FinancialsPortfolio,
+  // Per-project financials still delegate to the lean-module detail page
+  // (change orders + budget lines already live there). Wrap with a local
+  // component so we don't have to duplicate the moduleId binding.
+  "/executive-os/financials/:id": () => <LeanModuleDetailPage moduleId="financials" />,
+  "/executive-os/board-packets": BoardPackets,
   "/field": FieldHub,
   "/field/daily-log": FieldDailyLog,
   "/field/timecard": FieldTimecard,

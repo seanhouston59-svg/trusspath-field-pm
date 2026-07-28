@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Rocket, ClipboardList, Ruler, ChevronRight } from "lucide-react";
+import { Sparkles, Rocket, ClipboardList, Ruler, DollarSign, FileText, ChevronRight } from "lucide-react";
 import { LeanPortfolioRollup } from "@/components/executive-os/lean-portfolio-rollup";
 
 type ModuleCard = {
@@ -12,13 +12,17 @@ type ModuleCard = {
   testId: string;
 };
 
+// Ordered chronologically along the lifecycle so an executive scans the
+// landing top-to-bottom the same way a project moves through the OS.
+// Financials + Board Packets sit at the bottom because they're cross-cutting
+// surfaces that aggregate the other modules, not a lifecycle stage.
 const MODULES: ModuleCard[] = [
   {
     href: "/executive-os/project-setup",
     label: "Project Setup",
     Icon: ClipboardList,
     description:
-      "Charter, stakeholders, contract documents, deliverables, and kickoff \u2014 the intake step before pre-construction begins.",
+      "Charter, stakeholders, contract documents, deliverables, and kickoff — the intake step before pre-construction begins.",
     testId: "exec-os-project-setup-link",
   },
   {
@@ -26,7 +30,7 @@ const MODULES: ModuleCard[] = [
     label: "Pre-Construction",
     Icon: Ruler,
     description:
-      "Design tracking, RFIs, value engineering, permits, prequalification, bid packages, and long-lead procurement \u2014 through plan approval and full buyout.",
+      "Design tracking, RFIs, value engineering, permits, prequalification, bid packages, and long-lead procurement — through plan approval and full buyout.",
     testId: "exec-os-pre-construction-link",
   },
   {
@@ -34,18 +38,34 @@ const MODULES: ModuleCard[] = [
     label: "Mobilization",
     Icon: Rocket,
     description:
-      "Readiness across every project \u2014 checklist, permits, equipment, utilities, onboarding, milestones, and risks from Notice to Proceed through the first day of earthwork.",
+      "Readiness across every project — checklist, permits, equipment, utilities, onboarding, milestones, and risks from Notice to Proceed through the first day of earthwork.",
     testId: "exec-os-mobilization-link",
+  },
+  {
+    href: "/executive-os/financials",
+    label: "Financials",
+    Icon: DollarSign,
+    description:
+      "Org-wide budget vs. committed cost, approved and pending change orders, contingency remaining, and per-project drill-down.",
+    testId: "exec-os-financials-link",
+  },
+  {
+    href: "/executive-os/board-packets",
+    label: "Board Packets",
+    Icon: FileText,
+    description:
+      "One-click PDF export that assembles portfolio health, top risks, and the financial rollup into a board-ready document.",
+    testId: "exec-os-board-packets-link",
   },
 ];
 
 /**
- * Executive OS \u2014 placeholder landing.
+ * Executive OS landing.
  *
- * This will host the executive-level operating surfaces (portfolio KPIs,
- * financial rollups, board packets, cross-project risk view). Contents will
- * be added in a follow-up. For now it renders a friendly \u201ccoming soon\u201d card
- * so the nav entry is not a dead link.
+ * Hosts the executive-level operating surfaces: per-lifecycle-stage portfolios
+ * (Project Setup, Pre-Construction, Mobilization), the cross-cutting Financials
+ * rollup, and one-click Board Packet PDF export. The full 19-cell lean-module
+ * strip lives below the primary cards for deeper drill-down.
  */
 export default function ExecutiveOs() {
   return (
@@ -60,7 +80,7 @@ export default function ExecutiveOs() {
               <CardTitle className="text-xl">Executive OS</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
                 Portfolio KPIs, financial rollups, board-ready packets, and
-                cross-project risk \u2014 a single command deck for the executive team.
+                cross-project risk — a single command deck for the executive team.
               </p>
             </div>
           </CardHeader>
@@ -82,10 +102,6 @@ export default function ExecutiveOs() {
                 <ChevronRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
               </Link>
             ))}
-
-            <div className="rounded-md border border-dashed border-primary/30 bg-background/60 p-4 text-sm text-muted-foreground">
-              More modules coming soon \u2014 financial rollups and board packets are next.
-            </div>
           </CardContent>
         </Card>
 

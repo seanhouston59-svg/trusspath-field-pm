@@ -40,6 +40,7 @@ export const APP_ROUTES: RoutePattern[] = [
   "/executive-os/financials", "/executive-os/financials/:id",
   "/executive-os/schedule", "/executive-os/schedule/:id",
   "/executive-os/risk", "/executive-os/risk/:id",
+  "/executive-os/board-packets",
   "/field", "/field/daily-log", "/field/timecard", "/field/photo", "/field/observation", "/field/punch",
 ];
 
@@ -153,6 +154,7 @@ export const APP_NAV: NavGroup[] = [
       { href: "/executive-os/financials", label: "Financials", icon: "DollarSign" },
       { href: "/executive-os/schedule", label: "Schedule Control", icon: "CalendarClock" },
       { href: "/executive-os/risk", label: "Risk & Insurance", icon: "ShieldAlert" },
+      { href: "/executive-os/board-packets", label: "Board Packets", icon: "FileText" },
     ],
   },
 ];

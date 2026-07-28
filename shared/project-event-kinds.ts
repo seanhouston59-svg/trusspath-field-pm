@@ -65,6 +65,11 @@ export const EVENT_KINDS = {
   PRECON_PLAN_REPORT_GENERATED: "pre_construction.plan_report_generated",
   PRECON_DESIGN_REVIEW_REPORT_GENERATED: "pre_construction.design_review_report_generated",
   PRECON_BUYOUT_REPORT_GENERATED: "pre_construction.buyout_report_generated",
+
+  // Executive OS — Board Packets. Logged once per successful PDF export.
+  // Written against the first project the caller can see (event schema requires
+  // a projectId), but the packet itself is org-wide.
+  BOARD_PACKET_GENERATED: "board_packet",
 } as const;
 
 export type EventKind = typeof EVENT_KINDS[keyof typeof EVENT_KINDS];
@@ -143,6 +148,7 @@ export const EVENT_KIND_META: Record<string, EventKindMeta> = {
   [EVENT_KINDS.PRECON_PLAN_REPORT_GENERATED]: { label: "Pre-Construction Plan generated", category: "doc" },
   [EVENT_KINDS.PRECON_DESIGN_REVIEW_REPORT_GENERATED]: { label: "Design Review Report generated", category: "doc" },
   [EVENT_KINDS.PRECON_BUYOUT_REPORT_GENERATED]: { label: "Buyout Plan generated", category: "doc" },
+  [EVENT_KINDS.BOARD_PACKET_GENERATED]: { label: "Board packet generated", category: "doc" },
 };
 
 // Kinds grouped by category \u2014 used by the client to render filter chips and

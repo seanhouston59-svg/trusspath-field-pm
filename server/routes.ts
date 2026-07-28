@@ -44,6 +44,8 @@ import { generateMobilizationPlan } from "./reports/mobilization-plan";
 import { generateProjectCharter } from "./reports/project-charter";
 import { generateKickoffAgenda } from "./reports/kickoff-agenda";
 import { ReportBuilder } from "./reports/engine";
+import { buildFinancialsRollup } from "./financials-rollup";
+import { generateBoardPacket } from "./reports/board-packet";
 import {
   loadPreConstructionReportContext, PreConstructionNotInitializedError,
 } from "./reports/data-loaders";
@@ -2975,6 +2977,155 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const projectIds = orgProjects.map((p: Project) => p.id);
     const rollups = await storage.getLeanModuleRollup(projectIds);
     res.json({ projects: orgProjects, rollups });
+  });
+
+  /**
+   * Org-wide board packet export history. Returns the last N `board_packet`
+   * events across every project the caller can see, newest first.
+   *
+   * Uses raw SQL because storage.getProjectEvents() is per-project and this
+   * page needs a cross-project feed. Keeps everything org-scoped by filtering
+   * on organization_id (or bypassing for the platform-owner account).
+   */
+  app.get("/api/executive-os/board-packet-history", async (req: any, res) => {
+    const isOwner = req.account?.role === "owner";
+    const orgId = req.organizationId ?? null;
+    if (!isOwner && orgId === null) {
+      // Fail-closed: an authenticated but org-less account (e.g. mid-invite)
+      // must never see cross-tenant events.
+      return res.json([]);
+    }
+    const { sql: pgSql } = await import("./storage/db");
+    const kind = "board_packet";
+    const limit = 20;
+    const rows: any[] = isOwner
+      // UNSCOPED: owner sees every tenant. Same rule as other exec-os endpoints.
+      ? await pgSql`
+          SELECT id, organization_id, project_id, actor_account_id, actor_name,
+                 kind, title, subtitle, meta, source_type, source_id,
+                 occurred_at, created_at
+          FROM project_events
+          WHERE kind = ${kind}
+          ORDER BY occurred_at DESC
+          LIMIT ${limit}
+        `
+      // Org-scoped: only this tenant's events.
+      : await pgSql`
+          SELECT id, organization_id, project_id, actor_account_id, actor_name,
+                 kind, title, subtitle, meta, source_type, source_id,
+                 occurred_at, created_at
+          FROM project_events
+          WHERE kind = ${kind} AND organization_id = ${orgId}
+          ORDER BY occurred_at DESC
+          LIMIT ${limit}
+        `;
+    res.json(rows.map((r) => ({
+      id: r.id,
+      organizationId: r.organization_id,
+      projectId: r.project_id,
+      actorAccountId: r.actor_account_id,
+      actorName: r.actor_name,
+      kind: r.kind,
+      title: r.title,
+      subtitle: r.subtitle,
+      meta: r.meta ?? {},
+      sourceType: r.source_type,
+      sourceId: r.source_id,
+      occurredAt: typeof r.occurred_at === "string" ? r.occurred_at : new Date(r.occurred_at).toISOString(),
+      createdAt: typeof r.created_at === "string" ? r.created_at : new Date(r.created_at).toISOString(),
+    })));
+  });
+
+  /**
+   * Org-wide financials rollup. Aggregates budget, contract value, approved
+   * and pending change orders, committed sub/PO cost, VE savings, and design-
+   * RFI cost exposure into a single portfolio snapshot.
+   *
+   * Returns { orgTotals, projects: [...] } so the client can show both the
+   * headline chips and a per-project drill-down table in one paint.
+   */
+  app.get("/api/executive-os/financials-rollup", async (req: any, res) => {
+    const orgProjects = req.account?.role === "owner"
+      // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess.
+      ? await storage.getProjects()
+      : await storage.getProjects(req.organizationId ?? null);
+    const rollup = await buildFinancialsRollup(storage, orgProjects);
+    res.json(rollup);
+  });
+
+  /**
+   * Board packet PDF export. Assembles the org's portfolio health strip, top
+   * risks, and the financial rollup into a single board-ready document. The
+   * PDF is streamed directly — no persistence — so history is derived from
+   * project events (kind='board_packet') logged after each successful render.
+   */
+  app.get("/api/executive-os/board-packet.pdf", async (req: any, res) => {
+    const orgProjects = req.account?.role === "owner"
+      // UNSCOPED: platform-owner bypass.
+      ? await storage.getProjects()
+      : await storage.getProjects(req.organizationId ?? null);
+
+    const preparedBy = (req.query.preparedBy as string)?.trim()
+      || req.account?.displayName
+      || "Executive Team";
+    const preparedByRole = (req.query.preparedByRole as string)?.trim() || undefined;
+    const period = (req.query.period as string)?.trim() || undefined;
+
+    // Load all inputs BEFORE opening the PDF stream so an aggregation error
+    // returns a clean JSON 500 instead of a half-written PDF.
+    let rollup;
+    try {
+      rollup = await buildFinancialsRollup(storage, orgProjects);
+    } catch (err) {
+      console.error("[board-packet] rollup failed", err);
+      return res.status(500).json({ message: "Failed to load portfolio data" });
+    }
+
+    // Assemble the org name for the cover page. Owner sees "All organizations";
+    // regular users see their own org name.
+    let orgName = "All organizations";
+    if (req.organizationId) {
+      const org = await getOrganization(req.organizationId);
+      if (org?.name) orgName = org.name;
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="Board_Packet_${stamp}.pdf"`,
+    );
+
+    try {
+      await generateBoardPacket(res, {
+        orgName,
+        projects: orgProjects,
+        rollup,
+        preparedBy,
+        preparedByRole,
+        period,
+      });
+    } catch (err) {
+      console.error("[board-packet] render failed", err);
+      if (!res.headersSent) res.status(500).json({ message: "Failed to generate board packet" });
+      else res.end();
+      return;
+    }
+
+    // Log a single portfolio-scoped event. projectId is a required column on
+    // projectEvents, so pin it to the first project the caller can see; the
+    // event serves as a "board packet exported" audit line the client's
+    // history endpoint can filter on.
+    if (orgProjects.length > 0) {
+      logEvent(req, {
+        projectId: orgProjects[0].id,
+        kind: EVENT_KINDS.BOARD_PACKET_GENERATED,
+        title: "Board packet exported",
+        subtitle: `${orgProjects.length} project(s) · prepared by ${preparedBy}`,
+        meta: { period, projectCount: orgProjects.length, preparedBy },
+        sourceType: "executive_os",
+      });
+    }
   });
 
   app.get("/api/executive-os/pre-construction", async (req: any, res) => {

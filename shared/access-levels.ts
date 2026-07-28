@@ -102,6 +102,7 @@ const R = {
   executiveOsScheduleDetail: "/executive-os/schedule/:id",
   executiveOsRisk: "/executive-os/risk",
   executiveOsRiskDetail: "/executive-os/risk/:id",
+  executiveOsBoardPackets: "/executive-os/board-packets",
   adminSignups: "/admin/signups",
   // Mobile field kit (PWA) routes
   field: "/field",
