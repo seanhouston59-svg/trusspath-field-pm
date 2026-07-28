@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, CloudSun, Cloud, CloudRain, Snowflake, Sun, Wind, Users, ClipboardList, CheckCircle2, WifiOff, Loader2 } from "lucide-react";
+import { ArrowLeft, CloudSun, Cloud, CloudFog, CloudRain, Snowflake, Sun, Wind, Users, ClipboardList, CheckCircle2, WifiOff, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useProjects } from "@/hooks/use-data";
+import { useProjects, useProjectWeather, type DailyLogWeatherResponse } from "@/hooks/use-data";
 import { useAuth } from "@/lib/auth";
 import { queueRequest, subscribeQueue } from "@/lib/offline-queue";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
  *   the browser comes back online, the offline queue drains it.
  */
 
-type Weather = "sunny" | "partly-cloudy" | "cloudy" | "rain" | "snow" | "windy";
+type Weather = "sunny" | "partly-cloudy" | "cloudy" | "rain" | "snow" | "windy" | "fog";
 const WEATHER_OPTIONS: { key: Weather; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { key: "sunny", label: "Sunny", icon: Sun },
   { key: "partly-cloudy", label: "P.Cloudy", icon: CloudSun },
@@ -34,7 +34,29 @@ const WEATHER_OPTIONS: { key: Weather; label: string; icon: React.ComponentType<
   { key: "rain", label: "Rain", icon: CloudRain },
   { key: "snow", label: "Snow", icon: Snowflake },
   { key: "windy", label: "Windy", icon: Wind },
+  { key: "fog", label: "Fog", icon: CloudFog },
 ];
+
+/**
+ * Convert the server's daily-log slug (capitalized, e.g. "Partly cloudy") to
+ * the mobile field-mode slug (lowercase hyphenated, e.g. "partly-cloudy").
+ * The mobile form has its own vocab because the DB column is a free text
+ * field — desktop stores "Partly cloudy" and mobile has historically stored
+ * "partly-cloudy". We keep that behavior to avoid breaking analytics that
+ * bucket on the exact string, and just translate at the auto-fill boundary.
+ */
+function serverSlugToFieldSlug(s: DailyLogWeatherResponse["weather"]): Weather {
+  switch (s) {
+    case "Sunny": return "sunny";
+    case "Partly cloudy": return "partly-cloudy";
+    case "Cloudy": return "cloudy";
+    case "Rain": return "rain";
+    case "Snow": return "snow";
+    case "Wind": return "windy";
+    case "Fog": return "fog";
+    default: return "sunny";
+  }
+}
 
 export default function FieldDailyLog() {
   const [, navigate] = useLocation();
@@ -57,8 +79,33 @@ export default function FieldDailyLog() {
   const [submitting, setSubmitting] = useState(false);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [queueSize, setQueueSize] = useState(0);
+  // Mirrors the desktop form's dirty-tracking. When the foreman taps any
+  // weather tile or nudges Temp, we set this to true and stop auto-filling
+  // until they change project OR tap the little refresh icon in the header.
+  const [weatherDirty, setWeatherDirty] = useState(false);
 
   useEffect(() => subscribeQueue(setQueueSize), []);
+
+  // Auto-pull weather when there's a project selected. `today` is derived
+  // from the current date, so this runs once on mount and again on refresh.
+  // Skipped entirely when offline (the request would just fail anyway) so
+  // foremen out at a jobsite with no signal aren't stuck watching a spinner.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const weatherQuery = useProjectWeather(projectId, todayStr, { enabled: online });
+  useEffect(() => {
+    if (weatherQuery.data && !weatherDirty) {
+      setWeather(serverSlugToFieldSlug(weatherQuery.data.weather));
+      setTemp(weatherQuery.data.temp);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherQuery.data]);
+
+  // Project change = new location = re-enable auto-fill.
+  useEffect(() => { setWeatherDirty(false); }, [projectId]);
+
+  /** Manual re-pull — clears dirty flag first so the returned values apply. */
+  const refreshWeather = () => { setWeatherDirty(false); weatherQuery.refetch(); };
+
   useEffect(() => {
     const on = () => setOnline(true);
     const off = () => setOnline(false);
@@ -180,8 +227,42 @@ export default function FieldDailyLog() {
 
           {/* Weather */}
           <div>
-            <Label className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">Weather</Label>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <div className="mb-1.5 flex items-center justify-between">
+              <Label className="block text-xs font-semibold uppercase text-muted-foreground">Weather</Label>
+              {/* Refresh chip — large enough to tap with a work glove on. Hidden
+                  offline since the auto-pull won't work anyway. */}
+              {online && projectId != null && (
+                <button
+                  type="button"
+                  onClick={refreshWeather}
+                  disabled={weatherQuery.isFetching}
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:text-primary disabled:opacity-50"
+                  data-testid="field-log-weather-refresh"
+                  aria-label="Refresh weather"
+                >
+                  <RefreshCw className={cn("size-3", weatherQuery.isFetching && "animate-spin")} /> Refresh
+                </button>
+              )}
+            </div>
+            {/* Status line — tiny, informational. Shows the auto-pull result,
+                edited state, or an error hint. Kept above the tiles so foremen
+                see it before making a choice. */}
+            {online && projectId != null && (
+              <div className="mb-2 flex min-h-4 items-center gap-1.5 text-[11px] text-muted-foreground" data-testid="field-log-weather-status">
+                {weatherQuery.isFetching && (<><RefreshCw className="size-3 animate-spin" /> Checking…</>)}
+                {!weatherQuery.isFetching && weatherQuery.data && (
+                  <>
+                    <Cloud className="size-3" />
+                    <span className="truncate">Auto-filled · {weatherQuery.data.meta.locationName} · {weatherQuery.data.meta.description}</span>
+                    {weatherDirty && <span className="italic text-amber-600 dark:text-amber-400">· edited</span>}
+                  </>
+                )}
+                {!weatherQuery.isFetching && !weatherQuery.data && weatherQuery.isError && (
+                  <><AlertCircle className="size-3 text-amber-500" /> Couldn't auto-pull — tap a tile.</>
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
               {WEATHER_OPTIONS.map((w) => {
                 const Icon = w.icon;
                 const active = weather === w.key;
@@ -189,7 +270,7 @@ export default function FieldDailyLog() {
                   <button
                     key={w.key}
                     type="button"
-                    onClick={() => setWeather(w.key)}
+                    onClick={() => { setWeather(w.key); setWeatherDirty(true); }}
                     data-testid={`field-log-weather-${w.key}`}
                     className={cn(
                       "flex flex-col items-center gap-1 rounded-xl border-2 p-3 transition-all",
@@ -210,15 +291,15 @@ export default function FieldDailyLog() {
           <div>
             <Label className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">Temperature (°F)</Label>
             <div className="flex items-center gap-3">
-              <Button type="button" variant="outline" size="lg" onClick={() => setTemp((t) => t - 1)} className="h-14 w-14 shrink-0 text-2xl">−</Button>
+              <Button type="button" variant="outline" size="lg" onClick={() => { setTemp((t) => t - 1); setWeatherDirty(true); }} className="h-14 w-14 shrink-0 text-2xl">−</Button>
               <Input
                 type="number"
                 value={temp}
-                onChange={(e) => setTemp(Number(e.target.value) || 0)}
+                onChange={(e) => { setTemp(Number(e.target.value) || 0); setWeatherDirty(true); }}
                 data-testid="field-log-temp"
                 className="h-14 flex-1 text-center font-display text-3xl font-bold"
               />
-              <Button type="button" variant="outline" size="lg" onClick={() => setTemp((t) => t + 1)} className="h-14 w-14 shrink-0 text-2xl">+</Button>
+              <Button type="button" variant="outline" size="lg" onClick={() => { setTemp((t) => t + 1); setWeatherDirty(true); }} className="h-14 w-14 shrink-0 text-2xl">+</Button>
             </div>
           </div>
 
