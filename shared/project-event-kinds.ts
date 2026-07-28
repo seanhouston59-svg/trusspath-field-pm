@@ -48,6 +48,11 @@ export const EVENT_KINDS = {
   MOBILIZATION_ITEM_COMPLETED: "mobilization.item_completed",
   MOBILIZATION_PERMIT_APPROVED: "mobilization.permit_approved",
   MOBILIZATION_REPORT_GENERATED: "mobilization.report_generated",
+
+  // Project Setup (Executive OS)
+  PROJECT_SETUP_CHARTER_APPROVED: "project_setup.charter_approved",
+  PROJECT_SETUP_DELIVERABLE_COMPLETED: "project_setup.deliverable_completed",
+  PROJECT_SETUP_KICKOFF_SCHEDULED: "project_setup.kickoff_scheduled",
 } as const;
 
 export type EventKind = typeof EVENT_KINDS[keyof typeof EVENT_KINDS];
@@ -113,6 +118,9 @@ export const EVENT_KIND_META: Record<string, EventKindMeta> = {
   [EVENT_KINDS.MOBILIZATION_ITEM_COMPLETED]: { label: "Mobilization item completed", category: "project" },
   [EVENT_KINDS.MOBILIZATION_PERMIT_APPROVED]: { label: "Permit approved", category: "project" },
   [EVENT_KINDS.MOBILIZATION_REPORT_GENERATED]: { label: "Mobilization Plan generated", category: "doc" },
+  [EVENT_KINDS.PROJECT_SETUP_CHARTER_APPROVED]: { label: "Project Charter approved", category: "project" },
+  [EVENT_KINDS.PROJECT_SETUP_DELIVERABLE_COMPLETED]: { label: "Setup deliverable completed", category: "project" },
+  [EVENT_KINDS.PROJECT_SETUP_KICKOFF_SCHEDULED]: { label: "Kickoff meeting scheduled", category: "project" },
 };
 
 // Kinds grouped by category \u2014 used by the client to render filter chips and

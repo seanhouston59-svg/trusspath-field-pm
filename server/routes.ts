@@ -20,6 +20,8 @@ import {
   insertMobilizationItemSchema, insertMobilizationPermitSchema, insertMobilizationEquipmentSchema,
   insertMobilizationUtilitySchema, insertMobilizationStaffSchema, insertMobilizationSubSchema,
   insertMobilizationRiskSchema, insertMobilizationSignatureSchema, insertMobilizationPlanSchema,
+  insertProjectSetupSchema, insertProjectSetupStakeholderSchema, insertProjectSetupContractDocSchema,
+  insertProjectSetupDeliverableSchema, insertProjectSetupSignatureSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
   isAccountInGoodStanding, isSubscriptionActive, isDemoExpired,
@@ -29,6 +31,8 @@ import {
 import { EVENT_KINDS } from "@shared/project-event-kinds";
 import { MOBILIZATION_SECTIONS } from "@shared/mobilization-catalog";
 import { mobilizationRollup } from "./mobilization-rollup";
+import { projectSetupRollup } from "./project-setup-rollup";
+import { computeMobilizationGate } from "@shared/lifecycle-gates";
 import { generateMobilizationPlan } from "./reports/mobilization-plan";
 import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
 import {
@@ -973,6 +977,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     } catch (e) {
       console.error("[mobilization] seed failed for project", created.id, e);
     }
+    // Project Setup is the pre-mobilization intake, so it seeds on the same
+    // create. Separate try/catch: a signer auto-fill failure shouldn't cost the
+    // project its mobilization checklist, or vice versa.
+    try {
+      await storage.seedProjectSetup(created.id, created.organizationId ?? null);
+    } catch (e) {
+      console.error("[project-setup] seed failed for project", created.id, e);
+    }
     logEvent(req, {
       projectId: created.id,
       kind: EVENT_KINDS.PROJECT_CREATED,
@@ -1813,6 +1825,15 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     });
   });
 
+  // Soft gate: what Project Setup still owes Mobilization. Warnings only — the
+  // PM can always proceed, the banner just makes the cost visible.
+  app.get("/api/projects/:id/mobilization/gate", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    res.json(computeMobilizationGate(await projectSetupRollup(projectId)));
+  });
+
   // Mobilization Plan PDF. Streams straight into the response, so once
   // generateMobilizationPlan has written a byte we can no longer switch to a
   // JSON error body — hence the try/catch that only responds when headers are
@@ -1997,6 +2018,172 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         permitStatus: r.permitStatus,
         risksOpen: r.risksOpen,
       };
+    }));
+    res.json(rows);
+  });
+
+  /* ======================= Project Setup (Executive OS) =======================
+   * Pre-mobilization intake — the source for the Project Charter and Kickoff
+   * Agenda. Same shape as the mobilization block above: everything nested under
+   * /api/projects/:id so requireProjectAccess is the only authorization check,
+   * plus one org-derived portfolio route at the bottom.
+   */
+
+  app.get("/api/projects/:id/project-setup", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const bundle = await storage.getProjectSetupBundle(projectId);
+    res.json({ ...bundle, seeded: bundle.setup != null });
+  });
+
+  // Every column optional so the intake form can autosave a field at a time.
+  const projectSetupPatchSchema = insertProjectSetupSchema.omit({ projectId: true }).partial();
+
+  app.patch("/api/projects/:id/project-setup", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const { id: _id, projectId: _pid, ...body } = req.body ?? {};
+    const parsed = projectSetupPatchSchema.safeParse(body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+
+    // Read before write so the two lifecycle events fire on the transition
+    // rather than on every autosave that happens to include the same value.
+    const before = await storage.getProjectSetup(projectId);
+    if (!before) return res.status(404).json({ message: "Project setup not initialized" });
+    const updated = await storage.updateProjectSetup(projectId, parsed.data);
+    if (!updated) return res.status(404).json({ message: "Project setup not initialized" });
+
+    if (!before.charterApprovedAt && updated.charterApprovedAt) {
+      logEvent(req, {
+        projectId,
+        kind: EVENT_KINDS.PROJECT_SETUP_CHARTER_APPROVED,
+        title: "Project Charter approved",
+        subtitle: updated.charterApprovedAt,
+        sourceType: "project_setup",
+        sourceId: updated.id,
+        meta: { approvedById: updated.charterApprovedById },
+      });
+    }
+    if (!before.kickoffScheduledAt && updated.kickoffScheduledAt) {
+      logEvent(req, {
+        projectId,
+        kind: EVENT_KINDS.PROJECT_SETUP_KICKOFF_SCHEDULED,
+        title: "Kickoff meeting scheduled",
+        subtitle: updated.kickoffLocation ?? updated.kickoffScheduledAt,
+        sourceType: "project_setup",
+        sourceId: updated.id,
+        meta: { scheduledAt: updated.kickoffScheduledAt, location: updated.kickoffLocation },
+      });
+    }
+    res.json(updated);
+  });
+
+  // Opt-in seed for projects that predate this module. Idempotent — the seeder
+  // no-ops when a setup row already exists, so a double-click is harmless.
+  app.post("/api/projects/:id/project-setup/setup", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const project = await requireProjectAccess(req, res, projectId);
+    if (!project) return;
+    await storage.seedProjectSetup(projectId, project.organizationId ?? null);
+    res.status(201).json(await storage.getProjectSetupBundle(projectId));
+  });
+
+  app.get("/api/projects/:id/project-setup/health", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    res.json(await projectSetupRollup(projectId));
+  });
+
+  const PROJECT_SETUP_RESOURCES: {
+    path: string;
+    schema: { safeParse: (v: unknown) => any };
+    create: (data: any) => Promise<any>;
+    update: (id: number, data: any) => Promise<any>;
+    remove: (id: number) => Promise<void>;
+    onUpdate?: (req: any, row: any, patch: any) => void;
+  }[] = [
+    {
+      path: "stakeholders", schema: insertProjectSetupStakeholderSchema,
+      create: storage.createStakeholder.bind(storage),
+      update: storage.updateStakeholder.bind(storage),
+      remove: storage.deleteStakeholder.bind(storage),
+    },
+    {
+      path: "contract-docs", schema: insertProjectSetupContractDocSchema,
+      create: storage.createContractDoc.bind(storage),
+      update: storage.updateContractDoc.bind(storage),
+      remove: storage.deleteContractDoc.bind(storage),
+    },
+    {
+      path: "deliverables", schema: insertProjectSetupDeliverableSchema,
+      create: storage.createDeliverable.bind(storage),
+      update: storage.updateDeliverable.bind(storage),
+      remove: storage.deleteDeliverable.bind(storage),
+      onUpdate: (req, row, patch) => {
+        if (patch.status !== "complete") return;
+        logEvent(req, {
+          projectId: row.projectId,
+          kind: EVENT_KINDS.PROJECT_SETUP_DELIVERABLE_COMPLETED,
+          title: `Setup deliverable — ${row.label}`,
+          subtitle: row.dueDate ? `Due ${row.dueDate}` : null,
+          sourceType: "project_setup_deliverable",
+          sourceId: row.id,
+          meta: { label: row.label, dueDate: row.dueDate },
+        });
+      },
+    },
+    {
+      path: "signatures", schema: insertProjectSetupSignatureSchema,
+      create: storage.createSetupSignature.bind(storage),
+      update: storage.updateSetupSignature.bind(storage),
+      remove: storage.deleteSetupSignature.bind(storage),
+    },
+  ];
+
+  for (const resource of PROJECT_SETUP_RESOURCES) {
+    app.post(`/api/projects/:id/project-setup/${resource.path}`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      const parsed = resource.schema.safeParse({ ...(req.body ?? {}), projectId });
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+      const created = await resource.create(parsed.data as any);
+      res.status(201).json(created);
+    });
+
+    app.patch(`/api/projects/:id/project-setup/${resource.path}/:rowId`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const rowId = parseInt(req.params.rowId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      const { projectId: _ignored, id: _id, ...patch } = req.body ?? {};
+      const updated = await resource.update(rowId, patch);
+      if (!updated || updated.projectId !== projectId) return res.status(404).json({ message: "Not found" });
+      resource.onUpdate?.(req, updated, patch);
+      res.json(updated);
+    });
+
+    app.delete(`/api/projects/:id/project-setup/${resource.path}/:rowId`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const rowId = parseInt(req.params.rowId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      await resource.remove(rowId);
+      res.status(204).end();
+    });
+  }
+
+  app.get("/api/executive-os/project-setup", async (req: any, res) => {
+    const orgProjects = req.account?.role === "owner"
+      ? await storage.getProjects()
+      : await storage.getProjects(req.organizationId ?? undefined);
+    const rows = await Promise.all(orgProjects.map(async (p: Project) => {
+      const h = await projectSetupRollup(p.id);
+      return { projectId: p.id, projectName: p.name, ...h };
     }));
     res.json(rows);
   });

@@ -17,7 +17,8 @@ export const APP_ROUTES: RoutePattern[] = [
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings", "/settings/team",
   "/teams", "/excel",
-  "/executive-os", "/executive-os/mobilization", "/executive-os/mobilization/:id",
+  "/executive-os", "/executive-os/project-setup",
+  "/executive-os/mobilization", "/executive-os/mobilization/:id",
   "/field", "/field/daily-log", "/field/timecard", "/field/photo", "/field/observation", "/field/punch",
 ];
 
@@ -105,6 +106,9 @@ export const APP_NAV: NavGroup[] = [
     title: "Executive OS",
     items: [
       { href: "/executive-os", label: "Overview", icon: "Sparkles" },
+      // Lifecycle order: Project Setup is the pre-mobilization intake, so it
+      // sits above Mobilization even though it shipped second.
+      { href: "/executive-os/project-setup", label: "Project Setup", icon: "ClipboardList" },
       { href: "/executive-os/mobilization", label: "Mobilization", icon: "Rocket" },
     ],
   },

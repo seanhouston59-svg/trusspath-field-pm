@@ -897,6 +897,132 @@ export const mobilizationSectionNotes = pgTable("mobilization_section_notes", {
     .on(t.projectId, t.section),
 }));
 
+/* ======================= Project Setup (Executive OS) ====================
+ * Pre-mobilization intake. One setup row per project drives the Project
+ * Charter and Kickoff Agenda documents; stakeholders, contract docs,
+ * deliverables and signatures hang off project_id. Money and percentages are
+ * stored as text so a numeric round-trip can't shift a contract value.
+ */
+export const projectSetup = pgTable("project_setup", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  // in_progress | ready_for_kickoff | kicked_off | complete
+  status: text("status").notNull().default("in_progress"),
+
+  // Ownership / identity
+  projectNumber: text("project_number"),
+  contractNumber: text("contract_number"),
+  awardDate: text("award_date"),
+  noticeToProceedDate: text("notice_to_proceed_date"),
+  substantialCompletionDate: text("substantial_completion_date"),
+  finalCompletionDate: text("final_completion_date"),
+  // lump_sum | gmp | cost_plus | t_and_m | unit_price | design_build | other
+  contractType: text("contract_type"),
+  // dbb | cmar | design_build | ipd | other
+  deliveryMethod: text("delivery_method"),
+
+  // Financial
+  originalContractValue: text("original_contract_value"),
+  contingencyPercent: text("contingency_percent"),
+  retainagePercent: text("retainage_percent"),
+  paymentTerms: text("payment_terms"),
+  billingCycle: text("billing_cycle"), // monthly | bi_monthly | milestone
+
+  // Insurance / bonding
+  insuranceCarrier: text("insurance_carrier"),
+  insurancePolicyNumber: text("insurance_policy_number"),
+  bondCarrier: text("bond_carrier"),
+  bondPolicyNumber: text("bond_policy_number"),
+  bondAmount: text("bond_amount"),
+
+  // Narratives — these are the body of the Project Charter.
+  projectDescription: text("project_description"),
+  businessCase: text("business_case"),
+  strategicGoals: text("strategic_goals"),
+  successCriteria: text("success_criteria"),
+  keyRisks: text("key_risks"),
+  keyAssumptions: text("key_assumptions"),
+  keyConstraints: text("key_constraints"),
+  communicationPlan: text("communication_plan"),
+  changeControlProcess: text("change_control_process"),
+  documentationStandards: text("documentation_standards"),
+  qualityStandards: text("quality_standards"),
+  safetyStandards: text("safety_standards"),
+  submittalWorkflow: text("submittal_workflow"),
+  rfiWorkflow: text("rfi_workflow"),
+  payAppWorkflow: text("pay_app_workflow"),
+  closeoutRequirements: text("closeout_requirements"),
+  warrantyRequirements: text("warranty_requirements"),
+
+  // Kickoff meeting
+  kickoffScheduledAt: text("kickoff_scheduled_at"),
+  kickoffLocation: text("kickoff_location"),
+  kickoffAgendaNotes: text("kickoff_agenda_notes"),
+  kickoffAttendeesNarrative: text("kickoff_attendees_narrative"),
+  kickoffDecisions: text("kickoff_decisions"),
+  kickoffActionItems: text("kickoff_action_items"),
+
+  // Approvals
+  charterApprovedAt: text("charter_approved_at"),
+  charterApprovedById: integer("charter_approved_by_id"), // accounts.id
+  createdAt: text("created_at"),
+  updatedAt: text("updated_at"),
+}, (t) => ({
+  projectIdx: uniqueIndex("project_setup_project_idx").on(t.projectId),
+}));
+
+export const projectSetupStakeholders = pgTable("project_setup_stakeholders", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  role: text("role").notNull(),
+  organization: text("organization"),
+  name: text("name"),
+  title: text("title"),
+  email: text("email"),
+  phone: text("phone"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const projectSetupContractDocs = pgTable("project_setup_contract_docs", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  // contract | exhibit | spec | drawing_set | addendum | insurance_cert | bond | permit | other
+  kind: text("kind").notNull(),
+  label: text("label").notNull(),
+  revision: text("revision"),
+  issuedDate: text("issued_date"),
+  receivedDate: text("received_date"),
+  // Where the document lives: URL, folder path, or a physical location.
+  location: text("location"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const projectSetupDeliverables = pgTable("project_setup_deliverables", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  label: text("label").notNull(),
+  status: text("status").notNull().default("pending"), // pending | in_progress | complete | na
+  dueDate: text("due_date"),
+  completedAt: text("completed_at"),
+  ownerId: integer("owner_id"), // accounts.id
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+// Sign-off block on the Project Charter. Same shape as mobilization_signatures.
+export const projectSetupSignatures = pgTable("project_setup_signatures", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  role: text("role").notNull(),
+  name: text("name"),
+  title: text("title"),
+  signedDate: text("signed_date"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
 /* ------------------------------ Insert schemas -------------------------- */
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
@@ -956,6 +1082,24 @@ export type MobilizationSignature = typeof mobilizationSignatures.$inferSelect;
 export type InsertMobilizationSignature = typeof mobilizationSignatures.$inferInsert;
 export type MobilizationSectionNote = typeof mobilizationSectionNotes.$inferSelect;
 export type InsertMobilizationSectionNote = typeof mobilizationSectionNotes.$inferInsert;
+
+/* -------- Project Setup insert schemas + types -------- */
+export const insertProjectSetupSchema = createInsertSchema(projectSetup).omit({ id: true });
+export const insertProjectSetupStakeholderSchema = createInsertSchema(projectSetupStakeholders).omit({ id: true });
+export const insertProjectSetupContractDocSchema = createInsertSchema(projectSetupContractDocs).omit({ id: true });
+export const insertProjectSetupDeliverableSchema = createInsertSchema(projectSetupDeliverables).omit({ id: true });
+export const insertProjectSetupSignatureSchema = createInsertSchema(projectSetupSignatures).omit({ id: true });
+
+export type ProjectSetup = typeof projectSetup.$inferSelect;
+export type InsertProjectSetup = typeof projectSetup.$inferInsert;
+export type ProjectSetupStakeholder = typeof projectSetupStakeholders.$inferSelect;
+export type InsertProjectSetupStakeholder = typeof projectSetupStakeholders.$inferInsert;
+export type ProjectSetupContractDoc = typeof projectSetupContractDocs.$inferSelect;
+export type InsertProjectSetupContractDoc = typeof projectSetupContractDocs.$inferInsert;
+export type ProjectSetupDeliverable = typeof projectSetupDeliverables.$inferSelect;
+export type InsertProjectSetupDeliverable = typeof projectSetupDeliverables.$inferInsert;
+export type ProjectSetupSignature = typeof projectSetupSignatures.$inferSelect;
+export type InsertProjectSetupSignature = typeof projectSetupSignatures.$inferInsert;
 export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
 export type AppSettingsRow = typeof appSettings.$inferSelect;
 

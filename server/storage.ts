@@ -15,6 +15,8 @@ import {
   mobilizationPlans, mobilizationItems, mobilizationPermits, mobilizationEquipment,
   mobilizationUtilities, mobilizationStaff, mobilizationSubs, mobilizationRisks,
   mobilizationSignatures, mobilizationSectionNotes,
+  projectSetup, projectSetupStakeholders, projectSetupContractDocs,
+  projectSetupDeliverables, projectSetupSignatures,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -46,12 +48,20 @@ import type {
   MobilizationRisk, InsertMobilizationRisk,
   MobilizationSignature, InsertMobilizationSignature,
   MobilizationSectionNote, InsertMobilizationSectionNote,
+  ProjectSetup, InsertProjectSetup,
+  ProjectSetupStakeholder, InsertProjectSetupStakeholder,
+  ProjectSetupContractDoc, InsertProjectSetupContractDoc,
+  ProjectSetupDeliverable, InsertProjectSetupDeliverable,
+  ProjectSetupSignature, InsertProjectSetupSignature,
 } from '@shared/schema';
 import {
   MOBILIZATION_SECTIONS, DEFAULT_MOBILIZATION_ITEMS, DEFAULT_PERMITS,
   DEFAULT_MILESTONE_OFFSETS, MOBILIZATION_MILESTONE_KIND, addDays,
   DEFAULT_SIGNER_ROLES, SIGNER_ROLE_ALIASES,
 } from '@shared/mobilization-catalog';
+import {
+  PROJECT_SETUP_DELIVERABLES, PROJECT_SETUP_SIGNERS, PROJECT_SETUP_SIGNER_ALIASES,
+} from '@shared/project-setup-catalog';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, desc, and, isNotNull, gte, lt } from "drizzle-orm";
@@ -85,8 +95,12 @@ export const db = drizzle(sql);
  *  directions so a team member listed as "PM" or "Senior Project Manager"
  *  both resolve. Returns null when nothing matches — the row still gets
  *  created, just without a pre-filled name. */
-function matchSignerName(roster: TeamMember[], role: string): string | null {
-  const aliases = SIGNER_ROLE_ALIASES[role] ?? [role.toLowerCase()];
+function matchSignerName(
+  roster: TeamMember[],
+  role: string,
+  aliasTable: Record<string, string[]> = SIGNER_ROLE_ALIASES,
+): string | null {
+  const aliases = aliasTable[role] ?? [role.toLowerCase()];
   const hit = roster.find((m) => {
     const r = (m.role ?? "").trim().toLowerCase();
     if (!r) return false;
@@ -577,6 +591,117 @@ async function migrate() {
   await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS on_call_rotation TEXT`;
   await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS subcontractor_foremen TEXT`;
 
+  // Project Setup (Executive OS). Pre-mobilization intake — one setup row per
+  // project, everything else hangs off project_id. Money and percentages are
+  // TEXT so a numeric round-trip can't shift a contract value.
+  await sql`CREATE TABLE IF NOT EXISTS project_setup (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'in_progress',
+    project_number TEXT,
+    contract_number TEXT,
+    award_date TEXT,
+    notice_to_proceed_date TEXT,
+    substantial_completion_date TEXT,
+    final_completion_date TEXT,
+    contract_type TEXT,
+    delivery_method TEXT,
+    original_contract_value TEXT,
+    contingency_percent TEXT,
+    retainage_percent TEXT,
+    payment_terms TEXT,
+    billing_cycle TEXT,
+    insurance_carrier TEXT,
+    insurance_policy_number TEXT,
+    bond_carrier TEXT,
+    bond_policy_number TEXT,
+    bond_amount TEXT,
+    project_description TEXT,
+    business_case TEXT,
+    strategic_goals TEXT,
+    success_criteria TEXT,
+    key_risks TEXT,
+    key_assumptions TEXT,
+    key_constraints TEXT,
+    communication_plan TEXT,
+    change_control_process TEXT,
+    documentation_standards TEXT,
+    quality_standards TEXT,
+    safety_standards TEXT,
+    submittal_workflow TEXT,
+    rfi_workflow TEXT,
+    pay_app_workflow TEXT,
+    closeout_requirements TEXT,
+    warranty_requirements TEXT,
+    kickoff_scheduled_at TEXT,
+    kickoff_location TEXT,
+    kickoff_agenda_notes TEXT,
+    kickoff_attendees_narrative TEXT,
+    kickoff_decisions TEXT,
+    kickoff_action_items TEXT,
+    charter_approved_at TEXT,
+    charter_approved_by_id INTEGER,
+    created_at TEXT,
+    updated_at TEXT
+  )`;
+  // 1:1 with project. seedProjectSetup relies on this to stay idempotent under
+  // a concurrent retry, not just the read-then-write check.
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS project_setup_project_idx
+    ON project_setup (project_id)`;
+  await sql`CREATE TABLE IF NOT EXISTS project_setup_stakeholders (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    organization TEXT,
+    name TEXT,
+    title TEXT,
+    email TEXT,
+    phone TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS project_setup_contract_docs (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    label TEXT NOT NULL,
+    revision TEXT,
+    issued_date TEXT,
+    received_date TEXT,
+    location TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS project_setup_deliverables (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    label TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    due_date TEXT,
+    completed_at TEXT,
+    owner_id INTEGER,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS project_setup_signatures (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    name TEXT,
+    title TEXT,
+    signed_date TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS project_setup_stakeholders_project_idx
+    ON project_setup_stakeholders (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS project_setup_contract_docs_project_idx
+    ON project_setup_contract_docs (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS project_setup_deliverables_project_idx
+    ON project_setup_deliverables (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS project_setup_signatures_project_idx
+    ON project_setup_signatures (project_id)`;
+
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
   // aren't locked out of their own app. Everyone else stays in the state they were in.
@@ -989,6 +1114,29 @@ export interface IStorage {
   deleteMobilizationSignature(id: number): Promise<void>;
   getMobilizationSectionNotes(projectId: number): Promise<MobilizationSectionNote[]>;
   upsertMobilizationSectionNote(projectId: number, section: string, data: { narrative: string; updatedById?: number | null }): Promise<MobilizationSectionNote>;
+
+  seedProjectSetup(projectId: number, organizationId: number | null): Promise<void>;
+  getProjectSetup(projectId: number): Promise<ProjectSetup | null>;
+  getProjectSetupBundle(projectId: number): Promise<{
+    setup: ProjectSetup | null;
+    stakeholders: ProjectSetupStakeholder[];
+    contractDocs: ProjectSetupContractDoc[];
+    deliverables: ProjectSetupDeliverable[];
+    signatures: ProjectSetupSignature[];
+  }>;
+  updateProjectSetup(projectId: number, patch: Partial<InsertProjectSetup>): Promise<ProjectSetup | null>;
+  createStakeholder(data: InsertProjectSetupStakeholder): Promise<ProjectSetupStakeholder>;
+  updateStakeholder(id: number, data: Partial<InsertProjectSetupStakeholder>): Promise<ProjectSetupStakeholder | undefined>;
+  deleteStakeholder(id: number): Promise<void>;
+  createContractDoc(data: InsertProjectSetupContractDoc): Promise<ProjectSetupContractDoc>;
+  updateContractDoc(id: number, data: Partial<InsertProjectSetupContractDoc>): Promise<ProjectSetupContractDoc | undefined>;
+  deleteContractDoc(id: number): Promise<void>;
+  createDeliverable(data: InsertProjectSetupDeliverable): Promise<ProjectSetupDeliverable>;
+  updateDeliverable(id: number, data: Partial<InsertProjectSetupDeliverable>): Promise<ProjectSetupDeliverable | undefined>;
+  deleteDeliverable(id: number): Promise<void>;
+  createSetupSignature(data: InsertProjectSetupSignature): Promise<ProjectSetupSignature>;
+  updateSetupSignature(id: number, data: Partial<InsertProjectSetupSignature>): Promise<ProjectSetupSignature | undefined>;
+  deleteSetupSignature(id: number): Promise<void>;
 
   getMessages(projectId: number): Promise<Message[]>;
   createMessage(data: InsertMessage): Promise<Message>;
@@ -1801,6 +1949,174 @@ class DatabaseStorage implements IStorage {
       })
       .returning();
     return row;
+  }
+
+  /* --------------------------- Project Setup --------------------------- */
+  // Seeds a fresh project's setup record: the 1:1 setup row, the 13 default
+  // deliverables, and the 5 charter signers. Stakeholders and contract docs
+  // are NOT seeded — both directories are entirely project-specific.
+  // Idempotent: bails when a setup row already exists, so a retried project
+  // create can't double-seed.
+  async seedProjectSetup(projectId: number, organizationId: number | null): Promise<void> {
+    await ensureReady();
+    const existing = await this.getProjectSetup(projectId);
+    if (existing) return;
+
+    const now = new Date().toISOString();
+    await db.insert(projectSetup).values({
+      projectId,
+      status: "in_progress",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await db.insert(projectSetupDeliverables).values(
+      PROJECT_SETUP_DELIVERABLES.map((d) => ({
+        projectId,
+        label: d.label,
+        status: "pending",
+        sortOrder: d.sortOrder,
+      })),
+    );
+
+    // Names are a best-effort match against the org roster — an unmatched role
+    // still gets a row so the charter renders a blank to sign. Reading the
+    // roster unscoped would pull names from other tenants onto this charter,
+    // so a project with no organization gets no auto-fill at all.
+    const roster = organizationId != null ? await this.getTeam(organizationId) : [];
+    await db.insert(projectSetupSignatures).values(
+      PROJECT_SETUP_SIGNERS.map((role, i) => ({
+        projectId,
+        role,
+        name: matchSignerName(roster, role, PROJECT_SETUP_SIGNER_ALIASES),
+        sortOrder: i,
+      })),
+    );
+  }
+
+  async getProjectSetup(projectId: number): Promise<ProjectSetup | null> {
+    await ensureReady();
+    const rows = await db.select().from(projectSetup).where(eq(projectSetup.projectId, projectId));
+    return rows[0] ?? null;
+  }
+
+  async getProjectSetupBundle(projectId: number): Promise<{
+    setup: ProjectSetup | null;
+    stakeholders: ProjectSetupStakeholder[];
+    contractDocs: ProjectSetupContractDoc[];
+    deliverables: ProjectSetupDeliverable[];
+    signatures: ProjectSetupSignature[];
+  }> {
+    await ensureReady();
+    const [setup, stakeholders, contractDocs, deliverables, signatures] = await Promise.all([
+      this.getProjectSetup(projectId),
+      db.select().from(projectSetupStakeholders)
+        .where(eq(projectSetupStakeholders.projectId, projectId))
+        .orderBy(projectSetupStakeholders.sortOrder, projectSetupStakeholders.id),
+      db.select().from(projectSetupContractDocs)
+        .where(eq(projectSetupContractDocs.projectId, projectId))
+        .orderBy(projectSetupContractDocs.sortOrder, projectSetupContractDocs.id),
+      db.select().from(projectSetupDeliverables)
+        .where(eq(projectSetupDeliverables.projectId, projectId))
+        .orderBy(projectSetupDeliverables.sortOrder, projectSetupDeliverables.id),
+      db.select().from(projectSetupSignatures)
+        .where(eq(projectSetupSignatures.projectId, projectId))
+        .orderBy(projectSetupSignatures.sortOrder, projectSetupSignatures.id),
+    ]);
+    return { setup, stakeholders, contractDocs, deliverables, signatures };
+  }
+
+  // Returns null when the project has no setup row — callers surface that as
+  // "not set up yet" rather than lazily creating one, so the opt-in seed
+  // endpoint stays the only path that brings a legacy project into the module.
+  async updateProjectSetup(
+    projectId: number,
+    patch: Partial<InsertProjectSetup>,
+  ): Promise<ProjectSetup | null> {
+    await ensureReady();
+    const { id: _id, projectId: _pid, ...rest } = patch;
+    if (Object.keys(rest).length === 0) return await this.getProjectSetup(projectId);
+    const [row] = await db.update(projectSetup)
+      .set({ ...rest, updatedAt: new Date().toISOString() })
+      .where(eq(projectSetup.projectId, projectId))
+      .returning();
+    return row ?? null;
+  }
+
+  async createStakeholder(data: InsertProjectSetupStakeholder): Promise<ProjectSetupStakeholder> {
+    await ensureReady();
+    const [row] = await db.insert(projectSetupStakeholders).values(data).returning();
+    return row;
+  }
+  async updateStakeholder(
+    id: number,
+    data: Partial<InsertProjectSetupStakeholder>,
+  ): Promise<ProjectSetupStakeholder | undefined> {
+    await ensureReady();
+    const [row] = await db.update(projectSetupStakeholders).set(data)
+      .where(eq(projectSetupStakeholders.id, id)).returning();
+    return row;
+  }
+  async deleteStakeholder(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(projectSetupStakeholders).where(eq(projectSetupStakeholders.id, id));
+  }
+
+  async createContractDoc(data: InsertProjectSetupContractDoc): Promise<ProjectSetupContractDoc> {
+    await ensureReady();
+    const [row] = await db.insert(projectSetupContractDocs).values(data).returning();
+    return row;
+  }
+  async updateContractDoc(
+    id: number,
+    data: Partial<InsertProjectSetupContractDoc>,
+  ): Promise<ProjectSetupContractDoc | undefined> {
+    await ensureReady();
+    const [row] = await db.update(projectSetupContractDocs).set(data)
+      .where(eq(projectSetupContractDocs.id, id)).returning();
+    return row;
+  }
+  async deleteContractDoc(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(projectSetupContractDocs).where(eq(projectSetupContractDocs.id, id));
+  }
+
+  async createDeliverable(data: InsertProjectSetupDeliverable): Promise<ProjectSetupDeliverable> {
+    await ensureReady();
+    const [row] = await db.insert(projectSetupDeliverables).values(data).returning();
+    return row;
+  }
+  async updateDeliverable(
+    id: number,
+    data: Partial<InsertProjectSetupDeliverable>,
+  ): Promise<ProjectSetupDeliverable | undefined> {
+    await ensureReady();
+    const [row] = await db.update(projectSetupDeliverables).set(data)
+      .where(eq(projectSetupDeliverables.id, id)).returning();
+    return row;
+  }
+  async deleteDeliverable(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(projectSetupDeliverables).where(eq(projectSetupDeliverables.id, id));
+  }
+
+  async createSetupSignature(data: InsertProjectSetupSignature): Promise<ProjectSetupSignature> {
+    await ensureReady();
+    const [row] = await db.insert(projectSetupSignatures).values(data).returning();
+    return row;
+  }
+  async updateSetupSignature(
+    id: number,
+    data: Partial<InsertProjectSetupSignature>,
+  ): Promise<ProjectSetupSignature | undefined> {
+    await ensureReady();
+    const [row] = await db.update(projectSetupSignatures).set(data)
+      .where(eq(projectSetupSignatures.id, id)).returning();
+    return row;
+  }
+  async deleteSetupSignature(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(projectSetupSignatures).where(eq(projectSetupSignatures.id, id));
   }
 
   async getMessages(projectId: number): Promise<Message[]> {
