@@ -62,6 +62,7 @@ export const EVENT_KINDS = {
   PRECON_BID_PACKAGE_AWARDED: "pre_construction.bid_package_awarded",
   PRECON_LONG_LEAD_ORDERED: "pre_construction.long_lead_ordered",
   PRECON_LONG_LEAD_DELIVERED: "pre_construction.long_lead_delivered",
+  PRECON_PLAN_REPORT_GENERATED: "pre_construction.plan_report_generated",
 } as const;
 
 export type EventKind = typeof EVENT_KINDS[keyof typeof EVENT_KINDS];
@@ -137,6 +138,7 @@ export const EVENT_KIND_META: Record<string, EventKindMeta> = {
   [EVENT_KINDS.PRECON_BID_PACKAGE_AWARDED]: { label: "Bid package awarded", category: "project" },
   [EVENT_KINDS.PRECON_LONG_LEAD_ORDERED]: { label: "Long-lead item ordered", category: "project" },
   [EVENT_KINDS.PRECON_LONG_LEAD_DELIVERED]: { label: "Long-lead item delivered", category: "project" },
+  [EVENT_KINDS.PRECON_PLAN_REPORT_GENERATED]: { label: "Pre-Construction Plan generated", category: "doc" },
 };
 
 // Kinds grouped by category \u2014 used by the client to render filter chips and

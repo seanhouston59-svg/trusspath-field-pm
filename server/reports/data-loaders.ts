@@ -10,6 +10,8 @@ import { eq } from "drizzle-orm";
 import { db, storage } from "../storage";
 import { organizations } from "@shared/schema";
 import type { Project, Organization } from "@shared/schema";
+import { computePreConstructionHealth } from "../pre-construction-health";
+import type { PreConstructionReportContext } from "./pre-construction-shared";
 
 /** Statuses that mean "still needs someone's attention". */
 const OPEN_RFI = new Set(["open", "in review"]);
@@ -188,4 +190,54 @@ export async function loadDailyLogRollup(projectId: number, since?: Date): Promi
   if (!rows.length) return { logCount: 0, avgCrew: 0 };
   const crew = rows.reduce((s, l) => s + (Number.isFinite(l.crewCount) ? l.crewCount : 0), 0);
   return { logCount: rows.length, avgCrew: crew / rows.length };
+}
+
+/* -------------------------- pre-construction reports ---------------------- */
+
+/** Thrown when the project has no pre_construction row, so the route can answer
+ *  404 with the seed hint rather than turning a missing module into a 500. */
+export class PreConstructionNotInitializedError extends Error {
+  constructor(projectId: number) {
+    super(`Pre-Construction not initialized for project ${projectId}`);
+    this.name = "PreConstructionNotInitializedError";
+  }
+}
+
+/**
+ * Everything the Pre-Construction PDFs read, in one pass.
+ *
+ * Health is computed from the bundle already in hand rather than through
+ * preConstructionRollup, which would re-read all nine tables to reach the same
+ * numbers.
+ */
+export async function loadPreConstructionReportContext(
+  projectId: number,
+): Promise<PreConstructionReportContext> {
+  const [{ project, gcName }, bundle] = await Promise.all([
+    loadCoreProject(projectId),
+    storage.getPreConstructionBundle(projectId),
+  ]);
+
+  const { preCon, ...children } = bundle;
+  if (!preCon) throw new PreConstructionNotInitializedError(projectId);
+
+  // Both reads are project- or id-scoped, so neither can widen past the tenant.
+  const [setup, approver] = await Promise.all([
+    storage.getProjectSetupBundle(projectId),
+    preCon.preconPlanApprovedById != null
+      ? storage.getAccount(preCon.preconPlanApprovedById)
+      : Promise.resolve(undefined),
+  ]);
+
+  return {
+    project,
+    gcName,
+    preCon,
+    health: computePreConstructionHealth(bundle),
+    ...children,
+    stakeholders: setup.stakeholders,
+    approver: approver
+      ? { name: approver.displayName.trim(), email: approver.email }
+      : null,
+  };
 }
