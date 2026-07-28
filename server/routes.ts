@@ -16,6 +16,7 @@ import {
   insertChangeOrderSchema, insertActionItemSchema, insertDailyLogSchema,
   insertPunchItemSchema, insertContactSchema, insertEquipmentSchema, insertMaintenanceLogSchema,
   insertPhotoSchema, insertDocumentSchema, insertCompanyDocumentSchema, insertBlueprintSchema, insertDroneCaptureSchema, insertMessageSchema, insertNoteSchema, insertMilestoneSchema,
+
   insertTeamSchema,
   insertMobilizationItemSchema, insertMobilizationPermitSchema, insertMobilizationEquipmentSchema,
   insertMobilizationUtilitySchema, insertMobilizationStaffSchema, insertMobilizationSubSchema,
@@ -36,6 +37,8 @@ import {
 } from "@shared/schema";
 import { EVENT_KINDS } from "@shared/project-event-kinds";
 import { MOBILIZATION_SECTIONS } from "@shared/mobilization-catalog";
+import { LIFECYCLE_MILESTONES, buildLifecycleMilestoneRows } from "@shared/lifecycle-milestones-catalog";
+import { buildDashboardAlerts } from "./dashboard-alerts";
 import { mobilizationRollup } from "./mobilization-rollup";
 import { projectSetupRollup } from "./project-setup-rollup";
 import { preConstructionRollup } from "./pre-construction-rollup";
@@ -1800,6 +1803,50 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.delete("/api/milestones/:id", async (req, res) => {
     await storage.softDeleteEntity("milestones", parseInt(req.params.id, 10));
     res.status(204).end();
+  });
+
+  /**
+   * Seed the standard lifecycle milestone set (NTP through Final Closeout)
+   * on every project in the caller's organization. Idempotent per-project:
+   * for each project, only titles that do not already exist are inserted,
+   * so calling this repeatedly won't create duplicates. Existing custom or
+   * mobilization milestones are untouched.
+   */
+  app.post("/api/executive-os/milestones/seed-all", async (req: any, res) => {
+    const orgId = req.organizationId;
+    if (!orgId) return res.status(400).json({ message: "organization required" });
+    const projects = await storage.getProjects(orgId);
+    let projectCount = 0;
+    let inserted = 0;
+    let skipped = 0;
+    for (const project of projects) {
+      const existing = await storage.getMilestones(project.id);
+      const existingTitles = new Set(existing.map((m) => m.title.toLowerCase()));
+      const rows = buildLifecycleMilestoneRows(project.id, project.startDate ?? null)
+        .filter((r) => !existingTitles.has(r.title.toLowerCase()));
+      for (const row of rows) {
+        await storage.createMilestone(row);
+        inserted++;
+      }
+      skipped += LIFECYCLE_MILESTONES.length - rows.length;
+      projectCount++;
+    }
+    res.json({ projectCount, inserted, skipped });
+  });
+
+  /**
+   * Dashboard alerts aggregator. Consolidates the "PM needs to know" signals
+   * across milestones (due-soon + overdue), tasks (overdue + due-soon), RFIs
+   * (overdue + due-soon on open items), submittals (under review, due-soon),
+   * change orders (pending), inspections (upcoming + failed follow-ups),
+   * contracts (expired + expiring COIs), and mobilization (Planning without
+   * a plan). Everything is org-scoped via req.organizationId.
+   */
+  app.get("/api/dashboard/alerts", async (req: any, res) => {
+    const orgId = req.organizationId;
+    if (!orgId) return res.status(400).json({ message: "organization required" });
+    const alerts = await buildDashboardAlerts(storage, orgId);
+    res.json({ alerts, generatedAt: new Date().toISOString() });
   });
 
   /* ========================= Mobilization (Executive OS) =========================

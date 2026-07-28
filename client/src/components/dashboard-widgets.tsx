@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, CloudSun, StickyNote, ArrowRight, AlertTriangle, HelpCircle, GitPullRequestArrow, ClipboardList, Plus, ChevronDown, ChevronLeft, ChevronRight, CornerDownRight, Wrench, Car, HardHat } from "lucide-react";
+import { Bell, CloudSun, StickyNote, ArrowRight, AlertTriangle, HelpCircle, GitPullRequestArrow, ClipboardList, Plus, ChevronDown, ChevronLeft, ChevronRight, CornerDownRight, Wrench, Car, HardHat, Flag, ClipboardCheck, ShieldAlert, Rocket } from "lucide-react";
 import { Avatar } from "@/components/bits";
 import { useCreateNote, useNotes, useAddNoteReply, useProjects, useEquipment } from "@/hooks/use-data";
 import { relativeDays, isOverdue } from "@/lib/format";
@@ -10,57 +10,99 @@ import { useToast } from "@/hooks/use-toast";
 import type { Task, Rfi, ChangeOrder, DailyLog, Project, Equipment } from "@shared/schema";
 
 /* ---------------------------- Notifications ---------------------------- */
-type Notif = { id: string; icon: any; tone: string; text: string; meta: string; href: string };
+// The dashboard NotificationsBox is now driven by the server-side aggregator
+// at /api/dashboard/alerts. That endpoint pulls milestones (due-soon +
+// overdue), tasks, RFIs, submittals, change orders, inspections, contract
+// COIs, and mobilization plans, sorts them by severity, and returns a flat
+// list. This keeps the dashboard a single call away from a full "what does
+// a PM need to know right now" picture.
 
-export function NotificationsBox({ tasks, rfis, changeOrders, projects }: {
-  tasks: Task[]; rfis: Rfi[]; changeOrders: ChangeOrder[]; projects: Project[];
+type ServerAlert = {
+  id: string;
+  tone: "red" | "amber" | "sky" | "violet" | "emerald";
+  icon: string;
+  text: string;
+  meta: string;
+  href: string;
+  phase: string;
+  dueDate: string | null;
+};
+
+const ICON_MAP: Record<string, any> = {
+  Flag,
+  AlertTriangle,
+  HelpCircle,
+  ClipboardList,
+  GitPullRequestArrow,
+  ClipboardCheck,
+  ShieldAlert,
+  Rocket,
+};
+
+const TONE_CLASS: Record<ServerAlert["tone"], string> = {
+  red: "text-red-500 bg-red-500/12",
+  amber: "text-amber-500 bg-amber-500/12",
+  sky: "text-sky-500 bg-sky-500/12",
+  violet: "text-violet-500 bg-violet-500/12",
+  emerald: "text-emerald-500 bg-emerald-500/12",
+};
+
+export function NotificationsBox(_props: {
+  tasks?: Task[]; rfis?: Rfi[]; changeOrders?: ChangeOrder[]; projects?: Project[];
 }) {
-  const notifs: Notif[] = [];
-  const overdue = tasks.filter((t) => isOverdue(t.dueDate) && t.status !== "Complete");
-  overdue.slice(0, 1).forEach((t) => notifs.push({
-    id: `od-${t.id}`, icon: AlertTriangle, tone: "text-red-500 bg-red-500/12",
-    text: t.title, meta: `${relativeDays(t.dueDate)} · ${t.trade}`, href: "/tasks",
-  }));
-  rfis.filter((r) => r.status === "Open" && isOverdue(r.dueDate)).slice(0, 1).forEach((r) => notifs.push({
-    id: `rfi-${r.id}`, icon: HelpCircle, tone: "text-amber-500 bg-amber-500/12",
-    text: `${r.number} due`, meta: r.subject, href: "/rfis",
-  }));
-  changeOrders.filter((c) => c.status === "Pending").slice(0, 1).forEach((c) => notifs.push({
-    id: `co-${c.id}`, icon: GitPullRequestArrow, tone: "text-sky-500 bg-sky-500/12",
-    text: `${c.number} pending approval`, meta: c.title, href: "/change-orders",
-  }));
-  projects.filter((p) => p.status === "Planning").slice(0, 1).forEach((p) => notifs.push({
-    id: `log-${p.id}`, icon: ClipboardList, tone: "text-violet-500 bg-violet-500/12",
-    text: "Mobilization plan due", meta: p.name, href: `/projects/${p.id}`,
-  }));
+  // Poll every 60s so long-running dashboards pick up new alerts (e.g. an
+  // inspection just scheduled, or a milestone just marked complete) without a
+  // manual refresh.
+  const { data } = useQuery<{ alerts: ServerAlert[] }>({
+    queryKey: ["/api/dashboard/alerts"],
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  const alerts = data?.alerts ?? [];
+  // Cap the visible list so the box doesn't dominate the dashboard. Users
+  // can drill into each phase's dedicated page for the full list.
+  const VISIBLE = 8;
+  const visible = alerts.slice(0, VISIBLE);
+  const overflow = Math.max(0, alerts.length - VISIBLE);
 
   return (
     <div className="flex flex-col rounded-lg border border-border bg-card p-4 shadow-sm" data-testid="box-notifications">
       <div className="flex items-center justify-between">
         <h3 className="font-display text-sm font-bold">Notifications</h3>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-          <Bell className="size-3" /> {notifs.length}
+          <Bell className="size-3" /> {alerts.length}
         </span>
       </div>
       <div className="mt-3 flex-1 space-y-2">
-        {notifs.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">You're all caught up.</p>}
-        {notifs.map((n) => (
-          <Link
-            key={n.id}
-            href={n.href}
-            className="flex items-start gap-2.5 rounded-md border border-border p-2.5 transition-colors hover:border-primary/50 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            data-testid={`notif-${n.id}`}
-          >
-            <span className={cn("mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md", n.tone)}>
-              <n.icon className="size-3.5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium leading-tight">{n.text}</div>
-              <div className="truncate text-xs text-muted-foreground">{n.meta}</div>
-            </div>
-            <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        ))}
+        {alerts.length === 0 && (
+          <p className="py-6 text-center text-xs text-muted-foreground">You're all caught up.</p>
+        )}
+        {visible.map((n) => {
+          const Icon = ICON_MAP[n.icon] ?? Bell;
+          return (
+            <Link
+              key={n.id}
+              href={n.href}
+              className="flex items-start gap-2.5 rounded-md border border-border p-2.5 transition-colors hover:border-primary/50 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              data-testid={`notif-${n.id}`}
+            >
+              <span className={cn("mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md", TONE_CLASS[n.tone])}>
+                <Icon className="size-3.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium leading-tight">{n.text}</div>
+                <div className="truncate text-xs text-muted-foreground">{n.meta}</div>
+              </div>
+              <ArrowRight className="mt-1 size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          );
+        })}
+        {overflow > 0 && (
+          <div className="pt-1 text-center text-xs text-muted-foreground">
+            +{overflow} more · check the module pages for the full list
+          </div>
+        )}
       </div>
     </div>
   );
