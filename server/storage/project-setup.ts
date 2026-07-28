@@ -182,4 +182,32 @@ export class ProjectSetupRepo {
     await ensureReady();
     await db.delete(projectSetupSignatures).where(eq(projectSetupSignatures.id, id));
   }
+
+  /* --- By-id reads. Child rows carry no organizationId, so a route holding
+     only a row id must load the row to learn which project owns it before it
+     may mutate or delete it. --- */
+
+  async getStakeholderById(id: number): Promise<ProjectSetupStakeholder | null> {
+    await ensureReady();
+    const [row] = await db.select().from(projectSetupStakeholders).where(eq(projectSetupStakeholders.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getContractDocById(id: number): Promise<ProjectSetupContractDoc | null> {
+    await ensureReady();
+    const [row] = await db.select().from(projectSetupContractDocs).where(eq(projectSetupContractDocs.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getDeliverableById(id: number): Promise<ProjectSetupDeliverable | null> {
+    await ensureReady();
+    const [row] = await db.select().from(projectSetupDeliverables).where(eq(projectSetupDeliverables.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getSetupSignatureById(id: number): Promise<ProjectSetupSignature | null> {
+    await ensureReady();
+    const [row] = await db.select().from(projectSetupSignatures).where(eq(projectSetupSignatures.id, id)).limit(1);
+    return row ?? null;
+  }
 }

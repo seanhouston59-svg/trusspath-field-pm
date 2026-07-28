@@ -281,6 +281,58 @@ export class MobilizationRepo {
     await db.delete(mobilizationSignatures).where(eq(mobilizationSignatures.id, id));
   }
 
+  /* --- By-id reads. Child rows carry no organizationId, so a route holding
+     only a row id must load the row to learn which project owns it before it
+     may mutate or delete it. --- */
+
+  async getMobilizationItemById(id: number): Promise<MobilizationItem | null> {
+    await ensureReady();
+    const [row] = await db.select().from(mobilizationItems).where(eq(mobilizationItems.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getMobilizationPermitById(id: number): Promise<MobilizationPermit | null> {
+    await ensureReady();
+    const [row] = await db.select().from(mobilizationPermits).where(eq(mobilizationPermits.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getMobilizationEquipmentById(id: number): Promise<MobilizationEquipment | null> {
+    await ensureReady();
+    const [row] = await db.select().from(mobilizationEquipment).where(eq(mobilizationEquipment.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getMobilizationUtilityById(id: number): Promise<MobilizationUtility | null> {
+    await ensureReady();
+    const [row] = await db.select().from(mobilizationUtilities).where(eq(mobilizationUtilities.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getMobilizationStaffById(id: number): Promise<MobilizationStaff | null> {
+    await ensureReady();
+    const [row] = await db.select().from(mobilizationStaff).where(eq(mobilizationStaff.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getMobilizationSubById(id: number): Promise<MobilizationSub | null> {
+    await ensureReady();
+    const [row] = await db.select().from(mobilizationSubs).where(eq(mobilizationSubs.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getMobilizationRiskById(id: number): Promise<MobilizationRisk | null> {
+    await ensureReady();
+    const [row] = await db.select().from(mobilizationRisks).where(eq(mobilizationRisks.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getMobilizationSignatureById(id: number): Promise<MobilizationSignature | null> {
+    await ensureReady();
+    const [row] = await db.select().from(mobilizationSignatures).where(eq(mobilizationSignatures.id, id)).limit(1);
+    return row ?? null;
+  }
+
   async getMobilizationSectionNotes(projectId: number): Promise<MobilizationSectionNote[]> {
     await ensureReady();
     return await db.select().from(mobilizationSectionNotes)

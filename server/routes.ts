@@ -1914,6 +1914,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   const MOBILIZATION_RESOURCES: {
     path: string;
     schema: { safeParse: (v: unknown) => any };
+    byId: (id: number) => Promise<{ projectId: number } | null>;
     create: (data: any) => Promise<any>;
     update: (id: number, data: any) => Promise<any>;
     remove: (id: number) => Promise<void>;
@@ -1922,6 +1923,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     {
       path: "items", schema: insertMobilizationItemSchema,
       create: storage.createMobilizationItem.bind(storage),
+      byId: storage.getMobilizationItemById.bind(storage),
       update: storage.updateMobilizationItem.bind(storage),
       remove: storage.deleteMobilizationItem.bind(storage),
       onUpdate: (req, row, patch) => {
@@ -1940,6 +1942,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     {
       path: "permits", schema: insertMobilizationPermitSchema,
       create: storage.createMobilizationPermit.bind(storage),
+      byId: storage.getMobilizationPermitById.bind(storage),
       update: storage.updateMobilizationPermit.bind(storage),
       remove: storage.deleteMobilizationPermit.bind(storage),
       onUpdate: (req, row, patch) => {
@@ -1958,36 +1961,42 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     {
       path: "equipment", schema: insertMobilizationEquipmentSchema,
       create: storage.createMobilizationEquipment.bind(storage),
+      byId: storage.getMobilizationEquipmentById.bind(storage),
       update: storage.updateMobilizationEquipment.bind(storage),
       remove: storage.deleteMobilizationEquipment.bind(storage),
     },
     {
       path: "utilities", schema: insertMobilizationUtilitySchema,
       create: storage.createMobilizationUtility.bind(storage),
+      byId: storage.getMobilizationUtilityById.bind(storage),
       update: storage.updateMobilizationUtility.bind(storage),
       remove: storage.deleteMobilizationUtility.bind(storage),
     },
     {
       path: "staff", schema: insertMobilizationStaffSchema,
       create: storage.createMobilizationStaff.bind(storage),
+      byId: storage.getMobilizationStaffById.bind(storage),
       update: storage.updateMobilizationStaff.bind(storage),
       remove: storage.deleteMobilizationStaff.bind(storage),
     },
     {
       path: "subs", schema: insertMobilizationSubSchema,
       create: storage.createMobilizationSub.bind(storage),
+      byId: storage.getMobilizationSubById.bind(storage),
       update: storage.updateMobilizationSub.bind(storage),
       remove: storage.deleteMobilizationSub.bind(storage),
     },
     {
       path: "risks", schema: insertMobilizationRiskSchema,
       create: storage.createMobilizationRisk.bind(storage),
+      byId: storage.getMobilizationRiskById.bind(storage),
       update: storage.updateMobilizationRisk.bind(storage),
       remove: storage.deleteMobilizationRisk.bind(storage),
     },
     {
       path: "signatures", schema: insertMobilizationSignatureSchema,
       create: storage.createMobilizationSignature.bind(storage),
+      byId: storage.getMobilizationSignatureById.bind(storage),
       update: storage.updateMobilizationSignature.bind(storage),
       remove: storage.deleteMobilizationSignature.bind(storage),
     },
@@ -2023,6 +2032,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const rowId = parseInt(req.params.rowId, 10);
       if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
       if (!(await requireProjectAccess(req, res, projectId))) return;
+      // requireProjectAccess only vouches for the URL's project. Without this
+      // the row id is unscoped, so a caller with access to one project could
+      // delete another tenant's row by guessing its id. 404 (not 403) so the
+      // response doesn't reveal that the row exists.
+      const row = await resource.byId(rowId);
+      if (!row || row.projectId !== projectId) return res.status(404).json({ message: "Not found" });
       await resource.remove(rowId);
       res.status(204).end();
     });
@@ -2194,6 +2209,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   const PROJECT_SETUP_RESOURCES: {
     path: string;
     schema: { safeParse: (v: unknown) => any };
+    byId: (id: number) => Promise<{ projectId: number } | null>;
     create: (data: any) => Promise<any>;
     update: (id: number, data: any) => Promise<any>;
     remove: (id: number) => Promise<void>;
@@ -2202,18 +2218,21 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     {
       path: "stakeholders", schema: insertProjectSetupStakeholderSchema,
       create: storage.createStakeholder.bind(storage),
+      byId: storage.getStakeholderById.bind(storage),
       update: storage.updateStakeholder.bind(storage),
       remove: storage.deleteStakeholder.bind(storage),
     },
     {
       path: "contract-docs", schema: insertProjectSetupContractDocSchema,
       create: storage.createContractDoc.bind(storage),
+      byId: storage.getContractDocById.bind(storage),
       update: storage.updateContractDoc.bind(storage),
       remove: storage.deleteContractDoc.bind(storage),
     },
     {
       path: "deliverables", schema: insertProjectSetupDeliverableSchema,
       create: storage.createDeliverable.bind(storage),
+      byId: storage.getDeliverableById.bind(storage),
       update: storage.updateDeliverable.bind(storage),
       remove: storage.deleteDeliverable.bind(storage),
       onUpdate: (req, row, patch) => {
@@ -2232,6 +2251,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     {
       path: "signatures", schema: insertProjectSetupSignatureSchema,
       create: storage.createSetupSignature.bind(storage),
+      byId: storage.getSetupSignatureById.bind(storage),
       update: storage.updateSetupSignature.bind(storage),
       remove: storage.deleteSetupSignature.bind(storage),
     },
@@ -2265,6 +2285,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const rowId = parseInt(req.params.rowId, 10);
       if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
       if (!(await requireProjectAccess(req, res, projectId))) return;
+      // See the mobilization DELETE above: the row id is unscoped on its own.
+      const row = await resource.byId(rowId);
+      if (!row || row.projectId !== projectId) return res.status(404).json({ message: "Not found" });
       await resource.remove(rowId);
       res.status(204).end();
     });
@@ -2356,20 +2379,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(await preConstructionRollup(projectId));
   });
 
-  // Read-before-write for a child row. IStorage exposes no per-collection
-  // getter — only the 9-way bundle — so a transition check costs one bundle
-  // read. `watch` below gates this so only event-emitting patches pay for it.
-  async function preconChildBefore(projectId: number, collection: string, rowId: number) {
-    const bundle: Record<string, any> = await storage.getPreConstructionBundle(projectId);
-    return (bundle[collection] as any[] | undefined)?.find((r) => r.id === rowId) ?? null;
-  }
-
   const today = () => new Date().toISOString().slice(0, 10);
 
   const PRE_CONSTRUCTION_RESOURCES: {
     path: string;
     param: string;
-    collection: string;
+    byId: (id: number) => Promise<any | null>;
     schema: any;
     create: (data: any) => Promise<any>;
     update: (id: number, data: any) => Promise<any>;
@@ -2380,22 +2395,26 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     stamp?: (before: any, patch: any) => void;
     onTransition?: (req: any, before: any, after: any) => void;
   }[] = [
-    { path: "design-docs", param: "docId", collection: "designDocs",
+    { path: "design-docs", param: "docId",
+      byId: storage.getDesignDocById.bind(storage),
       schema: insertPreConstructionDesignDocSchema,
       create: storage.createDesignDoc.bind(storage),
       update: storage.updateDesignDoc.bind(storage),
       remove: storage.deleteDesignDoc.bind(storage) },
-    { path: "design-rfis", param: "rfiId", collection: "designRfis",
+    { path: "design-rfis", param: "rfiId",
+      byId: storage.getDesignRfiById.bind(storage),
       schema: insertPreConstructionDesignRfiSchema,
       create: storage.createDesignRfi.bind(storage),
       update: storage.updateDesignRfi.bind(storage),
       remove: storage.deleteDesignRfi.bind(storage) },
-    { path: "ve-items", param: "veId", collection: "veItems",
+    { path: "ve-items", param: "veId",
+      byId: storage.getVeItemById.bind(storage),
       schema: insertPreConstructionVeItemSchema,
       create: storage.createVeItem.bind(storage),
       update: storage.updateVeItem.bind(storage),
       remove: storage.deleteVeItem.bind(storage) },
-    { path: "permits", param: "permitId", collection: "permits",
+    { path: "permits", param: "permitId",
+      byId: storage.getPermitById.bind(storage),
       schema: insertPreConstructionPermitSchema,
       create: storage.createPermit.bind(storage),
       update: storage.updatePermit.bind(storage),
@@ -2421,12 +2440,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
           },
         });
       } },
-    { path: "prequal-subs", param: "subId", collection: "prequalSubs",
+    { path: "prequal-subs", param: "subId",
+      byId: storage.getPrequalSubById.bind(storage),
       schema: insertPreConstructionPrequalSubSchema,
       create: storage.createPrequalSub.bind(storage),
       update: storage.updatePrequalSub.bind(storage),
       remove: storage.deletePrequalSub.bind(storage) },
-    { path: "bid-packages", param: "bpId", collection: "bidPackages",
+    { path: "bid-packages", param: "bpId",
+      byId: storage.getBidPackageById.bind(storage),
       schema: insertPreConstructionBidPackageSchema,
       create: storage.createBidPackage.bind(storage),
       update: storage.updateBidPackage.bind(storage),
@@ -2450,7 +2471,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
           },
         });
       } },
-    { path: "long-lead-items", param: "llId", collection: "longLeadItems",
+    { path: "long-lead-items", param: "llId",
+      byId: storage.getLongLeadItemById.bind(storage),
       schema: insertPreConstructionLongLeadItemSchema,
       create: storage.createLongLeadItem.bind(storage),
       update: storage.updateLongLeadItem.bind(storage),
@@ -2484,7 +2506,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
           });
         }
       } },
-    { path: "signatures", param: "sigId", collection: "signatures",
+    { path: "signatures", param: "sigId",
+      byId: storage.getPreconSignatureById.bind(storage),
       schema: insertPreConstructionSignatureSchema,
       create: storage.createPreconSignature.bind(storage),
       update: storage.updatePreconSignature.bind(storage),
@@ -2514,7 +2537,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const patch: Record<string, any> = { ...parsed.data };
 
       const needsBefore = !!resource.watch?.some((k) => k in patch);
-      const before = needsBefore ? await preconChildBefore(projectId, resource.collection, rowId) : null;
+      const before = needsBefore ? await resource.byId(rowId) : null;
       if (needsBefore && (!before || before.projectId !== projectId)) {
         return res.status(404).json({ message: "Not found" });
       }
@@ -2531,6 +2554,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const rowId = parseInt(req.params[resource.param], 10);
       if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
       if (!(await requireProjectAccess(req, res, projectId))) return;
+      // See the mobilization DELETE above: the row id is unscoped on its own.
+      const row = await resource.byId(rowId);
+      if (!row || row.projectId !== projectId) return res.status(404).json({ message: "Not found" });
       await resource.remove(rowId);
       res.json({ deleted: true });
     });

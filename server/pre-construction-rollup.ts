@@ -39,7 +39,10 @@ export async function preConstructionRollup(projectId: number): Promise<PreConst
   // Every critical type with no issued row — including types nobody has created
   // a permit row for yet, since an untracked permit is still a missing permit.
   const issuedTypes = new Set(permits.filter((p) => p.status === "issued").map((p) => p.permitType));
-  const missingCriticalPermits = CRITICAL_PERMIT_TYPES.filter((t) => !issuedTypes.has(t));
+  // Suppress the "missing" list when no permits have been added yet — otherwise a fresh project shows all critical permits as missing before the user has done anything.
+  const missingCriticalPermits = permits.length
+    ? CRITICAL_PERMIT_TYPES.filter((t) => !issuedTypes.has(t))
+    : [];
 
   const bidPackagesBoughtOut = bidPackages.filter(
     (b) => b.status === "awarded" || b.status === "contract_executed",

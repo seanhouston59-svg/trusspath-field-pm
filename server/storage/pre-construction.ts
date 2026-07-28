@@ -280,4 +280,56 @@ export class PreConstructionRepo {
     await ensureReady();
     await db.delete(preConstructionSignatures).where(eq(preConstructionSignatures.id, id));
   }
+
+  /* --- By-id reads. Child rows carry no organizationId, so a route holding
+     only a row id must load the row to learn which project owns it before it
+     may mutate or delete it. --- */
+
+  async getDesignDocById(id: number): Promise<PreConstructionDesignDoc | null> {
+    await ensureReady();
+    const [row] = await db.select().from(preConstructionDesignDocs).where(eq(preConstructionDesignDocs.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getDesignRfiById(id: number): Promise<PreConstructionDesignRfi | null> {
+    await ensureReady();
+    const [row] = await db.select().from(preConstructionDesignRfis).where(eq(preConstructionDesignRfis.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getVeItemById(id: number): Promise<PreConstructionVeItem | null> {
+    await ensureReady();
+    const [row] = await db.select().from(preConstructionVeItems).where(eq(preConstructionVeItems.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getPermitById(id: number): Promise<PreConstructionPermit | null> {
+    await ensureReady();
+    const [row] = await db.select().from(preConstructionPermits).where(eq(preConstructionPermits.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getPrequalSubById(id: number): Promise<PreConstructionPrequalSub | null> {
+    await ensureReady();
+    const [row] = await db.select().from(preConstructionPrequalSubs).where(eq(preConstructionPrequalSubs.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getBidPackageById(id: number): Promise<PreConstructionBidPackage | null> {
+    await ensureReady();
+    const [row] = await db.select().from(preConstructionBidPackages).where(eq(preConstructionBidPackages.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getLongLeadItemById(id: number): Promise<PreConstructionLongLeadItem | null> {
+    await ensureReady();
+    const [row] = await db.select().from(preConstructionLongLeadItems).where(eq(preConstructionLongLeadItems.id, id)).limit(1);
+    return row ?? null;
+  }
+
+  async getPreconSignatureById(id: number): Promise<PreConstructionSignature | null> {
+    await ensureReady();
+    const [row] = await db.select().from(preConstructionSignatures).where(eq(preConstructionSignatures.id, id)).limit(1);
+    return row ?? null;
+  }
 }

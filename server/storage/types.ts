@@ -119,6 +119,16 @@ export interface IStorage {
   createMobilizationSignature(data: InsertMobilizationSignature): Promise<MobilizationSignature>;
   updateMobilizationSignature(id: number, data: Partial<InsertMobilizationSignature>): Promise<MobilizationSignature | undefined>;
   deleteMobilizationSignature(id: number): Promise<void>;
+  // By-id child reads. A row id alone doesn't say which project owns it, so
+  // mutation routes load the row before acting on it.
+  getMobilizationItemById(id: number): Promise<MobilizationItem | null>;
+  getMobilizationPermitById(id: number): Promise<MobilizationPermit | null>;
+  getMobilizationEquipmentById(id: number): Promise<MobilizationEquipment | null>;
+  getMobilizationUtilityById(id: number): Promise<MobilizationUtility | null>;
+  getMobilizationStaffById(id: number): Promise<MobilizationStaff | null>;
+  getMobilizationSubById(id: number): Promise<MobilizationSub | null>;
+  getMobilizationRiskById(id: number): Promise<MobilizationRisk | null>;
+  getMobilizationSignatureById(id: number): Promise<MobilizationSignature | null>;
   getMobilizationSectionNotes(projectId: number): Promise<MobilizationSectionNote[]>;
   upsertMobilizationSectionNote(projectId: number, section: string, data: { narrative: string; updatedById?: number | null }): Promise<MobilizationSectionNote>;
 
@@ -144,6 +154,10 @@ export interface IStorage {
   createSetupSignature(data: InsertProjectSetupSignature): Promise<ProjectSetupSignature>;
   updateSetupSignature(id: number, data: Partial<InsertProjectSetupSignature>): Promise<ProjectSetupSignature | undefined>;
   deleteSetupSignature(id: number): Promise<void>;
+  getStakeholderById(id: number): Promise<ProjectSetupStakeholder | null>;
+  getContractDocById(id: number): Promise<ProjectSetupContractDoc | null>;
+  getDeliverableById(id: number): Promise<ProjectSetupDeliverable | null>;
+  getSetupSignatureById(id: number): Promise<ProjectSetupSignature | null>;
 
   // ----- Pre-Construction (Executive OS) -----
   seedPreConstruction(projectId: number, organizationId: number | null): Promise<void>;
@@ -184,6 +198,14 @@ export interface IStorage {
   createPreconSignature(data: InsertPreConstructionSignature): Promise<PreConstructionSignature>;
   updatePreconSignature(id: number, data: Partial<InsertPreConstructionSignature>): Promise<PreConstructionSignature | undefined>;
   deletePreconSignature(id: number): Promise<void>;
+  getDesignDocById(id: number): Promise<PreConstructionDesignDoc | null>;
+  getDesignRfiById(id: number): Promise<PreConstructionDesignRfi | null>;
+  getVeItemById(id: number): Promise<PreConstructionVeItem | null>;
+  getPermitById(id: number): Promise<PreConstructionPermit | null>;
+  getPrequalSubById(id: number): Promise<PreConstructionPrequalSub | null>;
+  getBidPackageById(id: number): Promise<PreConstructionBidPackage | null>;
+  getLongLeadItemById(id: number): Promise<PreConstructionLongLeadItem | null>;
+  getPreconSignatureById(id: number): Promise<PreConstructionSignature | null>;
 
   getMessages(projectId: number): Promise<Message[]>;
   createMessage(data: InsertMessage): Promise<Message>;
