@@ -28,6 +28,76 @@ import { shortDate } from "@/lib/format";
 
 const CATEGORIES = ["New Hire", "Contract", "HR", "Safety", "Vendor", "Legal", "Insurance", "Other"];
 
+/**
+ * Common company-document title presets, grouped by category. Picking one
+ * writes the title verbatim into the title input; users can still tweak it
+ * (append a name, project code, revision, etc.) before uploading. Grouped so
+ * the dropdown stays scannable at ~30 entries.
+ *
+ * When adding new presets keep them generic — anything project- or client-
+ * specific belongs in the free text field, not this list.
+ */
+const TITLE_PRESETS: { group: string; titles: string[] }[] = [
+  {
+    group: "HR & New Hire",
+    titles: [
+      "Offer Letter",
+      "Employment Agreement",
+      "I-9 Employment Eligibility Verification",
+      "W-4 Tax Withholding",
+      "Direct Deposit Authorization",
+      "Employee Handbook Acknowledgment",
+      "Non-Disclosure Agreement (NDA)",
+      "Non-Compete Agreement",
+      "New Hire Onboarding Packet",
+    ],
+  },
+  {
+    group: "Contracts",
+    titles: [
+      "Master Services Agreement (MSA)",
+      "Subcontractor Agreement",
+      "Independent Contractor Agreement",
+      "Vendor Purchase Order Terms",
+      "Change Order",
+      "Statement of Work (SOW)",
+      "Consulting Agreement",
+    ],
+  },
+  {
+    group: "Safety & Compliance",
+    titles: [
+      "Safety Orientation Acknowledgment",
+      "OSHA 10 Certification",
+      "OSHA 30 Certification",
+      "Toolbox Talk Sign-Off",
+      "Incident Report",
+      "Site Access Agreement",
+      "Drug & Alcohol Testing Consent",
+    ],
+  },
+  {
+    group: "Insurance & Legal",
+    titles: [
+      "Certificate of Insurance (COI)",
+      "General Liability Policy",
+      "Workers' Compensation Certificate",
+      "Lien Waiver — Conditional",
+      "Lien Waiver — Unconditional",
+      "Indemnification Agreement",
+    ],
+  },
+  {
+    group: "Vendor & Procurement",
+    titles: [
+      "W-9 Request for Taxpayer Identification",
+      "Vendor Setup Form",
+      "Credit Application",
+      "Purchase Order",
+    ],
+  },
+];
+
 const CAT_META: Record<string, { icon: any; tint: string }> = {
   "New Hire": { icon: Building2, tint: "text-sky-500 bg-sky-500/12" },
   Contract: { icon: FileSignature, tint: "text-amber-500 bg-amber-500/12" },
@@ -210,7 +280,32 @@ export default function CompanyDocumentsPage() {
           <div className="space-y-4">
             <div>
               <Label>Title</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. New Hire Onboarding Packet" className="mt-1.5" data-testid="input-co-doc-title" />
+              {/* Two-part input: a preset dropdown that fills the text field,
+                  and a free-text override so users can tweak the name (append
+                  a subcontractor name, revision number, etc.) before upload.
+                  We DON'T store the preset key — only the final title text —
+                  because titles are already a plain text column. */}
+              <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. New Hire Onboarding Packet"
+                  data-testid="input-co-doc-title"
+                />
+                <Select value="" onValueChange={(v) => { if (v) setTitle(v); }}>
+                  <SelectTrigger data-testid="select-co-doc-title-preset"><SelectValue placeholder="Pick a preset…" /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {TITLE_PRESETS.map((grp) => (
+                      <div key={grp.group}>
+                        <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{grp.group}</div>
+                        {grp.titles.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label>File (PDF or image, max 25 MB)</Label>
@@ -251,14 +346,69 @@ export default function CompanyDocumentsPage() {
               </div>
             </div>
             {sigRequired && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
+                {/* Team-member picker — auto-fills signer name + email from the
+                    team roster. Faster than typing, and it keeps names/emails
+                    consistent across documents. Choosing "Someone else" clears
+                    both fields so the user can type freely. */}
                 <div>
-                  <Label>Signer name</Label>
-                  <Input value={signerName} onChange={(e) => setSignerName(e.target.value)} placeholder="John Doe" className="mt-1.5" data-testid="input-co-doc-signer-name" />
+                  <Label>Signer</Label>
+                  <Select
+                    value={(() => {
+                      const match = teamList.find((m) => (m.email || "").toLowerCase() === signerEmail.toLowerCase() && signerEmail);
+                      return match ? String(match.id) : (signerName || signerEmail) ? "__manual" : "";
+                    })()}
+                    onValueChange={(v) => {
+                      if (v === "__manual") {
+                        // Keep whatever is typed; do nothing.
+                        return;
+                      }
+                      if (v === "__clear") {
+                        setSignerName(""); setSignerEmail(""); return;
+                      }
+                      const m = teamList.find((tm) => String(tm.id) === v);
+                      if (m) {
+                        setSignerName(m.name || "");
+                        setSignerEmail(m.email || "");
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="mt-1.5" data-testid="select-co-doc-signer-team"><SelectValue placeholder="Pick a team member…" /></SelectTrigger>
+                    <SelectContent>
+                      {teamList.length > 0 && (
+                        <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Team members</div>
+                      )}
+                      {teamList.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)} disabled={!m.email}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{m.name}</span>
+                            <span className="text-[11px] text-muted-foreground">{m.email || "no email on file"}{m.role ? ` · ${m.role}` : ""}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      <div className="my-1 border-t border-border" />
+                      <SelectItem value="__manual">Someone else — type manually</SelectItem>
+                      <SelectItem value="__clear">— Clear signer —</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {signerName || signerEmail ? (
+                    <p className="mt-1 text-[11px] text-muted-foreground" data-testid="co-doc-signer-preview">
+                      Signing as <span className="font-medium text-foreground">{signerName || "—"}</span>{signerEmail && <> · {signerEmail}</>}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[11px] italic text-muted-foreground">No signer picked yet</p>
+                  )}
                 </div>
-                <div>
-                  <Label>Signer email</Label>
-                  <Input value={signerEmail} onChange={(e) => setSignerEmail(e.target.value)} placeholder="john@company.com" className="mt-1.5" data-testid="input-co-doc-signer-email" />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Signer name</Label>
+                    <Input value={signerName} onChange={(e) => setSignerName(e.target.value)} placeholder="John Doe" className="mt-1.5" data-testid="input-co-doc-signer-name" />
+                  </div>
+                  <div>
+                    <Label>Signer email</Label>
+                    <Input value={signerEmail} onChange={(e) => setSignerEmail(e.target.value)} placeholder="john@company.com" className="mt-1.5" data-testid="input-co-doc-signer-email" />
+                  </div>
                 </div>
                 <div>
                   <Label>Due date</Label>
