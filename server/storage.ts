@@ -1001,13 +1001,18 @@ async function migrate() {
   }
 }
 
+// Scoping contract for the org-scoped list reads below (getTeam, getProjects,
+// getContacts, getEquipment, getCompanyDocuments): passing `undefined` reads
+// across all tenants and is reserved for admin/system paths; passing `null`
+// means "caller has no organization" and returns nothing. Never let a null
+// scope widen into an unscoped read.
 export interface IStorage {
-  getTeam(): Promise<TeamMember[]>;
+  getTeam(organizationId?: number | null): Promise<TeamMember[]>;
   getTeamMember(id: number): Promise<TeamMember | undefined>;
   createTeamMember(data: InsertTeamMember): Promise<TeamMember>;
   updateTeamMember(id: number, data: Partial<InsertTeamMember>): Promise<TeamMember | undefined>;
   deleteTeamMember(id: number): Promise<void>;
-  getProjects(): Promise<Project[]>;
+  getProjects(organizationId?: number | null): Promise<Project[]>;
   getProject(id: number): Promise<Project | undefined>;
   createProject(data: InsertProject): Promise<Project>;
   updateProject(id: number, data: Partial<InsertProject>): Promise<Project | undefined>;
@@ -1033,11 +1038,11 @@ export interface IStorage {
   getPunchItems(projectId?: number): Promise<PunchItem[]>;
   createPunchItem(data: InsertPunchItem): Promise<PunchItem>;
   updatePunchStatus(id: number, status: string): Promise<PunchItem | undefined>;
-  getContacts(): Promise<Contact[]>;
+  getContacts(organizationId?: number | null): Promise<Contact[]>;
   createContact(data: InsertContact): Promise<Contact>;
   updateContact(id: number, data: Partial<InsertContact>): Promise<Contact | undefined>;
   deleteContact(id: number): Promise<void>;
-  getEquipment(projectId?: number): Promise<Equipment[]>;
+  getEquipment(projectId?: number, organizationId?: number | null): Promise<Equipment[]>;
   getEquipmentById(id: number): Promise<Equipment | undefined>;
   createEquipment(data: InsertEquipment): Promise<Equipment>;
   updateEquipment(id: number, patch: Partial<InsertEquipment>): Promise<Equipment | undefined>;
@@ -1053,12 +1058,14 @@ export interface IStorage {
   getDocument(id: number): Promise<DocumentRow | undefined>;
   createDocument(data: InsertDocument): Promise<DocumentRow>;
   deleteDocument(id: number): Promise<void>;
-  getCompanyDocuments(): Promise<CompanyDocument[]>;
+  getCompanyDocuments(organizationId?: number | null): Promise<CompanyDocument[]>;
   getCompanyDocument(id: number): Promise<CompanyDocument | undefined>;
   createCompanyDocument(data: InsertCompanyDocument): Promise<CompanyDocument>;
   updateCompanyDocument(id: number, data: Partial<InsertCompanyDocument>): Promise<CompanyDocument | undefined>;
   deleteCompanyDocument(id: number): Promise<void>;
   // Deleted Items Bin
+  // UNSCOPED: deleted_items has no organization_id column. Callers scope it
+  // from each row's JSON snapshot — see scopedDeletedItems() in routes.ts.
   getDeletedItems(): Promise<DeletedItem[]>;
   softDeleteEntity(entityType: string, entityId: number, deletedById?: number): Promise<DeletedItem>;
   restoreEntity(entityType: string, entityId: number): Promise<any>;
@@ -1146,13 +1153,17 @@ export interface IStorage {
   getNoteById(id: number): Promise<Note | undefined>;
   updateNote(id: number, patch: Partial<Note>): Promise<Note | undefined>;
   deleteNote(id: number): Promise<void>;
+  // UNSCOPED: integrations.key is globally unique, so per-org rows cannot
+  // exist. See the note on the implementation.
   getIntegrations(): Promise<Integration[]>;
   setIntegration(key: string, connected: boolean, config?: string): Promise<Integration>;
   connectIntegration(key: string, data: { accountLabel?: string; config?: string }): Promise<Integration>;
   disconnectIntegration(key: string): Promise<Integration>;
   createSubscriber(data: InsertSubscriber): Promise<Subscriber>;
+  // UNSCOPED: platform-level marketing table, not tenant data. Owner-only route.
   listSubscribers(): Promise<Subscriber[]>;
   createDemoRequest(data: InsertDemoRequest): Promise<DemoRequest>;
+  // UNSCOPED: platform-level marketing table, not tenant data. Owner-only route.
   listDemoRequests(): Promise<DemoRequest[]>;
   getSettings(): Promise<Record<string, any>>;
   updateSettings(patch: Record<string, any>): Promise<Record<string, any>>;
@@ -1173,7 +1184,7 @@ export interface IStorage {
   getOpenFieldPunch(accountId: number): Promise<FieldPunch | undefined>;
   getFieldPunchByClientId(accountId: number, clientId: string): Promise<FieldPunch | undefined>;
   createFieldObservation(data: InsertFieldObservation): Promise<FieldObservation>;
-  getRecentFieldObservations(opts: { accountId?: number; organizationId?: number; projectId?: number; limit?: number }): Promise<FieldObservation[]>;
+  getRecentFieldObservations(opts: { accountId?: number; organizationId?: number | null; projectId?: number; limit?: number }): Promise<FieldObservation[]>;
   getFieldObservationByClientId(accountId: number, clientId: string): Promise<FieldObservation | undefined>;
   updateAccountBilling(id: number, data: {
     stripeCustomerId?: string;
@@ -1195,10 +1206,14 @@ export interface IStorage {
   countAccounts(): Promise<number>;
   // ----- Demo login (48h) -----
   createDemoAccount(email: string, password: string, displayName: string, expiresAt: string): Promise<AccountPublic>;
+  // UNSCOPED: platform-admin view of the accounts table, which spans orgs
+  // by definition. Reached only through a requireOwner route.
   listDemoAccounts(): Promise<AccountPublic[]>;
   expireDemoAccount(id: number): Promise<AccountPublic | undefined>;
   purgeExpiredDemos(graceDays: number): Promise<{ purgedAccountIds: number[]; purgedOrgIds: number[] }>;
   // ----- Admin / access control -----
+  // UNSCOPED: platform-admin view of the accounts table, which spans orgs
+  // by definition. Reached only through a requireOwner route.
   listAccountsForAdmin(): Promise<AccountPublic[]>;
   setAccountApproval(id: number, status: "pending" | "approved" | "denied", approverId: number): Promise<AccountPublic | undefined>;
   // Jarvis memory
@@ -1246,8 +1261,10 @@ export function ensureReady(): Promise<void> {
 }
 
 class DatabaseStorage implements IStorage {
-  async getTeam(organizationId?: number): Promise<TeamMember[]> {
+  async getTeam(organizationId?: number | null): Promise<TeamMember[]> {
     await ensureReady();
+    // A null scope means "no organization" and must not widen to every tenant.
+    if (organizationId === null) return [];
     if (organizationId !== undefined) return await db.select().from(teamMembers).where(eq(teamMembers.organizationId, organizationId));
     return await db.select().from(teamMembers);
   }
@@ -1271,8 +1288,10 @@ class DatabaseStorage implements IStorage {
     await db.delete(teamMembers).where(eq(teamMembers.id, id));
   }
 
-  async getProjects(organizationId?: number): Promise<Project[]> {
+  async getProjects(organizationId?: number | null): Promise<Project[]> {
     await ensureReady();
+    // A null scope means "no organization" and must not widen to every tenant.
+    if (organizationId === null) return [];
     if (organizationId !== undefined) return await db.select().from(projects).where(eq(projects.organizationId, organizationId));
     return await db.select().from(projects);
   }
@@ -1412,8 +1431,10 @@ class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async getContacts(organizationId?: number): Promise<Contact[]> {
+  async getContacts(organizationId?: number | null): Promise<Contact[]> {
     await ensureReady();
+    // A null scope means "no organization" and must not widen to every tenant.
+    if (organizationId === null) return [];
     if (organizationId !== undefined) return await db.select().from(contacts).where(eq(contacts.organizationId, organizationId));
     return await db.select().from(contacts);
   }
@@ -1431,8 +1452,10 @@ class DatabaseStorage implements IStorage {
     await ensureReady();
     await db.delete(contacts).where(eq(contacts.id, id));
   }
-  async getEquipment(projectId?: number, organizationId?: number): Promise<Equipment[]> {
+  async getEquipment(projectId?: number, organizationId?: number | null): Promise<Equipment[]> {
     await ensureReady();
+    // A null scope means "no organization" and must not widen to every tenant.
+    if (organizationId === null) return [];
     const conds: any[] = [];
     if (projectId !== undefined) conds.push(eq(equipment.projectId, projectId));
     if (organizationId !== undefined) conds.push(eq(equipment.organizationId, organizationId));
@@ -1511,8 +1534,10 @@ class DatabaseStorage implements IStorage {
     await ensureReady();
     await db.delete(documents).where(eq(documents.id, id));
   }
-  async getCompanyDocuments(organizationId?: number): Promise<CompanyDocument[]> {
+  async getCompanyDocuments(organizationId?: number | null): Promise<CompanyDocument[]> {
     await ensureReady();
+    // A null scope means "no organization" and must not widen to every tenant.
+    if (organizationId === null) return [];
     if (organizationId !== undefined) {
       return await db.select().from(companyDocuments).where(eq(companyDocuments.organizationId, organizationId)).orderBy(desc(companyDocuments.date));
     }
@@ -2158,6 +2183,12 @@ class DatabaseStorage implements IStorage {
     await db.delete(notes).where(eq(notes.id, id));
   }
 
+  // UNSCOPED: integrations.key carries a global UNIQUE constraint, so there is
+  // exactly one row per third-party service for the whole deployment and
+  // per-org rows cannot exist. setIntegration keys off `key` alone for the same
+  // reason. The rows hold connection state (and a config blob), not tenant
+  // records. Making integrations per-org requires dropping the unique
+  // constraint for a composite key, so it is out of scope here.
   async getIntegrations(): Promise<Integration[]> {
     await ensureReady();
     return await db.select().from(integrations);
@@ -2246,6 +2277,11 @@ class DatabaseStorage implements IStorage {
   }
 
   /* --------------------------- Settings ---------------------------- */
+  // UNSCOPED: app_settings is a single global row (id=1) holding Jarvis persona
+  // prefs. The table has an organization_id column but no code writes it, so
+  // there is no per-org row to read. No tenant records are exposed, but the
+  // prefs themselves are shared across tenants. Making them per-org requires a
+  // write-path and primary-key change, so it is out of scope here.
   async getSettings(): Promise<Record<string, any>> {
     await ensureReady();
     const rows = await db.select().from(appSettings).where(eq(appSettings.id, 1));
@@ -2424,9 +2460,11 @@ class DatabaseStorage implements IStorage {
     const [row] = await db.insert(fieldObservations).values(data).returning();
     return row;
   }
-  async getRecentFieldObservations(opts: { accountId?: number; organizationId?: number; projectId?: number; limit?: number }): Promise<FieldObservation[]> {
+  async getRecentFieldObservations(opts: { accountId?: number; organizationId?: number | null; projectId?: number; limit?: number }): Promise<FieldObservation[]> {
     await ensureReady();
     const limit = opts.limit ?? 25;
+    // A null scope means "no organization" and must not widen to every tenant.
+    if (opts.organizationId === null) return [];
     const filters: any[] = [];
     if (opts.accountId != null) filters.push(eq(fieldObservations.accountId, opts.accountId));
     if (opts.organizationId != null) filters.push(eq(fieldObservations.organizationId, opts.organizationId));

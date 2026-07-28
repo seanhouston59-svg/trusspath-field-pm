@@ -164,6 +164,10 @@ export async function runWeeklyRolloverIfDue(): Promise<{ rolled: number }> {
   const todayIso = new Date().toISOString().slice(0, 10);
   // Fetch all draft timesheets (limit to those with accountId set — legacy
   // manual ones don't participate in this automation).
+  // UNSCOPED: intentionally deployment-wide. This is a maintenance sweep that
+  // flips stale drafts to needs-signature for every tenant; scoping it to the
+  // requesting org would leave other orgs' timesheets stuck in draft. It
+  // returns only a count and never hands rows to the caller.
   const all = await storage.getTimesheets();
   let rolled = 0;
   for (const ts of all) {

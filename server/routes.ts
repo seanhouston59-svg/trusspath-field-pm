@@ -445,7 +445,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const pid = parseInt(String(q), 10);
       if (!Number.isFinite(pid)) return res.status(400).json({ message: "Invalid projectId" });
       const project = await storage.getProject(pid);
-      if (!project || (req.organizationId && project.organizationId !== req.organizationId)) {
+      // Org-scoped: a missing org must reject, not wave the project through.
+      // resolveMembership already 403s a non-owner with no membership, so this
+      // is defense in depth — and it matches requireProjectAccess's guard.
+      if (!project || !req.organizationId || project.organizationId !== req.organizationId) {
         return res.status(404).json({ message: "Project not found" });
       }
       return next();
@@ -791,7 +794,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const limit = Math.max(1, Math.min(100, Number(req.query?.limit) || 25));
     const projectId = req.query?.projectId ? Number(req.query.projectId) : undefined;
     const rows = await storage.getRecentFieldObservations({
-      organizationId: req.organizationId ?? undefined,
+      // Org-scoped: prevents an account with no organization from reading every
+      // tenant's observations. `?? null` (not `?? undefined`) keeps it
+      // fail-closed — undefined drops the filter entirely.
+      organizationId: req.organizationId ?? null,
       projectId: Number.isFinite(projectId as number) ? (projectId as number) : undefined,
       limit,
     });
@@ -2006,8 +2012,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // Portfolio rollup across every project the caller can see.
   app.get("/api/executive-os/mobilization", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
+      // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —
+      // the single OWNER_EMAIL admin account sees every tenant by design.
       ? await storage.getProjects()
-      : await storage.getProjects(req.organizationId ?? undefined);
+      // Org-scoped: prevents a null-org account from reading every tenant's
+      // portfolio. `?? null` (not `?? undefined`) keeps this fail-closed.
+      : await storage.getProjects(req.organizationId ?? null);
     const rows = await Promise.all(orgProjects.map(async (p: Project) => {
       const r = await mobilizationRollup(p.id);
       return {
@@ -2243,8 +2253,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   app.get("/api/executive-os/project-setup", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
+      // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —
+      // the single OWNER_EMAIL admin account sees every tenant by design.
       ? await storage.getProjects()
-      : await storage.getProjects(req.organizationId ?? undefined);
+      // Org-scoped: prevents a null-org account from reading every tenant's
+      // portfolio. `?? null` (not `?? undefined`) keeps this fail-closed.
+      : await storage.getProjects(req.organizationId ?? null);
     const rows = await Promise.all(orgProjects.map(async (p: Project) => {
       const h = await projectSetupRollup(p.id);
       return { projectId: p.id, projectName: p.name, ...h };
@@ -2406,6 +2420,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   // INTEGRATIONS — connect/disconnect third-party services
   app.get("/api/integrations", async (_req, res) => {
+    // UNSCOPED: integrations.key is globally unique so there is one row per
+    // service for the whole deployment — see storage.getIntegrations().
     res.json(await storage.getIntegrations());
   });
   app.patch("/api/integrations/:key", async (req, res) => {
@@ -2677,25 +2693,73 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // DELETED ITEMS BIN
-  app.get("/api/deleted-items", async (_req, res) => {
-    res.json(await storage.getDeletedItems());
+  //
+  // Org-scoped: `deleted_items` has no organization_id column, so scope is
+  // recovered from the JSON snapshot of the deleted row — its organizationId
+  // when present, otherwise its projectId matched against the caller's
+  // projects. A snapshot carrying neither is withheld from non-owners rather
+  // than shown to every tenant. Without this, one org could list, restore, and
+  // permanently delete another org's rows.
+  async function scopedDeletedItems(req: any): Promise<any[]> {
+    // UNSCOPED: the table has no org column, so the read cannot be. The filter
+    // below is what scopes it; nothing outside this helper reads the bin.
+    const rows = await storage.getDeletedItems();
+    if (req.account?.role === "owner") return rows; // platform-owner bypass
+    const orgId = req.organizationId;
+    if (!orgId) return [];
+    const projectIds = new Set((await storage.getProjects(orgId)).map((p: Project) => p.id));
+    return rows.filter((r: any) => {
+      let snap: any;
+      try { snap = JSON.parse(r.data); } catch { return false; }
+      if (snap?.organizationId != null) return snap.organizationId === orgId;
+      if (snap?.projectId != null) return projectIds.has(snap.projectId);
+      return false;
+    });
+  }
+  // Confirm a specific bin entry belongs to the caller before mutating it.
+  async function ownsDeletedItem(req: any, type: string, entityId: number): Promise<boolean> {
+    const rows = await scopedDeletedItems(req);
+    return rows.some((r: any) => r.entityType === type && r.entityId === entityId);
+  }
+
+  app.get("/api/deleted-items", async (req: any, res) => {
+    res.json(await scopedDeletedItems(req));
   });
-  app.post("/api/deleted-items/:type/:id/restore", async (req, res) => {
+  app.post("/api/deleted-items/:type/:id/restore", async (req: any, res) => {
     const { type, id } = req.params;
+    const entityId = parseInt(id, 10);
+    if (!Number.isFinite(entityId)) return res.status(400).json({ message: "Invalid id" });
+    // 404 (not 403) so the bin never reveals another tenant's entries exist.
+    if (!(await ownsDeletedItem(req, type, entityId))) {
+      return res.status(404).json({ message: "Item not found in bin" });
+    }
     try {
-      const restored = await storage.restoreEntity(type, parseInt(id, 10));
+      const restored = await storage.restoreEntity(type, entityId);
       res.json(restored);
     } catch (e: any) {
       res.status(404).json({ message: e?.message ?? "Item not found in bin" });
     }
   });
-  app.delete("/api/deleted-items/:type/:id/permanent", async (req, res) => {
+  app.delete("/api/deleted-items/:type/:id/permanent", async (req: any, res) => {
     const { type, id } = req.params;
-    await storage.permanentDeleteEntity(type, parseInt(id, 10));
+    const entityId = parseInt(id, 10);
+    if (!Number.isFinite(entityId)) return res.status(400).json({ message: "Invalid id" });
+    if (!(await ownsDeletedItem(req, type, entityId))) {
+      return res.status(404).json({ message: "Item not found in bin" });
+    }
+    await storage.permanentDeleteEntity(type, entityId);
     res.status(204).end();
   });
-  app.delete("/api/deleted-items", async (_req, res) => {
-    await storage.emptyDeletedItems();
+  app.delete("/api/deleted-items", async (req: any, res) => {
+    if (req.account?.role === "owner") {
+      await storage.emptyDeletedItems(); // platform-owner bypass — clears every bin
+    } else {
+      // Empty only the caller's own entries; a blanket delete would wipe every
+      // tenant's recycle bin.
+      for (const r of await scopedDeletedItems(req)) {
+        await storage.permanentDeleteEntity(r.entityType, r.entityId);
+      }
+    }
     res.status(204).end();
   });
 
@@ -2744,6 +2808,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   // ADMIN — list signups (used by /#/admin/signups). Owner only.
   app.get("/api/admin/signups", requireOwner, async (_req, res) => {
+    // UNSCOPED: platform-level marketing tables, requireOwner above.
     res.json({
       subscribers: await storage.listSubscribers(),
       demoRequests: await storage.listDemoRequests(),
@@ -2752,6 +2817,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   // ADMIN — list all accounts with approval + subscription state. Owner only.
   app.get("/api/admin/accounts", requireOwner, async (_req, res) => {
+    // UNSCOPED: platform-admin account list, requireOwner above.
     const rows = await storage.listAccountsForAdmin();
     res.json({ accounts: rows });
   });
@@ -2781,6 +2847,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // can log in and click around with full edit access. Auto-expires after 48h
   // (enforced in verifyPassword + authMiddleware; existing sessions are rejected).
   app.get("/api/admin/demo-accounts", requireOwner, async (_req, res) => {
+    // UNSCOPED: platform-admin demo account list, requireOwner above.
     const rows = await storage.listDemoAccounts();
     res.json({ demoAccounts: rows });
   });
@@ -2919,7 +2986,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   /* ---------------------------- TIMESHEETS ---------------------------- */
 
   // List timesheets (optionally filtered by project, or scoped to the caller)
-  app.get("/api/timesheets", async (req: any, res) => {
+  app.get("/api/timesheets", scopeProjectQuery, async (req: any, res) => {
     try {
       // Fire the weekly rollover opportunistically — cheap early-exit inside.
       runWeeklyRolloverIfDue().catch(() => {});
@@ -2931,7 +2998,13 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       }
       const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
       const rows = await storage.getTimesheets(projectId);
-      res.json(rows);
+      // Org-scoped: prevents an unfiltered list from returning every tenant's
+      // payroll rows. scopeProjectQuery has already validated ?projectId=; this
+      // filters the no-projectId case down to the caller's own projects.
+      // Filtering by project rather than timesheets.organizationId is
+      // deliberate — that column is null on legacy hand-created rows, which
+      // an org-column filter would silently drop from the list.
+      res.json(filterByOrgProjects(req, rows));
     } catch (err) {
       console.error("[timesheets] list error:", err);
       res.status(500).json({ message: "Failed to list timesheets" });
@@ -2949,7 +3022,11 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       if (!ts) {
         // Find any project they belong to; fall back to 0 (org-wide) so the
         // row still exists. Downstream UI treats projectId=0 as "no project".
-        const projects = await storage.getProjects();
+        //
+        // Org-scoped: prevents stamping the caller's timesheet with another
+        // tenant's projectId. An account with no organization scopes to null,
+        // which yields no projects and therefore the projectId=0 sentinel.
+        const projects = await storage.getProjects(req.organizationId ?? null);
         const project = projects[0];
         ts = await ensureTimesheetForWeek({
           accountId: req.account.id,
@@ -3170,11 +3247,24 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       if (ts.managerSignature) lines.push(`Manager Signature: ${ts.managerSignature}`);
       const content = lines.join("\n");
 
-      // Check if a company doc already exists for this timesheet
-      const existingDocs = await storage.getCompanyDocuments();
+      // The document is matched by title alone, so the candidate set must be
+      // scoped before matching — see the guard below.
+      const project = await storage.getProject(ts.projectId);
+      if (project?.organizationId == null) {
+        return res.status(400).json({
+          message: "Project has no organization scope, so the document cannot be filed.",
+          code: "PROJECT_NOT_SCOPED",
+        });
+      }
+
+      // Check if a company doc already exists for this timesheet.
+      // Org-scoped: prevents overwriting another tenant's document when two
+      // orgs have an employee of the same name in the same week.
+      const existingDocs = await storage.getCompanyDocuments(project.organizationId);
       const existing = existingDocs.find((d) => d.title === `Timesheet — ${ts.employeeName} — Week of ${ts.weekStart}`);
 
       const docData = {
+        organizationId: project.organizationId,
         title: `Timesheet — ${ts.employeeName} — Week of ${ts.weekStart}`,
         category: "HR",
         status: "Active",

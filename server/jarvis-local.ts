@@ -1,5 +1,5 @@
 import { storage, normalizeQuestion, inferTopic } from "./storage";
-import { buildContext, type ContextBundle } from "./jarvis";
+import { buildContext, resolveScopedProject, type ContextBundle } from "./jarvis";
 import { runHealthScan } from "./health";
 import { getWeather, getWeatherOneLiner, getNearbyPlaces, hasPlacesApi } from "./apis";
 import { resolveOrgTimezone, todayInTz } from "./lib/orgs";
@@ -257,7 +257,7 @@ export async function buildRichLocalBrief(projectId?: number, organizationId?: n
   // Resolve the org's timezone so "today", "morning", etc. mean the user's local
   // time — not UTC (Vercel serverless runs in UTC by default).
   const timezone = await resolveOrgTimezone(organizationId);
-  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  const project = await resolveScopedProject(projectId, organizationId);
   if (!project) {
     return `${weekdayGreeting(timezone)}\n\nNo active project found yet. Head to the Projects tab and create one \u2014 once it's set up I can give you real briefings with overdue items, weather, and priorities.`;
   }
@@ -270,7 +270,9 @@ export async function buildRichLocalBrief(projectId?: number, organizationId?: n
     storage.getSubmittals(pid),
     storage.getChangeOrders(pid),
     storage.getActionItems(pid),
-    storage.getTeam(),
+    // Org-scoped: prevents another tenant's roster reaching the local brief.
+    // Undefined = platform-owner bypass, per resolveScopedProject's contract.
+    storage.getTeam(organizationId),
   ]);
 
   const overdueTasks = pickOverdue(tasks, "dueDate");
@@ -451,7 +453,7 @@ export async function buildSafetyBrief(projectId: number | undefined, organizati
   const dateStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
   // Get project for weather
-  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  const project = await resolveScopedProject(projectId, organizationId);
   const address = project?.address;
 
   // Get live weather if available
@@ -600,7 +602,7 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
   // --- Live weather API (Open-Meteo, no key needed) ---
   if (/\b(weather|forecast|temperature|how hot|how cold|raining|rain|snow|wind|storm)\b/i.test(lower)) {
     try {
-      const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+      const project = await resolveScopedProject(projectId, organizationId);
       const address = project?.address;
       if (address) {
         const weather = await getWeather(address);
@@ -618,7 +620,7 @@ export async function localJarvisChat(projectId: number | undefined, history: { 
   // --- Live Google Maps Places API ---
   if (hasPlacesApi() && /\b(lunch|food|eat|restaurant|hungry|dinner|breakfast|coffee|hardware|supplies|hotel|motel|gas|fuel)\b/i.test(lower)) {
     try {
-      const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+      const project = await resolveScopedProject(projectId, organizationId);
       const address = project?.address;
       if (address) {
         const places = await getNearbyPlaces(address, lower);

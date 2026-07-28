@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { storage } from "./storage";
 import { runHealthScan } from "./health";
 import { resolveOrgTimezone, todayInTz } from "./lib/orgs";
+import type { Project } from "@shared/schema";
 
 // OpenAI model used for Jarvis. Configurable via env so we can swap without a
 // deploy — defaults to gpt-4o-mini which is cheap ($0.15/1M input, $0.60/1M
@@ -61,19 +62,50 @@ function dueToday(arr: any[], field: string, today: string): any[] {
 
 export type ContextBundle = { compact: string; projectName?: string };
 
+/**
+ * Resolve the project a briefing/chat should describe, scoped to the caller.
+ *
+ * Shared by jarvis.ts and jarvis-local.ts because both engines build prompts
+ * from project data and must not cross tenants. The `projectId` arrives from an
+ * unvalidated `?projectId=` query param (see `pid()` in routes.ts), so it is
+ * verified here rather than trusted.
+ *
+ * `organizationId` is undefined only for the legacy platform-owner account:
+ * `resolveMembership` 403s any other caller that has no membership, so an
+ * undefined scope on a jarvis route means the owner bypass and reads broadly by
+ * design — the same rule `requireProjectAccess` applies.
+ */
+export async function resolveScopedProject(
+  projectId?: number,
+  organizationId?: number,
+): Promise<Project | undefined> {
+  if (projectId) {
+    const project = await storage.getProject(projectId);
+    if (!project) return undefined;
+    // Org-scoped: prevents an arbitrary ?projectId= from pulling another
+    // tenant's tasks, RFIs, and change orders into the LLM prompt.
+    if (organizationId !== undefined && project.organizationId !== organizationId) return undefined;
+    return project;
+  }
+  // Org-scoped: prevents defaulting a briefing to another tenant's project.
+  return (await storage.getProjects(organizationId))[0];
+}
+
 // buildContext now accepts the caller's org id so "today", "overdue", and
 // "due today" match what the user sees in the app instead of UTC.
 export async function buildContext(projectId?: number, organizationId?: number): Promise<ContextBundle> {
   const timezone = await resolveOrgTimezone(organizationId);
   const today = todayInTz(timezone);
-  const p = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  const p = await resolveScopedProject(projectId, organizationId);
   const pid = p?.id;
   const tasks = await storage.getTasks(pid);
   const rfis = await storage.getRfis(pid);
   const subs = await storage.getSubmittals(pid);
   const cos = await storage.getChangeOrders(pid);
   const actions = await storage.getActionItems(pid);
-  const team = await storage.getTeam();
+  // Org-scoped: prevents another tenant's roster appearing in the TEAM block.
+  // Undefined = platform-owner bypass, per resolveScopedProject's contract.
+  const team = await storage.getTeam(organizationId);
 
   const L = (arr: any[], label: string, field: string) => {
     const ov = overdue(arr, field, today).slice(0, 6);
@@ -133,7 +165,7 @@ export async function jarvisChat(projectId: number | undefined, history: Msg[], 
 
   // Fetch live weather/places data when relevant to the question
   let liveApiBlock = "";
-  const project = projectId ? await storage.getProject(projectId) : (await storage.getProjects())[0];
+  const project = await resolveScopedProject(projectId, organizationId);
   const address = project?.address;
   if (address) {
     // Always fetch weather for safety briefs

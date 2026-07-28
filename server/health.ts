@@ -30,11 +30,16 @@ export async function runHealthScan(): Promise<HealthReport> {
   const brokenLinks: BrokenLink[] = APP_LINKS.filter((l) => !isKnownRoute(l.href))
     .map((l) => ({ href: l.href, label: l.label, source: l.source }));
 
+  // UNSCOPED: deliberately deployment-wide. This is an integrity probe — it
+  // asserts each storage read does not throw and reports only `rows.length`,
+  // never row content. Scoping it per-org would make the probe pass for an
+  // empty org while a broken table went unnoticed. The counts it returns are
+  // aggregate, so no tenant records cross an org boundary.
   const projects = await storage.getProjects();
   const pid = projects[0]?.id;
 
   const mods: [string, () => Promise<any[]>][] = [
-    ["Projects", async () => storage.getProjects()],
+    ["Projects", async () => storage.getProjects()], // UNSCOPED: counts only, per the note above
     ["Tasks", async () => storage.getTasks(pid)],
     ["RFIs", async () => storage.getRfis(pid)],
     ["Submittals", async () => storage.getSubmittals(pid)],
@@ -42,8 +47,8 @@ export async function runHealthScan(): Promise<HealthReport> {
     ["Action Items", async () => storage.getActionItems(pid)],
     ["Daily Logs", async () => storage.getDailyLogs(pid)],
     ["Punch Items", async () => storage.getPunchItems(pid)],
-    ["Team", async () => storage.getTeam()],
-    ["Contacts", async () => storage.getContacts()],
+    ["Team", async () => storage.getTeam()], // UNSCOPED: counts only, per the note above
+    ["Contacts", async () => storage.getContacts()], // UNSCOPED: counts only, per the note above
     ["Equipment", async () => storage.getEquipment(pid)],
     ["Photos", async () => storage.getPhotos(pid)],
     ["Documents", async () => storage.getDocuments(pid)],
@@ -51,7 +56,7 @@ export async function runHealthScan(): Promise<HealthReport> {
     ["Drone Captures", async () => storage.getDroneCaptures(pid)],
     ["Messages", async () => (pid ? storage.getMessages(pid) : [])],
     ["Notes", async () => storage.getNotes(pid)],
-    ["Integrations", async () => storage.getIntegrations()],
+    ["Integrations", async () => storage.getIntegrations()], // UNSCOPED: counts only, per the note above
   ];
 
   const moduleChecks: HealthCheck[] = [];

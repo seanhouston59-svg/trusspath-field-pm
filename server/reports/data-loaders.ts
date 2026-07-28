@@ -148,9 +148,13 @@ export async function loadTimesheetRollup(projectId: number, since?: Date): Prom
   totalHours: number;
   byTrade: Array<{ trade: string; headcount: number; hours: number }>;
 }> {
+  const project = await storage.getProject(projectId);
   const [sheets, team] = await Promise.all([
     storage.getTimesheets(projectId),
-    storage.getTeam(),
+    // Org-scoped: prevents cross-tenant name collisions from relabelling a
+    // trade with another tenant's roster. A project with no organization gets
+    // an empty roster, so every name rolls up under "Unassigned".
+    storage.getTeam(project?.organizationId ?? null),
   ]);
   const tradeByName = new Map(team.map((m) => [norm(m.name), m.trade || "Unassigned"]));
 
