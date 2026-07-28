@@ -40,6 +40,7 @@ import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import Dashboard from "@/pages/dashboard";
+import NotificationsPage from "@/pages/notifications";
 import Projects from "@/pages/projects";
 import ProjectDetail from "@/pages/project-detail";
 import Tasks from "@/pages/tasks";
@@ -104,6 +105,7 @@ import FieldPunch from "@/pages/field/punch";
 const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/": Landing,
   "/app": Dashboard,
+  "/notifications": NotificationsPage,
   "/projects": Projects,
   "/projects/:id": ProjectDetail,
   "/schedule": Schedule,

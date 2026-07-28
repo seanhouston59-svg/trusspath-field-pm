@@ -29,6 +29,7 @@ export interface AccessLevelDef extends AccessCapabilities {
 // Route patterns (mirror APP_ROUTES). "/" (landing) is public to all levels.
 const R = {
   dashboard: "/app",
+  notifications: "/notifications",
   projects: "/projects",
   projectDetail: "/projects/:id",
   schedule: "/schedule",
@@ -175,7 +176,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
+      R.dashboard, R.notifications, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
       R.contacts, R.messages, R.notes, R.timesheets,
@@ -191,7 +192,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
+      R.dashboard, R.notifications, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.punch, R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints,
       R.messages, R.notes, R.timesheets,
       R.teams, R.excel,
@@ -206,7 +207,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
+      R.dashboard, R.notifications, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.rfis, R.submittals, R.photos, R.documents, R.companyDocuments, R.blueprints, R.messages, R.timesheets,
       R.teams, R.excel,
       // Subs can log field activity for their own scope (photos, observations).
@@ -221,7 +222,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: false, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
+      R.dashboard, R.notifications, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
       R.contacts, R.messages, R.notes, R.timesheets,

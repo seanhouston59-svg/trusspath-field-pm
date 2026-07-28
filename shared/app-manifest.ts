@@ -12,7 +12,7 @@ export type RoutePattern = string;
 
 /** Every route registered in App.tsx (patterns; :id = dynamic segment). */
 export const APP_ROUTES: RoutePattern[] = [
-  "/", "/app", "/projects", "/projects/:id", "/schedule", "/gantt", "/cpm", "/integrations",
+  "/", "/app", "/notifications", "/projects", "/projects/:id", "/schedule", "/gantt", "/cpm", "/integrations",
   "/tasks", "/action-items", "/rfis", "/submittals", "/change-orders", "/punch",
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings", "/settings/team",

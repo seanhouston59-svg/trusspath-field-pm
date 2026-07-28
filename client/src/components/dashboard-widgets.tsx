@@ -68,12 +68,17 @@ export function NotificationsBox(_props: {
 
   return (
     <div className="flex flex-col rounded-lg border border-border bg-card p-4 shadow-sm" data-testid="box-notifications">
-      <div className="flex items-center justify-between">
+      <Link
+        href="/notifications"
+        className="group -m-1 flex items-center justify-between rounded-md p-1 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        data-testid="notif-header-link"
+      >
         <h3 className="font-display text-sm font-bold">Notifications</h3>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
           <Bell className="size-3" /> {alerts.length}
+          <ArrowRight className="size-3 opacity-0 transition-opacity group-hover:opacity-100" />
         </span>
-      </div>
+      </Link>
       <div className="mt-3 flex-1 space-y-2">
         {alerts.length === 0 && (
           <p className="py-6 text-center text-xs text-muted-foreground">You're all caught up.</p>
@@ -99,9 +104,22 @@ export function NotificationsBox(_props: {
           );
         })}
         {overflow > 0 && (
-          <div className="pt-1 text-center text-xs text-muted-foreground">
-            +{overflow} more · check the module pages for the full list
-          </div>
+          <Link
+            href="/notifications"
+            className="block rounded-md py-2 text-center text-xs font-medium text-primary transition-colors hover:bg-muted/40"
+            data-testid="notif-see-all"
+          >
+            +{overflow} more · see all notifications
+          </Link>
+        )}
+        {alerts.length > 0 && overflow === 0 && (
+          <Link
+            href="/notifications"
+            className="block rounded-md py-2 text-center text-xs font-medium text-primary transition-colors hover:bg-muted/40"
+            data-testid="notif-see-all"
+          >
+            See all notifications
+          </Link>
         )}
       </div>
     </div>
