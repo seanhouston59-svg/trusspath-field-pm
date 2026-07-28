@@ -557,6 +557,33 @@ export const fieldObservations = pgTable("field_observations", {
   createdAt: text("created_at").notNull().default(sql`NOW()`),
 });
 
+/* -------------------------- Field Voice Notes ---------------------------
+ * Hands-free field capture: a foreman taps Record, speaks, and the audio
+ * plus an optional live transcript get saved against a project. Stored
+ * file lives on disk (same PHOTO_DIR pattern) and the row keeps the
+ * transcript so the search + timeline can index the note without
+ * transcoding every playback. GPS is optional — captured when available
+ * so a note pinned to a specific location can be plotted on a map later.
+ */
+export const voiceNotes = pgTable("voice_notes", {
+  id: serial("id").primaryKey(),
+  accountId: integer("account_id").notNull(),
+  organizationId: integer("organization_id"),
+  projectId: integer("project_id").notNull(),
+  title: text("title"),
+  transcript: text("transcript"),
+  durationMs: integer("duration_ms"),
+  storedFileName: text("stored_file_name"),
+  mimeType: text("mime_type"),
+  fileSizeBytes: integer("file_size_bytes"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  accuracyM: doublePrecision("accuracy_m"),
+  occurredAt: text("occurred_at").notNull().default(sql`NOW()`),
+  clientId: text("client_id"),
+  createdAt: text("created_at").notNull().default(sql`NOW()`),
+});
+
 // -----------------------------------------------------------------------------
 // Project Timeline event log.
 //
@@ -1522,6 +1549,8 @@ export type FieldPunch = typeof fieldPunches.$inferSelect;
 export type InsertFieldPunch = typeof fieldPunches.$inferInsert;
 export type FieldObservation = typeof fieldObservations.$inferSelect;
 export type InsertFieldObservation = typeof fieldObservations.$inferInsert;
+export type VoiceNote = typeof voiceNotes.$inferSelect;
+export type InsertVoiceNote = typeof voiceNotes.$inferInsert;
 
 /** Default app settings (single source for server + client). */
 export const DEFAULT_SETTINGS = {

@@ -916,6 +916,140 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.status(201).json({ observation });
   });
 
+  /* ----------------------------- Voice notes -----------------------------
+   * Hands-free field capture. POST accepts a base64-encoded audio blob
+   * (audio/webm, audio/mp4, audio/mpeg, or audio/wav) plus optional
+   * transcript + GPS. Audio is stashed on PHOTO_DIR (same on-disk store
+   * we use for images) so playback goes through /api/field/voice-notes/:id/file.
+   *
+   * Every read is org-scoped via req._orgProjectIds, seeded by the
+   * scopeProjectQuery middleware for the account.
+   */
+  const AUDIO_MIME = new Set([
+    "audio/webm", "audio/webm;codecs=opus", "audio/ogg", "audio/ogg;codecs=opus",
+    "audio/mp4", "audio/mpeg", "audio/wav", "audio/x-wav", "audio/aac",
+  ]);
+
+  app.get("/api/field/voice-notes", scopeProjectQuery, async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    if (!req.organizationId) return res.json({ voiceNotes: [] });
+    const projectId = req.query?.projectId ? Number(req.query.projectId) : undefined;
+    const orgProjectIds = req._orgProjectIds ? Array.from(req._orgProjectIds) as number[]
+      // UNSCOPED: fallback resolves org project set when middleware didn't populate it
+      : (await storage.getProjects(req.organizationId)).map((p) => p.id);
+    const rows = await storage.voiceNotes.list(req.organizationId, {
+      projectId: Number.isFinite(projectId as number) ? (projectId as number) : undefined,
+      orgProjectIds,
+    });
+    res.json({ voiceNotes: rows });
+  });
+
+  app.post("/api/field/voice-notes", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    if (!req.organizationId) return res.status(400).json({ error: "organization required" });
+    const projectId = Number(req.body?.projectId);
+    if (!Number.isFinite(projectId) || projectId <= 0) return res.status(400).json({ error: "projectId required" });
+
+    // Confirm the caller's org actually owns this project before letting bytes land on disk.
+    const orgProjects = await storage.getProjects(req.organizationId);
+    if (!orgProjects.some((p) => p.id === projectId)) {
+      return res.status(403).json({ error: "project not in caller's organization" });
+    }
+
+    const dataUrl = String(req.body?.audio || "");
+    const m = /^data:([-\w.+;=]+);base64,(.+)$/i.exec(dataUrl);
+    if (!m) return res.status(400).json({ error: "audio must be a data URL (data:audio/*;base64,...)" });
+    const mime = m[1].toLowerCase();
+    // MediaRecorder often reports "audio/webm;codecs=opus" — accept the base form too.
+    const baseMime = mime.split(";")[0];
+    if (!AUDIO_MIME.has(mime) && !AUDIO_MIME.has(baseMime)) {
+      return res.status(400).json({ error: `unsupported audio type: ${mime}` });
+    }
+    let buf: Buffer;
+    try { buf = Buffer.from(m[2], "base64"); } catch { return res.status(400).json({ error: "invalid base64" }); }
+    if (buf.length === 0) return res.status(400).json({ error: "empty audio" });
+    if (buf.length > 25 * 1024 * 1024) return res.status(413).json({ error: "audio too large (25mb cap)" });
+
+    // Extension mapping keeps the on-disk file playable by name in dev.
+    const extMap: Record<string, string> = {
+      "audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a",
+      "audio/mpeg": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/aac": "aac",
+    };
+    const ext = extMap[baseMime] || "bin";
+    const filename = `voice-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    try { fs.mkdirSync(PHOTO_DIR, { recursive: true }); } catch {}
+    const abs = path.resolve(PHOTO_DIR, filename);
+    fs.writeFileSync(abs, buf);
+
+    const title = req.body?.title ? String(req.body.title).slice(0, 200).trim() : null;
+    const transcript = req.body?.transcript ? String(req.body.transcript).slice(0, 8000) : null;
+    const durationMs = Number.isFinite(Number(req.body?.durationMs)) ? Number(req.body.durationMs) : null;
+    const lat = req.body?.lat != null && Number.isFinite(Number(req.body.lat)) ? Number(req.body.lat) : null;
+    const lng = req.body?.lng != null && Number.isFinite(Number(req.body.lng)) ? Number(req.body.lng) : null;
+    const accuracyM = req.body?.accuracyM != null && Number.isFinite(Number(req.body.accuracyM)) ? Number(req.body.accuracyM) : null;
+    const occurredAt = req.body?.occurredAt ? String(req.body.occurredAt) : new Date().toISOString();
+    const clientId = req.body?.clientId ? String(req.body.clientId).slice(0, 64) : null;
+
+    const row = await storage.voiceNotes.create({
+      accountId: req.account.id,
+      organizationId: req.organizationId,
+      projectId,
+      title,
+      transcript,
+      durationMs,
+      storedFileName: filename,
+      mimeType: baseMime,
+      fileSizeBytes: buf.length,
+      lat,
+      lng,
+      accuracyM,
+      occurredAt,
+      clientId,
+    });
+
+    logEvent(req, {
+      projectId,
+      kind: EVENT_KINDS.VOICE_NOTE_CAPTURED,
+      title: title ? `Voice note \u2014 ${title}` : "Voice note captured",
+      subtitle: transcript ? transcript.slice(0, 120) : undefined,
+      sourceType: "voice_note",
+      sourceId: row.id,
+      meta: { durationMs, mime: baseMime, hasTranscript: !!transcript },
+      occurredAt,
+    });
+
+    res.status(201).json({ voiceNote: row });
+  });
+
+  app.get("/api/field/voice-notes/:id/file", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    if (!req.organizationId) return res.status(403).json({ error: "organization required" });
+    const id = parseInt(req.params.id, 10);
+    const row = await storage.voiceNotes.get(req.organizationId, id);
+    if (!row || !row.storedFileName) return res.status(404).json({ error: "not found" });
+    try { fs.mkdirSync(PHOTO_DIR, { recursive: true }); } catch {}
+    const abs = path.resolve(PHOTO_DIR, row.storedFileName);
+    if (!abs.startsWith(PHOTO_DIR + path.sep) || !fs.existsSync(abs)) {
+      return res.status(404).json({ error: "file missing" });
+    }
+    res.setHeader("Content-Type", row.mimeType || "application/octet-stream");
+    res.setHeader("Content-Length", String(fs.statSync(abs).size));
+    fs.createReadStream(abs).pipe(res);
+  });
+
+  app.delete("/api/field/voice-notes/:id", async (req: any, res) => {
+    if (!req.account?.id) return res.status(401).json({ error: "Unauthenticated" });
+    if (!req.organizationId) return res.status(403).json({ error: "organization required" });
+    const id = parseInt(req.params.id, 10);
+    const row = await storage.voiceNotes.delete(req.organizationId, id);
+    if (!row) return res.status(404).json({ error: "not found" });
+    // Best-effort: remove the on-disk file too.
+    if (row.storedFileName) {
+      try { fs.unlinkSync(path.resolve(PHOTO_DIR, row.storedFileName)); } catch {}
+    }
+    res.status(204).end();
+  });
+
   // Team
   app.get("/api/team", async (req: any, res) => res.json(await storage.getTeam(req.organizationId)));
   app.post("/api/team", async (req: any, res) => {

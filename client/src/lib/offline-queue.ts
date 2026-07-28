@@ -22,7 +22,7 @@ const DB_NAME = "trusspath-offline";
 const DB_VERSION = 1;
 const STORE_NAME = "queue";
 
-export type QueuedKind = "daily-log" | "timecard" | "photo" | "observation" | "punch-item" | "punch-status" | "generic";
+export type QueuedKind = "daily-log" | "timecard" | "photo" | "observation" | "voice-note" | "punch-item" | "punch-status" | "generic";
 
 export type QueuedRequest = {
   id?: number;

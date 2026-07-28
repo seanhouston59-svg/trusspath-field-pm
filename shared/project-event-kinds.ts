@@ -17,6 +17,7 @@ export const EVENT_KINDS = {
   // Field capture
   PHOTO_UPLOADED: "photo.uploaded",
   OBSERVATION_LOGGED: "observation.logged",
+  VOICE_NOTE_CAPTURED: "voice_note.captured",
 
   // Coordination items
   RFI_CREATED: "rfi.created",

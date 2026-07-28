@@ -131,6 +131,7 @@ const R = {
   fieldTimecard: "/field/timecard",
   fieldPhoto: "/field/photo",
   fieldObservation: "/field/observation",
+  fieldVoiceNote: "/field/voice-note",
   fieldPunch: "/field/punch",
   // External tool launchers — universal, available to every role.
   teams: "/teams",
@@ -144,6 +145,7 @@ const FIELD_KIT_ROUTES = [
   "/field/timecard",
   "/field/photo",
   "/field/observation",
+  "/field/voice-note",
   "/field/punch",
 ];
 
@@ -210,8 +212,8 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
       R.dashboard, R.notifications, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
       R.rfis, R.submittals, R.photos, R.documents, R.companyDocuments, R.blueprints, R.messages, R.timesheets,
       R.teams, R.excel,
-      // Subs can log field activity for their own scope (photos, observations).
-      R.field, R.fieldPhoto, R.fieldObservation,
+      // Subs can log field activity for their own scope (photos, observations, voice notes).
+      R.field, R.fieldPhoto, R.fieldObservation, R.fieldVoiceNote,
     ],
   },
   {

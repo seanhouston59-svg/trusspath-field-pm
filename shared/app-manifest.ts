@@ -52,7 +52,7 @@ export const APP_ROUTES: RoutePattern[] = [
   "/executive-os/contracts", "/executive-os/contracts/:id",
   "/executive-os/inspections", "/executive-os/inspections/:id",
   "/executive-os/board-packets",
-  "/field", "/field/daily-log", "/field/timecard", "/field/photo", "/field/observation", "/field/punch",
+  "/field", "/field/daily-log", "/field/timecard", "/field/photo", "/field/observation", "/field/voice-note", "/field/punch",
 ];
 
 export type NavLink = { href: string; label: string; icon: string };

@@ -25,6 +25,7 @@ import { TimesheetsRepo } from "./timesheets";
 import { SystemRepo } from "./system";
 import { ContractsRepo } from "./contracts";
 import { InspectionsRepo } from "./inspections";
+import { VoiceNotesRepo } from "./voice-notes";
 
 /**
  * The single storage facade. Every member is a one-line delegation to a
@@ -64,6 +65,7 @@ export class DatabaseStorage implements IStorage {
   // part of IStorage yet to avoid churning the interface.
   public readonly contracts = new ContractsRepo();
   public readonly inspections = new InspectionsRepo();
+  public readonly voiceNotes = new VoiceNotesRepo();
 
   getTeam: IStorage["getTeam"] = (...a) => this.accounts.getTeam(...a);
   getTeamMember: IStorage["getTeamMember"] = (...a) => this.accounts.getTeamMember(...a);

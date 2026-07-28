@@ -895,6 +895,32 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS inspections_org_idx ON inspections (organization_id)`;
   await sql`CREATE INDEX IF NOT EXISTS inspections_project_idx ON inspections (project_id)`;
 
+  // Field kit: hands-free voice notes. Audio bytes live in the same on-disk
+  // location as photos (PHOTO_DIR); this row stores the metadata + optional
+  // browser-side transcript so the timeline and search can index the note
+  // without transcoding audio.
+  await sql`CREATE TABLE IF NOT EXISTS voice_notes (
+    id SERIAL PRIMARY KEY,
+    account_id INTEGER NOT NULL,
+    organization_id INTEGER,
+    project_id INTEGER NOT NULL,
+    title TEXT,
+    transcript TEXT,
+    duration_ms INTEGER,
+    stored_file_name TEXT,
+    mime_type TEXT,
+    file_size_bytes INTEGER,
+    lat DOUBLE PRECISION,
+    lng DOUBLE PRECISION,
+    accuracy_m DOUBLE PRECISION,
+    occurred_at TEXT NOT NULL DEFAULT NOW(),
+    client_id TEXT,
+    created_at TEXT NOT NULL DEFAULT NOW()
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS voice_notes_project_idx ON voice_notes (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS voice_notes_account_idx ON voice_notes (account_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS voice_notes_org_idx ON voice_notes (organization_id)`;
+
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
   // aren't locked out of their own app. Everyone else stays in the state they were in.

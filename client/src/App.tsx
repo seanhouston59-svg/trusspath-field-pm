@@ -98,6 +98,7 @@ import FieldDailyLog from "@/pages/field/daily-log";
 import FieldTimecard from "@/pages/field/timecard";
 import FieldPhoto from "@/pages/field/photo";
 import FieldObservation from "@/pages/field/observation";
+import FieldVoiceNote from "@/pages/field/voice-note";
 import FieldPunch from "@/pages/field/punch";
 
 // Single source of truth for routes lives in shared/app-manifest.ts (APP_ROUTES).
@@ -178,6 +179,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/field/timecard": FieldTimecard,
   "/field/photo": FieldPhoto,
   "/field/observation": FieldObservation,
+  "/field/voice-note": FieldVoiceNote,
   "/field/punch": FieldPunch,
 };
 
