@@ -106,6 +106,137 @@ export async function getWeatherOneLiner(address: string): Promise<string | null
   }
 }
 
+/**
+ * Map an Open-Meteo weather_code (WMO) to one of the seven slugs the daily-log
+ * form's Weather dropdown supports: Sunny | Partly cloudy | Cloudy | Rain |
+ * Snow | Wind | Fog. Note: "Wind" is preferred over precip-based slugs only
+ * when it's dry — a rainy windy day is still "Rain".
+ *
+ * Code groups (per WMO):
+ *   0     clear             -> Sunny
+ *   1     mostly clear      -> Sunny
+ *   2     partly cloudy     -> Partly cloudy
+ *   3     overcast          -> Cloudy
+ *   45,48 fog               -> Fog
+ *   51-67 drizzle/rain      -> Rain
+ *   71-77 snow              -> Snow
+ *   80-82 rain showers      -> Rain
+ *   85-86 snow showers      -> Snow
+ *   95-99 thunderstorms     -> Rain (safest bucket for daily-log)
+ */
+function weatherCodeToSlug(code: number, windMph: number, precipInches: number): "Sunny" | "Partly cloudy" | "Cloudy" | "Rain" | "Snow" | "Wind" | "Fog" {
+  if (code === 45 || code === 48) return "Fog";
+  if (code === 71 || code === 73 || code === 75 || code === 77 || code === 85 || code === 86) return "Snow";
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return "Rain";
+  // At this point conditions are dry (clear/partly cloudy/overcast). If wind is
+  // notable and precipitation is nil, surface "Wind" so the field crew flags it.
+  if (windMph >= 20 && precipInches < 0.05) return "Wind";
+  if (code === 3) return "Cloudy";
+  if (code === 2) return "Partly cloudy";
+  return "Sunny";
+}
+
+export interface DailyLogWeather {
+  /** One of the seven daily-log slugs. */
+  weather: "Sunny" | "Partly cloudy" | "Cloudy" | "Rain" | "Snow" | "Wind" | "Fog";
+  /** Rounded degrees Fahrenheit. For historical/future dates: daily mean temp.
+   *  For today: current temp reading. */
+  temp: number;
+  /** Extras for the UI — never persisted on the log. */
+  meta: {
+    /** "Aspen, CO" or similar, from the geocoder. */
+    locationName: string;
+    /** "today" | "historical" | "forecast" — which Open-Meteo endpoint was used. */
+    source: "today" | "historical" | "forecast";
+    /** Descriptive text ("partly cloudy", "heavy rain", ...) — for tooltip. */
+    description: string;
+    /** Wind mph, rounded — used to decide "Wind" slug. */
+    windMph: number;
+  };
+}
+
+/**
+ * Look up daily-log-ready weather + temperature for a project address on a
+ * given date. Uses Open-Meteo (no API key). Picks the correct endpoint:
+ *   - today                -> /v1/forecast?current=...
+ *   - past dates           -> /v1/archive?daily=... (ERA5 reanalysis)
+ *   - future dates (<= 15d) -> /v1/forecast?daily=...
+ *
+ * Returns null when we can't geocode the address or the API fails. The caller
+ * (route handler) turns null into a 404 so the client can fall back to manual
+ * entry silently.
+ *
+ * @param address Full street address from the project record.
+ * @param dateStr YYYY-MM-DD. Defaults to today (in the site's local tz).
+ */
+export async function getDailyLogWeather(address: string, dateStr?: string): Promise<DailyLogWeather | null> {
+  const geo = await geocode(address);
+  if (!geo) return null;
+
+  // Normalize the date. We compare in UTC-ish YYYY-MM-DD because Open-Meteo
+  // does the same — the API's timezone=auto param handles the site-local shift.
+  const today = new Date().toISOString().slice(0, 10);
+  const target = (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) ? dateStr : today;
+
+  try {
+    if (target === today) {
+      // Current conditions — matches getWeatherOneLiner's request shape.
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}&current=temperature_2m,wind_speed_10m,precipitation,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const cur = data?.current;
+      if (!cur) return null;
+      const temp = Math.round(cur.temperature_2m);
+      const wind = Math.round(cur.wind_speed_10m);
+      const precip = Number(cur.precipitation ?? 0);
+      const code = Number(cur.weather_code ?? 0);
+      return {
+        weather: weatherCodeToSlug(code, wind, precip),
+        temp,
+        meta: {
+          locationName: geo.name,
+          source: "today",
+          description: WEATHER_CODES[code] || "current conditions",
+          windMph: wind,
+        },
+      };
+    }
+
+    // Past vs future — Open-Meteo has separate endpoints. We pick archive for
+    // any date strictly before today, and forecast for today+1 through +15.
+    const isPast = target < today;
+    const baseUrl = isPast ? "https://archive-api.open-meteo.com/v1/archive" : "https://api.open-meteo.com/v1/forecast";
+    const url = `${baseUrl}?latitude=${geo.lat}&longitude=${geo.lon}&start_date=${target}&end_date=${target}&daily=temperature_2m_mean,temperature_2m_max,wind_speed_10m_max,precipitation_sum,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const daily = data?.daily;
+    if (!daily?.time?.length) return null;
+    // Prefer the daily mean; fall back to the max if mean is missing (some
+    // archive rows are sparse right at the edge of the ERA5 lag window).
+    const meanTemp = Number(daily.temperature_2m_mean?.[0] ?? NaN);
+    const maxTemp = Number(daily.temperature_2m_max?.[0] ?? NaN);
+    const temp = Math.round(Number.isFinite(meanTemp) ? meanTemp : maxTemp);
+    const wind = Math.round(Number(daily.wind_speed_10m_max?.[0] ?? 0));
+    const precip = Number(daily.precipitation_sum?.[0] ?? 0);
+    const code = Number(daily.weather_code?.[0] ?? 0);
+    if (!Number.isFinite(temp)) return null;
+    return {
+      weather: weatherCodeToSlug(code, wind, precip),
+      temp,
+      meta: {
+        locationName: geo.name,
+        source: isPast ? "historical" : "forecast",
+        description: WEATHER_CODES[code] || (isPast ? "historical conditions" : "forecast"),
+        windMph: wind,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getWeather(address: string): Promise<string | null> {
   const geo = await geocode(address);
   if (!geo) return null;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, Upload, X, Save, ImagePlus } from "lucide-react";
-import { useProjects, useTeam, useCreateDailyLog, useUpdateDailyLog } from "@/hooks/use-data";
+import { Camera, Upload, X, Save, ImagePlus, RefreshCw, Cloud, AlertCircle } from "lucide-react";
+import { useProjects, useTeam, useCreateDailyLog, useUpdateDailyLog, useProjectWeather } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,13 @@ export function DailyLogForm({ editing, onDone }: { editing: DailyLog | null; on
   const [authorId, setAuthorId] = useState<number | "">(team[0]?.id ?? "");
   const [weather, setWeather] = useState("Sunny");
   const [temp, setTemp] = useState(72);
+  // Tracks whether the user has hand-edited weather/temp since the last
+  // auto-fill. If true, we DON'T overwrite their values when the auto-pull
+  // returns — they win. Reset whenever the project or date changes (since a
+  // different project/date is a different weather context entirely) and after
+  // an explicit Refresh click. When editing an existing log this starts as
+  // true so we never clobber saved data.
+  const [weatherDirty, setWeatherDirty] = useState<boolean>(!!editing);
   const [crewCount, setCrewCount] = useState(1);
   const [summary, setSummary] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
@@ -76,8 +83,45 @@ export function DailyLogForm({ editing, onDone }: { editing: DailyLog | null; on
       setCrewCount(editing.crewCount);
       setSummary(editing.summary);
       setPhotos(parsePhotos(editing.photos));
+      // Editing an existing log — respect saved values, don't auto-fill over
+      // them unless the user explicitly hits Refresh.
+      setWeatherDirty(true);
     }
   }, [editing]);
+
+  // Auto-pull weather for the selected project + date. Only runs when there's
+  // an actual selection, and only overwrites the fields when the user hasn't
+  // hand-edited them (weatherDirty=false) — that way the auto-fill feels like
+  // a helpful default, not something fighting with manual entry.
+  const weatherQuery = useProjectWeather(projectId, date);
+  useEffect(() => {
+    if (weatherQuery.data && !weatherDirty) {
+      setWeather(weatherQuery.data.weather);
+      setTemp(weatherQuery.data.temp);
+    }
+    // We intentionally omit weatherDirty from deps: we only want to reactively
+    // fill from a NEW query result, not from the flag flipping to false.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weatherQuery.data]);
+
+  // Reset the dirty flag whenever the project or date changes — a new context
+  // means the previous manual entry no longer applies, and the fresh auto-pull
+  // should be allowed to fill in.
+  useEffect(() => {
+    if (!editing) setWeatherDirty(false);
+  }, [projectId, date, editing]);
+
+  /**
+   * Force a re-fetch of the weather for the current project/date and clear the
+   * dirty flag so the returned values are applied. Bound to the little refresh
+   * icon next to the Weather field. If a fetch is in-flight already we still
+   * clear the dirty flag — that way if the user hand-edited, hit Refresh, and
+   * the in-flight request lands, we apply it.
+   */
+  const refreshWeather = () => {
+    setWeatherDirty(false);
+    weatherQuery.refetch();
+  };
 
   // ensure defaults once data loads (only for new logs)
   useEffect(() => {
@@ -156,14 +200,34 @@ export function DailyLogForm({ editing, onDone }: { editing: DailyLog | null; on
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Weather</span>
-          <select className={field} value={weather} onChange={(e) => setWeather(e.target.value)} data-testid="input-log-weather">
+          <span className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
+            <span>Weather</span>
+            {/* Refresh button re-pulls Open-Meteo for the current project/date.
+                Disabled while the request is in flight; the icon spins to give
+                feedback. Kept small (icon-only) to not crowd the label. */}
+            <button
+              type="button"
+              onClick={refreshWeather}
+              disabled={!projectId || weatherQuery.isFetching}
+              className="inline-flex items-center gap-1 rounded p-0.5 text-muted-foreground hover:text-primary disabled:opacity-40"
+              title={projectId ? "Refresh from local forecast" : "Pick a project first"}
+              data-testid="button-refresh-weather"
+              aria-label="Refresh weather"
+            >
+              <RefreshCw className={cn("size-3", weatherQuery.isFetching && "animate-spin")} />
+            </button>
+          </span>
+          <select className={field} value={weather}
+            onChange={(e) => { setWeather(e.target.value); setWeatherDirty(true); }}
+            data-testid="input-log-weather">
             {WEATHERS.map((w) => <option key={w} value={w}>{w}</option>)}
           </select>
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Temp (°F)</span>
-          <input type="number" className={field} value={temp} onChange={(e) => setTemp(Number(e.target.value))} data-testid="input-log-temp" />
+          <input type="number" className={field} value={temp}
+            onChange={(e) => { setTemp(Number(e.target.value)); setWeatherDirty(true); }}
+            data-testid="input-log-temp" />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Crew on site</span>
@@ -186,6 +250,32 @@ export function DailyLogForm({ editing, onDone }: { editing: DailyLog | null; on
           </div>
         </div>
       </div>
+
+      {/* Weather status line — subtle, informational. Shows what the auto-pull
+          returned (source + location + description) so the user can trust the
+          value, or an error hint if the lookup failed. Empty when no attempt
+          has been made yet (no project selected). */}
+      {projectId && (
+        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground" data-testid="weather-status">
+          {weatherQuery.isFetching && (
+            <><RefreshCw className="size-3 animate-spin" /> Checking local forecast…</>
+          )}
+          {!weatherQuery.isFetching && weatherQuery.data && (
+            <>
+              <Cloud className="size-3" />
+              <span>
+                Auto-filled from Open-Meteo · {weatherQuery.data.meta.locationName} · {weatherQuery.data.meta.description}
+                {weatherQuery.data.meta.source === "historical" && " (historical)"}
+                {weatherQuery.data.meta.source === "forecast" && " (forecast)"}
+              </span>
+              {weatherDirty && <span className="italic text-amber-600 dark:text-amber-400">· edited</span>}
+            </>
+          )}
+          {!weatherQuery.isFetching && !weatherQuery.data && weatherQuery.isError && (
+            <><AlertCircle className="size-3 text-amber-500" /> Couldn't auto-pull weather for this project. Enter manually.</>
+          )}
+        </div>
+      )}
 
       <label className="mt-3 block">
         <span className="mb-1 block text-xs font-medium text-muted-foreground">Work summary</span>

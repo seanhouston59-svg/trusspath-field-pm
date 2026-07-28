@@ -153,6 +153,51 @@ export function useDeleteDailyLog() {
   return useDeleteWithUndo("daily-logs", "/api/daily-logs", "/api/daily-logs");
 }
 
+/**
+ * Shape returned by `GET /api/weather/for-project/:id?date=YYYY-MM-DD` — mirrors
+ * the `DailyLogWeather` interface in server/apis.ts. Kept as a plain type here
+ * so the client can consume it without pulling in server-only imports.
+ */
+export interface DailyLogWeatherResponse {
+  weather: "Sunny" | "Partly cloudy" | "Cloudy" | "Rain" | "Snow" | "Wind" | "Fog";
+  temp: number;
+  meta: {
+    locationName: string;
+    source: "today" | "historical" | "forecast";
+    description: string;
+    windMph: number;
+  };
+}
+
+/**
+ * Fetch daily-log-ready weather for a project on a given date. Used by the
+ * daily-log form to auto-fill the Weather + Temp fields. Uses `useQuery` so
+ * React Query dedupes/caches (server also emits Cache-Control: max-age=900),
+ * but the query is `enabled` only when a projectId + date are provided so it
+ * won't fire until the form has both selected.
+ */
+export function useProjectWeather(projectId: number | "" | null | undefined, date: string | undefined, opts?: { enabled?: boolean }) {
+  const enabled = !!projectId && !!date && (opts?.enabled ?? true);
+  return useQuery<DailyLogWeatherResponse>({
+    queryKey: ["/api/weather/for-project", projectId, date],
+    enabled,
+    // Don't retry on 404 — that's the intended "no address / lookup failed"
+    // signal. Any other error retries once (network blips, etc).
+    retry: (failureCount, err: any) => {
+      const msg = String(err?.message || "");
+      if (msg.includes("404")) return false;
+      return failureCount < 1;
+    },
+    staleTime: 10 * 60 * 1000,  // 10 min — forms re-mount often; avoid duplicate hits
+    refetchOnWindowFocus: false, // form auto-fill; user doesn't expect focus-driven refetches
+    queryFn: async () => {
+      const url = `/api/weather/for-project/${projectId}?date=${encodeURIComponent(date!)}`;
+      const res = await apiRequest("GET", url);
+      return res.json();
+    },
+  });
+}
+
 export function usePunchItems(projectId?: number) {
   return useQuery<PunchItem[]>({
     queryKey: ["/api/punch", { projectId }],

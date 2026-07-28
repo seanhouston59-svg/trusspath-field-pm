@@ -63,6 +63,13 @@ export const APP_NAV: NavGroup[] = [
       { href: "/blueprints", label: "Blueprints", icon: "PencilRuler" },
       { href: "/drone", label: "Drone Captures", icon: "Plane" },
       { href: "/equipment", label: "Fleet & Equipment", icon: "Wrench" },
+      // Requests & Tasks — collapsed into Field Ops so PMs/supers see the
+      // paperwork they own next to the daily-log tools they use every morning.
+      { href: "/rfis", label: "RFIs", icon: "HelpCircle" },
+      { href: "/submittals", label: "Submittals", icon: "FileStack" },
+      { href: "/change-orders", label: "Change Orders", icon: "GitPullRequestArrow" },
+      { href: "/tasks", label: "Tasks", icon: "ListChecks" },
+      { href: "/action-items", label: "Action Items", icon: "CheckSquare" },
     ],
   },
   {
@@ -70,16 +77,6 @@ export const APP_NAV: NavGroup[] = [
     items: [
       { href: "/documents", label: "Project Documents", icon: "FileText" },
       { href: "/company-documents", label: "Company Documents", icon: "Building2" },
-    ],
-  },
-  {
-    title: "Requests & Tasks",
-    items: [
-      { href: "/rfis", label: "RFIs", icon: "HelpCircle" },
-      { href: "/submittals", label: "Submittals", icon: "FileStack" },
-      { href: "/change-orders", label: "Change Orders", icon: "GitPullRequestArrow" },
-      { href: "/tasks", label: "Tasks", icon: "ListChecks" },
-      { href: "/action-items", label: "Action Items", icon: "CheckSquare" },
     ],
   },
   {

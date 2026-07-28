@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import multer from "multer";
 import { storage } from "./storage";
+import { getDailyLogWeather } from "./apis";
 import { jarvisChat, jarvisBrief } from "./jarvis";
 import { localJarvisChat, buildRichLocalBrief, buildSafetyBrief } from "./jarvis-local";
 import { buildContext } from "./jarvis";
@@ -774,6 +775,35 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.delete("/api/team/:id", async (req, res) => {
     await storage.softDeleteEntity("team-members", parseInt(req.params.id, 10));
     res.status(204).end();
+  });
+
+  // GET /api/weather/for-project/:id?date=YYYY-MM-DD
+  //
+  // Auto-fill helper for the Daily Log form. Looks up the project's address,
+  // geocodes it (Google if $GOOGLE_MAPS_API_KEY is set, else Open-Meteo), then
+  // fetches Open-Meteo weather for the requested date and maps it to the app's
+  // seven daily-log slugs. Returns { weather, temp, meta } on success, 404 on
+  // any failure (bad address, geocode miss, upstream API down) — the client
+  // silently falls back to whatever the user typed.
+  app.get("/api/weather/for-project/:id", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Bad project id" });
+    const project = await requireProjectAccess(req, res, projectId);
+    if (!project) return; // requireProjectAccess already sent 403/404
+    if (!project.address || !project.address.trim()) {
+      return res.status(404).json({ message: "Project has no address to look up weather for." });
+    }
+    // Optional ?date=YYYY-MM-DD. Server validates format in getDailyLogWeather.
+    const dateStr = typeof req.query.date === "string" ? req.query.date : undefined;
+    const result = await getDailyLogWeather(project.address, dateStr);
+    if (!result) {
+      return res.status(404).json({ message: "Weather lookup failed. You can still enter conditions manually." });
+    }
+    // Cache-friendly — clients that fetch on every keystroke will hit the CDN.
+    // 15 minutes is short enough that current-day conditions stay fresh, but
+    // long enough to survive form re-renders / focus events.
+    res.set("Cache-Control", "private, max-age=900");
+    res.json(result);
   });
 
   // Projects
