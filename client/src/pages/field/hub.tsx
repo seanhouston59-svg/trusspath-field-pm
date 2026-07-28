@@ -1,4 +1,4 @@
-import { Camera, ClipboardList, Clock, ListChecks, MapPin, MessageSquareWarning, Download, WifiOff, CheckCircle2, Maximize2 } from "lucide-react";
+import { Camera, ClipboardList, Clock, ListChecks, MapPin, MessageSquareWarning, Download, WifiOff, CheckCircle2, Maximize2, StickyNote } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
@@ -29,6 +29,9 @@ const TILES: Tile[] = [
   { href: "/field/photo", label: "Take photo", icon: Camera, hint: "Geo + timestamp", accent: "from-sky-500/20 to-sky-500/5 text-sky-600 dark:text-sky-400" },
   { href: "/field/observation", label: "Observation", icon: MessageSquareWarning, hint: "Safety · RFI · issue", accent: "from-rose-500/20 to-rose-500/5 text-rose-600 dark:text-rose-400" },
   { href: "/field/punch", label: "Punch item", icon: ListChecks, hint: "Add or close a task", accent: "from-violet-500/20 to-violet-500/5 text-violet-600 dark:text-violet-400" },
+  // Opens the shared corkboard at /notes — quick reminders, hand-offs
+  // between shifts, or a spot to pin a photo caption before you forget.
+  { href: "/notes", label: "Sticky notes", icon: StickyNote, hint: "Jot a reminder · corkboard", accent: "from-yellow-500/20 to-yellow-500/5 text-yellow-700 dark:text-yellow-400" },
 ];
 
 export default function FieldHub() {
