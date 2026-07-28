@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Rocket, ClipboardList, Ruler, ChevronRight, Construction } from "lucide-react";
-import { UPCOMING_MODULES } from "./executive-os/upcoming-modules";
+import { LEAN_MODULES } from "@shared/lean-modules-catalog";
 
 type ModuleCard = {
   href: string;
@@ -103,7 +103,7 @@ export default function ExecutiveOs() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {UPCOMING_MODULES.map((m) => (
+              {LEAN_MODULES.map((m) => (
                 <Link
                   key={m.slug}
                   href={`/executive-os/${m.slug}`}

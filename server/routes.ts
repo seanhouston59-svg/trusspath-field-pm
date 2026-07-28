@@ -26,6 +26,7 @@ import {
   insertPreConstructionVeItemSchema, insertPreConstructionPermitSchema, insertPreConstructionPrequalSubSchema,
   insertPreConstructionBidPackageSchema, insertPreConstructionLongLeadItemSchema,
   insertPreConstructionSignatureSchema,
+  insertLeanModuleStateSchema, insertLeanModuleItemSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
   isAccountInGoodStanding, isSubscriptionActive, isDemoExpired,
@@ -38,6 +39,7 @@ import { mobilizationRollup } from "./mobilization-rollup";
 import { projectSetupRollup } from "./project-setup-rollup";
 import { preConstructionRollup } from "./pre-construction-rollup";
 import { computeMobilizationGate } from "@shared/lifecycle-gates";
+import { isLeanModuleSlug } from "@shared/lean-modules-catalog";
 import { generateMobilizationPlan } from "./reports/mobilization-plan";
 import { generateProjectCharter } from "./reports/project-charter";
 import { generateKickoffAgenda } from "./reports/kickoff-agenda";
@@ -2664,6 +2666,106 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       res.json({ deleted: true });
     });
   }
+
+  // ---------------------------------------------------------------------
+  // Lean Executive OS modules (4-22). Every lifecycle module beyond Pre-Con
+  // shares one route surface, keyed by module slug. Cheaper to grow than 19
+  // hand-rolled route sets and doesn't lock the URL shape when a module
+  // graduates to its own schema — the eventual purpose-built routes can
+  // co-exist and take over on the same paths.
+  // ---------------------------------------------------------------------
+  const leanModuleStatePatchSchema = insertLeanModuleStateSchema
+    .omit({ projectId: true, moduleId: true })
+    .partial();
+  const leanModuleItemCreateSchema = insertLeanModuleItemSchema.omit({ moduleId: true, projectId: true });
+  const leanModuleItemPatchSchema = insertLeanModuleItemSchema
+    .omit({ projectId: true, moduleId: true })
+    .partial();
+
+  function validateModuleSlug(res: any, moduleId: string): boolean {
+    if (!isLeanModuleSlug(moduleId)) {
+      res.status(404).json({ message: `Unknown module: ${moduleId}` });
+      return false;
+    }
+    return true;
+  }
+
+  app.get("/api/projects/:id/modules/:moduleId", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const moduleId = String(req.params.moduleId);
+    if (!validateModuleSlug(res, moduleId)) return;
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    // Lazy-create the parent state row so the client always gets a shape it
+    // can render — matches the seed behaviour of the shipped modules.
+    await storage.ensureLeanModuleState(projectId, moduleId);
+    const bundle = await storage.getLeanModuleBundle(projectId, moduleId);
+    res.json(bundle);
+  });
+
+  app.patch("/api/projects/:id/modules/:moduleId", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const moduleId = String(req.params.moduleId);
+    if (!validateModuleSlug(res, moduleId)) return;
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const { id: _id, projectId: _pid, moduleId: _mid, ...body } = req.body ?? {};
+    const parsed = leanModuleStatePatchSchema.safeParse(body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const patch: Record<string, any> = { ...parsed.data };
+
+    const before = await storage.ensureLeanModuleState(projectId, moduleId);
+    // Attribute the approver on the transition — same pattern as Pre-Con.
+    if (patch.planApprovedAt && !before.planApprovedAt && patch.planApprovedById == null) {
+      patch.planApprovedById = req.account?.id ?? null;
+    }
+
+    const updated = await storage.updateLeanModuleState(projectId, moduleId, patch);
+    if (!updated) return res.status(404).json({ message: "Module state not found" });
+    res.json(updated);
+  });
+
+  app.post("/api/projects/:id/modules/:moduleId/items", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const moduleId = String(req.params.moduleId);
+    if (!validateModuleSlug(res, moduleId)) return;
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const parsed = leanModuleItemCreateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const created = await storage.createLeanModuleItem({ ...parsed.data, projectId, moduleId });
+    res.status(201).json(created);
+  });
+
+  app.patch("/api/projects/:id/modules/:moduleId/items/:itemId", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    const itemId = parseInt(req.params.itemId, 10);
+    if (!Number.isFinite(projectId) || !Number.isFinite(itemId)) {
+      return res.status(400).json({ message: "Invalid id" });
+    }
+    const moduleId = String(req.params.moduleId);
+    if (!validateModuleSlug(res, moduleId)) return;
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const parsed = leanModuleItemPatchSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const updated = await storage.updateLeanModuleItem(itemId, projectId, moduleId, parsed.data);
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/projects/:id/modules/:moduleId/items/:itemId", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    const itemId = parseInt(req.params.itemId, 10);
+    if (!Number.isFinite(projectId) || !Number.isFinite(itemId)) {
+      return res.status(400).json({ message: "Invalid id" });
+    }
+    const moduleId = String(req.params.moduleId);
+    if (!validateModuleSlug(res, moduleId)) return;
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const ok = await storage.deleteLeanModuleItem(itemId, projectId, moduleId);
+    if (!ok) return res.status(404).json({ message: "Not found" });
+    res.json({ deleted: true });
+  });
 
   app.get("/api/executive-os/pre-construction", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"

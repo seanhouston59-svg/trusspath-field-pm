@@ -82,7 +82,8 @@ import ProjectSetupPortfolio from "@/pages/executive-os/project-setup-portfolio"
 import ProjectSetupDetail from "@/pages/executive-os/project-setup-detail";
 import PreConstructionPortfolio from "@/pages/executive-os/pre-construction-portfolio";
 import PreConstructionDetail from "@/pages/executive-os/pre-construction-detail";
-import { UPCOMING_MODULE_COMPONENTS, UPCOMING_MODULES } from "@/pages/executive-os/upcoming-modules";
+import { LEAN_MODULES } from "@shared/lean-modules-catalog";
+import { LeanModuleDetailPage, LeanModulePortfolioPage } from "@/pages/executive-os/lean-module";
 import InviteAcceptPage from "@/pages/invite-accept";
 import FieldHub from "@/pages/field/hub";
 import FieldDailyLog from "@/pages/field/daily-log";
@@ -132,14 +133,20 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/executive-os/pre-construction/:id": PreConstructionDetail,
   "/executive-os/mobilization": MobilizationPortfolio,
   "/executive-os/mobilization/:id": MobilizationDetail,
-  // Skeleton entries for modules 4-22. Each renders the shared
-  // "coming soon" placeholder scoped to its title/blurb. Swap the value
-  // to the real portfolio/detail component when that module ships.
+  // Modules 4-22 all render the shared lean module page (portfolio + detail).
+  // The moduleId is bound per slug so each URL renders the correct catalog
+  // entry (title, blurb, categories). When a module graduates to a purpose-
+  // built schema (like Pre-Con did) it swaps out of this block and into an
+  // explicit route mapping above.
   ...Object.fromEntries(
-    UPCOMING_MODULES.flatMap((m) => [
-      [`/executive-os/${m.slug}`, UPCOMING_MODULE_COMPONENTS[m.slug].Portfolio],
-      [`/executive-os/${m.slug}/:id`, UPCOMING_MODULE_COMPONENTS[m.slug].Detail],
-    ]),
+    LEAN_MODULES.flatMap((m) => {
+      const Portfolio = () => <LeanModulePortfolioPage moduleId={m.slug} />;
+      const Detail = () => <LeanModuleDetailPage moduleId={m.slug} />;
+      return [
+        [`/executive-os/${m.slug}`, Portfolio],
+        [`/executive-os/${m.slug}/:id`, Detail],
+      ];
+    }),
   ),
   "/field": FieldHub,
   "/field/daily-log": FieldDailyLog,

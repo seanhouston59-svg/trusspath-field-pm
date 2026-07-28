@@ -16,6 +16,7 @@ import { DeletedItemsRepo } from "./deleted-items";
 import { MobilizationRepo } from "./mobilization";
 import { ProjectSetupRepo } from "./project-setup";
 import { PreConstructionRepo } from "./pre-construction";
+import { LeanModulesRepo } from "./lean-modules";
 import { MessagesRepo } from "./messages";
 import { IntegrationsRepo } from "./integrations";
 import { EventsRepo } from "./events";
@@ -49,6 +50,7 @@ export class DatabaseStorage implements IStorage {
   private readonly mobilization = new MobilizationRepo(this);
   private readonly projectSetup = new ProjectSetupRepo(this);
   private readonly preConstruction = new PreConstructionRepo(this);
+  private readonly leanModules = new LeanModulesRepo();
   private readonly messages = new MessagesRepo();
   private readonly integrations = new IntegrationsRepo();
   private readonly events = new EventsRepo();
@@ -229,6 +231,14 @@ export class DatabaseStorage implements IStorage {
   getBidPackageById: IStorage["getBidPackageById"] = (...a) => this.preConstruction.getBidPackageById(...a);
   getLongLeadItemById: IStorage["getLongLeadItemById"] = (...a) => this.preConstruction.getLongLeadItemById(...a);
   getPreconSignatureById: IStorage["getPreconSignatureById"] = (...a) => this.preConstruction.getPreconSignatureById(...a);
+
+  // Lean Executive OS modules (4-22)
+  getLeanModuleBundle: IStorage["getLeanModuleBundle"] = (...a) => this.leanModules.getBundle(...a);
+  ensureLeanModuleState: IStorage["ensureLeanModuleState"] = (...a) => this.leanModules.ensureState(...a);
+  updateLeanModuleState: IStorage["updateLeanModuleState"] = (...a) => this.leanModules.updateState(...a);
+  createLeanModuleItem: IStorage["createLeanModuleItem"] = (...a) => this.leanModules.createItem(...a);
+  updateLeanModuleItem: IStorage["updateLeanModuleItem"] = (...a) => this.leanModules.updateItem(...a);
+  deleteLeanModuleItem: IStorage["deleteLeanModuleItem"] = (...a) => this.leanModules.deleteItem(...a);
   getMessages: IStorage["getMessages"] = (...a) => this.messages.getMessages(...a);
   createMessage: IStorage["createMessage"] = (...a) => this.messages.createMessage(...a);
   getNotes: IStorage["getNotes"] = (...a) => this.messages.getNotes(...a);

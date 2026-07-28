@@ -797,6 +797,45 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS pre_construction_signatures_project_idx
     ON pre_construction_signatures (project_id)`;
 
+  // Lean Executive OS modules (4-22). Shared parent + item tables keyed by
+  // (project_id, module_id). See shared/schema.ts leanModuleState + leanModuleItems.
+  await sql`CREATE TABLE IF NOT EXISTS lean_module_state (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    module_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'not_started',
+    target_start_date TEXT,
+    target_complete_date TEXT,
+    owner_name TEXT,
+    owner_phone TEXT,
+    owner_email TEXT,
+    overview TEXT,
+    risks TEXT,
+    assumptions TEXT,
+    next_steps TEXT,
+    notes TEXT,
+    plan_approved_at TEXT,
+    plan_approved_by_id INTEGER,
+    created_at TEXT,
+    updated_at TEXT
+  )`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS lean_module_state_project_module_idx
+    ON lean_module_state (project_id, module_id)`;
+  await sql`CREATE TABLE IF NOT EXISTS lean_module_items (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    module_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT,
+    owner_name TEXT,
+    due_date TEXT,
+    status TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS lean_module_items_project_module_idx
+    ON lean_module_items (project_id, module_id)`;
+
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
   // aren't locked out of their own app. Everyone else stays in the state they were in.

@@ -1251,6 +1251,62 @@ export const preConstructionLongLeadItems = pgTable("pre_construction_long_lead_
 
 // Sign-off block on the Pre-Construction Plan. Same shape as
 // mobilization_signatures and project_setup_signatures.
+/* -------- Lean Executive OS modules (4-22) ------------------------------
+ *
+ * Lifecycle modules 4-22 (Site Logistics through Risk & Insurance) share two
+ * tables: `lean_module_state` for the per-module parent record and
+ * `lean_module_items` for the row list. Each module is identified by its
+ * slug (e.g. "site-logistics") and a project can have at most one state row
+ * per module.
+ *
+ * When any module graduates to its own dedicated tables (like Pre-Con did),
+ * its data is migrated over and its slug is retired here.
+ */
+export const leanModuleState = pgTable("lean_module_state", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  moduleId: text("module_id").notNull(), // matches slug in LEAN_MODULES
+  // not_started | in_progress | ready_for_review | approved | complete | on_hold
+  status: text("status").notNull().default("not_started"),
+  // Optional target start / target complete dates (ISO date strings)
+  targetStartDate: text("target_start_date"),
+  targetCompleteDate: text("target_complete_date"),
+  // Ownership
+  ownerName: text("owner_name"),
+  ownerPhone: text("owner_phone"),
+  ownerEmail: text("owner_email"),
+  // Freeform narrative fields — modules that need more structure graduate off
+  // this table into their own dedicated schema.
+  overview: text("overview"),
+  risks: text("risks"),
+  assumptions: text("assumptions"),
+  nextSteps: text("next_steps"),
+  notes: text("notes"),
+  // Approvals
+  planApprovedAt: text("plan_approved_at"),
+  planApprovedById: integer("plan_approved_by_id"), // accounts.id
+  createdAt: text("created_at"),
+  updatedAt: text("updated_at"),
+}, (t) => ({
+  projectModuleIdx: uniqueIndex("lean_module_state_project_module_idx").on(t.projectId, t.moduleId),
+}));
+
+export const leanModuleItems = pgTable("lean_module_items", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  moduleId: text("module_id").notNull(), // matches slug in LEAN_MODULES
+  // Freeform row fields. Modules that need more columns graduate off this
+  // table into a purpose-built schema.
+  title: text("title").notNull(),
+  category: text("category"),
+  ownerName: text("owner_name"),
+  dueDate: text("due_date"),
+  // not_started | in_progress | complete | on_hold | at_risk | n_a
+  status: text("status"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
 export const preConstructionSignatures = pgTable("pre_construction_signatures", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
@@ -1350,6 +1406,14 @@ export const insertPreConstructionPrequalSubSchema = createInsertSchema(preConst
 export const insertPreConstructionBidPackageSchema = createInsertSchema(preConstructionBidPackages).omit({ id: true });
 export const insertPreConstructionLongLeadItemSchema = createInsertSchema(preConstructionLongLeadItems).omit({ id: true });
 export const insertPreConstructionSignatureSchema = createInsertSchema(preConstructionSignatures).omit({ id: true });
+
+/* -------- Lean module insert schemas + types -------- */
+export const insertLeanModuleStateSchema = createInsertSchema(leanModuleState).omit({ id: true });
+export const insertLeanModuleItemSchema = createInsertSchema(leanModuleItems).omit({ id: true });
+export type LeanModuleState = typeof leanModuleState.$inferSelect;
+export type InsertLeanModuleState = typeof leanModuleState.$inferInsert;
+export type LeanModuleItem = typeof leanModuleItems.$inferSelect;
+export type InsertLeanModuleItem = typeof leanModuleItems.$inferInsert;
 
 export type PreConstruction = typeof preConstruction.$inferSelect;
 export type InsertPreConstruction = typeof preConstruction.$inferInsert;
