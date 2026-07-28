@@ -24,7 +24,7 @@ import { formatCurrency, shortDate, relativeDays, isOverdue } from "@/lib/format
 import { useAccess } from "@/lib/access";
 import { NotificationsBox, WeatherBar, StickyNotepadBox, NoteWallCarouselBox, FleetServiceBox } from "@/components/dashboard-widgets";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
 
 import {
@@ -148,13 +148,25 @@ function useDashboardCtx() {
   const chartUnit: "M" | "K" | "" =
     rawMax >= 1_000_000 ? "M" : rawMax >= 1_000 ? "K" : "";
   const chartDivisor = chartUnit === "M" ? 1_000_000 : chartUnit === "K" ? 1_000 : 1;
-  const chartData = projects.map((p) => ({
-    name: p.name.split(" ")[0] || p.name,
-    // Use one decimal when the divisor could round otherwise-nonzero values to
-    // zero (e.g. $200k / 1M = 0.2 — we want the bar to show).
-    Budget: Number((p.budget / chartDivisor).toFixed(chartDivisor === 1 ? 0 : 1)),
-    Spent: Number((p.spent / chartDivisor).toFixed(chartDivisor === 1 ? 0 : 1)),
-  }));
+  // Each project is its own row on the chart. We keep the full project name
+  // (truncated at 18 chars for the axis, full name for tooltip) so two
+  // projects that share a first word ("Boulder Warehouse" vs "Boulder Grant")
+  // don't look identical. We also carry the raw dollar values for the
+  // tooltip so users see "$213,000" instead of "0.2 M".
+  const chartData = projects.map((p) => {
+    const shortName = p.name.length > 18 ? p.name.slice(0, 17) + "…" : p.name;
+    return {
+      name: shortName,
+      fullName: p.name,
+      // Use one decimal when the divisor could round otherwise-nonzero values
+      // to zero (e.g. $200k / 1M = 0.2 — we want the bar to show).
+      Budget: Number((p.budget / chartDivisor).toFixed(chartDivisor === 1 ? 0 : 1)),
+      Spent: Number((p.spent / chartDivisor).toFixed(chartDivisor === 1 ? 0 : 1)),
+      budgetRaw: p.budget,
+      spentRaw: p.spent,
+      pct: p.budget > 0 ? Math.round((p.spent / p.budget) * 100) : 0,
+    };
+  });
   type FeedItem = { id: string; kind: "Blocked" | "Overdue RFI" | "Pending CO"; title: string; meta: string; priority?: string; testid: string; href: string };
   const feed: FeedItem[] = [
     ...blockedTasks.map<FeedItem>((t) => ({ id: `task-${t.id}`, kind: "Blocked", title: t.title, meta: `${t.trade} · ${relativeDays(t.dueDate)}`, priority: t.priority, testid: `attention-task-${t.id}`, href: "/tasks" })),
@@ -431,16 +443,61 @@ const WIDGET_REGISTRY: WidgetDef[] = [
             </div>
           ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={c.chartData} barGap={4} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+            {/* barGap: gap between Budget/Spent within a project (tight, they're a pair)
+                barCategoryGap: gap BETWEEN projects (wide, so each project reads as its own group).
+                45% category gap gives clear visual separation between projects. */}
+            <BarChart
+              data={c.chartData}
+              barGap={2}
+              barCategoryGap="35%"
+              margin={{ top: 16, right: 8, left: -8, bottom: c.chartData.length > 4 ? 20 : 4 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} interval={0} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }}
+                tickLine={false}
+                axisLine={false}
+                interval={0}
+                angle={c.chartData.length > 4 ? -20 : 0}
+                textAnchor={c.chartData.length > 4 ? "end" : "middle"}
+                height={c.chartData.length > 4 ? 44 : 24}
+              />
               <YAxis tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} unit={c.chartUnit} />
               <Tooltip
                 contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--popover-border))", borderRadius: 8, fontSize: 12 }}
-                cursor={{ fill: "hsl(var(--muted))" }}
+                cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }}
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const row = payload[0]?.payload as (typeof c.chartData)[number] | undefined;
+                  if (!row) return null;
+                  return (
+                    <div className="rounded-lg border border-popover-border bg-popover px-3 py-2 text-xs shadow-md">
+                      <div className="mb-1 font-semibold">{row.fullName}</div>
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-sky-500/40" />Budget</span>
+                        <span className="font-mono tabular-nums">{formatCurrency(row.budgetRaw, { compact: true })}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-primary" />Spent</span>
+                        <span className="font-mono tabular-nums">{formatCurrency(row.spentRaw, { compact: true })}</span>
+                      </div>
+                      <div className="mt-1 border-t border-border pt-1 text-muted-foreground">{row.pct}% of budget used</div>
+                    </div>
+                  );
+                }}
               />
               <Bar dataKey="Budget" radius={[4, 4, 0, 0]} fill="hsl(var(--chart-2))" fillOpacity={0.35} />
-              <Bar dataKey="Spent" radius={[4, 4, 0, 0]} fill="hsl(var(--chart-1))" />
+              <Bar dataKey="Spent" radius={[4, 4, 0, 0]} fill="hsl(var(--chart-1))">
+                {/* Show "NN%" above each Spent bar so at-a-glance you can see
+                    which projects are running hot without hovering. */}
+                <LabelList
+                  dataKey="pct"
+                  position="top"
+                  formatter={(v: number) => (v > 0 ? `${v}%` : "")}
+                  style={{ fontSize: 10, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }}
+                />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
           )}
