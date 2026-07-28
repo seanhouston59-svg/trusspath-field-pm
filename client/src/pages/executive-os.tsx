@@ -1,7 +1,8 @@
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Rocket, ClipboardList, Ruler, ChevronRight } from "lucide-react";
+import { Sparkles, Rocket, ClipboardList, Ruler, ChevronRight, Construction } from "lucide-react";
+import { UPCOMING_MODULES } from "./executive-os/upcoming-modules";
 
 type ModuleCard = {
   href: string;
@@ -84,6 +85,35 @@ export default function ExecutiveOs() {
 
             <div className="rounded-md border border-dashed border-primary/30 bg-background/60 p-4 text-sm text-muted-foreground">
               More modules coming soon \u2014 financial rollups and board packets are next.
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6 border-muted/50 bg-muted/30">
+          <CardHeader className="flex flex-row items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Construction className="size-5" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Roadmap</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Every remaining lifecycle module is scaffolded and reachable. Working surfaces land one at a time.
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {UPCOMING_MODULES.map((m) => (
+                <Link
+                  key={m.slug}
+                  href={`/executive-os/${m.slug}`}
+                  className="group flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  data-testid={`exec-os-${m.slug}-link`}
+                >
+                  <span className="flex-1 truncate">{m.title}</span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              ))}
             </div>
           </CardContent>
         </Card>

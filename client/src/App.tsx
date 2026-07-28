@@ -82,6 +82,7 @@ import ProjectSetupPortfolio from "@/pages/executive-os/project-setup-portfolio"
 import ProjectSetupDetail from "@/pages/executive-os/project-setup-detail";
 import PreConstructionPortfolio from "@/pages/executive-os/pre-construction-portfolio";
 import PreConstructionDetail from "@/pages/executive-os/pre-construction-detail";
+import { UPCOMING_MODULE_COMPONENTS, UPCOMING_MODULES } from "@/pages/executive-os/upcoming-modules";
 import InviteAcceptPage from "@/pages/invite-accept";
 import FieldHub from "@/pages/field/hub";
 import FieldDailyLog from "@/pages/field/daily-log";
@@ -131,6 +132,15 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/executive-os/pre-construction/:id": PreConstructionDetail,
   "/executive-os/mobilization": MobilizationPortfolio,
   "/executive-os/mobilization/:id": MobilizationDetail,
+  // Skeleton entries for modules 4-22. Each renders the shared
+  // "coming soon" placeholder scoped to its title/blurb. Swap the value
+  // to the real portfolio/detail component when that module ships.
+  ...Object.fromEntries(
+    UPCOMING_MODULES.flatMap((m) => [
+      [`/executive-os/${m.slug}`, UPCOMING_MODULE_COMPONENTS[m.slug].Portfolio],
+      [`/executive-os/${m.slug}/:id`, UPCOMING_MODULE_COMPONENTS[m.slug].Detail],
+    ]),
+  ),
   "/field": FieldHub,
   "/field/daily-log": FieldDailyLog,
   "/field/timecard": FieldTimecard,

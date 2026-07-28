@@ -9,6 +9,10 @@ import {
   LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2, Smartphone,
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2, ChevronRight,
   Video, FileSpreadsheet, Sparkles, Rocket, Ruler,
+  // Icons for Executive OS lifecycle modules 4-22.
+  Truck, Mountain, Layers, Home, Cable, Boxes, Paintbrush, ArrowUpDown, Trees,
+  Gauge, ListTodo, PackageCheck, BadgeCheck, HardHat, CheckCheck, DollarSign,
+  CalendarClock, ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -27,7 +31,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { ClockStatusLight } from "@/components/clock-status-light";
 import { useToast } from "@/hooks/use-toast";
 import { useFieldMode } from "@/hooks/use-field-mode";
-import { HardHat, WifiOff } from "lucide-react";
+import { WifiOff } from "lucide-react";
 
 const ICONS: Record<string, any> = {
   LayoutDashboard, FolderKanban, ListChecks, HelpCircle, ClipboardList,
@@ -37,6 +41,10 @@ const ICONS: Record<string, any> = {
   ShieldCheck, Smartphone,
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2,
   Video, FileSpreadsheet, Sparkles, Rocket, Ruler,
+  // Executive OS lifecycle modules 4-22.
+  Truck, Mountain, Layers, Home, Cable, Boxes, Paintbrush, ArrowUpDown, Trees,
+  Gauge, ListTodo, PackageCheck, BadgeCheck, HardHat, CheckCheck, DollarSign,
+  CalendarClock, ShieldAlert,
 };
 
 // Collapse state is persisted per-group in localStorage. Missing entries
