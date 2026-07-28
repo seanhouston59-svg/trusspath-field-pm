@@ -145,7 +145,11 @@ export default function PreConstructionDetail() {
             </TabsList>
 
             <TabsContent value="overview">
-              <OverviewTab preCon={bundle.preCon} projectId={projectId} />
+              <OverviewTab
+                preCon={bundle.preCon}
+                bidPackages={bundle.bidPackages}
+                projectId={projectId}
+              />
             </TabsContent>
 
             <TabsContent value="design">

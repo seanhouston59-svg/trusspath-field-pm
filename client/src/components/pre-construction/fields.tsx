@@ -2,6 +2,10 @@ import { useState, type ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,11 +39,10 @@ export type PreconField = Extract<
 >;
 
 /** Integer-valued columns. Split from PreconField because these must be sent as
- *  numbers — the insert schema rejects the raw string from an <input>. */
-export type PreconNumField = Extract<
-  keyof PreConstruction,
-  "designCompletionPercent" | "bidPackagesCount" | "bidPackagesBoughtOutCount"
->;
+ *  numbers — the insert schema rejects the raw string from an <input>.
+ *  bidPackagesCount/bidPackagesBoughtOutCount are deliberately absent: they are
+ *  deprecated, derived from bidPackages rows, and stripped by the PATCH route. */
+export type PreconNumField = Extract<keyof PreConstruction, "designCompletionPercent">;
 
 export type SavePrecon = (data: Partial<PreConstruction>) => Promise<unknown>;
 
@@ -258,8 +261,13 @@ export function EditableTable<Row extends { id: number }>({
   /** Leading status glyph, e.g. the delivered check on a long-lead row. */
   rowIcon?: (row: Row) => ReactNode;
 }) {
+  // One dialog for the whole table rather than one per row — the id in state is
+  // what the confirm acts on.
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+
   if (rows.length === 0) return null;
   return (
+    <>
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full text-sm">
         <thead>
@@ -290,7 +298,7 @@ export function EditableTable<Row extends { id: number }>({
                 <Button
                   size="icon" variant="ghost"
                   className="size-7 text-red-600 hover:bg-red-50 hover:text-red-700"
-                  onClick={() => remove(row.id)}
+                  onClick={() => setPendingDelete(row.id)}
                   aria-label={`Remove ${rowLabel(row)}`}
                   data-testid={`${testId}-${row.id}-delete`}
                 >
@@ -302,6 +310,28 @@ export function EditableTable<Row extends { id: number }>({
         </tbody>
       </table>
     </div>
+
+    <AlertDialog open={pendingDelete !== null} onOpenChange={(o) => !o && setPendingDelete(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this row?</AlertDialogTitle>
+          <AlertDialogDescription>Delete this row? This cannot be undone.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (pendingDelete !== null) remove(pendingDelete);
+              setPendingDelete(null);
+            }}
+            data-testid={`${testId}-delete-confirm`}
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 

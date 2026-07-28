@@ -104,7 +104,12 @@ export class PreConstructionRepo {
     patch: Partial<InsertPreConstruction>,
   ): Promise<PreConstruction | null> {
     await ensureReady();
-    const { id: _id, projectId: _pid, ...rest } = patch;
+    // Legacy columns: bidPackagesCount/bidPackagesBoughtOutCount are derived from bidPackages rows; ignore inbound writes.
+    const {
+      id: _id, projectId: _pid,
+      bidPackagesCount: _count, bidPackagesBoughtOutCount: _boughtOut,
+      ...rest
+    } = patch;
     if (Object.keys(rest).length === 0) return await this.getPreConstruction(projectId);
     const [row] = await db.update(preConstruction)
       .set({ ...rest, updatedAt: new Date().toISOString() })

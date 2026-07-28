@@ -1,5 +1,6 @@
 import {
-  DESIGN_DISCIPLINES, DOC_TYPES, DESIGN_RFI_STATUSES, VE_STATUSES,
+  DESIGN_DISCIPLINES, DOC_TYPES, DESIGN_DOC_STATUSES,
+  DESIGN_RFI_STATUSES, DESIGN_RFI_IMPACTS, VE_STATUSES,
 } from "@shared/pre-construction-catalog";
 import type {
   PreConstructionDesignDoc, PreConstructionDesignRfi, PreConstructionVeItem,
@@ -15,29 +16,13 @@ import {
   type Col, type SaveRow,
 } from "./fields";
 
-/** designDocs.status and designRfis.impact are CHECK-constrained in the schema
- *  but have no catalog export, so the option lists live here rather than
- *  reaching into shared/ during a UI-only change. */
-const DOC_STATUSES = [
-  { value: "current", label: "Current" },
-  { value: "superseded", label: "Superseded" },
-  { value: "pending", label: "Pending" },
-] as const;
-
-const RFI_IMPACTS = [
-  { value: "none", label: "None" },
-  { value: "cost", label: "Cost" },
-  { value: "schedule", label: "Schedule" },
-  { value: "both", label: "Cost + schedule" },
-] as const;
-
 const DOC_COLS: Col<PreConstructionDesignDoc>[] = [
   { key: "label", label: "Label", required: true, className: "min-w-[10rem]" },
   { key: "docType", label: "Type", type: "select", options: DOC_TYPES },
   { key: "revision", label: "Rev", className: "min-w-[5rem]" },
   { key: "issuedDate", label: "Issued", type: "date" },
   { key: "receivedDate", label: "Received", type: "date" },
-  { key: "status", label: "Status", type: "select", options: DOC_STATUSES },
+  { key: "status", label: "Status", type: "select", options: DESIGN_DOC_STATUSES },
   { key: "location", label: "Location", className: "min-w-[10rem]" },
   { key: "notes", label: "Notes", type: "textarea" },
 ];
@@ -47,7 +32,7 @@ const RFI_COLS: Col<PreConstructionDesignRfi>[] = [
   { key: "subject", label: "Subject", required: true, className: "min-w-[10rem]" },
   { key: "discipline", label: "Discipline", type: "select", options: DESIGN_DISCIPLINES },
   { key: "status", label: "Status", type: "select", options: DESIGN_RFI_STATUSES },
-  { key: "impact", label: "Impact", type: "select", options: RFI_IMPACTS },
+  { key: "impact", label: "Impact", type: "select", options: DESIGN_RFI_IMPACTS },
   { key: "askedDate", label: "Asked", type: "date" },
   { key: "respondedDate", label: "Responded", type: "date" },
   { key: "question", label: "Question", type: "textarea" },

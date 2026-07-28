@@ -2323,7 +2323,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Every column optional so the intake form can autosave a field at a time.
-  const preConstructionPatchSchema = insertPreConstructionSchema.omit({ projectId: true }).partial();
+  // Legacy columns: bidPackagesCount/bidPackagesBoughtOutCount are derived from bidPackages rows; ignore inbound writes.
+  const preConstructionPatchSchema = insertPreConstructionSchema
+    .omit({ projectId: true, bidPackagesCount: true, bidPackagesBoughtOutCount: true })
+    .partial();
 
   app.patch("/api/projects/:id/pre-construction", async (req: any, res) => {
     const projectId = parseInt(req.params.id, 10);

@@ -54,6 +54,16 @@ export const DOC_TYPES = [
 
 export type DocType = (typeof DOC_TYPES)[number]["value"];
 
+/** Revision state of a design document — whether the sheet in hand is the one
+ *  to build from. */
+export const DESIGN_DOC_STATUSES = [
+  { value: "current", label: "Current" },
+  { value: "superseded", label: "Superseded" },
+  { value: "pending", label: "Pending" },
+] as const;
+
+export type DesignDocStatus = (typeof DESIGN_DOC_STATUSES)[number]["value"];
+
 export const DESIGN_RFI_STATUSES = [
   { value: "open", label: "Open" },
   { value: "answered", label: "Answered" },
@@ -62,6 +72,16 @@ export const DESIGN_RFI_STATUSES = [
 ] as const;
 
 export type DesignRfiStatus = (typeof DESIGN_RFI_STATUSES)[number]["value"];
+
+/** What an RFI answer costs — drives which impact columns matter on the row. */
+export const DESIGN_RFI_IMPACTS = [
+  { value: "none", label: "None" },
+  { value: "cost", label: "Cost" },
+  { value: "schedule", label: "Schedule" },
+  { value: "both", label: "Cost & Schedule" },
+] as const;
+
+export type DesignRfiImpact = (typeof DESIGN_RFI_IMPACTS)[number]["value"];
 
 export const VE_STATUSES = [
   { value: "proposed", label: "Proposed" },

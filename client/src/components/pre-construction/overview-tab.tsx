@@ -6,10 +6,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PRE_CONSTRUCTION_STATUSES, DESIGN_PHASES } from "@shared/pre-construction-catalog";
-import type { PreConstruction } from "@shared/schema";
+import { Label } from "@/components/ui/label";
+import type { PreConstruction, PreConstructionBidPackage } from "@shared/schema";
 import { useUpdatePreConstruction } from "@/hooks/use-pre-construction";
 import {
-  CollapsibleCard, SaveStatusPill, PreconText, PreconArea, PreconNumber, PreconSelect,
+  CollapsibleCard, SaveStatusPill, LABEL_CLASS, PreconText, PreconArea, PreconNumber, PreconSelect,
   countFilled, type PreconField, type PreconNumField, type SavePrecon,
 } from "./fields";
 
@@ -32,9 +33,9 @@ const PERMITTING: PreconField[] = [
   "openConditionsNarrative",
 ];
 const BIDDING: PreconField[] = ["bidStrategy", "prequalCriteria", "bidderOutreachNarrative"];
-const BUYOUT: (PreconField | PreconNumField)[] = [
+const BUYOUT: PreconField[] = [
   "buyoutTargetDate", "buyoutCompleteDate", "buyoutStrategy", "longLeadStrategy",
-  "deliveryRiskNarrative", "bidPackagesCount", "bidPackagesBoughtOutCount",
+  "deliveryRiskNarrative",
 ];
 const RISKS: PreconField[] = ["overallRisks", "overallAssumptions", "openIssues", "nextSteps"];
 
@@ -108,10 +109,16 @@ function PlanApprovalCard({ preCon, save }: { preCon: PreConstruction | null; sa
   );
 }
 
-export function OverviewTab({ preCon, projectId }: {
+export function OverviewTab({ preCon, bidPackages, projectId }: {
   preCon: PreConstruction | null;
+  /** Buyout progress is derived from these rows, not from the deprecated
+   *  bidPackagesCount columns, which nothing maintains. */
+  bidPackages: PreConstructionBidPackage[];
   projectId: number | undefined;
 }) {
+  const boughtOut = bidPackages.filter(
+    (b) => b.status === "awarded" || b.status === "contract_executed",
+  ).length;
   const update = useUpdatePreConstruction(projectId);
   const save: SavePrecon = (data) => update.mutateAsync(data);
   const p = { preCon, save };
@@ -184,14 +191,16 @@ export function OverviewTab({ preCon, projectId }: {
         <div className="grid gap-4 sm:grid-cols-2">
           <PreconText {...p} field="buyoutTargetDate" label="Buyout target date" type="date" />
           <PreconText {...p} field="buyoutCompleteDate" label="Buyout complete date" type="date" />
-          <PreconNumber
-            {...p} field="bidPackagesCount" label="Bid packages"
-            hint="Overrides the count rolled up from the Bid Packages tab."
-          />
-          <PreconNumber
-            {...p} field="bidPackagesBoughtOutCount" label="Bid packages bought out"
-            hint="Overrides the rolled-up awarded count."
-          />
+        </div>
+        <div className="mt-4">
+          <Label className={LABEL_CLASS}>Bid packages</Label>
+          <p className="text-sm" data-testid="precon-buyout-derived">
+            <span className="font-semibold">{boughtOut}</span> of{" "}
+            <span className="font-semibold">{bidPackages.length}</span> bought out
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Counted from the Bid Packages tab — award a package there to move this.
+          </p>
         </div>
         <div className="mt-4 grid gap-4">
           <PreconArea {...p} field="buyoutStrategy" label="Buyout strategy" />

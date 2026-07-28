@@ -1047,9 +1047,9 @@ export const preConstruction = pgTable("pre_construction", {
   buyoutTargetDate: text("buyout_target_date"),
   buyoutCompleteDate: text("buyout_complete_date"),
 
-  // Buyout counters. Denormalized so the portfolio roll-up doesn't have to
-  // count bid package rows per project.
+  // @deprecated derived from bidPackages count; do not read or write.
   bidPackagesCount: integer("bid_packages_count").notNull().default(0),
+  // @deprecated derived from bidPackages count; do not read or write.
   bidPackagesBoughtOutCount: integer("bid_packages_bought_out_count").notNull().default(0),
 
   // Ownership
