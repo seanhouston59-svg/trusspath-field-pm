@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -42,7 +43,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeanItemPasteDialog } from "@/components/executive-os/lean-item-paste-dialog";
 import { LeanItemAttachmentsButton } from "@/components/executive-os/lean-item-attachments-button";
 import { cn } from "@/lib/utils";
-import type { Project } from "@shared/schema";
+import type { LeanModuleItem, Project, TeamMember } from "@shared/schema";
+import { useTeam } from "@/hooks/use-data";
 import {
   LEAN_MODULE_ITEM_STATUSES,
   LEAN_MODULE_STATE_STATUSES,
@@ -201,6 +203,9 @@ function LeanModuleDetail({ moduleId, projectId }: { moduleId: string; projectId
   const createItem = useCreateLeanModuleItem(projectId, moduleId);
   const updateItem = useUpdateLeanModuleItem(projectId, moduleId);
   const deleteItem = useDeleteLeanModuleItem(projectId, moduleId);
+  // Team members feed the per-row assignment picker. Also used by the
+  // module-level owner input at the top of the page.
+  const { data: team = [] } = useTeam();
 
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState<string>("");
@@ -571,26 +576,43 @@ function LeanModuleDetail({ moduleId, projectId }: { moduleId: string; projectId
                           </Select>
                         </td>
                         <td className="px-2 py-2">
-                          <CellText
+                          <OwnerPicker
                             value={row.ownerName ?? ""}
-                            onCommit={(v) =>
+                            team={team}
+                            placeholder={ghost.itemOwner}
+                            onChange={(v) =>
                               updateItem.mutate({ id: row.id, patch: { ownerName: v || null } })
                             }
-                            placeholder={ghost.itemOwner}
                           />
                         </td>
                         <td className="px-2 py-2">
-                          <Input
-                            type="date"
-                            className="h-8 text-xs"
-                            value={row.dueDate ?? ""}
-                            onChange={(e) =>
-                              updateItem.mutate({
-                                id: row.id,
-                                patch: { dueDate: e.target.value || null },
-                              })
-                            }
-                          />
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="date"
+                              className={cn(
+                                "h-8 text-xs",
+                                isRowOverdue(row) &&
+                                  "border-red-500/50 text-red-600 dark:text-red-400",
+                              )}
+                              value={row.dueDate ?? ""}
+                              onChange={(e) =>
+                                updateItem.mutate({
+                                  id: row.id,
+                                  patch: { dueDate: e.target.value || null },
+                                })
+                              }
+                            />
+                            {isRowOverdue(row) && (
+                              <span
+                                title="Overdue"
+                                className="inline-flex items-center rounded-full bg-red-500/12 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 ring-1 ring-red-500/25 dark:text-red-400"
+                                data-testid={`lean-${moduleId}-overdue-${row.id}`}
+                              >
+                                <AlertTriangle className="mr-0.5 size-3" />
+                                Late
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-2 py-2">
                           <Select
@@ -770,6 +792,143 @@ function FieldTextarea({
       />
     </div>
   );
+}
+
+/**
+ * Owner assignment picker for a lean item row.
+ *
+ * Behavior:
+ * - Shows a Select populated with the org's team members plus a "Custom…"
+ *   escape hatch and a "Clear" option.
+ * - When the current value matches a team member's name exactly, it renders as
+ *   the selected option. Otherwise it renders as `Custom (…)` so the user
+ *   can still see and edit the freeform string.
+ * - Choosing "Custom…" flips the cell into a plain text input so the user can
+ *   type any name (external subs, unlisted people). Blurring the input
+ *   commits.
+ *
+ * Backward-compatible: `ownerName` remains a plain text field in the DB.
+ */
+function OwnerPicker({
+  value,
+  team,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  team: TeamMember[];
+  placeholder?: string;
+  onChange: (v: string) => void;
+}) {
+  // If the current value doesn't match any team member, default to freeform
+  // mode so the user isn't surprised by data disappearing behind a picker.
+  const matchesTeam = team.some((m) => m.name === value);
+  const [freeform, setFreeform] = useState(!matchesTeam && !!value);
+  const [local, setLocal] = useState(value);
+  // Keep local input in sync when the row's value changes from elsewhere.
+  if (value !== local && !document.activeElement?.classList.contains("owner-picker-input")) {
+    // Reset only when not currently typing; avoids clobbering user keystrokes.
+  }
+
+  if (freeform) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          className="owner-picker-input h-8 text-xs"
+          value={local}
+          placeholder={placeholder}
+          onChange={(e) => setLocal(e.target.value)}
+          onBlur={() => local !== value && onChange(local)}
+          autoFocus
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          title="Switch back to team picker"
+          onClick={() => {
+            // Commit any pending edit, then flip back to picker mode.
+            if (local !== value) onChange(local);
+            setFreeform(false);
+          }}
+        >
+          <X className="size-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
+  // Sentinel values — real names can't start with `__`, so these are safe.
+  const CLEAR = "__clear__";
+  const CUSTOM = "__custom__";
+
+  return (
+    <Select
+      value={matchesTeam ? value : ""}
+      onValueChange={(v) => {
+        if (v === CLEAR) {
+          onChange("");
+          return;
+        }
+        if (v === CUSTOM) {
+          setLocal(value);
+          setFreeform(true);
+          return;
+        }
+        onChange(v);
+      }}
+    >
+      <SelectTrigger className="h-8 text-xs">
+        <SelectValue placeholder={placeholder || "Assign…"}>
+          {value || undefined}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {team.length === 0 && (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+            No team members yet.
+          </div>
+        )}
+        {team.map((m) => (
+          <SelectItem key={m.id} value={m.name}>
+            <span className="flex items-center gap-2">
+              <span
+                className="inline-flex size-5 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                style={{ background: m.color }}
+              >
+                {m.initials}
+              </span>
+              <span>{m.name}</span>
+              <span className="text-muted-foreground">· {m.role}</span>
+            </span>
+          </SelectItem>
+        ))}
+        {value && !matchesTeam && (
+          // Show the current freeform value so the picker doesn't look empty.
+          <SelectItem value={value} disabled>
+            Custom: {value}
+          </SelectItem>
+        )}
+        <div className="my-1 border-t" />
+        <SelectItem value={CUSTOM}>Custom… (type a name)</SelectItem>
+        {value && <SelectItem value={CLEAR}>Clear</SelectItem>}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/**
+ * A lean item is "overdue" if it has a due date in the past AND it hasn't
+ * been closed out. `complete` and `n_a` are terminal states; anything else
+ * (including empty status) is treated as still open.
+ */
+function isRowOverdue(row: LeanModuleItem): boolean {
+  if (!row.dueDate) return false;
+  if (row.status === "complete" || row.status === "n_a") return false;
+  // Compare on YYYY-MM-DD strings — avoids TZ drift from Date parsing.
+  const today = new Date().toISOString().slice(0, 10);
+  return row.dueDate < today;
 }
 
 function CellText({
