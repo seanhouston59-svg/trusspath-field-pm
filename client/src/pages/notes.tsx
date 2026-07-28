@@ -34,9 +34,17 @@ const COLOR_KEYS = Object.keys(NOTE_COLORS);
 // after the frame). Below MOBILE_BOARD_PX we compact the note width so a
 // sticky always fits inside the frame with a comfortable side margin.
 const NOTE_W_DESKTOP = 260;
-const NOTE_W_MOBILE = 200;
-const NOTE_H = 260;
+// 160px wide notes let us fit 2 columns side-by-side on iPhone widths
+// (369px inner corkboard → 2×160 + 12 gutter + 2×12 outer = 356px) with a
+// comfortable margin. Height compresses too so a full row is readable
+// without the reply composer being pushed off-screen.
+const NOTE_W_MOBILE = 160;
+const NOTE_H_DESKTOP = 260;
+const NOTE_H_MOBILE = 210;
 const MOBILE_BOARD_PX = 480;
+const MOBILE_COLS = 2;
+const MOBILE_GUTTER = 12;
+const MOBILE_MARGIN = 12;
 // Bottom reservation so notes can't be dragged under the floating JARVIS FAB
 // (~64px tall + 16px offset). On desktop we still leave a small margin so the
 // contact-shadow of a bottom-row note doesn't clip against the frame.
@@ -113,18 +121,23 @@ export default function NotesPage() {
 
   const isMobileBoard = boardW > 0 && boardW < MOBILE_BOARD_PX;
   const NOTE_W = isMobileBoard ? NOTE_W_MOBILE : NOTE_W_DESKTOP;
+  const NOTE_H = isMobileBoard ? NOTE_H_MOBILE : NOTE_H_DESKTOP;
   const FAB_RESERVE = isMobileBoard ? FAB_RESERVE_MOBILE : FAB_RESERVE_DESKTOP;
 
-  // On phone-sized boards, ignore stored x/y positions entirely and lay notes
-  // out in a single centered vertical column. Multiple notes saved at similar
-  // x-coords on a wide board would otherwise all clamp to the same mobile x
-  // and stack on top of each other unreadably. Vertical gap keeps the pushpin
-  // + colored header bar visible for every note.
-  const MOBILE_NOTE_GAP = 20;
+  // On phone-sized boards, ignore stored x/y and lay notes out in a 2-column
+  // grid that wraps onto rows below. Stored positions from a wide desktop
+  // board would otherwise all clamp to similar mobile x-coords and stack
+  // unreadably on top of each other. Column count is fixed at MOBILE_COLS
+  // so the layout is predictable across notes; the whole grid is centered
+  // horizontally inside the corkboard.
   const mobileLayoutFor = (index: number): { x: number; y: number } => {
-    const centerX = Math.max(0, (boardW - NOTE_W) / 2);
-    const y = 16 + index * (NOTE_H + MOBILE_NOTE_GAP);
-    return { x: centerX, y };
+    const col = index % MOBILE_COLS;
+    const row = Math.floor(index / MOBILE_COLS);
+    const gridW = MOBILE_COLS * NOTE_W + (MOBILE_COLS - 1) * MOBILE_GUTTER;
+    const leftOffset = Math.max(MOBILE_MARGIN, (boardW - gridW) / 2);
+    const x = leftOffset + col * (NOTE_W + MOBILE_GUTTER);
+    const y = MOBILE_MARGIN + row * (NOTE_H + MOBILE_GUTTER);
+    return { x, y };
   };
 
   // Clamp any (x, y) note position into the visible board rectangle, minus
