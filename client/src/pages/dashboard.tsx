@@ -805,28 +805,36 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setCustomizeOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted"
+                className="inline-flex size-10 sm:size-auto sm:h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border sm:px-3 sm:py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted"
                 data-testid="button-customize-open"
+                aria-label="Add widget"
+                title="Add widget"
               >
-                <Plus className="size-3.5" /> Add
+                <Plus className="size-3.5" /> <span className="hidden sm:inline">Add</span>
               </button>
               <button
                 type="button"
                 onClick={() => { setEditMode(false); setCustomizeOpen(false); }}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                className="inline-flex size-10 sm:size-auto sm:h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-primary sm:px-3 sm:py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
                 data-testid="button-edit-done"
+                aria-label="Done editing"
+                title="Done editing"
               >
-                <Check className="size-3.5" /> Done
+                <Check className="size-3.5" /> <span className="hidden sm:inline">Done</span>
               </button>
             </>
           ) : (
             <button
               type="button"
               onClick={() => setEditMode(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted"
+              // Icon-only on phones so the top bar fits on iPhone-sized
+              // viewports; full "Customize" label returns at sm+.
+              className="inline-flex size-10 sm:size-auto sm:h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border sm:px-3 sm:py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted"
               data-testid="button-edit-dashboard"
+              aria-label="Customize dashboard"
+              title="Customize dashboard"
             >
-              <LayoutGrid className="size-3.5" /> Customize
+              <LayoutGrid className="size-3.5" /> <span className="hidden sm:inline">Customize</span>
             </button>
           )}
         </div>

@@ -242,7 +242,10 @@ export function ClockStatusLight() {
       title={`${label} \u00b7 Tap: ${nextAction} \u00b7 Long-press: Timesheets`}
       data-testid="clock-status-light"
       className={cn(
-        "inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-wait",
+        // Dot-only on phones (sm-): render as a square 10-tap-target so it's
+        // still easy to hit and matches the neighboring icon buttons.
+        // With label on sm+, revert to the wider pill layout.
+        "inline-flex h-10 sm:h-9 w-10 sm:w-auto shrink-0 cursor-pointer items-center justify-center sm:justify-start gap-2 rounded-md border border-border bg-muted/40 px-0 sm:px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-wait",
         state === "in" && "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400",
         state === "break" && "border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400",
       )}
@@ -261,7 +264,10 @@ export function ClockStatusLight() {
           <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500/60" aria-hidden="true" />
         )}
       </span>
-      <span className="whitespace-nowrap">{busy ? "Working\u2026" : label}</span>
+      {/* Text label hidden on phones so the top bar fits on iPhone-sized
+          viewports. The colored dot alone still communicates state, and the
+          aria-label / title preserve accessibility. Full label returns at sm+. */}
+      <span className="hidden sm:inline whitespace-nowrap">{busy ? "Working\u2026" : label}</span>
     </button>
   );
 

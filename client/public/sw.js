@@ -14,7 +14,7 @@
  * we'd rather let the browser cache them naturally than risk stale bundles.
  */
 
-const CACHE_VERSION = "trusspath-v63";
+const CACHE_VERSION = "trusspath-v64";
 const APP_SHELL = "/";
 const OFFLINE_FALLBACK = "/";
 
