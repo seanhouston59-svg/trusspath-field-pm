@@ -29,11 +29,19 @@ const NOTE_COLORS: Record<string, { bg: string; bar: string; text: string; pin: 
 };
 const COLOR_KEYS = Object.keys(NOTE_COLORS);
 
-// Sticky note dimensions. Bumped up so notes read like real paper stickies
-// on a corkboard rather than tiny thumbnail tiles. Board drag-clamp math
-// uses these so notes can't be dragged off the edge.
-const NOTE_W = 260;
+// Sticky note dimensions. 260px reads like a real paper sticky on tablet+
+// but overflows the corkboard on iPhone-sized viewports (~370px inner width
+// after the frame). Below MOBILE_BOARD_PX we compact the note width so a
+// sticky always fits inside the frame with a comfortable side margin.
+const NOTE_W_DESKTOP = 260;
+const NOTE_W_MOBILE = 200;
 const NOTE_H = 260;
+const MOBILE_BOARD_PX = 480;
+// Bottom reservation so notes can't be dragged under the floating JARVIS FAB
+// (~64px tall + 16px offset). On desktop we still leave a small margin so the
+// contact-shadow of a bottom-row note doesn't clip against the frame.
+const FAB_RESERVE_MOBILE = 96;
+const FAB_RESERVE_DESKTOP = 24;
 
 // Corkboard background: layered radial gradients approximate cork grain
 // without an image asset. Two size-varied dot patterns give the surface a
@@ -66,6 +74,9 @@ export default function NotesPage() {
   const [color, setColor] = useState("amber");
   const [draft, setDraft] = useState("");
   const [drag, setDrag] = useState<{ id: number; x: number; y: number; offX: number; offY: number } | null>(null);
+  // Track the corkboard's current inner width so note sizing + clamping stay
+  // responsive to viewport changes (rotation, split-screen, resize).
+  const [boardW, setBoardW] = useState<number>(0);
   // Per-note reply drafts, keyed by note id. We keep this in the parent so the
   // input stays in sync across re-renders (useNotes will refetch after each
   // reply is posted) without dropping keystrokes.
@@ -88,14 +99,46 @@ export default function NotesPage() {
     );
   };
 
+  // Keep boardW in sync with the actual rendered corkboard width so all the
+  // responsive sizing/clamping math below reacts to rotation and resize.
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el) return;
+    const measure = () => setBoardW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const isMobileBoard = boardW > 0 && boardW < MOBILE_BOARD_PX;
+  const NOTE_W = isMobileBoard ? NOTE_W_MOBILE : NOTE_W_DESKTOP;
+  const FAB_RESERVE = isMobileBoard ? FAB_RESERVE_MOBILE : FAB_RESERVE_DESKTOP;
+
+  // Clamp any (x, y) note position into the visible board rectangle, minus
+  // the note's own footprint and the reserved bottom-right area for the
+  // JARVIS FAB. Used both for live-drag and for correcting stored positions
+  // that were saved on a wider viewport.
+  const clampPos = (x: number, y: number, rect?: { width: number; height: number } | null) => {
+    const w = rect?.width ?? boardRef.current?.clientWidth ?? boardW;
+    const h = rect?.height ?? boardRef.current?.clientHeight ?? 0;
+    if (!w || !h) return { x, y };
+    const maxX = Math.max(0, w - NOTE_W);
+    const maxY = Math.max(0, h - NOTE_H - FAB_RESERVE);
+    return {
+      x: Math.max(0, Math.min(maxX, x)),
+      y: Math.max(0, Math.min(maxY, y)),
+    };
+  };
+
   useEffect(() => {
     if (!drag) return;
     const onMove = (e: PointerEvent) => {
       const rect = boardRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const x = Math.max(0, Math.min(rect.width - NOTE_W, e.clientX - rect.left - drag.offX));
-      const y = Math.max(0, Math.min(rect.height - NOTE_H, e.clientY - rect.top - drag.offY));
-      setDrag({ ...drag, x, y });
+      const raw = { x: e.clientX - rect.left - drag.offX, y: e.clientY - rect.top - drag.offY };
+      const clamped = clampPos(raw.x, raw.y, rect);
+      setDrag({ ...drag, x: clamped.x, y: clamped.y });
     };
     const onUp = () => {
       if (drag) updatePos.mutate({ id: drag.id, x: Math.round(drag.x), y: Math.round(drag.y) });
@@ -107,7 +150,10 @@ export default function NotesPage() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
     };
-  }, [drag, updatePos]);
+    // clampPos closes over boardW / NOTE_W / FAB_RESERVE — safe to re-create
+    // whenever those change since the drag state itself doesn't outlive them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag, updatePos, boardW]);
 
   const addNote = () => {
     if (!draft.trim()) return;
@@ -201,8 +247,12 @@ export default function NotesPage() {
         {notes.map((n, i) => {
           const c = NOTE_COLORS[n.color] ?? NOTE_COLORS.amber;
           const isDragging = drag?.id === n.id;
-          const x = isDragging ? drag!.x : n.x;
-          const y = isDragging ? drag!.y : n.y;
+          // Clamp render position so notes saved on a wider viewport can't
+          // hang off the frame on a phone (or under the JARVIS FAB). Live
+          // drags are already clamped, so we only apply this to stored coords.
+          const stored = clampPos(n.x, n.y);
+          const x = isDragging ? drag!.x : stored.x;
+          const y = isDragging ? drag!.y : stored.y;
           // Give each note a tiny stable rotation so the board looks like
           // real paper stickies, not a rigid grid. Rotation is deterministic
           // per note id so the same sticky doesn't jitter between renders.
@@ -211,20 +261,22 @@ export default function NotesPage() {
             <div
               key={n.id}
               onPointerDown={(e) => {
-                // Compute the pointer offset relative to the note's stored
-                // top-left (n.x, n.y in board-space), NOT the note's current
+                // Compute the pointer offset relative to the note's clamped
+                // render top-left (stored.x/y), NOT the note's current
                 // getBoundingClientRect() — that rect reflects the rotated
                 // element and would cause a small jump on drop when the note
-                // straightens for dragging.
+                // straightens for dragging. Using the clamped position also
+                // means picking up a note that was previously off-screen
+                // (from an older wider layout) grabs it at its visible spot.
                 const boardRect = boardRef.current?.getBoundingClientRect();
                 if (!boardRect) return;
                 const pointerBoardX = e.clientX - boardRect.left;
                 const pointerBoardY = e.clientY - boardRect.top;
                 setDrag({
                   id: n.id,
-                  x: n.x, y: n.y,
-                  offX: pointerBoardX - n.x,
-                  offY: pointerBoardY - n.y,
+                  x: stored.x, y: stored.y,
+                  offX: pointerBoardX - stored.x,
+                  offY: pointerBoardY - stored.y,
                 });
                 (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
               }}
