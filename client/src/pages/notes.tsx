@@ -115,6 +115,18 @@ export default function NotesPage() {
   const NOTE_W = isMobileBoard ? NOTE_W_MOBILE : NOTE_W_DESKTOP;
   const FAB_RESERVE = isMobileBoard ? FAB_RESERVE_MOBILE : FAB_RESERVE_DESKTOP;
 
+  // On phone-sized boards, ignore stored x/y positions entirely and lay notes
+  // out in a single centered vertical column. Multiple notes saved at similar
+  // x-coords on a wide board would otherwise all clamp to the same mobile x
+  // and stack on top of each other unreadably. Vertical gap keeps the pushpin
+  // + colored header bar visible for every note.
+  const MOBILE_NOTE_GAP = 20;
+  const mobileLayoutFor = (index: number): { x: number; y: number } => {
+    const centerX = Math.max(0, (boardW - NOTE_W) / 2);
+    const y = 16 + index * (NOTE_H + MOBILE_NOTE_GAP);
+    return { x: centerX, y };
+  };
+
   // Clamp any (x, y) note position into the visible board rectangle, minus
   // the note's own footprint and the reserved bottom-right area for the
   // JARVIS FAB. Used both for live-drag and for correcting stored positions
@@ -227,7 +239,14 @@ export default function NotesPage() {
       {/* corkboard */}
       <div
         ref={boardRef}
-        className="relative h-[calc(100vh-19rem)] min-h-[520px] overflow-hidden rounded-xl shadow-inner"
+        // On mobile we switch overflow to auto so the vertical stack of
+        // notes can scroll instead of colliding with the JARVIS FAB. On
+        // desktop we keep overflow hidden so drag-and-drop is bounded by
+        // the visible board.
+        className={cn(
+          "relative h-[calc(100vh-19rem)] min-h-[520px] rounded-xl shadow-inner",
+          isMobileBoard ? "overflow-y-auto overflow-x-hidden" : "overflow-hidden",
+        )}
         style={{
           backgroundImage: CORK_BG,
           backgroundSize: CORK_BG_SIZE,
@@ -247,10 +266,13 @@ export default function NotesPage() {
         {notes.map((n, i) => {
           const c = NOTE_COLORS[n.color] ?? NOTE_COLORS.amber;
           const isDragging = drag?.id === n.id;
-          // Clamp render position so notes saved on a wider viewport can't
-          // hang off the frame on a phone (or under the JARVIS FAB). Live
-          // drags are already clamped, so we only apply this to stored coords.
-          const stored = clampPos(n.x, n.y);
+          // On mobile-sized boards, reflow every note into a single centered
+          // column instead of honoring stored x/y (which were set on a wide
+          // desktop board and would all clamp to the same spot on a phone,
+          // stacking notes on top of each other). On desktop we clamp stored
+          // coordinates so a note saved past the current viewport edge still
+          // renders inside the frame. Live drags always win.
+          const stored = isMobileBoard ? mobileLayoutFor(i) : clampPos(n.x, n.y);
           const x = isDragging ? drag!.x : stored.x;
           const y = isDragging ? drag!.y : stored.y;
           // Give each note a tiny stable rotation so the board looks like
