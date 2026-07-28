@@ -57,6 +57,8 @@ const R = {
   settings: "/settings",
   settingsTeam: "/settings/team",
   executiveOs: "/executive-os",
+  executiveOsProjectSetup: "/executive-os/project-setup",
+  executiveOsProjectSetupDetail: "/executive-os/project-setup/:id",
   executiveOsMobilization: "/executive-os/mobilization",
   executiveOsMobilizationDetail: "/executive-os/mobilization/:id",
   adminSignups: "/admin/signups",

@@ -17,7 +17,7 @@ export const APP_ROUTES: RoutePattern[] = [
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings", "/settings/team",
   "/teams", "/excel",
-  "/executive-os", "/executive-os/project-setup",
+  "/executive-os", "/executive-os/project-setup", "/executive-os/project-setup/:id",
   "/executive-os/mobilization", "/executive-os/mobilization/:id",
   "/field", "/field/daily-log", "/field/timecard", "/field/photo", "/field/observation", "/field/punch",
 ];

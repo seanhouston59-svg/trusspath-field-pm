@@ -53,6 +53,8 @@ export const EVENT_KINDS = {
   PROJECT_SETUP_CHARTER_APPROVED: "project_setup.charter_approved",
   PROJECT_SETUP_DELIVERABLE_COMPLETED: "project_setup.deliverable_completed",
   PROJECT_SETUP_KICKOFF_SCHEDULED: "project_setup.kickoff_scheduled",
+  PROJECT_SETUP_CHARTER_REPORT_GENERATED: "project_setup.charter_report_generated",
+  PROJECT_SETUP_KICKOFF_AGENDA_GENERATED: "project_setup.kickoff_agenda_generated",
 } as const;
 
 export type EventKind = typeof EVENT_KINDS[keyof typeof EVENT_KINDS];
@@ -121,6 +123,8 @@ export const EVENT_KIND_META: Record<string, EventKindMeta> = {
   [EVENT_KINDS.PROJECT_SETUP_CHARTER_APPROVED]: { label: "Project Charter approved", category: "project" },
   [EVENT_KINDS.PROJECT_SETUP_DELIVERABLE_COMPLETED]: { label: "Setup deliverable completed", category: "project" },
   [EVENT_KINDS.PROJECT_SETUP_KICKOFF_SCHEDULED]: { label: "Kickoff meeting scheduled", category: "project" },
+  [EVENT_KINDS.PROJECT_SETUP_CHARTER_REPORT_GENERATED]: { label: "Project Charter generated", category: "doc" },
+  [EVENT_KINDS.PROJECT_SETUP_KICKOFF_AGENDA_GENERATED]: { label: "Kickoff Agenda generated", category: "doc" },
 };
 
 // Kinds grouped by category \u2014 used by the client to render filter chips and

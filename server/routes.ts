@@ -34,6 +34,8 @@ import { mobilizationRollup } from "./mobilization-rollup";
 import { projectSetupRollup } from "./project-setup-rollup";
 import { computeMobilizationGate } from "@shared/lifecycle-gates";
 import { generateMobilizationPlan } from "./reports/mobilization-plan";
+import { generateProjectCharter } from "./reports/project-charter";
+import { generateKickoffAgenda } from "./reports/kickoff-agenda";
 import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
 import {
   bootstrapOrganizationForAccount, bootstrapDemoOrgForAccount,
@@ -2097,6 +2099,68 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!(await requireProjectAccess(req, res, projectId))) return;
     res.json(await projectSetupRollup(projectId));
   });
+
+  /**
+   * The two Project Setup PDFs. Both stream straight to the response, so once
+   * the generator has written a byte we can no longer switch to a JSON error —
+   * hence the headersSent check. The timeline event fires after the stream is
+   * handed off and is deliberately not awaited.
+   */
+  const PROJECT_SETUP_REPORTS: {
+    path: string;
+    generate: (projectId: number, opts: any) => Promise<void>;
+    kind: string;
+    title: string;
+    sourceType: string;
+  }[] = [
+    {
+      path: "charter",
+      generate: generateProjectCharter,
+      kind: EVENT_KINDS.PROJECT_SETUP_CHARTER_REPORT_GENERATED,
+      title: "Project Charter generated",
+      sourceType: "project_charter",
+    },
+    {
+      path: "kickoff-agenda",
+      generate: generateKickoffAgenda,
+      kind: EVENT_KINDS.PROJECT_SETUP_KICKOFF_AGENDA_GENERATED,
+      title: "Kickoff Agenda generated",
+      sourceType: "kickoff_agenda",
+    },
+  ];
+
+  for (const report of PROJECT_SETUP_REPORTS) {
+    app.get(`/api/projects/:id/project-setup/report/${report.path}`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+
+      // `rev` is the Project Setup query name; `revision` is accepted so a link
+      // copied from the Mobilization report still works.
+      const revision =
+        (req.query.rev as string)?.trim() || (req.query.revision as string)?.trim() || "Rev 0";
+      const preparedBy =
+        (req.query.preparedBy as string)?.trim() || req.account?.displayName || "Project Team";
+
+      try {
+        await report.generate(projectId, { preparedBy, revision, res });
+      } catch (err) {
+        console.error(`[project-setup/report/${report.path}] generation failed`, err);
+        if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
+        else res.end();
+        return;
+      }
+
+      logEvent(req, {
+        projectId,
+        kind: report.kind,
+        title: report.title,
+        subtitle: `${revision} — prepared by ${preparedBy}`,
+        meta: { revision, preparedBy },
+        sourceType: report.sourceType,
+      });
+    });
+  }
 
   const PROJECT_SETUP_RESOURCES: {
     path: string;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
-import { ArrowLeft, FileText, Rocket } from "lucide-react";
+import { ArrowLeft, FileText, Rocket, AlertTriangle } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { DashboardTab } from "@/components/mobilization/dashboard-tab";
 import { TimelineTab } from "@/components/mobilization/timeline-tab";
 import { useProject, useTeam } from "@/hooks/use-data";
 import { useMobilization, useMobilizationHealth, useSeedMobilization } from "@/hooks/use-mobilization";
+import { useMobilizationGate } from "@/hooks/use-project-setup";
 import {
   PERMIT_STATUSES, UTILITY_KINDS, UTILITY_KIND_LABELS, RISK_SCALES, RISK_STATUSES,
 } from "@shared/mobilization-catalog";
@@ -217,6 +218,37 @@ function GenerateReportDialog({ projectId, seeded }: { projectId: number; seeded
   );
 }
 
+/** Warns when the upstream Project Setup module is incomplete. Never blocks —
+ *  a PM can always mobilize; the banner just makes the cost visible. */
+function SetupGateBanner({ projectId }: { projectId: number | undefined }) {
+  const { data: gate } = useMobilizationGate(projectId);
+  if (!gate?.warnings.length) return null;
+  return (
+    <div
+      className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3"
+      data-testid="mob-setup-gate-banner"
+    >
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+            Project Setup is not complete
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-amber-700/90 dark:text-amber-300/90">
+            {gate.warnings.map((w) => <li key={w}>{w}</li>)}
+          </ul>
+        </div>
+        <Link
+          href={`/executive-os/project-setup/${projectId}`}
+          className="shrink-0 whitespace-nowrap text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
+        >
+          View Project Setup →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function MobilizationDetail() {
   const [, params] = useRoute("/executive-os/mobilization/:id");
   const projectId = params?.id ? parseInt(params.id, 10) : undefined;
@@ -264,6 +296,8 @@ export default function MobilizationDetail() {
             )}
           </div>
         </div>
+
+        <SetupGateBanner projectId={projectId} />
 
         {isLoading || !bundle || !health ? (
           <div className="space-y-3">
