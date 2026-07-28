@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = process.cwd();
-const STORAGE_FILE = path.join(ROOT, "server/storage.ts");
+const STORAGE_FILE = path.join(ROOT, "server/storage/types.ts");
 const SCAN_DIRS = ["server"];
 const SUPPRESS_LOOKBACK = 6; // lines above a call searched for `UNSCOPED:`
 
@@ -59,7 +59,7 @@ const storageSrc = fs.readFileSync(STORAGE_FILE, "utf8");
 const storageLines = storageSrc.split("\n");
 const ifaceStart = storageLines.findIndex((l) => /^export interface IStorage/.test(l));
 if (ifaceStart === -1) {
-  console.error("audit-storage-scoping: could not locate `export interface IStorage` — has storage.ts moved?");
+  console.error("audit-storage-scoping: could not locate `export interface IStorage` — has server/storage/types.ts moved?");
   process.exit(2);
 }
 
@@ -81,7 +81,7 @@ for (const [name, info] of collectionReads) {
   if (hasSuppression(storageLines, info.line - 1)) continue;
   findings.push({
     kind: "NO-SCOPE-PARAM",
-    file: "server/storage.ts",
+    file: "server/storage/types.ts",
     line: info.line,
     detail: `IStorage.${name}() has no organization/project parameter, so callers cannot scope it.`,
   });
