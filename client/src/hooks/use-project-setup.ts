@@ -100,7 +100,7 @@ export function useSeedProjectSetup(projectId: number | undefined) {
   return useMutation({
     mutationFn: async (override?: number) => {
       const id = override ?? projectId;
-      await apiRequest("POST", `/api/projects/${id}/project-setup/setup`);
+      await apiRequest("POST", `/api/projects/${id}/project-setup/seed`);
     },
     onSuccess: invalidate,
   });

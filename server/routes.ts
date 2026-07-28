@@ -2084,7 +2084,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   // Opt-in seed for projects that predate this module. Idempotent — the seeder
   // no-ops when a setup row already exists, so a double-click is harmless.
-  app.post("/api/projects/:id/project-setup/setup", async (req: any, res) => {
+  app.post("/api/projects/:id/project-setup/seed", async (req: any, res) => {
     const projectId = parseInt(req.params.id, 10);
     if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
     const project = await requireProjectAccess(req, res, projectId);
@@ -3216,8 +3216,22 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const { email } = req.body;
       if (!email) return res.status(400).json({ message: "Email is required" });
 
+      const ts = await storage.getTimesheet(id);
+      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
+
+      // The roster must be read through the timesheet's project, so the
+      // timesheet is loaded before the recipient is validated.
+      const project = await storage.getProject(ts.projectId);
+      if (project?.organizationId == null) {
+        return res.status(400).json({
+          message: "Project has no organization scope, so the recipient cannot be verified.",
+          code: "PROJECT_NOT_SCOPED",
+        });
+      }
+
       // Validate recipient is a Project Executive on this team.
-      const team = await storage.getTeam();
+      // Org-scoped: prevents cross-tenant timesheet delivery to same-email execs in other orgs.
+      const team = await storage.getTeam(project.organizationId);
       const recipient = team.find((t) => (t.email ?? "").toLowerCase() === String(email).toLowerCase());
       if (!recipient) {
         return res.status(400).json({
@@ -3232,8 +3246,6 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         });
       }
 
-      const ts = await storage.getTimesheet(id);
-      if (!ts) return res.status(404).json({ message: "Timesheet not found" });
       const entries = await storage.getTimeEntries(id);
 
       // Build email body
