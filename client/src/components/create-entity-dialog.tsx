@@ -35,6 +35,10 @@ type Props = {
   /** Fires whenever a field value changes. Return a partial update to also patch
    *  other fields (e.g. selecting a Position also fills Access Level). */
   onFieldChange?: (name: string, value: string | number, values: Record<string, string | number>) => Record<string, string | number> | void;
+  /** Optional filter to hide/show fields dynamically based on current values.
+   *  Runs on every render so "reveal on Other…" style flows work out of the
+   *  box without duplicating the dialog. */
+  fieldsForValues?: (values: Record<string, string | number>) => FieldDef[];
 };
 
 function today() {
@@ -43,7 +47,7 @@ function today() {
 }
 
 export function CreateEntityDialog({
-  open, onOpenChange, title, fields, defaults, submitLabel = "Save", isPending = false, onSubmit, onFieldChange,
+  open, onOpenChange, title, fields, defaults, submitLabel = "Save", isPending = false, onSubmit, onFieldChange, fieldsForValues,
 }: Props) {
   const [values, setValues] = useState<Record<string, string | number>>(defaults);
   const [error, setError] = useState<string | null>(null);
@@ -70,8 +74,15 @@ export function CreateEntityDialog({
     return patch ? { ...next, ...patch } : next;
   });
 
+  // Effective field list — filtered on every render so `fieldsForValues` can
+  // hide/show rows in response to current values (e.g. only show the "custom
+  // trade" text box when the trade dropdown is set to Other).
+  const activeFields = fieldsForValues ? fieldsForValues(values) : fields;
+
   const submit = async () => {
-    const missing = fields.filter((f) => f.required && (values[f.name] === "" || values[f.name] === undefined));
+    // Only validate the fields currently visible — hidden "Other…" text
+    // boxes should never trip the required check.
+    const missing = activeFields.filter((f) => f.required && (values[f.name] === "" || values[f.name] === undefined));
     if (missing.length) {
       setError(`Please fill in: ${missing.map((m) => m.label).join(", ")}`);
       return;
@@ -99,7 +110,7 @@ export function CreateEntityDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {fields.map((f) => {
+          {activeFields.map((f) => {
             const colSpan = f.half ? "sm:col-span-1" : "sm:col-span-2";
             const ctype = f.type ?? "text";
             return (

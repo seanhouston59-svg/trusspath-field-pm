@@ -226,6 +226,10 @@ export const punchItems = pgTable("punch_items", {
   location: text("location").notNull(),
   trade: text("trade").notNull(),
   status: text("status").notNull(),
+  // Optional — defaults to "Medium" so legacy rows and older API callers
+  // stay valid. Kept as free text so we can extend the picklist without a
+  // schema change.
+  priority: text("priority").default("Medium"),
   assigneeId: integer("assignee_id"),
 });
 

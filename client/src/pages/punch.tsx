@@ -5,6 +5,9 @@ import { GhostState, GhostPunchRows } from "@/components/ghost-state";
 import { PunchList } from "@/components/tables";
 import { PunchBoard } from "@/components/punch-board";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
+import {
+  PUNCH_ITEM_TEMPLATES, PUNCH_TRADES, PUNCH_PRIORITIES, PUNCH_OTHER,
+} from "@/lib/punch-catalog";
 import { ListToolbar, type View } from "@/components/list-toolbar";
 import { usePunchItems, useTeamMap, useProjects, useTeam, useCreatePunchItem, useUpdatePunchStatus } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
@@ -41,14 +44,40 @@ export default function PunchPage() {
     });
   }, [items, projectFilter, assigneeFilter]);
 
+  // Item + trade are drop-downs sourced from a shared catalog. Picking
+  // "Other…" reveals a plain text input right below so users can still enter
+  // anything unusual without being boxed in by the preset list.
+  const itemOptions = [
+    ...PUNCH_ITEM_TEMPLATES.map((v) => ({ value: v, label: v })),
+    { value: PUNCH_OTHER, label: "Other… (type in)" },
+  ];
+  const tradeOptions = [
+    ...PUNCH_TRADES.map((v) => ({ value: v, label: v })),
+    { value: PUNCH_OTHER, label: "Other… (type in)" },
+  ];
+  const priorityOptions = PUNCH_PRIORITIES.map((v) => ({ value: v, label: v }));
+
   const fields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
-    { name: "title", label: "Item", type: "text", required: true, placeholder: "Touch up drywall at Room 112" },
+    { name: "priority", label: "Priority", type: "select", options: priorityOptions, required: true, half: true },
+    { name: "titleChoice", label: "Item", type: "select", options: itemOptions, required: true, placeholder: "Pick a common item…" },
+    { name: "titleCustom", label: "Item (custom)", type: "text", placeholder: "Describe the item…" },
     { name: "location", label: "Location", type: "text", required: true, half: true, placeholder: "Level 1, Rm 112" },
-    { name: "trade", label: "Trade", type: "text", required: true, half: true, placeholder: "Drywall" },
+    { name: "tradeChoice", label: "Trade", type: "select", options: tradeOptions, required: true, half: true },
+    { name: "tradeCustom", label: "Trade (custom)", type: "text", half: true, placeholder: "Specify trade…" },
     { name: "status", label: "Status", type: "select", options: ["Open", "In Progress", "Complete"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "assigneeId", label: "Assignee", type: "select", options: teamOptions, half: true },
   ];
+
+  // Hide the custom text fields unless the user picked "Other…" for that
+  // dropdown. Keeps the form compact for the 95% case while preserving the
+  // escape hatch.
+  const visibleFields = (values: Record<string, string | number>): FieldDef[] =>
+    fields.filter((f) => {
+      if (f.name === "titleCustom") return values.titleChoice === PUNCH_OTHER;
+      if (f.name === "tradeCustom") return values.tradeChoice === PUNCH_OTHER;
+      return true;
+    });
 
   return (
     <Layout
@@ -64,19 +93,33 @@ export default function PunchPage() {
         onOpenChange={setOpen}
         title="New Punch Item"
         fields={fields}
-        defaults={{ status: "Open", assigneeId: "0" }}
+        fieldsForValues={visibleFields}
+        defaults={{
+          status: "Open", assigneeId: "0", priority: "Medium",
+          titleChoice: "", titleCustom: "", tradeChoice: "", tradeCustom: "",
+        }}
         submitLabel="Create Item"
         isPending={create.isPending}
-        onSubmit={(v) =>
-          create.mutateAsync({
+        onSubmit={(v) => {
+          // Fold the dropdown + "Other…" custom text into the single string
+          // the API expects. If the user picked "Other…" but typed nothing,
+          // fall back to the label so we never send an empty title/trade.
+          const title = v.titleChoice === PUNCH_OTHER
+            ? String(v.titleCustom || "").trim() || "Other"
+            : String(v.titleChoice || "").trim();
+          const trade = v.tradeChoice === PUNCH_OTHER
+            ? String(v.tradeCustom || "").trim() || "Other"
+            : String(v.tradeChoice || "").trim();
+          return create.mutateAsync({
             projectId: Number(v.projectId),
-            title: String(v.title),
+            title,
             location: String(v.location),
-            trade: String(v.trade),
+            trade,
             status: String(v.status),
+            priority: String(v.priority || "Medium"),
             assigneeId: v.assigneeId === "0" ? undefined : Number(v.assigneeId),
-          })
-        }
+          });
+        }}
       />
 
       <ListToolbar
