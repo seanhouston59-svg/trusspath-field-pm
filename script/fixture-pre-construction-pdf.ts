@@ -1,8 +1,8 @@
 /**
- * Renders the Pre-Construction Plan PDF from fixture data — no database.
+ * Renders all three Pre-Construction PDFs from fixture data — no database.
  *
  * Unlike script/fixture-mobilization-pdf.ts, which re-states its report's
- * section order by hand, this calls the real renderer. The synthetic bundle is
+ * section order by hand, this calls the real renderers. The synthetic bundle is
  * deliberately awkward — an unissued critical permit, at-risk long-lead items,
  * a package awarded over its estimate, a negative RFI cost impact — so the
  * branches a clean project never reaches still get drawn.
@@ -15,6 +15,10 @@ import { computePreConstructionHealth } from "../server/pre-construction-health"
 import {
   renderPreConstructionPlan, preConstructionPlanMeta,
 } from "../server/reports/pre-construction-plan";
+import {
+  renderDesignReviewReport, designReviewReportMeta,
+} from "../server/reports/design-review-report";
+import { renderBuyoutPlan, buyoutPlanMeta } from "../server/reports/buyout-plan";
 import type {
   PreConstructionReportContext, PreConstructionReportOptions,
 } from "../server/reports/pre-construction-shared";
@@ -597,7 +601,29 @@ const opts: PreConstructionReportOptions = {
   revision: "Rev 2",
 };
 
-const file = `${process.argv[2] ?? "/tmp"}/pre-construction-plan.pdf`;
+const outDir = process.argv[2] ?? "/tmp";
+
+/** All three documents read the same context, so they render from one table. */
+const TARGETS = [
+  {
+    label: "Pre-Construction Plan",
+    file: `${outDir}/pre-construction-plan.pdf`,
+    meta: preConstructionPlanMeta,
+    render: renderPreConstructionPlan,
+  },
+  {
+    label: "Design Review Report",
+    file: `${outDir}/design-review-report.pdf`,
+    meta: designReviewReportMeta,
+    render: renderDesignReviewReport,
+  },
+  {
+    label: "Buyout Plan",
+    file: `${outDir}/buyout-plan.pdf`,
+    meta: buyoutPlanMeta,
+    render: renderBuyoutPlan,
+  },
+];
 
 /** `/Type /Page` per page object; `/Type /Pages` is the tree node, hence the
  *  negative lookahead. Cheaper than pulling in a PDF parser for one number. */
@@ -607,21 +633,24 @@ function pageCount(path: string): number {
 }
 
 async function main(): Promise<void> {
-  const builder = new ReportBuilder(preConstructionPlanMeta(ctx, opts));
-  const stream = createWriteStream(file);
-  builder.pipe(stream);
-  renderPreConstructionPlan(builder, ctx);
-  builder.end();
-  await new Promise<void>((resolve, reject) => {
-    stream.on("finish", () => resolve());
-    stream.on("error", reject);
-  });
+  for (const target of TARGETS) {
+    const builder = new ReportBuilder(target.meta(ctx, opts));
+    const stream = createWriteStream(target.file);
+    builder.pipe(stream);
+    target.render(builder, ctx);
+    builder.end();
+    await new Promise<void>((resolve, reject) => {
+      stream.on("finish", () => resolve());
+      stream.on("error", reject);
+    });
 
-  const bytes = statSync(file).size;
-  if (bytes === 0) throw new Error(`${file} rendered zero bytes`);
-  console.log(
-    `Pre-Construction Plan  ${pageCount(file)} pages  ${(bytes / 1024).toFixed(1)} KB  ${file}`,
-  );
+    const bytes = statSync(target.file).size;
+    if (bytes === 0) throw new Error(`${target.file} rendered zero bytes`);
+    console.log(
+      `${target.label.padEnd(22)} ${String(pageCount(target.file)).padStart(2)} pages  ` +
+      `${(bytes / 1024).toFixed(1).padStart(6)} KB  ${target.file}`,
+    );
+  }
 }
 
 main().catch((err) => {

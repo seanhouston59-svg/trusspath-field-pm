@@ -47,6 +47,8 @@ import {
 } from "./reports/data-loaders";
 import { reportFilename, type PreConstructionReportContext } from "./reports/pre-construction-shared";
 import { renderPreConstructionPlan, preConstructionPlanMeta } from "./reports/pre-construction-plan";
+import { renderDesignReviewReport, designReviewReportMeta } from "./reports/design-review-report";
+import { renderBuyoutPlan, buyoutPlanMeta } from "./reports/buyout-plan";
 import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
 import {
   bootstrapOrganizationForAccount, bootstrapDemoOrgForAccount,
@@ -2388,62 +2390,97 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(await preConstructionRollup(projectId));
   });
 
-  // Pre-Construction Plan PDF. Unlike the Mobilization and Project Setup
-  // generators, this loads its data before opening the stream, so a project with
-  // no pre-con row gets a JSON 404 instead of a truncated PDF. After the builder
-  // writes its first byte only the headersSent check is left.
-  app.get("/api/projects/:id/pre-construction/reports/plan.pdf", async (req: any, res) => {
-    const projectId = parseInt(req.params.id, 10);
-    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
-    if (!(await requireProjectAccess(req, res, projectId))) return;
-
-    const revision = (req.query.revision as string)?.trim() || "Rev 0";
-    const preparedBy =
-      (req.query.preparedBy as string)?.trim() || req.account?.displayName || "Project Team";
-    const preparedByRole = (req.query.preparedByRole as string)?.trim() || undefined;
-
-    let ctx: PreConstructionReportContext;
-    try {
-      ctx = await loadPreConstructionReportContext(projectId);
-    } catch (err) {
-      if (err instanceof PreConstructionNotInitializedError) {
-        return res.status(404).json({
-          error: "Pre-Construction not initialized. POST /api/projects/:id/pre-construction/seed first.",
-        });
-      }
-      console.error("[pre-construction/reports/plan.pdf] load failed", err);
-      return res.status(500).json({ message: "Failed to generate report" });
-    }
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${reportFilename("pre-construction-plan", ctx.project)}"`,
-    );
-
-    const builder = new ReportBuilder(
-      preConstructionPlanMeta(ctx, { preparedBy, preparedByRole, revision }),
-    );
-    builder.pipe(res);
-    try {
-      renderPreConstructionPlan(builder, ctx);
-      builder.end();
-    } catch (err) {
-      console.error("[pre-construction/reports/plan.pdf] render failed", err);
-      if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
-      else res.end();
-      return;
-    }
-
-    logEvent(req, {
-      projectId,
-      kind: EVENT_KINDS.PRECON_PLAN_REPORT_GENERATED,
-      title: "Pre-Construction Plan generated",
-      subtitle: `${revision} — prepared by ${preparedBy}`,
-      meta: { revision, preparedBy },
+  // The three Pre-Construction PDFs read the same context and differ only in
+  // which renderer runs and which event they log, so they are registered from a
+  // table rather than as three copies of the handler.
+  const PRE_CONSTRUCTION_REPORTS = [
+    {
+      path: "plan.pdf",
+      slug: "pre-construction-plan",
+      title: "Pre-Construction Plan",
       sourceType: "pre_construction_plan",
+      kind: EVENT_KINDS.PRECON_PLAN_REPORT_GENERATED,
+      meta: preConstructionPlanMeta,
+      render: renderPreConstructionPlan,
+    },
+    {
+      path: "design-review.pdf",
+      slug: "design-review",
+      title: "Design Review Report",
+      sourceType: "pre_construction_design_review",
+      kind: EVENT_KINDS.PRECON_DESIGN_REVIEW_REPORT_GENERATED,
+      meta: designReviewReportMeta,
+      render: renderDesignReviewReport,
+    },
+    {
+      path: "buyout.pdf",
+      slug: "buyout-plan",
+      title: "Buyout Plan",
+      sourceType: "pre_construction_buyout",
+      kind: EVENT_KINDS.PRECON_BUYOUT_REPORT_GENERATED,
+      meta: buyoutPlanMeta,
+      render: renderBuyoutPlan,
+    },
+  ];
+
+  // Unlike the Mobilization and Project Setup generators, these load their data
+  // before opening the stream, so a project with no pre-con row gets a JSON 404
+  // instead of a truncated PDF. After the builder writes its first byte only the
+  // headersSent check is left.
+  for (const report of PRE_CONSTRUCTION_REPORTS) {
+    app.get(`/api/projects/:id/pre-construction/reports/${report.path}`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+
+      const revision = (req.query.revision as string)?.trim() || "Rev 0";
+      const preparedBy =
+        (req.query.preparedBy as string)?.trim() || req.account?.displayName || "Project Team";
+      const preparedByRole = (req.query.preparedByRole as string)?.trim() || undefined;
+
+      let ctx: PreConstructionReportContext;
+      try {
+        ctx = await loadPreConstructionReportContext(projectId);
+      } catch (err) {
+        if (err instanceof PreConstructionNotInitializedError) {
+          return res.status(404).json({
+            error: "Pre-Construction not initialized. POST /api/projects/:id/pre-construction/seed first.",
+          });
+        }
+        console.error(`[pre-construction/reports/${report.path}] load failed`, err);
+        return res.status(500).json({ message: "Failed to generate report" });
+      }
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${reportFilename(report.slug, ctx.project)}"`,
+      );
+
+      const builder = new ReportBuilder(
+        report.meta(ctx, { preparedBy, preparedByRole, revision }),
+      );
+      builder.pipe(res);
+      try {
+        report.render(builder, ctx);
+        builder.end();
+      } catch (err) {
+        console.error(`[pre-construction/reports/${report.path}] render failed`, err);
+        if (!res.headersSent) res.status(500).json({ message: "Failed to generate report" });
+        else res.end();
+        return;
+      }
+
+      logEvent(req, {
+        projectId,
+        kind: report.kind,
+        title: `${report.title} generated`,
+        subtitle: `${revision} — prepared by ${preparedBy}`,
+        meta: { revision, preparedBy },
+        sourceType: report.sourceType,
+      });
     });
-  });
+  }
 
   const today = () => new Date().toISOString().slice(0, 10);
 

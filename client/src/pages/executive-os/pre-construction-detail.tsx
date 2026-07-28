@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { EmptyState, SectionProgressBar } from "@/components/mobilization/bits";
 import { OverviewTab } from "@/components/pre-construction/overview-tab";
 import { DesignTab } from "@/components/pre-construction/design-tab";
@@ -39,16 +40,34 @@ const STATUS_STYLES: Record<string, string> = {
   complete: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400 ring-emerald-500/25",
 };
 
-/** Phase 3 wires these to real endpoints. Rendering them now keeps the header
- *  layout honest and gives the buttons a home. */
+/** `key` is the test hook, `path` the route segment — they differ for Buyout. */
 const REPORTS = [
-  { key: "plan", label: "Pre-Construction Plan" },
-  { key: "design-review", label: "Design Review Report" },
-  { key: "buyout-plan", label: "Buyout Plan" },
+  { key: "plan", path: "plan.pdf", label: "Pre-Construction Plan" },
+  { key: "design-review", path: "design-review.pdf", label: "Design Review Report" },
+  { key: "buyout-plan", path: "buyout.pdf", label: "Buyout Plan" },
 ] as const;
 
-function ReportButtons({ seeded }: { seeded: boolean }) {
+/** Each report streams from the server, so it opens in a new tab rather than
+ *  going through the query client. */
+function ReportButtons({ projectId, seeded }: { projectId?: number; seeded: boolean }) {
+  const { account } = useAuth();
   const { toast } = useToast();
+
+  const generate = (report: typeof REPORTS[number]) => {
+    const qs = new URLSearchParams({
+      preparedBy: account?.displayName || "Project Team",
+      revision: "Rev 0",
+    });
+    window.open(
+      `/api/projects/${projectId}/pre-construction/reports/${report.path}?${qs}`,
+      "_blank",
+    );
+    toast({
+      title: `Generating ${report.label}`,
+      description: "Your PDF will open in a new tab.",
+    });
+  };
+
   return (
     <div className="flex flex-wrap gap-2">
       {REPORTS.map((r, i) => (
@@ -56,11 +75,8 @@ function ReportButtons({ seeded }: { seeded: boolean }) {
           key={r.key}
           size="sm"
           variant={i === 0 ? "default" : "outline"}
-          disabled={!seeded}
-          onClick={() => toast({
-            title: `${r.label} PDF`,
-            description: "Not available yet — this report ships in the next Pre-Construction release.",
-          })}
+          disabled={!seeded || projectId == null}
+          onClick={() => generate(r)}
           data-testid={`precon-generate-${r.key}`}
         >
           <FileText className="size-4" /> {r.label} PDF
@@ -116,7 +132,7 @@ export default function PreConstructionDetail() {
                 ) : <Skeleton className="h-4 w-64" />}
               </div>
             </div>
-            <ReportButtons seeded={!!bundle?.seeded} />
+            <ReportButtons projectId={projectId} seeded={!!bundle?.seeded} />
           </div>
         </div>
 

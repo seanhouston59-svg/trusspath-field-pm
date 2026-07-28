@@ -86,17 +86,17 @@ function label(map: Record<string, string>, value: string | null | undefined): s
   return v ? (map[v] ?? v) : "—";
 }
 
-const disciplineLabel = (v: string | null | undefined) => label(DISCIPLINE, v);
-const docTypeLabel = (v: string | null | undefined) => label(DOC_TYPE, v);
-const docStatusLabel = (v: string | null | undefined) => label(DOC_STATUS, v);
-const rfiStatusLabel = (v: string | null | undefined) => label(RFI_STATUS, v);
-const rfiImpactLabel = (v: string | null | undefined) => label(RFI_IMPACT, v);
-const veStatusLabel = (v: string | null | undefined) => label(VE_STATUS, v);
+export const disciplineLabel = (v: string | null | undefined) => label(DISCIPLINE, v);
+export const docTypeLabel = (v: string | null | undefined) => label(DOC_TYPE, v);
+export const docStatusLabel = (v: string | null | undefined) => label(DOC_STATUS, v);
+export const rfiStatusLabel = (v: string | null | undefined) => label(RFI_STATUS, v);
+export const rfiImpactLabel = (v: string | null | undefined) => label(RFI_IMPACT, v);
+export const veStatusLabel = (v: string | null | undefined) => label(VE_STATUS, v);
 export const permitTypeLabel = (v: string | null | undefined) => label(PERMIT_TYPE, v);
 const permitStatusLabel = (v: string | null | undefined) => label(PERMIT_STATUS, v);
-const prequalStatusLabel = (v: string | null | undefined) => label(PREQUAL_STATUS, v);
-const packageStatusLabel = (v: string | null | undefined) => label(PACKAGE_STATUS, v);
-const leadStatusLabel = (v: string | null | undefined) => label(LEAD_STATUS, v);
+export const prequalStatusLabel = (v: string | null | undefined) => label(PREQUAL_STATUS, v);
+export const packageStatusLabel = (v: string | null | undefined) => label(PACKAGE_STATUS, v);
+export const leadStatusLabel = (v: string | null | undefined) => label(LEAD_STATUS, v);
 export const designPhaseLabel = (v: string | null | undefined) => label(PHASE, v);
 export const planStatusLabel = (v: string | null | undefined) => label(PLAN_STATUS, v);
 
@@ -109,7 +109,7 @@ export function blank(v: string | null | undefined): boolean {
   return !(v ?? "").trim();
 }
 
-function days(v: number | null | undefined): string {
+export function days(v: number | null | undefined): string {
   return v == null ? "—" : String(v);
 }
 
@@ -127,7 +127,7 @@ function parseMoney(v: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function money(v: string | null | undefined): string {
+export function money(v: string | null | undefined): string {
   const n = parseMoney(v);
   return n === null ? text(v) : formatMoney(n);
 }
@@ -184,6 +184,27 @@ export function personFor(
     (s) => wanted.includes(s.role.trim().toLowerCase()) && (s.name ?? "").trim(),
   );
   return (stake?.name ?? "").trim();
+}
+
+/**
+ * The sign-off rows whose role mentions one of `fragments`, in seeded order.
+ *
+ * Matching is a case-insensitive substring so a hand-edited role — "Architect
+ * of Record (Raman + Locke)" — still lands in the right block. The Design
+ * Review Report and the Buyout Plan each sign a different subset of the Plan's
+ * block, which is why this filters rather than taking the whole list.
+ */
+export function signaturesFor(
+  signatures: PreConstructionSignature[],
+  fragments: string[],
+): Array<{ role: string; name: string; date?: string }> {
+  const wanted = fragments.map((f) => f.toLowerCase());
+  return signatures
+    .filter((s) => {
+      const role = s.role.trim().toLowerCase();
+      return wanted.some((f) => role.includes(f));
+    })
+    .map((s) => ({ role: s.role, name: s.name ?? "", date: s.signedDate ?? undefined }));
 }
 
 /* ------------------------------ row builders ------------------------------ */
