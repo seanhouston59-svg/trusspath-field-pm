@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/sheet";
 import { Avatar } from "@/components/bits";
 import { ItemStatusPill, DateChip } from "@/components/mobilization/bits";
-import { useUpdateItem } from "@/hooks/use-mobilization";
+import {
+  useUpdateItem, useUpdateSectionNote, type MobilizationSectionNoteRow,
+} from "@/hooks/use-mobilization";
+import { useDebouncedSave } from "@/lib/use-debounced-save";
 import {
   MOBILIZATION_SECTIONS, MOBILIZATION_ITEM_STATUSES, MOBILIZATION_ITEM_STATUS_LABELS,
   SECTION_FEEDS_TRACKER, daysUntil,
@@ -26,11 +29,60 @@ function nextStatus(current: string): "done" | "not_started" {
   return current === "done" ? "not_started" : "done";
 }
 
+function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const seconds = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (seconds < 45) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  return days < 30 ? `${days}d ago` : new Date(iso).toLocaleDateString();
+}
+
+/** Free-text narrative for the whole section. Prints in the Mobilization Plan
+ *  PDF under the section header, above the checklist. */
+function SectionNarrative({
+  section, note, projectId,
+}: {
+  section: string;
+  note: MobilizationSectionNoteRow | undefined;
+  projectId: number | undefined;
+}) {
+  const update = useUpdateSectionNote(projectId);
+  const { value, setValue, saving } = useDebouncedSave<string>(
+    note?.narrative ?? "",
+    async (v) => { await update.mutateAsync({ section, narrative: v }); },
+  );
+  const stamp = relativeTime(note?.updatedAt);
+
+  return (
+    <div className="border-b border-border/60 px-4 pb-3">
+      <Textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Section narrative (prints in the plan)"
+        rows={3}
+        className="mt-2"
+      />
+      {(saving || stamp) && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {saving ? "Saving…" : `Saved · ${stamp}`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SectionCard({
-  section, items, team, projectId, onOpen, onJumpToTab,
+  section, items, note, team, projectId, onOpen, onJumpToTab,
 }: {
   section: string;
   items: MobilizationItem[];
+  note: MobilizationSectionNoteRow | undefined;
   team: Map<number, TeamMember>;
   projectId: number | undefined;
   onOpen: (item: MobilizationItem) => void;
@@ -84,6 +136,7 @@ function SectionCard({
               </Button>
             </div>
           )}
+          <SectionNarrative section={section} note={note} projectId={projectId} />
           {items.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">No items in this section.</p>
           ) : items.map((item) => {
@@ -203,15 +256,17 @@ function ItemSheet({
 }
 
 export function ChecklistTab({
-  items, team, projectId, onJumpToTab,
+  items, sectionNotes, team, projectId, onJumpToTab,
 }: {
   items: MobilizationItem[];
+  sectionNotes: MobilizationSectionNoteRow[];
   team: TeamMember[];
   projectId: number | undefined;
   onJumpToTab: (tab: string) => void;
 }) {
   const [openItem, setOpenItem] = useState<MobilizationItem | null>(null);
   const teamMap = new Map(team.map((m) => [m.id, m]));
+  const noteBySection = new Map(sectionNotes.map((n) => [n.section, n]));
 
   // Sections render in catalog order; anything with an unrecognised section
   // (renamed catalog entry, hand-added row) is appended so it never vanishes.
@@ -234,6 +289,7 @@ export function ChecklistTab({
           key={section}
           section={section}
           items={bySection.get(section) ?? []}
+          note={noteBySection.get(section)}
           team={teamMap}
           projectId={projectId}
           onOpen={setOpenItem}

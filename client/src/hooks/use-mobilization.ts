@@ -2,9 +2,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type {
   MobilizationPlan, MobilizationItem, MobilizationPermit, MobilizationEquipment,
-  MobilizationUtility, MobilizationStaff, MobilizationSub, MobilizationRisk, Milestone,
+  MobilizationUtility, MobilizationStaff, MobilizationSub, MobilizationRisk,
+  MobilizationSignature, Milestone,
 } from "@shared/schema";
-import type { HealthTone } from "@shared/mobilization-catalog";
+import { DEFAULT_SIGNER_ROLES, type HealthTone } from "@shared/mobilization-catalog";
+
+/** One entry per catalog section, filled in server-side — sections that have
+ *  never been written come back with an empty narrative and a null updatedAt. */
+export type MobilizationSectionNoteRow = {
+  section: string;
+  narrative: string;
+  updatedAt: string | null;
+  updatedById: number | null;
+};
 
 export type MobilizationBundle = {
   plan: MobilizationPlan | null;
@@ -16,6 +26,8 @@ export type MobilizationBundle = {
   subs: MobilizationSub[];
   risks: MobilizationRisk[];
   milestones: Milestone[];
+  signatures: MobilizationSignature[];
+  sectionNotes: MobilizationSectionNoteRow[];
   seeded: boolean;
 };
 
@@ -75,7 +87,8 @@ export function useMobilizationPortfolio() {
   return useQuery<MobilizationPortfolioRow[]>({ queryKey: ["/api/executive-os/mobilization"] });
 }
 
-type Resource = "items" | "permits" | "equipment" | "utilities" | "staff" | "subs" | "risks";
+type Resource =
+  | "items" | "permits" | "equipment" | "utilities" | "staff" | "subs" | "risks" | "signatures";
 
 function useInvalidateMobilization(projectId: number | undefined) {
   const qc = useQueryClient();
@@ -138,5 +151,57 @@ export function useSeedMobilization(projectId: number | undefined) {
   return useMutation({
     mutationFn: async () => { await apiRequest("POST", `/api/projects/${projectId}/mobilization/seed`); },
     onSuccess: invalidate,
+  });
+}
+
+// ------------------------------------------------------- expanded plan fields
+
+/** Partial update of the mobilization plan row. Every column is optional, so
+ *  the Overview tab can send one field per keystroke-debounce. */
+export function useUpdatePlan(projectId: number | undefined) {
+  const invalidate = useInvalidateMobilization(projectId);
+  return useMutation({
+    mutationFn: async (data: Partial<MobilizationPlan>) => {
+      const res = await apiRequest("PATCH", `/api/projects/${projectId}/mobilization/plan`, data);
+      return (await res.json()) as MobilizationPlan;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Upsert of a per-section narrative. The row is lazy-created server-side on
+ *  the first PUT, so there is nothing to create first. */
+export function useUpdateSectionNote(projectId: number | undefined) {
+  const invalidate = useInvalidateMobilization(projectId);
+  return useMutation({
+    mutationFn: async ({ section, narrative }: { section: string; narrative: string }) => {
+      const res = await apiRequest(
+        "PUT",
+        `/api/projects/${projectId}/mobilization/section-notes/${encodeURIComponent(section)}`,
+        { narrative },
+      );
+      return (await res.json()) as MobilizationSectionNoteRow;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export const useCreateSignature = (projectId: number | undefined) =>
+  useCreateMobilizationRow<MobilizationSignature>(projectId, "signatures");
+export const useUpdateSignature = (projectId: number | undefined) =>
+  useUpdateMobilizationRow<MobilizationSignature>(projectId, "signatures");
+export const useDeleteSignature = (projectId: number | undefined) =>
+  useDeleteMobilizationRow(projectId, "signatures");
+
+/** Backfill for projects seeded before the sign-off block existed. Posts the
+ *  nine default roles one at a time so sortOrder matches the catalog order. */
+export function useSeedDefaultSignatures(projectId: number | undefined) {
+  const create = useCreateSignature(projectId);
+  return useMutation({
+    mutationFn: async () => {
+      for (let i = 0; i < DEFAULT_SIGNER_ROLES.length; i++) {
+        await create.mutateAsync({ role: DEFAULT_SIGNER_ROLES[i], sortOrder: i });
+      }
+    },
   });
 }

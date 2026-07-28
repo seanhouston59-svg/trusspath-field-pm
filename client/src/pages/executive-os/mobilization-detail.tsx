@@ -19,6 +19,7 @@ import {
 } from "@/components/mobilization/bits";
 import { TrackerTab, type TrackerField } from "@/components/mobilization/tracker-tab";
 import { ChecklistTab } from "@/components/mobilization/checklist-tab";
+import { OverviewTab } from "@/components/mobilization/overview-tab";
 import { DashboardTab } from "@/components/mobilization/dashboard-tab";
 import { TimelineTab } from "@/components/mobilization/timeline-tab";
 import { useProject, useTeam } from "@/hooks/use-data";
@@ -32,6 +33,7 @@ import type {
 } from "@shared/schema";
 
 const TABS = [
+  { value: "overview", label: "Overview" },
   { value: "dashboard", label: "Dashboard" },
   { value: "checklist", label: "Checklist" },
   { value: "permits", label: "Permits" },
@@ -218,7 +220,7 @@ function GenerateReportDialog({ projectId, seeded }: { projectId: number; seeded
 export default function MobilizationDetail() {
   const [, params] = useRoute("/executive-os/mobilization/:id");
   const projectId = params?.id ? parseInt(params.id, 10) : undefined;
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState("overview");
 
   const { data: project } = useProject(projectId);
   const { data: team = [] } = useTeam();
@@ -287,12 +289,26 @@ export default function MobilizationDetail() {
               ))}
             </TabsList>
 
+            <TabsContent value="overview">
+              <OverviewTab
+                plan={bundle.plan}
+                signatures={bundle.signatures}
+                projectId={projectId}
+              />
+            </TabsContent>
+
             <TabsContent value="dashboard">
               <DashboardTab health={health} />
             </TabsContent>
 
             <TabsContent value="checklist">
-              <ChecklistTab items={bundle.items} team={team} projectId={projectId} onJumpToTab={setTab} />
+              <ChecklistTab
+                items={bundle.items}
+                sectionNotes={bundle.sectionNotes}
+                team={team}
+                projectId={projectId}
+                onJumpToTab={setTab}
+              />
             </TabsContent>
 
             <TabsContent value="permits">

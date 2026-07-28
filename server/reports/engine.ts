@@ -48,6 +48,11 @@ export type ReportMeta = {
   revision?: string;
   health?: HealthTone;
   phase?: string;
+  /** Optional cover-page additions — each is skipped when empty. */
+  ownerRep?: string | null;
+  architect?: string | null;
+  engineerOfRecord?: string | null;
+  jurisdiction?: string | null;
 };
 
 export type StatChip = { label: string; value: string; tone?: Tone };
@@ -235,6 +240,10 @@ export class ReportBuilder {
       ["General Contractor", this.meta.gcName || "—"],
       ["Address", this.meta.address || "—"],
     ];
+    if (this.meta.ownerRep?.trim()) rows.push(["Owner Rep", this.meta.ownerRep.trim()]);
+    if (this.meta.architect?.trim()) rows.push(["Architect", this.meta.architect.trim()]);
+    if (this.meta.engineerOfRecord?.trim()) rows.push(["Engineer of Record", this.meta.engineerOfRecord.trim()]);
+    if (this.meta.jurisdiction?.trim()) rows.push(["Jurisdiction", this.meta.jurisdiction.trim()]);
     if (this.meta.reportingPeriod) rows.push(["Reporting Period", this.meta.reportingPeriod]);
 
     const labelW = 150;
@@ -284,6 +293,9 @@ export class ReportBuilder {
   }
 
   sectionBreak(): this {
+    // The cover already advances to a fresh page, as does a preceding break, so
+    // an unconditional addPage() here would emit a blank one.
+    if (this.doc.y <= MARGIN + HEADER_H + 0.5) return this;
     this.doc.addPage();
     return this;
   }
@@ -570,6 +582,74 @@ export class ReportBuilder {
     d.font("Helvetica").fontSize(9).fillColor(PALETTE.primary)
       .text(text, MARGIN + 14, top + 8, { width: CONTENT_W - 30 });
     d.y = top + h + 8;
+    this.resetText();
+    return this;
+  }
+
+  /** Titled free-text block. Renders nothing when the body is empty, so a
+   *  caller can list every optional narrative without guarding each one. */
+  narrativeBlock(title: string, body?: string | null): this {
+    const text = (body ?? "").trim();
+    if (!text) return this;
+    this.h3(title);
+    this.p(text);
+    return this;
+  }
+
+  /** Red-flagged box of the numbers somebody needs when things go wrong.
+   *  Rows with neither a name nor a phone are dropped; an all-empty list
+   *  renders nothing at all. */
+  emergencyContactCard(
+    contacts: Array<{ label: string; name?: string | null; phone?: string | null; note?: string | null }>,
+  ): this {
+    const rows = contacts
+      .map((c) => ({
+        label: c.label,
+        name: (c.name ?? "").trim(),
+        phone: (c.phone ?? "").trim(),
+        note: (c.note ?? "").trim(),
+      }))
+      .filter((c) => c.name || c.phone);
+    if (!rows.length) return this;
+
+    const d = this.doc;
+    const labelW = 130;
+    const valueW = CONTENT_W - labelW - 28;
+    const lineH = 13;
+
+    d.font("Helvetica").fontSize(9);
+    const bodyH = rows.reduce((h, r) => {
+      const value = [r.name, r.phone].filter(Boolean).join("  ·  ");
+      const vh = Math.max(lineH, d.heightOfString(value, { width: valueW }));
+      const nh = r.note ? d.heightOfString(r.note, { width: valueW }) + 2 : 0;
+      return h + vh + nh + 3;
+    }, 0);
+    const boxH = bodyH + 30;
+
+    this.ensure(boxH + 6);
+    const top = d.y;
+    d.roundedRect(MARGIN, top, CONTENT_W, boxH, 3).fill(PALETTE.bgTint);
+    d.rect(MARGIN, top, 3, boxH).fill(PALETTE.red);
+    d.font("Helvetica-Bold").fontSize(9).fillColor(PALETTE.red)
+      .text("EMERGENCY CONTACTS", MARGIN + 14, top + 8, { width: CONTENT_W - 28, characterSpacing: 0.8 });
+
+    let y = top + 24;
+    for (const r of rows) {
+      const value = [r.name, r.phone].filter(Boolean).join("  ·  ");
+      d.font("Helvetica").fontSize(8).fillColor(PALETTE.muted)
+        .text(r.label, MARGIN + 14, y, { width: labelW, lineBreak: false });
+      d.font("Helvetica-Bold").fontSize(9).fillColor(PALETTE.primary)
+        .text(value, MARGIN + 14 + labelW, y - 1, { width: valueW });
+      let rowBottom = Math.max(d.y, y + lineH);
+      if (r.note) {
+        d.font("Helvetica").fontSize(8).fillColor(PALETTE.muted)
+          .text(r.note, MARGIN + 14 + labelW, rowBottom + 1, { width: valueW });
+        rowBottom = d.y;
+      }
+      y = rowBottom + 3;
+    }
+
+    d.y = top + boxH + 8;
     this.resetText();
     return this;
   }

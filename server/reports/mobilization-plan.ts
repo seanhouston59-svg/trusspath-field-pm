@@ -18,7 +18,7 @@ import {
 } from "./data-loaders";
 import {
   MOBILIZATION_SECTIONS, DEFAULT_MOBILIZATION_ITEMS, UTILITY_KIND_LABELS,
-  EARTHWORK_MILESTONE_TITLE, daysUntil,
+  SIGNER_ROLE_ALIASES, EARTHWORK_MILESTONE_TITLE, daysUntil,
 } from "@shared/mobilization-catalog";
 import type { MobilizationItem, TeamMember } from "@shared/schema";
 
@@ -27,7 +27,8 @@ const OVERDUE_GRACE_DAYS = 5;
 
 const RISK_WEIGHT: Record<string, number> = { low: 1, med: 2, high: 3 };
 
-/** Roles we try to pre-fill on the sign-off block, in render order. */
+/** Sign-off fallback for projects seeded before mobilization_signatures
+ *  existed. Live projects render from the seeded rows instead. */
 const SIGNER_ROLES = [
   "Chief Executive Officer",
   "Project Executive",
@@ -36,17 +37,8 @@ const SIGNER_ROLES = [
   "Safety Manager",
 ];
 
-/** Loose matching so "PM", "Project Mgr" and "Project Manager" all resolve. */
-const ROLE_ALIASES: Record<string, string[]> = {
-  "Chief Executive Officer": ["ceo", "chief executive"],
-  "Project Executive": ["project executive", "exec", "px"],
-  "Project Manager": ["project manager", "pm", "project mgr"],
-  "Superintendent": ["superintendent", "super", "supt"],
-  "Safety Manager": ["safety manager", "safety", "ehs"],
-};
-
 function findSigner(team: TeamMember[], role: string): string {
-  const aliases = ROLE_ALIASES[role] ?? [role.toLowerCase()];
+  const aliases = SIGNER_ROLE_ALIASES[role] ?? [role.toLowerCase()];
   const hit = team.find((m) => {
     const r = (m.role ?? "").trim().toLowerCase();
     return aliases.some((a) => r === a || r.includes(a));
@@ -97,13 +89,36 @@ export async function generateMobilizationPlan(
 ): Promise<void> {
   const { res } = opts;
 
-  const [core, roll, team] = await Promise.all([
+  const [core, roll] = await Promise.all([
     loadCoreProject(projectId),
     mobilizationRollup(projectId),
-    storage.getTeam(),
   ]);
   const { project, gcName } = core;
+
+  // Signatures and section notes deliberately bypass the rollup: the rollup is
+  // also called once per project by the portfolio endpoint, which never renders
+  // either of them.
+  const [team, signatures, sectionNotes] = await Promise.all([
+    // An unscoped roster read would pull names from other tenants onto this
+    // project's sign-off block.
+    project.organizationId != null ? storage.getTeam(project.organizationId) : Promise.resolve([]),
+    storage.getMobilizationSignatures(projectId),
+    storage.getMobilizationSectionNotes(projectId),
+  ]);
   const teamMap = new Map(team.map((m) => [m.id, m]));
+  const plan = roll.plan;
+
+  const narrativeMap = new Map(sectionNotes.map((n) => [n.section, n.narrative]));
+  /** The per-section free text authored on the Checklist tab. */
+  const sectionNarrative = (section: string): string | null => narrativeMap.get(section) ?? null;
+
+  const emergencyContacts = [
+    { label: "Superintendent", name: findSigner(team, "Superintendent"), phone: plan?.superintendentPhone },
+    { label: "Project Manager", name: findSigner(team, "Project Manager"), phone: plan?.projectManagerPhone },
+    { label: "Safety Officer", name: plan?.safetyOfficerName, phone: plan?.safetyOfficerPhone },
+    { label: "24-Hour Contact", name: plan?.emergencyContact24hName, phone: plan?.emergencyContact24hPhone },
+    { label: "Hospital", name: plan?.hospitalName, phone: plan?.hospitalPhone },
+  ];
 
   const since = project.startDate ? new Date(project.startDate) : undefined;
   const [rfi, submittals, cos, punch, obs, labor] = await Promise.all([
@@ -130,6 +145,10 @@ export async function generateMobilizationPlan(
     revision: opts.revision ?? "Rev 0",
     health: roll.health,
     phase: "Mobilization",
+    ownerRep: plan?.ownerRep,
+    architect: plan?.architect,
+    engineerOfRecord: plan?.engineerOfRecord,
+    jurisdiction: plan?.jurisdiction,
   };
 
   const filename = `Mobilization Plan — ${project.name} — ${today}.pdf`;
@@ -146,6 +165,45 @@ export async function generateMobilizationPlan(
 
   // ---------------------------------------------------------- 1. Cover
   r.coverPage(`${project.name} · ${project.number}`);
+
+  // ------------------------------------ 1b. Project Information (directory)
+  // Every row here is optional plan data, so the whole section is skipped when
+  // nothing has been filled in rather than printing a page of em dashes.
+  const directory: Array<[string, string]> = [];
+  const addRow = (label: string, value: string | number | null | undefined) => {
+    const v = value === null || value === undefined ? "" : String(value).trim();
+    if (v) directory.push([label, v]);
+  };
+  addRow("Owner Representative", plan?.ownerRep);
+  addRow("Owner Rep Phone", plan?.ownerRepPhone);
+  addRow("Owner Rep Email", plan?.ownerRepEmail);
+  addRow("Architect", plan?.architect);
+  addRow("Architect Firm", plan?.architectFirm);
+  addRow("Architect Phone", plan?.architectPhone);
+  addRow("Architect Email", plan?.architectEmail);
+  addRow("Engineer of Record", plan?.engineerOfRecord);
+  addRow("Engineer Firm", plan?.engineerFirm);
+  addRow("Engineer Phone", plan?.engineerPhone);
+  addRow("Engineer Email", plan?.engineerEmail);
+  addRow("Jurisdiction", plan?.jurisdiction);
+  addRow("Permit Expediter", plan?.permitExpediter);
+  addRow("Permit Expediter Phone", plan?.permitExpediterPhone);
+  addRow("Project Type", plan?.projectType);
+  addRow("Square Footage", plan?.squareFootage != null
+    ? `${plan.squareFootage.toLocaleString("en-US")} sq ft` : null);
+  addRow("Stories", plan?.stories);
+  addRow("Occupancy Type", plan?.occupancyType);
+  addRow("Weather Station", plan?.weatherStation);
+  addRow("Nearest Hospital", plan?.hospitalName);
+  addRow("Hospital Phone", plan?.hospitalPhone);
+
+  const hasContacts = emergencyContacts.some((c) => (c.name ?? "").trim() || (c.phone ?? "").trim());
+  if (directory.length || hasContacts) {
+    r.sectionBreak();
+    r.h1("Project Information");
+    r.keyValueGrid(directory, 2);
+    r.emergencyContactCard(emergencyContacts);
+  }
 
   // ----------------------------------------------- 2. Executive Summary
   r.sectionBreak();
@@ -218,9 +276,24 @@ export async function generateMobilizationPlan(
     r.progressBar(roll.sectionPct[section] ?? 0, section);
   }
 
+  // ------------------------------------------- 2b. Objectives & Scope
+  const scopeNarratives: Array<[string, string | null | undefined]> = [
+    ["Mobilization Objectives", plan?.objectivesNarrative],
+    ["Scope Summary", plan?.scopeSummary],
+    ["Exclusions", plan?.exclusions],
+    ["Key Assumptions", plan?.assumptions],
+    ["Work Not Included", plan?.workNotIncluded],
+  ];
+  if (scopeNarratives.some(([, body]) => (body ?? "").trim())) {
+    r.sectionBreak();
+    r.h1("Objectives & Scope");
+    for (const [title, body] of scopeNarratives) r.narrativeBlock(title, body);
+  }
+
   // --------------------------------------------- 3. Project Information
   r.sectionBreak();
   r.h1("1. Project Information");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Project Information"));
   r.keyValueGrid([
     ["Project Name", project.name],
     ["Project Number", project.number],
@@ -242,14 +315,22 @@ export async function generateMobilizationPlan(
 
   // ------------------------------------------ 4. Mobilization Objectives
   r.h1("2. Mobilization Objectives");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Mobilization Objectives"));
   const objectives = itemsIn(roll.items, "Mobilization Objectives");
-  r.bulletList(objectives.map((i) => i.description ? `${i.title} — ${i.description}` : i.title));
+  // The authored narrative supersedes the seeded catalog bullets — printing
+  // both just says the same thing twice, less well.
+  if ((plan?.objectivesNarrative ?? "").trim()) {
+    r.p("Objectives are stated in full under Objectives & Scope.", { muted: true });
+  } else {
+    r.bulletList(objectives.map((i) => i.description ? `${i.title} — ${i.description}` : i.title));
+  }
   r.h2("Status");
   r.checklist(toChecklist(objectives, teamMap));
 
   // ------------------------------------------------------ 5. Staffing Plan
   r.sectionBreak();
   r.h1("3. Staffing Plan");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Staffing Plan"));
   r.statRow([
     { label: "Assigned Staff", value: String(roll.staff.length) },
     { label: "Fully Onboarded", value: `${roll.staffOnboardedPct}%`, tone: roll.staffOnboardedPct >= 90 ? "green" : roll.staffOnboardedPct >= 60 ? "yellow" : "red" },
@@ -288,13 +369,19 @@ export async function generateMobilizationPlan(
   r.h2("Staffing Checklist");
   r.checklist(toChecklist(itemsIn(roll.items, "Staffing Plan"), teamMap));
 
+  r.emergencyContactCard(emergencyContacts);
+  r.narrativeBlock("On-Call Rotation", plan?.onCallRotation);
+  r.narrativeBlock("Subcontractor Foremen", plan?.subcontractorForemen);
+
   // ---------------------------------------------------------- 6. Site Setup
   r.sectionBreak();
   r.h1("4. Site Setup");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Site Setup"));
   r.checklist(toChecklist(itemsIn(roll.items, "Site Setup"), teamMap));
 
   // ------------------------------------------------- 7. Temporary Utilities
   r.h1("5. Temporary Utilities");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Temporary Utilities"));
   r.statRow([
     { label: "Utilities Tracked", value: String(roll.utilities.length) },
     { label: "Installed", value: `${roll.utilitiesInstalledPct}%`, tone: roll.utilitiesInstalledPct >= 90 ? "green" : "yellow" },
@@ -317,6 +404,7 @@ export async function generateMobilizationPlan(
   // ---------------------------------------------- 8. Equipment Mobilization
   r.sectionBreak();
   r.h1("6. Equipment Mobilization");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Equipment Mobilization"));
   r.statRow([
     { label: "Equipment Tracked", value: String(roll.equipment.length) },
     { label: "On Site", value: `${roll.equipmentOnSitePct}%`, tone: roll.equipmentOnSitePct >= 90 ? "green" : "yellow" },
@@ -338,6 +426,7 @@ export async function generateMobilizationPlan(
   // -------------------------------------------------------------- 9. Permits
   r.sectionBreak();
   r.h1("7. Permits");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Permits"));
   r.statRow([
     { label: "Approved", value: String(roll.permitStatus.approved), tone: "green" },
     { label: "Pending", value: String(roll.permitStatus.pending), tone: roll.permitStatus.pending > 0 ? "yellow" : "default" },
@@ -367,11 +456,13 @@ export async function generateMobilizationPlan(
 
   // --------------------------------------- 10. Procurement (Long-Lead Items)
   r.h1("8. Procurement — Long-Lead Items");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Procurement"));
   r.checklist(toChecklist(itemsIn(roll.items, "Procurement"), teamMap));
 
   // ------------------------------------------------- 11. Safety Mobilization
   r.sectionBreak();
   r.h1("9. Safety Mobilization");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Safety Mobilization"));
   r.statRow([
     { label: "Incidents", value: String(obs.safetyIncidents), tone: obs.safetyIncidents > 0 ? "red" : "green" },
     { label: "Near Misses", value: String(obs.nearMisses), tone: obs.nearMisses > 0 ? "yellow" : "green" },
@@ -384,22 +475,45 @@ export async function generateMobilizationPlan(
   );
   r.checklist(toChecklist(itemsIn(roll.items, "Safety Mobilization"), teamMap));
 
+  r.narrativeBlock("Site-Specific Hazards", plan?.siteSpecificHazards);
+  r.narrativeBlock("Emergency Action Plan", plan?.eapDetails);
+  r.emergencyContactCard([
+    { label: "Nearest Hospital", name: plan?.hospitalName, phone: plan?.hospitalPhone },
+  ]);
+  r.narrativeBlock("Hospital Route", plan?.hospitalRoute);
+  r.narrativeBlock("Primary Muster Point", plan?.musterPoint);
+  r.narrativeBlock("Secondary Muster Point", plan?.secondaryMusterPoint);
+  r.narrativeBlock("SDS Location", plan?.msdsLocation);
+
   // ------------------------------------------------- 12. Environmental Plan
   r.h1("10. Environmental Plan");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Environmental Plan"));
   r.checklist(toChecklist(itemsIn(roll.items, "Environmental Plan"), teamMap));
+  r.narrativeBlock("Environmental Narrative", plan?.environmentalNarrative);
+  r.narrativeBlock("Spill Response", plan?.spillResponsePlan);
 
   // ------------------------------------------------ 13. Communications Plan
   r.sectionBreak();
   r.h1("11. Communications Plan");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Communications Plan"));
   r.checklist(toChecklist(itemsIn(roll.items, "Communications Plan"), teamMap));
 
   // ----------------------------------------------------- 14. Logistics Plan
   r.h1("12. Logistics Plan");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Logistics Plan"));
   r.checklist(toChecklist(itemsIn(roll.items, "Logistics Plan"), teamMap));
+  r.narrativeBlock("Truck Routes", plan?.truckRoutes);
+  r.narrativeBlock("Delivery Hours", plan?.deliveryHours);
+  r.narrativeBlock("Crane Picks", plan?.cranePicks);
+  r.narrativeBlock("Laydown Areas", plan?.laydownAreas);
+  r.narrativeBlock("Gate Schedule", plan?.gateSchedule);
+  r.narrativeBlock("Neighbor Communications", plan?.neighborCommsPlan);
+  r.narrativeBlock("Noise Ordinance Hours", plan?.noiseOrdinanceHours);
 
   // ----------------------------------------------------------- 15. Schedule
   r.sectionBreak();
   r.h1("13. Schedule");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Schedule"));
 
   const sortedMilestones = [...roll.milestones].sort((a, b) => a.date.localeCompare(b.date));
   const ntp = sortedMilestones[0];
@@ -438,6 +552,7 @@ export async function generateMobilizationPlan(
   // ------------------------------------------------------ 16. Risk Register
   r.sectionBreak();
   r.h1("14. Risk Register");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Risk Register"));
   r.riskRegisterSection({
     risks: roll.risks.map((x) => ({
       risk: x.risk,
@@ -454,6 +569,7 @@ export async function generateMobilizationPlan(
   // ------------------------------------------ 17. Final Mobilization Checklist
   r.sectionBreak();
   r.h1("15. Final Mobilization Checklist");
+  r.narrativeBlock("Section Narrative", sectionNarrative("Mobilization Checklist"));
   r.p("Go / no-go items. All must be complete before field work begins.");
   r.progressBar(roll.sectionPct["Mobilization Checklist"] ?? 0, "Go / no-go complete");
   r.checklist(toChecklist(itemsIn(roll.items, "Mobilization Checklist"), teamMap));
@@ -540,7 +656,11 @@ export async function generateMobilizationPlan(
   // ---------------------------------------------------------- 19. Sign-off
   r.sectionBreak();
   r.signOffBlock({
-    signers: SIGNER_ROLES.map((role) => ({ role, name: findSigner(team, role) })),
+    // Seeded rows are already sortOrder-ordered. Projects seeded before the
+    // sign-off block existed have none, so the original five roles stand in.
+    signers: signatures.length
+      ? signatures.map((s) => ({ role: s.role, name: s.name ?? "", date: s.signedDate ?? undefined }))
+      : SIGNER_ROLES.map((role) => ({ role, name: findSigner(team, role) })),
   });
 
   // ---------------------------------------------------------- 20. Appendix
