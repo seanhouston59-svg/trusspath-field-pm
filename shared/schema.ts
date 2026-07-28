@@ -529,6 +529,58 @@ export const fieldObservations = pgTable("field_observations", {
   createdAt: text("created_at").notNull().default(sql`NOW()`),
 });
 
+// -----------------------------------------------------------------------------
+// Project Timeline event log.
+//
+// One row per meaningful action across the whole app (RFI created, punch
+// closed, photo uploaded, timesheet clock-in, daily log submitted, etc.).
+// Append-only — nothing here is ever updated in place, only inserted. This is
+// the audit trail users search when reconstructing what happened on a job
+// months after the fact.
+//
+// The `meta` blob is intentionally loose (jsonb) so any route can drop in
+// route-specific detail (e.g. RFI number, punch title, photo caption, weather
+// slug) without needing a schema change. The client renders known keys and
+// ignores the rest.
+//
+// Naming: `kind` is a stable machine identifier ("rfi.created", "punch.closed",
+// "timesheet.clockin"). The UI resolves that to an icon + colour. See
+// `client/src/lib/project-events.ts` for the display metadata.
+// -----------------------------------------------------------------------------
+export const projectEvents = pgTable("project_events", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id"),
+  projectId: integer("project_id").notNull(),
+  // Who caused the event. Nullable because system-generated events (Jarvis
+  // auto-close, cron rollups) don't have a human actor.
+  actorAccountId: integer("actor_account_id"),
+  actorName: text("actor_name"), // denormalized snapshot — survives if member leaves
+  // Stable dotted identifier: "<entity>.<verb>". Keep the list in
+  // shared/project-event-kinds.ts (server + client).
+  kind: text("kind").notNull(),
+  // Short human-readable summary that renders as the timeline row title.
+  // Server-generated at insert time so we don't need the actor's locale on
+  // the read side. Example: "RFI #37 submitted — Beam sizing at grid B-4".
+  title: text("title").notNull(),
+  // Optional second line, e.g. "assigned to Marcus" or a truncated body.
+  subtitle: text("subtitle"),
+  // Route-specific detail. Common keys the UI understands:
+  //   { number, status, category, count, weather, temp, sourceUrl }
+  meta: jsonb("meta").notNull().default(sql`'{}'::jsonb`),
+  // Optional link back to the source row — lets the UI deep-link to the
+  // detail page for that entity.
+  sourceType: text("source_type"), // 'rfi' | 'punch' | 'photo' | 'timesheet' | …
+  sourceId: integer("source_id"),
+  // When the underlying event actually happened. For most rows this equals
+  // createdAt, but backfills and offline sync may set an earlier occurredAt.
+  occurredAt: text("occurred_at").notNull().default(sql`NOW()`),
+  createdAt: text("created_at").notNull().default(sql`NOW()`),
+});
+
+export const insertProjectEventSchema = createInsertSchema(projectEvents).omit({ id: true, createdAt: true });
+export type InsertProjectEvent = typeof insertProjectEventSchema._type;
+export type ProjectEvent = typeof projectEvents.$inferSelect;
+
 // Access helpers — shared between server and client so both agree on what "in good standing" means.
 
 // True if this account is a demo login whose 48h window has passed.

@@ -23,6 +23,7 @@ import {
   ORG_ROLES, type OrgRole,
   type Project,
 } from "@shared/schema";
+import { EVENT_KINDS } from "@shared/project-event-kinds";
 import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
 import {
   bootstrapOrganizationForAccount, bootstrapDemoOrgForAccount,
@@ -37,6 +38,43 @@ import { resolveMembership, requireCap, requireRole } from "./lib/mt-middleware"
 
 function pid(req: any): number | undefined {
   return req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
+}
+
+// Fire-and-forget Project Timeline event logger. Every mutation route calls
+// this after the underlying save succeeds. Never awaited on the critical
+// path — storage.recordEvent already swallows errors, but we double-guard so
+// even a throw here can't kill a response.
+//
+// Callers pass just the interesting bits (projectId, kind, title, optional
+// subtitle/meta/source). Actor + org are pulled from `req` automatically.
+function logEvent(req: any, args: {
+  projectId: number | null | undefined;
+  kind: string;
+  title: string;
+  subtitle?: string | null;
+  meta?: Record<string, any>;
+  sourceType?: string;
+  sourceId?: number | null;
+  occurredAt?: string;
+}): void {
+  if (!args.projectId) return; // Some entities aren't project-scoped.
+  const actor = req?.account;
+  Promise.resolve(storage.recordEvent({
+    projectId: args.projectId,
+    organizationId: req?.organizationId ?? null,
+    actorAccountId: actor?.id ?? null,
+    actorName: actor?.name ?? actor?.email ?? null,
+    kind: args.kind,
+    title: args.title,
+    subtitle: args.subtitle ?? null,
+    meta: args.meta ?? {},
+    sourceType: args.sourceType,
+    sourceId: args.sourceId ?? null,
+    occurredAt: args.occurredAt,
+  })).catch(() => {
+    // Storage already logged. Nothing else to do — the user's mutation
+    // succeeded even if their audit trail row didn't land.
+  });
 }
 
 // Human-readable random password for demo logins (owner reads it aloud/copies it).
@@ -696,6 +734,27 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     } catch (err) {
       console.warn("[field/punches] auto-timesheet failed:", (err as Error)?.message ?? err);
     }
+    // Timeline: emit clock-in / clock-out. Skip break_start / break_end —
+    // those are secondary events that would spam the log without adding much.
+    if (kind === "in" || kind === "out") {
+      logEvent(req, {
+        projectId,
+        kind: kind === "in" ? EVENT_KINDS.TIMESHEET_CLOCKIN : EVENT_KINDS.TIMESHEET_CLOCKOUT,
+        title: kind === "in" ? `Clocked in\u00a0on site` : `Clocked out`,
+        subtitle: (Number.isFinite(lat as number) && Number.isFinite(lng as number))
+          ? `${(lat as number).toFixed(4)}, ${(lng as number).toFixed(4)}`
+          : undefined,
+        sourceType: "field_punch",
+        sourceId: punch.id,
+        meta: {
+          hoursToday,
+          totalHours,
+          note: note || undefined,
+          accuracyM,
+        },
+        occurredAt,
+      });
+    }
     res.status(201).json({ punch, timesheetId, hoursToday, totalHours });
   });
 
@@ -753,6 +812,16 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       photoId: Number.isFinite(photoId as number) ? (photoId as number) : null,
       occurredAt,
       clientId,
+    });
+    logEvent(req, {
+      projectId,
+      kind: EVENT_KINDS.OBSERVATION_LOGGED,
+      title: `${kind.charAt(0).toUpperCase() + kind.slice(1)} observation \u2014 ${title}`,
+      subtitle: body ? body.slice(0, 120) : undefined,
+      sourceType: "field_observation",
+      sourceId: observation.id,
+      meta: { obsKind: kind, severity, photoId: observation.photoId ?? null },
+      occurredAt,
     });
 
     res.status(201).json({ observation });
@@ -845,10 +914,47 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!project) return; // response already sent
     res.json(project);
   });
+
+  // -------------------------------------------------------------------------
+  // Project Timeline — unified event log per project.
+  //
+  // GET /api/projects/:id/events
+  //   ?q=<search text>          match against title / subtitle / actorName
+  //   &kinds=rfi.created,punch.closed   comma-separated kind filter
+  //   &limit=<n>                page size (max 500, default 100)
+  //   &before=<ISO ts>          cursor for next page (older than this)
+  //
+  // The client uses this as its infinite-scroll source. Kind counts also
+  // returned so the filter chips can badge unread counts without a second call.
+  // -------------------------------------------------------------------------
+  app.get("/api/projects/:id/events", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    const project = await requireProjectAccess(req, res, projectId);
+    if (!project) return;
+    const rawKinds = typeof req.query.kinds === "string" ? req.query.kinds : "";
+    const kinds = rawKinds ? rawKinds.split(",").map((s: string) => s.trim()).filter(Boolean) : undefined;
+    const events = await storage.getProjectEvents(projectId, {
+      q: typeof req.query.q === "string" ? req.query.q : undefined,
+      kinds,
+      limit: req.query.limit ? Math.min(parseInt(String(req.query.limit), 10) || 100, 500) : 100,
+      before: typeof req.query.before === "string" ? req.query.before : undefined,
+    });
+    const counts = await storage.getProjectEventKindCounts(projectId);
+    res.json({ events, counts });
+  });
   app.post("/api/projects", async (req: any, res) => {
     const parsed = insertProjectSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createProject(withOrg(req, parsed.data)));
+    const created = await storage.createProject(withOrg(req, parsed.data));
+    logEvent(req, {
+      projectId: created.id,
+      kind: EVENT_KINDS.PROJECT_CREATED,
+      title: `Project created \u2014 ${created.name}`,
+      sourceType: "project",
+      sourceId: created.id,
+      meta: { status: created.status, address: created.address ?? null },
+    });
+    res.status(201).json(created);
   });
   app.patch("/api/projects/:id", async (req: any, res) => {
     const id = parseInt(req.params.id, 10);
@@ -864,16 +970,35 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getTasks(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/tasks", async (req, res) => {
+  app.post("/api/tasks", async (req: any, res) => {
     const parsed = insertTaskSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createTask(parsed.data));
+    const created = await storage.createTask(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.TASK_CREATED,
+      title: `Task created \u2014 ${created.title}`,
+      sourceType: "task",
+      sourceId: created.id,
+      meta: { status: created.status, priority: created.priority ?? null, assigneeId: created.assigneeId ?? null },
+    });
+    res.status(201).json(created);
   });
-  app.patch("/api/tasks/:id/status", async (req, res) => {
+  app.patch("/api/tasks/:id/status", async (req: any, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
     const updated = await storage.updateTaskStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Task not found" });
+    if (/^(done|complete|completed|closed)$/i.test(status)) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.TASK_COMPLETED,
+        title: `Task completed \u2014 ${updated.title}`,
+        sourceType: "task",
+        sourceId: updated.id,
+        meta: { status },
+      });
+    }
     res.json(updated);
   });
 
@@ -882,16 +1007,36 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getRfis(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/rfis", async (req, res) => {
+  app.post("/api/rfis", async (req: any, res) => {
     const parsed = insertRfiSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createRfi(parsed.data));
+    const created = await storage.createRfi(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.RFI_CREATED,
+      title: `${created.number} submitted \u2014 ${created.subject}`,
+      sourceType: "rfi",
+      sourceId: created.id,
+      meta: { number: created.number, status: created.status },
+    });
+    res.status(201).json(created);
   });
-  app.patch("/api/rfis/:id/status", async (req, res) => {
+  app.patch("/api/rfis/:id/status", async (req: any, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
     const updated = await storage.updateRfiStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "RFI not found" });
+    // Only emit "resolved" on terminal states — Closed/Answered/Resolved.
+    if (/^(closed|resolved|answered|complete|completed)$/i.test(status)) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.RFI_RESOLVED,
+        title: `${updated.number} resolved \u2014 ${updated.subject}`,
+        sourceType: "rfi",
+        sourceId: updated.id,
+        meta: { number: updated.number, status },
+      });
+    }
     res.json(updated);
   });
 
@@ -920,16 +1065,35 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getChangeOrders(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/change-orders", async (req, res) => {
+  app.post("/api/change-orders", async (req: any, res) => {
     const parsed = insertChangeOrderSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createChangeOrder(parsed.data));
+    const created = await storage.createChangeOrder(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.CHANGE_ORDER_CREATED,
+      title: `${created.number} requested \u2014 ${created.title}`,
+      sourceType: "change_order",
+      sourceId: created.id,
+      meta: { number: created.number, amount: created.amount ?? null, status: created.status },
+    });
+    res.status(201).json(created);
   });
-  app.patch("/api/change-orders/:id/status", async (req, res) => {
+  app.patch("/api/change-orders/:id/status", async (req: any, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
     const updated = await storage.updateChangeOrderStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Change order not found" });
+    if (/^(approved|accepted|executed)$/i.test(status)) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.CHANGE_ORDER_APPROVED,
+        title: `${updated.number} approved`,
+        sourceType: "change_order",
+        sourceId: updated.id,
+        meta: { number: updated.number, amount: updated.amount ?? null, status },
+      });
+    }
     res.json(updated);
   });
 
@@ -958,10 +1122,20 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getDailyLogs(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/daily-logs", async (req, res) => {
+  app.post("/api/daily-logs", async (req: any, res) => {
     const parsed = insertDailyLogSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createDailyLog(parsed.data));
+    const created = await storage.createDailyLog(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DAILY_LOG_SUBMITTED,
+      title: `Daily log submitted \u2014 ${created.date}`,
+      sourceType: "daily_log",
+      sourceId: created.id,
+      meta: { date: created.date, weather: created.weather ?? null, temp: created.temp ?? null, crewCount: created.crewCount ?? null },
+      occurredAt: created.date ? new Date(created.date).toISOString() : undefined,
+    });
+    res.status(201).json(created);
   });
   app.patch("/api/daily-logs/:id", async (req, res) => {
     const parsed = insertDailyLogSchema.partial().safeParse(req.body);
@@ -980,10 +1154,20 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getPunchItems(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/punch", async (req, res) => {
+  app.post("/api/punch", async (req: any, res) => {
     const parsed = insertPunchItemSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createPunchItem(parsed.data));
+    const created = await storage.createPunchItem(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PUNCH_CREATED,
+      title: `Punch item added \u2014 ${created.title}`,
+      subtitle: created.location ?? undefined,
+      sourceType: "punch",
+      sourceId: created.id,
+      meta: { trade: created.trade, status: created.status },
+    });
+    res.status(201).json(created);
   });
 
   // Field-flow punch create — lighter contract with offline-queue idempotency.
@@ -1029,13 +1213,33 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       assigneeId: req.body?.assigneeId != null ? Number(req.body.assigneeId) : undefined,
     });
     if (idempKey) fieldPunchItemIdemp.set(idempKey, { id: created.id, ts: now });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PUNCH_CREATED,
+      title: `Punch item added \u2014 ${created.title}`,
+      subtitle: created.location ?? undefined,
+      sourceType: "punch",
+      sourceId: created.id,
+      meta: { trade: created.trade, status: created.status, source: "field" },
+    });
     res.status(201).json({ punchItem: created });
   });
-  app.patch("/api/punch/:id/status", async (req, res) => {
+  app.patch("/api/punch/:id/status", async (req: any, res) => {
     const status = String(req.body?.status ?? "");
     if (!status) return res.status(400).json({ message: "status required" });
     const updated = await storage.updatePunchStatus(parseInt(req.params.id, 10), status);
     if (!updated) return res.status(404).json({ message: "Punch item not found" });
+    if (/^(closed|complete|completed|resolved|done)$/i.test(status)) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.PUNCH_CLOSED,
+        title: `Punch item closed \u2014 ${updated.title}`,
+        subtitle: updated.location ?? undefined,
+        sourceType: "punch",
+        sourceId: updated.id,
+        meta: { trade: updated.trade, status },
+      });
+    }
     res.json(updated);
   });
 
@@ -1064,7 +1268,16 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.post("/api/equipment", async (req: any, res) => {
     const parsed = insertEquipmentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createEquipment(withOrg(req, parsed.data)));
+    const created = await storage.createEquipment(withOrg(req, parsed.data));
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.EQUIPMENT_ADDED,
+      title: `Equipment added \u2014 ${created.name}`,
+      sourceType: "equipment",
+      sourceId: created.id,
+      meta: { type: created.type, status: created.status },
+    });
+    res.status(201).json(created);
   });
   app.patch("/api/equipment/:id", async (req: any, res) => {
     const id = parseInt(req.params.id, 10);
@@ -1116,10 +1329,20 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getPhotos(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/photos", async (req, res) => {
+  app.post("/api/photos", async (req: any, res) => {
     const parsed = insertPhotoSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createPhoto(parsed.data));
+    const created = await storage.createPhoto(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PHOTO_UPLOADED,
+      title: `Photo uploaded${created.caption ? " \u2014 " + created.caption : ""}`,
+      subtitle: created.location ?? undefined,
+      sourceType: "photo",
+      sourceId: created.id,
+      meta: { date: created.date ?? null },
+    });
+    res.status(201).json(created);
   });
 
   // JSON photo upload — used by the mobile foreman flow and the offline
@@ -1174,11 +1397,20 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       mimeType: mime,
       fileSizeBytes: buf.length,
     });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PHOTO_UPLOADED,
+      title: `Photo uploaded${created.caption ? " \u2014 " + created.caption : ""}`,
+      subtitle: created.location ?? undefined,
+      sourceType: "photo",
+      sourceId: created.id,
+      meta: { date: created.date ?? null, source: "field", lat, lng },
+    });
     res.status(201).json(created);
   });
 
   // Photo file upload (multipart: metadata + image in one request)
-  app.post("/api/photos/upload", photoUpload.single("file"), async (req, res) => {
+  app.post("/api/photos/upload", photoUpload.single("file"), async (req: any, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No image provided." });
     const projectId = parseInt(req.body.projectId, 10);
@@ -1199,6 +1431,15 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       originalFileName: file.originalname,
       mimeType: file.mimetype,
       fileSizeBytes: file.size,
+    });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.PHOTO_UPLOADED,
+      title: `Photo uploaded${created.caption ? " \u2014 " + created.caption : ""}`,
+      subtitle: created.location ?? undefined,
+      sourceType: "photo",
+      sourceId: created.id,
+      meta: { date: created.date ?? null, filename: file.originalname },
     });
     res.status(201).json(created);
   });
@@ -1230,14 +1471,23 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getDocuments(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/documents", async (req, res) => {
+  app.post("/api/documents", async (req: any, res) => {
     const parsed = insertDocumentSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createDocument(parsed.data));
+    const created = await storage.createDocument(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DOC_UPLOADED,
+      title: `Document uploaded \u2014 ${created.name}`,
+      sourceType: "document",
+      sourceId: created.id,
+      meta: { type: created.type, size: created.size },
+    });
+    res.status(201).json(created);
   });
 
   // Document file upload (multipart: metadata + file in one request)
-  app.post("/api/documents/upload", upload.single("file"), async (req, res) => {
+  app.post("/api/documents/upload", upload.single("file"), async (req: any, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No file provided." });
     const projectId = parseInt(req.body.projectId, 10);
@@ -1257,6 +1507,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       originalFileName: file.originalname,
       mimeType: file.mimetype,
       fileSizeBytes: file.size,
+    });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DOC_UPLOADED,
+      title: `Document uploaded \u2014 ${created.name}`,
+      sourceType: "document",
+      sourceId: created.id,
+      meta: { type: created.type, size: created.size, filename: file.originalname },
     });
     res.status(201).json(created);
   });
@@ -1356,10 +1614,19 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getBlueprints(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/blueprints", async (req, res) => {
+  app.post("/api/blueprints", async (req: any, res) => {
     const parsed = insertBlueprintSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createBlueprint(parsed.data));
+    const created = await storage.createBlueprint(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.BLUEPRINT_UPLOADED,
+      title: `Blueprint uploaded \u2014 ${created.title}`,
+      sourceType: "blueprint",
+      sourceId: created.id,
+      meta: { discipline: created.discipline, revision: created.revision, sheetNumber: created.sheetNumber },
+    });
+    res.status(201).json(created);
   });
 
   // Drone captures
@@ -1367,10 +1634,19 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getDroneCaptures(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/drone-captures", async (req, res) => {
+  app.post("/api/drone-captures", async (req: any, res) => {
     const parsed = insertDroneCaptureSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createDroneCapture(parsed.data));
+    const created = await storage.createDroneCapture(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DRONE_CAPTURED,
+      title: `Drone capture \u2014 ${created.title}`,
+      sourceType: "drone_capture",
+      sourceId: created.id,
+      meta: { captureType: created.captureType, status: created.status, area: created.area },
+    });
+    res.status(201).json(created);
   });
 
   // Milestones
@@ -1378,15 +1654,36 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getMilestones(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/milestones", async (req, res) => {
+  app.post("/api/milestones", async (req: any, res) => {
     const parsed = insertMilestoneSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createMilestone(parsed.data));
+    const created = await storage.createMilestone(parsed.data);
+    if (/^complete/i.test(created.status ?? "")) {
+      logEvent(req, {
+        projectId: created.projectId,
+        kind: EVENT_KINDS.MILESTONE_REACHED,
+        title: `Milestone reached \u2014 ${created.title}`,
+        sourceType: "milestone",
+        sourceId: created.id,
+        meta: { kind: created.kind, date: created.date, status: created.status },
+      });
+    }
+    res.status(201).json(created);
   });
-  app.patch("/api/milestones/:id", async (req, res) => {
+  app.patch("/api/milestones/:id", async (req: any, res) => {
     const id = parseInt(req.params.id, 10);
     const updated = await storage.updateMilestone(id, req.body ?? {});
     if (!updated) return res.status(404).json({ message: "not found" });
+    if (/^complete/i.test(String(req.body?.status ?? ""))) {
+      logEvent(req, {
+        projectId: updated.projectId,
+        kind: EVENT_KINDS.MILESTONE_REACHED,
+        title: `Milestone reached \u2014 ${updated.title}`,
+        sourceType: "milestone",
+        sourceId: updated.id,
+        meta: { kind: updated.kind, date: updated.date, status: updated.status },
+      });
+    }
     res.json(updated);
   });
   app.delete("/api/milestones/:id", async (req, res) => {
@@ -1395,7 +1692,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   });
 
   // Drone capture file upload (multipart: metadata + image in one request)
-  app.post("/api/drone-captures/upload", droneUpload.single("file"), async (req, res) => {
+  app.post("/api/drone-captures/upload", droneUpload.single("file"), async (req: any, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No image provided." });
     const projectId = parseInt(req.body.projectId, 10);
@@ -1422,6 +1719,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       originalFileName: file.originalname,
       mimeType: file.mimetype,
       fileSizeBytes: file.size,
+    });
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.DRONE_CAPTURED,
+      title: `Drone capture \u2014 ${created.title}`,
+      sourceType: "drone_capture",
+      sourceId: created.id,
+      meta: { captureType: created.captureType, area: created.area, filename: file.originalname },
     });
     res.status(201).json(created);
   });
@@ -1451,10 +1756,19 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.get("/api/messages/:projectId", async (req, res) => {
     res.json(await storage.getMessages(parseInt(req.params.projectId, 10)));
   });
-  app.post("/api/messages", async (req, res) => {
+  app.post("/api/messages", async (req: any, res) => {
     const parsed = insertMessageSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createMessage(parsed.data));
+    const created = await storage.createMessage(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.MESSAGE_POSTED,
+      title: `Message posted`,
+      subtitle: created.body ? created.body.slice(0, 120) : undefined,
+      sourceType: "message",
+      sourceId: created.id,
+    });
+    res.status(201).json(created);
   });
 
   // Notes (sticky)
@@ -1462,10 +1776,19 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const rows = await storage.getNotes(pid(req));
     res.json(filterByOrgProjects(req, rows));
   });
-  app.post("/api/notes", async (req, res) => {
+  app.post("/api/notes", async (req: any, res) => {
     const parsed = insertNoteSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
-    res.status(201).json(await storage.createNote(parsed.data));
+    const created = await storage.createNote(parsed.data);
+    logEvent(req, {
+      projectId: created.projectId,
+      kind: EVENT_KINDS.NOTE_ADDED,
+      title: `Note added`,
+      subtitle: created.body ? created.body.slice(0, 120) : undefined,
+      sourceType: "note",
+      sourceId: created.id,
+    });
+    res.status(201).json(created);
   });
   app.patch("/api/notes/:id", async (req, res) => {
     const x = Number(req.body?.x);
@@ -2108,6 +2431,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         managerName: manager?.name ?? null,
         managerEmail: manager?.email ?? null,
       });
+      logEvent(req, {
+        projectId: ts.projectId ?? undefined,
+        kind: EVENT_KINDS.TIMESHEET_SUBMITTED,
+        title: `Timesheet submitted \u2014 ${updated?.employeeName ?? "Employee"} (${updated?.weekStart} \u2192 ${updated?.weekEnd})`,
+        sourceType: "timesheet",
+        sourceId: id,
+        meta: { weekStart: updated?.weekStart, weekEnd: updated?.weekEnd, totalHours: updated?.totalHours },
+      });
       // Fire the manager notification email in the background; failure just
       // logs — the submit itself already succeeded and the manager can pick
       // it up from their /timesheets queue.
@@ -2166,6 +2497,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         status: "approved",
         managerSignature: signature,
         managerApprovedAt: new Date().toISOString(),
+      });
+      logEvent(req, {
+        projectId: ts.projectId ?? undefined,
+        kind: EVENT_KINDS.TIMESHEET_APPROVED,
+        title: `Timesheet approved \u2014 ${updated?.employeeName ?? "Employee"} (${updated?.weekStart} \u2192 ${updated?.weekEnd})`,
+        sourceType: "timesheet",
+        sourceId: id,
+        meta: { weekStart: updated?.weekStart, weekEnd: updated?.weekEnd, totalHours: updated?.totalHours },
       });
       res.json(updated);
     } catch (err) {

@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams } from "wouter";
 import {
   MapPin, Calendar, Building2, DollarSign, ListChecks, HelpCircle, ClipboardList, CheckSquare,
-  ExternalLink, Pencil, X,
+  ExternalLink, Pencil, X, Clock,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
 import { TaskTable, RfiTable, DailyLogList, PunchList } from "@/components/tables";
+import { ProjectTimeline } from "@/components/project-timeline";
 import {
   useProject, useTasks, useRfis, useDailyLogs, usePunchItems, useTeamMap, useUpdateProject,
 } from "@/hooks/use-data";
@@ -17,6 +18,7 @@ import { AddressAutocomplete } from "@/components/address-autocomplete";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: DollarSign },
+  { key: "timeline", label: "Timeline", icon: Clock },
   { key: "tasks", label: "Tasks", icon: ListChecks },
   { key: "rfis", label: "RFIs", icon: HelpCircle },
   { key: "logs", label: "Daily Logs", icon: ClipboardList },
@@ -205,6 +207,7 @@ export default function ProjectDetail() {
             </div>
           </div>
         )}
+        {tab === "timeline" && <ProjectTimeline projectId={projectId} />}
         {tab === "tasks" && <TaskTable tasks={tasks} team={team} />}
         {tab === "rfis" && <RfiTable rfis={rfis} team={team} />}
         {tab === "logs" && <DailyLogList logs={logs} team={team} />}

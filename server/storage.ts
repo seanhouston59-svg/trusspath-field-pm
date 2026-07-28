@@ -11,6 +11,7 @@ import {
   timesheets, timeEntries,
   fieldPunches,
   fieldObservations,
+  projectEvents,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -31,6 +32,7 @@ import type {
   TimeEntry, InsertTimeEntry,
   FieldPunch, InsertFieldPunch,
   FieldObservation, InsertFieldObservation,
+  ProjectEvent, InsertProjectEvent,
 } from '@shared/schema';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -188,6 +190,28 @@ async function migrate() {
     project_id INTEGER NOT NULL, author_id INTEGER,
     body TEXT NOT NULL, created_at TEXT NOT NULL
   )`;
+  // Project Timeline audit log. Append-only. Every mutation route logs one row.
+  // See shared/schema.ts → projectEvents for column docs.
+  await sql`CREATE TABLE IF NOT EXISTS project_events (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER,
+    project_id INTEGER NOT NULL,
+    actor_account_id INTEGER,
+    actor_name TEXT,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    subtitle TEXT,
+    meta JSONB NOT NULL DEFAULT '{}'::jsonb,
+    source_type TEXT,
+    source_id INTEGER,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  // Read pattern: WHERE project_id = ? ORDER BY occurred_at DESC LIMIT ?
+  // Composite index carries the sort so we don't need a sort step in Postgres.
+  await sql`CREATE INDEX IF NOT EXISTS idx_project_events_project_time ON project_events(project_id, occurred_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_project_events_org_time ON project_events(organization_id, occurred_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_project_events_kind ON project_events(kind)`;
   await sql`CREATE TABLE IF NOT EXISTS notes (
     id SERIAL PRIMARY KEY,
     project_id INTEGER, body TEXT NOT NULL, color TEXT NOT NULL,
@@ -362,6 +386,287 @@ async function migrate() {
     } catch (e) {
       console.error("[migrate] owner bootstrap failed:", e);
     }
+  }
+
+  // One-time seed pass: turn every existing record (RFIs, punch items, photos,
+  // etc.) into a project_events row so the Timeline tab has history from day
+  // one instead of only tracking events created after this deploy. Guarded by
+  // an app_settings.config.event_backfill_done flag so it never runs twice.
+  try {
+    const settingsRow = await sql`SELECT config FROM app_settings WHERE id = 1 LIMIT 1`;
+    let cfg: Record<string, any> = {};
+    if (settingsRow.length > 0) {
+      try { cfg = JSON.parse(settingsRow[0].config || "{}"); } catch { cfg = {}; }
+    }
+    if (!cfg.event_backfill_done) {
+      console.log("[migrate] running project_events backfill…");
+
+      // RFIs -> rfi.created (+ rfi.resolved for terminal statuses)
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, r.project_id, NULL, r.submitted_by,
+               'rfi.created',
+               'RFI ' || r.number || ' submitted \u2014 ' || r.subject,
+               NULL,
+               jsonb_build_object('status', r.status, 'priority', r.priority),
+               'rfi', r.id,
+               COALESCE(r.date_submitted::timestamptz, NOW())
+        FROM rfis r
+        JOIN projects p ON p.id = r.project_id
+        WHERE r.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='rfi' AND e.source_id=r.id AND e.kind='rfi.created')`;
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, r.project_id, NULL, r.submitted_by,
+               'rfi.resolved',
+               'RFI ' || r.number || ' resolved',
+               NULL,
+               jsonb_build_object('status', r.status),
+               'rfi', r.id,
+               COALESCE(r.date_submitted::timestamptz, NOW())
+        FROM rfis r
+        JOIN projects p ON p.id = r.project_id
+        WHERE r.deleted_at IS NULL
+          AND lower(r.status) IN ('closed','resolved','answered')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='rfi' AND e.source_id=r.id AND e.kind='rfi.resolved')`;
+
+      // Change orders -> change_order.created (+ approved)
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, c.project_id, NULL, NULL,
+               'change_order.created',
+               'CO ' || c.number || ' requested \u2014 ' || c.title,
+               NULL,
+               jsonb_build_object('status', c.status, 'amount', c.amount),
+               'change_order', c.id,
+               COALESCE(c.date_issued::timestamptz, NOW())
+        FROM change_orders c
+        JOIN projects p ON p.id = c.project_id
+        WHERE c.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='change_order' AND e.source_id=c.id AND e.kind='change_order.created')`;
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, c.project_id, NULL, NULL,
+               'change_order.approved',
+               'CO ' || c.number || ' approved',
+               NULL,
+               jsonb_build_object('status', c.status, 'amount', c.amount),
+               'change_order', c.id,
+               COALESCE(c.date_issued::timestamptz, NOW())
+        FROM change_orders c
+        JOIN projects p ON p.id = c.project_id
+        WHERE c.deleted_at IS NULL
+          AND lower(c.status) IN ('approved','accepted','executed')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='change_order' AND e.source_id=c.id AND e.kind='change_order.approved')`;
+
+      // Daily logs
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, d.project_id, NULL, d.superintendent,
+               'daily_log.submitted',
+               'Daily log submitted',
+               d.summary,
+               jsonb_build_object('weather', d.weather, 'temp', d.temp, 'crewCount', d.crew_count),
+               'daily_log', d.id,
+               COALESCE(d.date::timestamptz, NOW())
+        FROM daily_logs d
+        JOIN projects p ON p.id = d.project_id
+        WHERE d.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='daily_log' AND e.source_id=d.id)`;
+
+      // Punch items -> created (+ closed for terminal status)
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, pu.project_id, NULL, NULL,
+               'punch.created',
+               'Punch item added \u2014 ' || pu.title,
+               pu.location,
+               jsonb_build_object('status', pu.status, 'trade', pu.trade),
+               'punch', pu.id,
+               NOW()
+        FROM punch_items pu
+        JOIN projects p ON p.id = pu.project_id
+        WHERE pu.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='punch' AND e.source_id=pu.id AND e.kind='punch.created')`;
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, pu.project_id, NULL, NULL,
+               'punch.closed',
+               'Punch item closed \u2014 ' || pu.title,
+               NULL,
+               jsonb_build_object('status', pu.status),
+               'punch', pu.id,
+               NOW()
+        FROM punch_items pu
+        JOIN projects p ON p.id = pu.project_id
+        WHERE pu.deleted_at IS NULL
+          AND lower(pu.status) IN ('closed','complete','completed','resolved','done')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='punch' AND e.source_id=pu.id AND e.kind='punch.closed')`;
+
+      // Photos
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, ph.project_id, NULL, NULL,
+               'photo.uploaded',
+               'Photo uploaded \u2014 ' || COALESCE(ph.title, 'Untitled'),
+               ph.description,
+               jsonb_build_object('location', ph.location, 'trade', ph.trade),
+               'photo', ph.id,
+               COALESCE(ph.date::timestamptz, NOW())
+        FROM photos ph
+        JOIN projects p ON p.id = ph.project_id
+        WHERE ph.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='photo' AND e.source_id=ph.id)`;
+
+      // Tasks -> created (+ completed)
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, t.project_id, NULL, NULL,
+               'task.created',
+               'Task created \u2014 ' || t.title,
+               t.trade,
+               jsonb_build_object('status', t.status, 'priority', t.priority),
+               'task', t.id,
+               COALESCE(t.start_date::timestamptz, NOW())
+        FROM tasks t
+        JOIN projects p ON p.id = t.project_id
+        WHERE t.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='task' AND e.source_id=t.id AND e.kind='task.created')`;
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, t.project_id, NULL, NULL,
+               'task.completed',
+               'Task completed \u2014 ' || t.title,
+               NULL,
+               jsonb_build_object('status', t.status),
+               'task', t.id,
+               COALESCE(t.end_date::timestamptz, NOW())
+        FROM tasks t
+        JOIN projects p ON p.id = t.project_id
+        WHERE t.deleted_at IS NULL
+          AND lower(t.status) IN ('done','complete','completed','closed')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='task' AND e.source_id=t.id AND e.kind='task.completed')`;
+
+      // Documents
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, d.project_id, NULL, NULL,
+               'doc.uploaded',
+               'Document uploaded \u2014 ' || d.name,
+               NULL,
+               jsonb_build_object('type', d.type, 'size', d.size),
+               'document', d.id,
+               COALESCE(d.date::timestamptz, NOW())
+        FROM documents d
+        JOIN projects p ON p.id = d.project_id
+        WHERE d.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='document' AND e.source_id=d.id)`;
+
+      // Blueprints
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, b.project_id, NULL, NULL,
+               'blueprint.uploaded',
+               'Blueprint uploaded \u2014 ' || b.title,
+               b.sheet_number,
+               jsonb_build_object('discipline', b.discipline, 'revision', b.revision),
+               'blueprint', b.id,
+               COALESCE(b.date::timestamptz, NOW())
+        FROM blueprints b
+        JOIN projects p ON p.id = b.project_id
+        WHERE b.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='blueprint' AND e.source_id=b.id)`;
+
+      // Drone captures
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, dc.project_id, NULL, NULL,
+               'drone.captured',
+               'Drone capture \u2014 ' || COALESCE(dc.title, 'Untitled'),
+               dc.notes,
+               jsonb_build_object('altitude', dc.altitude, 'weather', dc.weather),
+               'drone_capture', dc.id,
+               COALESCE(dc.flight_date::timestamptz, NOW())
+        FROM drone_captures dc
+        JOIN projects p ON p.id = dc.project_id
+        WHERE dc.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='drone_capture' AND e.source_id=dc.id)`;
+
+      // Field punches (clock in/out) — only kind='in' or 'out'
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, fp.project_id, fp.account_id,
+               COALESCE((SELECT display_name FROM accounts a WHERE a.id = fp.account_id), 'Field worker'),
+               CASE WHEN lower(fp.kind) = 'in' THEN 'timesheet.clockin' ELSE 'timesheet.clockout' END,
+               CASE WHEN lower(fp.kind) = 'in' THEN 'Clocked in' ELSE 'Clocked out' END,
+               NULL,
+               jsonb_build_object('source', 'field_punch'),
+               'field_punch', fp.id,
+               COALESCE(fp.punched_at::timestamptz, NOW())
+        FROM field_punches fp
+        JOIN projects p ON p.id = fp.project_id
+        WHERE lower(fp.kind) IN ('in','out')
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='field_punch' AND e.source_id=fp.id)`;
+
+      // Field observations
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, fo.project_id, fo.account_id,
+               COALESCE((SELECT display_name FROM accounts a WHERE a.id = fo.account_id), 'Field worker'),
+               'observation.logged',
+               'Field observation \u2014 ' || COALESCE(fo.category, 'Note'),
+               fo.note,
+               jsonb_build_object('severity', fo.severity),
+               'field_observation', fo.id,
+               COALESCE(fo.observed_at::timestamptz, NOW())
+        FROM field_observations fo
+        JOIN projects p ON p.id = fo.project_id
+        WHERE NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='field_observation' AND e.source_id=fo.id)`;
+
+      // Milestones (only those flagged complete)
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, m.project_id, NULL, NULL,
+               'milestone.reached',
+               'Milestone reached \u2014 ' || m.title,
+               m.notes,
+               jsonb_build_object('status', m.status, 'kind', m.kind),
+               'milestone', m.id,
+               COALESCE(m.date::timestamptz, NOW())
+        FROM milestones m
+        JOIN projects p ON p.id = m.project_id
+        WHERE lower(m.status) LIKE 'complete%'
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='milestone' AND e.source_id=m.id)`;
+
+      // Notes
+      await sql`INSERT INTO project_events
+        (organization_id, project_id, actor_account_id, actor_name, kind, title, subtitle, meta, source_type, source_id, occurred_at)
+        SELECT p.organization_id, n.project_id, NULL, NULL,
+               'note.added',
+               'Note added',
+               LEFT(n.text, 200),
+               '{}'::jsonb,
+               'note', n.id,
+               COALESCE(n.created_at::timestamptz, NOW())
+        FROM notes n
+        JOIN projects p ON p.id = n.project_id
+        WHERE n.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM project_events e WHERE e.source_type='note' AND e.source_id=n.id)`;
+
+      cfg.event_backfill_done = true;
+      const nowIso = new Date().toISOString();
+      if (settingsRow.length > 0) {
+        await sql`UPDATE app_settings SET config = ${JSON.stringify(cfg)}, updated_at = ${nowIso} WHERE id = 1`;
+      } else {
+        await sql`INSERT INTO app_settings (id, config, updated_at) VALUES (1, ${JSON.stringify(cfg)}, ${nowIso})`;
+      }
+      console.log("[migrate] project_events backfill complete");
+    }
+  } catch (e) {
+    // Backfill is best-effort. If a column name doesn't line up with an older
+    // deploy, log and move on rather than blocking startup — new writes still
+    // flow via recordEvent().
+    console.warn("[migrate] project_events backfill skipped:", (e as Error)?.message ?? e);
   }
 }
 
@@ -1618,6 +1923,116 @@ class DatabaseStorage implements IStorage {
   async deleteJarvisMemory(id: number): Promise<void> {
     await ensureReady();
     await db.delete(jarvisMemory).where(eq(jarvisMemory.id, id));
+  }
+
+  /* ---------------------- Project Timeline / event log --------------------- */
+
+  /**
+   * Append one row to the project timeline. Called from mutation routes
+   * (fire-and-forget — the caller doesn't await the result on the critical
+   * path). Never throws — timeline logging failure should never break a real
+   * mutation. Any DB error is swallowed and logged to console.
+   *
+   * Callers pass a minimal payload; we fill in defaults (occurredAt = now,
+   * meta = {}).
+   */
+  async recordEvent(data: Partial<InsertProjectEvent> & {
+    projectId: number;
+    kind: string;
+    title: string;
+  }): Promise<void> {
+    try {
+      await ensureReady();
+      await db.insert(projectEvents).values({
+        projectId: data.projectId,
+        organizationId: data.organizationId ?? null,
+        actorAccountId: data.actorAccountId ?? null,
+        actorName: data.actorName ?? null,
+        kind: data.kind,
+        title: data.title,
+        subtitle: data.subtitle ?? null,
+        meta: (data.meta ?? {}) as any,
+        sourceType: data.sourceType ?? null,
+        sourceId: data.sourceId ?? null,
+        occurredAt: data.occurredAt ?? new Date().toISOString(),
+      } as any);
+    } catch (err) {
+      // Non-fatal — timeline is a nice-to-have, not the source of truth.
+      // eslint-disable-next-line no-console
+      console.error("[recordEvent] failed:", err);
+    }
+  }
+
+  /**
+   * Read the timeline for one project with optional filters. Server-side
+   * pagination + kind filter + full-text-ish search over title/subtitle so
+   * large projects (thousands of events) stay quick.
+   */
+  async getProjectEvents(
+    projectId: number,
+    opts: {
+      q?: string;
+      kinds?: string[];  // filter to just these kinds
+      limit?: number;
+      before?: string;   // ISO — for pagination (return events older than this)
+    } = {},
+  ): Promise<ProjectEvent[]> {
+    await ensureReady();
+    const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+    // Use tagged-template SQL directly so we can compose LIKE + IN cleanly.
+    // Drizzle's builder gets awkward with dynamic IN lists over jsonb.
+    const kindClause = opts.kinds && opts.kinds.length > 0
+      ? sql`AND kind = ANY(${opts.kinds})`
+      : sql``;
+    const beforeClause = opts.before
+      ? sql`AND occurred_at < ${opts.before}`
+      : sql``;
+    const searchClause = opts.q && opts.q.trim().length > 0
+      ? (() => {
+          const like = `%${opts.q!.trim().toLowerCase()}%`;
+          return sql`AND (LOWER(title) LIKE ${like} OR LOWER(COALESCE(subtitle, '')) LIKE ${like} OR LOWER(COALESCE(actor_name, '')) LIKE ${like})`;
+        })()
+      : sql``;
+    const rows: any[] = await sql`
+      SELECT id, organization_id, project_id, actor_account_id, actor_name, kind,
+             title, subtitle, meta, source_type, source_id, occurred_at, created_at
+      FROM project_events
+      WHERE project_id = ${projectId}
+      ${kindClause}
+      ${beforeClause}
+      ${searchClause}
+      ORDER BY occurred_at DESC
+      LIMIT ${limit}
+    `;
+    return rows.map((r) => ({
+      id: r.id,
+      organizationId: r.organization_id,
+      projectId: r.project_id,
+      actorAccountId: r.actor_account_id,
+      actorName: r.actor_name,
+      kind: r.kind,
+      title: r.title,
+      subtitle: r.subtitle,
+      meta: r.meta ?? {},
+      sourceType: r.source_type,
+      sourceId: r.source_id,
+      occurredAt: typeof r.occurred_at === "string" ? r.occurred_at : new Date(r.occurred_at).toISOString(),
+      createdAt: typeof r.created_at === "string" ? r.created_at : new Date(r.created_at).toISOString(),
+    })) as ProjectEvent[];
+  }
+
+  /** Kind counts for one project — used by the filter chips to show badges. */
+  async getProjectEventKindCounts(projectId: number): Promise<Record<string, number>> {
+    await ensureReady();
+    const rows: any[] = await sql`
+      SELECT kind, COUNT(*)::int AS c
+      FROM project_events
+      WHERE project_id = ${projectId}
+      GROUP BY kind
+    `;
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.kind] = r.c;
+    return out;
   }
 
   /* ----------------------------- Timesheets ---------------------------- */
