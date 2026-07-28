@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 /**
  * Wouter's built-in useHashLocation returns the pathname WITH the query
@@ -302,6 +303,7 @@ function App() {
                   <AppChrome />
                 </Router>
               </ErrorBoundary>
+              <SpeedInsights />
             </TooltipProvider>
           </AccessProvider>
         </AuthProvider>
