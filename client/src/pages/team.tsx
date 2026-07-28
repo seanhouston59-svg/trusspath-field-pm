@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Mail, Phone, Building2, Plus, Pencil, Trash2, ShieldCheck, UserPlus, CheckCircle2, Clock } from "lucide-react";
+import { Mail, Phone, Building2, Plus, Pencil, Trash2, ShieldCheck, UserPlus, CheckCircle2, Clock, UserMinus } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Avatar } from "@/components/bits";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
 import {
   useTeam, useCreateTeamMember, useUpdateTeamMember, useDeleteTeamMember,
-  useCurrentOrg, useOrgMembers, useOrgInvites, useCreateInvite,
+  useCurrentOrg, useOrgMembers, useOrgInvites, useCreateInvite, useRemoveMember,
 } from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
 import {
@@ -121,6 +121,7 @@ export default function Team() {
   const { data: membersData } = useOrgMembers();
   const { data: invitesData } = useOrgInvites();
   const createInvite = useCreateInvite();
+  const removeMember = useRemoveMember();
 
   const myMembershipRole = orgData?.membership?.role;
   const canInviteMembers = myMembershipRole === "owner" || myMembershipRole === "admin";
@@ -133,6 +134,17 @@ export default function Team() {
       if (m.status === "active" && m.email) s.add(m.email.toLowerCase());
     });
     return s;
+  }, [membersData]);
+  // email → full membership record (used by the Remove-seat button so it can
+  // look up id, role, and accountId to decide if removal is allowed).
+  const membershipByEmail = useMemo(() => {
+    const map = new Map<string, { id: number; role: string; accountId: number }>();
+    (membersData?.members ?? []).forEach((m) => {
+      if (m.status === "active" && m.email) {
+        map.set(m.email.toLowerCase(), { id: m.id, role: m.role, accountId: m.accountId });
+      }
+    });
+    return map;
   }, [membersData]);
   const pendingInviteEmails = useMemo(() => {
     const s = new Set<string>();
@@ -155,6 +167,9 @@ export default function Team() {
 
   // Confirmation dialog state for the invite flow.
   const [inviteTarget, setInviteTarget] = useState<TeamMember | null>(null);
+  // Confirmation dialog state for the remove-seat flow. Carries both the team
+  // roster entry (for display) and the resolved membership id (for the API call).
+  const [removeTarget, setRemoveTarget] = useState<{ member: TeamMember; membershipId: number; role: string } | null>(null);
 
   const levelLabel = (slug: string) => (ACCESS_BY_SLUG as Record<string, { label: string }>)[slug]?.label ?? slug;
   // If we're editing an existing member whose legacy free-text role isn't in POSITIONS,
@@ -275,6 +290,65 @@ export default function Team() {
     return dollars % 1 === 0 ? `$${dollars.toFixed(0)}` : `$${dollars.toFixed(2)}`;
   };
 
+  /**
+   * Kick off the Remove-seat flow — resolve the membership id from the email,
+   * then open the confirmation dialog. If we can't resolve a membership (e.g.
+   * the chip was stale), fall back to a toast rather than showing a broken
+   * dialog.
+   */
+  const openRemoveSeat = (m: TeamMember) => {
+    const email = (m.email || "").trim().toLowerCase();
+    const membership = email ? membershipByEmail.get(email) : undefined;
+    if (!membership) {
+      toast({ title: "Membership not found", description: "This team member's login has already been removed. Refresh to see the latest state.", variant: "destructive" });
+      return;
+    }
+    setRemoveTarget({ member: m, membershipId: membership.id, role: membership.role });
+  };
+
+  /**
+   * Whether the current user is allowed to remove this membership.
+   * Mirrors the server-side checks (owner-only-removes-owner, primary-owner
+   * protection, self-removal) so we don't render a broken button. Non-owners
+   * see no button on owner rows; owners never see a button on their own row.
+   */
+  const canRemoveSeat = (m: TeamMember): boolean => {
+    if (!canInviteMembers) return false;
+    const email = (m.email || "").trim().toLowerCase();
+    if (!email) return false;
+    const membership = membershipByEmail.get(email);
+    if (!membership) return false;
+    // Server-enforced rules, mirrored for UX:
+    // 1) Only owners can remove other owners.
+    if (membership.role === "owner" && myMembershipRole !== "owner") return false;
+    // 2) Never allow removing the primary org owner (org.ownerAccountId).
+    if (orgData?.organization?.ownerAccountId === membership.accountId) return false;
+    // 3) Don't let users remove their own seat from this UI (Settings has a
+    //    dedicated "leave org" flow that also transfers ownership etc.).
+    if (orgData?.membership?.accountId === membership.accountId) return false;
+    return true;
+  };
+
+  const doRemoveSeat = async () => {
+    if (!removeTarget) return;
+    try {
+      await removeMember.mutateAsync(removeTarget.membershipId);
+      toast({
+        title: `Removed ${removeTarget.member.name}'s login`,
+        description: pricing && seats && seats.active > (seats.included ?? 0)
+          ? `Seat freed. Your next invoice drops by ${fmtCents(pricing.seatAmountCents)}/${pricing.billing === "annual" ? "yr" : "mo"}.`
+          : "Seat freed and Stripe subscription updated.",
+      });
+      setRemoveTarget(null);
+    } catch (err: any) {
+      toast({
+        title: "Remove failed",
+        description: err?.message || "Could not remove the seat. See console for details.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const doInvite = async () => {
     if (!inviteTarget) return;
     const email = (inviteTarget.email || "").trim().toLowerCase();
@@ -376,8 +450,20 @@ export default function Team() {
               {(() => {
                 const st = inviteStatus(m);
                 if (st === "active") return (
-                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400" data-testid={`chip-active-user-${m.id}`}>
-                    <CheckCircle2 className="size-3.5" /> Active user
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400" data-testid={`chip-active-user-${m.id}`}>
+                      <CheckCircle2 className="size-3.5" /> Active user
+                    </div>
+                    {canRemoveSeat(m) && (
+                      <button
+                        onClick={() => openRemoveSeat(m)}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-red-500/40 bg-red-500/5 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
+                        data-testid={`button-remove-seat-${m.id}`}
+                        title="Remove this user's login and free their seat"
+                      >
+                        <UserMinus className="size-3.5" /> Remove seat
+                      </button>
+                    )}
                   </div>
                 );
                 if (st === "pending") return (
@@ -470,6 +556,60 @@ export default function Team() {
                     data-testid="button-confirm-invite"
                   >
                     {createInvite.isPending ? "Sending…" : willOverage ? `Send invite · +${fmtCents(extraCents)}/${period}` : "Send invite"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove-seat confirmation dialog — shown when the user clicks "Remove
+          seat" on an Active user chip. Explains what removal does (revokes
+          login access + syncs Stripe down) and previews the seat/pricing
+          impact. Mirrors the invite dialog's structure for consistency. */}
+      <AlertDialog open={removeTarget !== null} onOpenChange={(v) => !v && setRemoveTarget(null)}>
+        <AlertDialogContent data-testid="dialog-remove-seat-confirm">
+          {removeTarget && (() => {
+            const wasOverage = pricing && includedSeats !== null && activeSeats > includedSeats;
+            const savedCents = wasOverage ? pricing!.seatAmountCents : 0;
+            const period = pricing?.billing === "annual" ? "yr" : "mo";
+            const seatsAfter = Math.max(0, activeSeats - 1);
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove {removeTarget.member.name}'s login?</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3 pt-2">
+                      <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-foreground">
+                        <div>This will immediately revoke <span className="font-medium">{removeTarget.member.email}</span>'s login access. They'll be signed out and can't reach any project data until re-invited.</div>
+                        <div className="mt-2 text-xs text-muted-foreground">Their project roster entry stays intact so you don't lose their contact info — only the login is removed.</div>
+                      </div>
+
+                      {pricing && includedSeats !== null ? (
+                        savedCents > 0 ? (
+                          <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-200">
+                            <div className="font-medium">Save {fmtCents(savedCents)}/{period}</div>
+                            <div className="mt-1 text-xs">You'll drop to {seatsAfter} active seat{seatsAfter === 1 ? "" : "s"}. Stripe pro-rates the change onto your next invoice.</div>
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">You're within your included {includedSeats} seat{includedSeats === 1 ? "" : "s"} — no billing change. Freed seat becomes available for the next invite.</div>
+                        )
+                      ) : (
+                        <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">Seat pricing unavailable — your org may not be on a paid plan yet.</div>
+                      )}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={removeMember.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => { e.preventDefault(); doRemoveSeat(); }}
+                    disabled={removeMember.isPending}
+                    className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-600"
+                    data-testid="button-confirm-remove-seat"
+                  >
+                    {removeMember.isPending ? "Removing…" : savedCents > 0 ? `Remove seat · -${fmtCents(savedCents)}/${period}` : "Remove seat"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </>
