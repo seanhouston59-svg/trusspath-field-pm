@@ -1023,6 +1023,245 @@ export const projectSetupSignatures = pgTable("project_setup_signatures", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+/* ====================== Pre-Construction (Executive OS) ==================
+ * Sits between Project Setup and Mobilization: design tracking, value
+ * engineering, permitting, subcontractor prequal, bid buyout and long-lead
+ * procurement. One pre_construction row per project drives the documents;
+ * everything else hangs off project_id. Money is stored as text so a numeric
+ * round-trip can't shift a bid or PO value.
+ */
+export const preConstruction = pgTable("pre_construction", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  // in_progress | design_locked | bought_out | complete
+  status: text("status").notNull().default("in_progress"),
+
+  // Design progress
+  // sd | dd | cd | permit_set | bid_set | for_construction
+  designPhase: text("design_phase"),
+  designCompletionPercent: integer("design_completion_percent"),
+
+  // Milestone dates
+  permitTargetDate: text("permit_target_date"),
+  permitReceivedDate: text("permit_received_date"),
+  buyoutTargetDate: text("buyout_target_date"),
+  buyoutCompleteDate: text("buyout_complete_date"),
+
+  // Buyout counters. Denormalized so the portfolio roll-up doesn't have to
+  // count bid package rows per project.
+  bidPackagesCount: integer("bid_packages_count").notNull().default(0),
+  bidPackagesBoughtOutCount: integer("bid_packages_bought_out_count").notNull().default(0),
+
+  // Ownership
+  preconLeadName: text("precon_lead_name"),
+  preconLeadPhone: text("precon_lead_phone"),
+  preconLeadEmail: text("precon_lead_email"),
+  estimatorName: text("estimator_name"),
+  estimatorPhone: text("estimator_phone"),
+  estimatorEmail: text("estimator_email"),
+
+  // Narratives — design
+  designNarrative: text("design_narrative"),
+  designAssumptions: text("design_assumptions"),
+  designExclusions: text("design_exclusions"),
+  veStrategy: text("ve_strategy"),
+
+  // Narratives — constructability
+  constructabilityFindings: text("constructability_findings"),
+  constructabilitySummary: text("constructability_summary"),
+  siteConditionsNotes: text("site_conditions_notes"),
+  logisticsConsiderations: text("logistics_considerations"),
+
+  // Narratives — permitting
+  permitStrategy: text("permit_strategy"),
+  jurisdictionalNarrative: text("jurisdictional_narrative"),
+  openConditionsNarrative: text("open_conditions_narrative"),
+
+  // Narratives — prequal / bidding
+  prequalCriteria: text("prequal_criteria"),
+  bidStrategy: text("bid_strategy"),
+  bidderOutreachNarrative: text("bidder_outreach_narrative"),
+
+  // Narratives — buyout / procurement
+  buyoutStrategy: text("buyout_strategy"),
+  longLeadStrategy: text("long_lead_strategy"),
+  deliveryRiskNarrative: text("delivery_risk_narrative"),
+
+  // Narratives — overall
+  overallRisks: text("overall_risks"),
+  overallAssumptions: text("overall_assumptions"),
+  openIssues: text("open_issues"),
+  nextSteps: text("next_steps"),
+
+  // Approvals
+  preconPlanApprovedAt: text("precon_plan_approved_at"),
+  preconPlanApprovedById: integer("precon_plan_approved_by_id"), // accounts.id
+  createdAt: text("created_at"),
+  updatedAt: text("updated_at"),
+}, (t) => ({
+  projectIdx: uniqueIndex("pre_construction_project_idx").on(t.projectId),
+}));
+
+export const preConstructionDesignDocs = pgTable("pre_construction_design_docs", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  // architectural | structural | mep | civil | landscape | interiors | other
+  discipline: text("discipline"),
+  // drawing_set | spec_section | addendum | bulletin | sketch | narrative | report | other
+  docType: text("doc_type"),
+  label: text("label").notNull(),
+  revision: text("revision"),
+  issuedDate: text("issued_date"),
+  receivedDate: text("received_date"),
+  status: text("status"), // current | superseded | pending
+  // Where the document lives: URL, folder path, or a physical location.
+  location: text("location"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+// Design-phase RFIs, tracked separately from the construction-phase `rfis`
+// table: these are questions to the design team before the set is final.
+export const preConstructionDesignRfis = pgTable("pre_construction_design_rfis", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  rfiNumber: text("rfi_number"),
+  subject: text("subject").notNull(),
+  discipline: text("discipline"),
+  question: text("question"),
+  response: text("response"),
+  status: text("status"), // open | answered | closed | void
+  askedById: integer("asked_by_id"), // accounts.id
+  askedDate: text("asked_date"),
+  respondedById: integer("responded_by_id"), // accounts.id
+  respondedDate: text("responded_date"),
+  impact: text("impact"), // none | cost | schedule | both
+  costImpactUsd: text("cost_impact_usd"),
+  scheduleImpactDays: integer("schedule_impact_days"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const preConstructionVeItems = pgTable("pre_construction_ve_items", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  veNumber: text("ve_number"),
+  description: text("description").notNull(),
+  discipline: text("discipline"),
+  status: text("status"), // proposed | accepted | rejected | held
+  estimatedSavingsUsd: text("estimated_savings_usd"),
+  scheduleImpactDays: integer("schedule_impact_days"),
+  proposedById: integer("proposed_by_id"), // accounts.id
+  proposedDate: text("proposed_date"),
+  decisionDate: text("decision_date"),
+  decisionNotes: text("decision_notes"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+// Distinct from mobilization_permits: these are the pre-construction permit
+// applications tracked through the jurisdiction, not the on-site postings.
+export const preConstructionPermits = pgTable("pre_construction_permits", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  // building | demolition | earthwork | foundation | mep | electrical | plumbing
+  // | mechanical | fire | zoning | right_of_way | environmental | other
+  permitType: text("permit_type"),
+  permitNumber: text("permit_number"),
+  jurisdiction: text("jurisdiction"),
+  applicationDate: text("application_date"),
+  hearingDate: text("hearing_date"),
+  issuedDate: text("issued_date"),
+  expirationDate: text("expiration_date"),
+  // not_started | application_in_progress | submitted | in_review
+  // | conditions_pending | issued | expired | revoked
+  status: text("status"),
+  expediter: text("expediter"),
+  expediterPhone: text("expediter_phone"),
+  feePaid: text("fee_paid"),
+  conditions: text("conditions"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const preConstructionPrequalSubs = pgTable("pre_construction_prequal_subs", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  companyName: text("company_name").notNull(),
+  trade: text("trade"),
+  contact: text("contact"),
+  phone: text("phone"),
+  email: text("email"),
+  insuranceExpires: text("insurance_expires"),
+  insuranceLimit: text("insurance_limit"),
+  bondCapacity: text("bond_capacity"),
+  emrRating: text("emr_rating"),
+  // not_started | submitted | approved | conditionally_approved | declined | expired
+  prequalStatus: text("prequal_status"),
+  prequalDate: text("prequal_date"),
+  prequalExpires: text("prequal_expires"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const preConstructionBidPackages = pgTable("pre_construction_bid_packages", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  packageNumber: text("package_number"),
+  label: text("label").notNull(),
+  csiDivision: text("csi_division"),
+  estimatedValueUsd: text("estimated_value_usd"),
+  bidDueDate: text("bid_due_date"),
+  bidsReceivedCount: integer("bids_received_count").notNull().default(0),
+  awardedTo: text("awarded_to"),
+  awardedDate: text("awarded_date"),
+  awardedValueUsd: text("awarded_value_usd"),
+  // not_ready | out_for_bid | bids_received | awarded | contract_executed | on_hold
+  status: text("status"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const preConstructionLongLeadItems = pgTable("pre_construction_long_lead_items", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  itemNumber: text("item_number"),
+  description: text("description").notNull(),
+  discipline: text("discipline"),
+  csiDivision: text("csi_division"),
+  orderedDate: text("ordered_date"),
+  submittedDate: text("submitted_date"),
+  approvedDate: text("approved_date"),
+  fabricationStartDate: text("fabrication_start_date"),
+  expectedDeliveryDate: text("expected_delivery_date"),
+  actualDeliveryDate: text("actual_delivery_date"),
+  leadTimeWeeks: integer("lead_time_weeks"),
+  // identified | submittal_pending | submittal_approved | ordered | in_fabrication
+  // | shipped | delivered | installed | at_risk
+  status: text("status"),
+  supplier: text("supplier"),
+  supplierContact: text("supplier_contact"),
+  supplierPhone: text("supplier_phone"),
+  poNumber: text("po_number"),
+  poValueUsd: text("po_value_usd"),
+  alternatives: text("alternatives"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+// Sign-off block on the Pre-Construction Plan. Same shape as
+// mobilization_signatures and project_setup_signatures.
+export const preConstructionSignatures = pgTable("pre_construction_signatures", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  role: text("role").notNull(),
+  name: text("name"),
+  title: text("title"),
+  signedDate: text("signed_date"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
 /* ------------------------------ Insert schemas -------------------------- */
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
@@ -1100,6 +1339,37 @@ export type ProjectSetupDeliverable = typeof projectSetupDeliverables.$inferSele
 export type InsertProjectSetupDeliverable = typeof projectSetupDeliverables.$inferInsert;
 export type ProjectSetupSignature = typeof projectSetupSignatures.$inferSelect;
 export type InsertProjectSetupSignature = typeof projectSetupSignatures.$inferInsert;
+
+/* -------- Pre-Construction insert schemas + types -------- */
+export const insertPreConstructionSchema = createInsertSchema(preConstruction).omit({ id: true });
+export const insertPreConstructionDesignDocSchema = createInsertSchema(preConstructionDesignDocs).omit({ id: true });
+export const insertPreConstructionDesignRfiSchema = createInsertSchema(preConstructionDesignRfis).omit({ id: true });
+export const insertPreConstructionVeItemSchema = createInsertSchema(preConstructionVeItems).omit({ id: true });
+export const insertPreConstructionPermitSchema = createInsertSchema(preConstructionPermits).omit({ id: true });
+export const insertPreConstructionPrequalSubSchema = createInsertSchema(preConstructionPrequalSubs).omit({ id: true });
+export const insertPreConstructionBidPackageSchema = createInsertSchema(preConstructionBidPackages).omit({ id: true });
+export const insertPreConstructionLongLeadItemSchema = createInsertSchema(preConstructionLongLeadItems).omit({ id: true });
+export const insertPreConstructionSignatureSchema = createInsertSchema(preConstructionSignatures).omit({ id: true });
+
+export type PreConstruction = typeof preConstruction.$inferSelect;
+export type InsertPreConstruction = typeof preConstruction.$inferInsert;
+export type PreConstructionDesignDoc = typeof preConstructionDesignDocs.$inferSelect;
+export type InsertPreConstructionDesignDoc = typeof preConstructionDesignDocs.$inferInsert;
+export type PreConstructionDesignRfi = typeof preConstructionDesignRfis.$inferSelect;
+export type InsertPreConstructionDesignRfi = typeof preConstructionDesignRfis.$inferInsert;
+export type PreConstructionVeItem = typeof preConstructionVeItems.$inferSelect;
+export type InsertPreConstructionVeItem = typeof preConstructionVeItems.$inferInsert;
+export type PreConstructionPermit = typeof preConstructionPermits.$inferSelect;
+export type InsertPreConstructionPermit = typeof preConstructionPermits.$inferInsert;
+export type PreConstructionPrequalSub = typeof preConstructionPrequalSubs.$inferSelect;
+export type InsertPreConstructionPrequalSub = typeof preConstructionPrequalSubs.$inferInsert;
+export type PreConstructionBidPackage = typeof preConstructionBidPackages.$inferSelect;
+export type InsertPreConstructionBidPackage = typeof preConstructionBidPackages.$inferInsert;
+export type PreConstructionLongLeadItem = typeof preConstructionLongLeadItems.$inferSelect;
+export type InsertPreConstructionLongLeadItem = typeof preConstructionLongLeadItems.$inferInsert;
+export type PreConstructionSignature = typeof preConstructionSignatures.$inferSelect;
+export type InsertPreConstructionSignature = typeof preConstructionSignatures.$inferInsert;
+
 export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
 export type AppSettingsRow = typeof appSettings.$inferSelect;
 
