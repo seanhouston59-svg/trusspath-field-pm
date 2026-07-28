@@ -1,4 +1,4 @@
-import { pgTable, text, integer, serial, doublePrecision, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, doublePrecision, boolean, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -714,6 +714,67 @@ export const mobilizationPlans = pgTable("mobilization_plans", {
   startedAt: text("started_at"),
   completedAt: text("completed_at"),
   notes: text("notes"),
+
+  // Project header — the cast of characters and the building itself. These
+  // live on the plan rather than on `projects` because they are only ever
+  // captured during mobilization and would be dead weight on every project row.
+  ownerRep: text("owner_rep"),
+  ownerRepPhone: text("owner_rep_phone"),
+  ownerRepEmail: text("owner_rep_email"),
+  architect: text("architect"),
+  architectFirm: text("architect_firm"),
+  architectPhone: text("architect_phone"),
+  architectEmail: text("architect_email"),
+  engineerOfRecord: text("engineer_of_record"),
+  engineerFirm: text("engineer_firm"),
+  engineerPhone: text("engineer_phone"),
+  engineerEmail: text("engineer_email"),
+  jurisdiction: text("jurisdiction"),
+  permitExpediter: text("permit_expediter"),
+  permitExpediterPhone: text("permit_expediter_phone"),
+  projectType: text("project_type"),
+  squareFootage: integer("square_footage"),
+  stories: integer("stories"),
+  occupancyType: text("occupancy_type"),
+  weatherStation: text("weather_station"),
+
+  // Site logistics
+  truckRoutes: text("truck_routes"),
+  deliveryHours: text("delivery_hours"),
+  cranePicks: text("crane_picks"),
+  laydownAreas: text("laydown_areas"),
+  gateSchedule: text("gate_schedule"),
+  neighborCommsPlan: text("neighbor_comms_plan"),
+  noiseOrdinanceHours: text("noise_ordinance_hours"),
+
+  // Objectives and scope
+  objectivesNarrative: text("objectives_narrative"),
+  scopeSummary: text("scope_summary"),
+  exclusions: text("exclusions"),
+  assumptions: text("assumptions"),
+  workNotIncluded: text("work_not_included"),
+
+  // Safety and environmental
+  siteSpecificHazards: text("site_specific_hazards"),
+  eapDetails: text("eap_details"),
+  hospitalName: text("hospital_name"),
+  hospitalPhone: text("hospital_phone"),
+  hospitalRoute: text("hospital_route"),
+  musterPoint: text("muster_point"),
+  secondaryMusterPoint: text("secondary_muster_point"),
+  spillResponsePlan: text("spill_response_plan"),
+  msdsLocation: text("msds_location"),
+  environmentalNarrative: text("environmental_narrative"),
+
+  // Staffing and emergency contacts
+  superintendentPhone: text("superintendent_phone"),
+  projectManagerPhone: text("project_manager_phone"),
+  safetyOfficerName: text("safety_officer_name"),
+  safetyOfficerPhone: text("safety_officer_phone"),
+  emergencyContact24hName: text("emergency_contact_24h_name"),
+  emergencyContact24hPhone: text("emergency_contact_24h_phone"),
+  onCallRotation: text("on_call_rotation"),
+  subcontractorForemen: text("subcontractor_foremen"),
 });
 
 export const mobilizationItems = pgTable("mobilization_items", {
@@ -808,6 +869,34 @@ export const mobilizationRisks = pgTable("mobilization_risks", {
   notes: text("notes"),
 });
 
+// The sign-off block on the Mobilization Plan PDF. Rows are seeded per project
+// so the roles always render in a fixed order even before anyone signs; `name`
+// is best-effort matched against team_members at seed time and stays editable.
+export const mobilizationSignatures = pgTable("mobilization_signatures", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  role: text("role").notNull(),
+  name: text("name"),
+  title: text("title"),
+  signedDate: text("signed_date"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+// Free-text narrative per checklist section. Lazily created on first write —
+// a project with no narratives has no rows, and the read path fills the gaps.
+export const mobilizationSectionNotes = pgTable("mobilization_section_notes", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull(),
+  section: text("section").notNull(),
+  narrative: text("narrative").notNull().default(""),
+  updatedAt: text("updated_at").notNull(),
+  updatedById: integer("updated_by_id"), // accounts.id
+}, (t) => ({
+  projectSectionIdx: uniqueIndex("mobilization_section_notes_project_section_idx")
+    .on(t.projectId, t.section),
+}));
+
 /* ------------------------------ Insert schemas -------------------------- */
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
@@ -844,6 +933,8 @@ export const insertMobilizationUtilitySchema = createInsertSchema(mobilizationUt
 export const insertMobilizationStaffSchema = createInsertSchema(mobilizationStaff).omit({ id: true });
 export const insertMobilizationSubSchema = createInsertSchema(mobilizationSubs).omit({ id: true });
 export const insertMobilizationRiskSchema = createInsertSchema(mobilizationRisks).omit({ id: true });
+export const insertMobilizationSignatureSchema = createInsertSchema(mobilizationSignatures).omit({ id: true });
+export const insertMobilizationSectionNoteSchema = createInsertSchema(mobilizationSectionNotes).omit({ id: true });
 
 export type MobilizationPlan = typeof mobilizationPlans.$inferSelect;
 export type InsertMobilizationPlan = typeof mobilizationPlans.$inferInsert;
@@ -861,6 +952,10 @@ export type MobilizationSub = typeof mobilizationSubs.$inferSelect;
 export type InsertMobilizationSub = typeof mobilizationSubs.$inferInsert;
 export type MobilizationRisk = typeof mobilizationRisks.$inferSelect;
 export type InsertMobilizationRisk = typeof mobilizationRisks.$inferInsert;
+export type MobilizationSignature = typeof mobilizationSignatures.$inferSelect;
+export type InsertMobilizationSignature = typeof mobilizationSignatures.$inferInsert;
+export type MobilizationSectionNote = typeof mobilizationSectionNotes.$inferSelect;
+export type InsertMobilizationSectionNote = typeof mobilizationSectionNotes.$inferInsert;
 export const insertSettingsSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
 export type AppSettingsRow = typeof appSettings.$inferSelect;
 

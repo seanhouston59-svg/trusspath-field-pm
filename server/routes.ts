@@ -19,14 +19,15 @@ import {
   insertTeamSchema,
   insertMobilizationItemSchema, insertMobilizationPermitSchema, insertMobilizationEquipmentSchema,
   insertMobilizationUtilitySchema, insertMobilizationStaffSchema, insertMobilizationSubSchema,
-  insertMobilizationRiskSchema,
+  insertMobilizationRiskSchema, insertMobilizationSignatureSchema, insertMobilizationPlanSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
   isAccountInGoodStanding, isSubscriptionActive, isDemoExpired,
   ORG_ROLES, type OrgRole,
-  type Project,
+  type Project, type MobilizationSectionNote,
 } from "@shared/schema";
 import { EVENT_KINDS } from "@shared/project-event-kinds";
+import { MOBILIZATION_SECTIONS } from "@shared/mobilization-catalog";
 import { mobilizationRollup } from "./mobilization-rollup";
 import { generateMobilizationPlan } from "./reports/mobilization-plan";
 import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
@@ -79,6 +80,19 @@ function logEvent(req: any, args: {
   })).catch(() => {
     // Storage already logged. Nothing else to do — the user's mutation
     // succeeded even if their audit trail row didn't land.
+  });
+}
+
+// Section narratives are lazily created, so the read path returns the full
+// canonical section list with empty placeholders for the ones never written.
+// The client can then render every section without special-casing absence.
+function fillSectionNotes(rows: MobilizationSectionNote[]) {
+  const bySection = new Map(rows.map((r) => [r.section, r]));
+  return MOBILIZATION_SECTIONS.map((section) => {
+    const row = bySection.get(section);
+    return row
+      ? { section, narrative: row.narrative, updatedAt: row.updatedAt, updatedById: row.updatedById }
+      : { section, narrative: "", updatedAt: null, updatedById: null };
   });
 }
 
@@ -1719,12 +1733,70 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const projectId = parseInt(req.params.id, 10);
     if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
     if (!(await requireProjectAccess(req, res, projectId))) return;
-    const r = await mobilizationRollup(projectId);
+    // Signatures and narratives are read here rather than inside
+    // mobilizationRollup so the portfolio endpoint, which calls the rollup once
+    // per project, doesn't pay for two queries it never renders.
+    const [r, signatures, sectionNotes] = await Promise.all([
+      mobilizationRollup(projectId),
+      storage.getMobilizationSignatures(projectId),
+      storage.getMobilizationSectionNotes(projectId),
+    ]);
     res.json({
       plan: r.plan ?? null, items: r.items, permits: r.permits, equipment: r.equipment,
       utilities: r.utilities, staff: r.staff, subs: r.subs, risks: r.risks,
       milestones: r.milestones, seeded: r.seeded,
+      signatures, sectionNotes: fillSectionNotes(sectionNotes),
     });
+  });
+
+  // The plan row carries the expanded header / logistics / safety fields. Every
+  // column is optional so the Overview tab can autosave one field at a time.
+  const mobilizationPlanPatchSchema = insertMobilizationPlanSchema
+    .omit({ projectId: true })
+    .partial();
+
+  app.patch("/api/projects/:id/mobilization/plan", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const { id: _id, projectId: _pid, ...body } = req.body ?? {};
+    const parsed = mobilizationPlanPatchSchema.safeParse(body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const row = await storage.upsertMobilizationPlan(projectId, parsed.data);
+    res.json(row);
+  });
+
+  app.get("/api/projects/:id/mobilization/section-notes", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    res.json(fillSectionNotes(await storage.getMobilizationSectionNotes(projectId)));
+  });
+
+  app.put("/api/projects/:id/mobilization/section-notes/:section", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const section = decodeURIComponent(req.params.section);
+    if (!MOBILIZATION_SECTIONS.includes(section as any)) {
+      return res.status(404).json({ message: "Unknown section" });
+    }
+    const narrative = req.body?.narrative;
+    if (typeof narrative !== "string") {
+      return res.status(400).json({ message: "narrative must be a string" });
+    }
+    const row = await storage.upsertMobilizationSectionNote(projectId, section, {
+      narrative,
+      updatedById: req.account?.id ?? null,
+    });
+    res.json(row);
+  });
+
+  app.get("/api/projects/:id/mobilization/signatures", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    res.json(await storage.getMobilizationSignatures(projectId));
   });
 
   app.get("/api/projects/:id/mobilization/health", async (req: any, res) => {
@@ -1864,6 +1936,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       create: storage.createMobilizationRisk.bind(storage),
       update: storage.updateMobilizationRisk.bind(storage),
       remove: storage.deleteMobilizationRisk.bind(storage),
+    },
+    {
+      path: "signatures", schema: insertMobilizationSignatureSchema,
+      create: storage.createMobilizationSignature.bind(storage),
+      update: storage.updateMobilizationSignature.bind(storage),
+      remove: storage.deleteMobilizationSignature.bind(storage),
     },
   ];
 

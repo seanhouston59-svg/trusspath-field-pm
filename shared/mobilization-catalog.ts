@@ -244,6 +244,30 @@ export const DEFAULT_MILESTONE_OFFSETS: { title: string; dayOffset: number }[] =
   { title: "Earthwork Begins", dayOffset: 14 },
 ];
 
+/** Sign-off roles seeded onto every new mobilization plan, in render order.
+ *  The last four have no internal counterpart, so they are never auto-filled. */
+export const DEFAULT_SIGNER_ROLES: string[] = [
+  "Chief Executive Officer",
+  "Project Executive",
+  "Project Manager",
+  "Superintendent",
+  "Safety Manager",
+  "Owner Representative",
+  "Architect of Record",
+  "Engineer of Record",
+  "Permit Authority",
+];
+
+/** Loose matching against team_members.role so "PM", "Project Mgr" and
+ *  "Project Manager" all resolve to the same signer. */
+export const SIGNER_ROLE_ALIASES: Record<string, string[]> = {
+  "Chief Executive Officer": ["ceo", "chief executive"],
+  "Project Executive": ["project executive", "exec", "px"],
+  "Project Manager": ["project manager", "pm", "project mgr"],
+  "Superintendent": ["superintendent", "super", "supt"],
+  "Safety Manager": ["safety manager", "safety", "ehs"],
+};
+
 /** The milestone that marks "field work begins" — drives days-to-earthwork. */
 export const EARTHWORK_MILESTONE_TITLE = "Earthwork Begins";
 

@@ -14,6 +14,7 @@ import {
   projectEvents,
   mobilizationPlans, mobilizationItems, mobilizationPermits, mobilizationEquipment,
   mobilizationUtilities, mobilizationStaff, mobilizationSubs, mobilizationRisks,
+  mobilizationSignatures, mobilizationSectionNotes,
   DEFAULT_SETTINGS,
 } from '@shared/schema';
 import type {
@@ -43,10 +44,13 @@ import type {
   MobilizationStaff, InsertMobilizationStaff,
   MobilizationSub, InsertMobilizationSub,
   MobilizationRisk, InsertMobilizationRisk,
+  MobilizationSignature, InsertMobilizationSignature,
+  MobilizationSectionNote, InsertMobilizationSectionNote,
 } from '@shared/schema';
 import {
   MOBILIZATION_SECTIONS, DEFAULT_MOBILIZATION_ITEMS, DEFAULT_PERMITS,
   DEFAULT_MILESTONE_OFFSETS, MOBILIZATION_MILESTONE_KIND, addDays,
+  DEFAULT_SIGNER_ROLES, SIGNER_ROLE_ALIASES,
 } from '@shared/mobilization-catalog';
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
@@ -76,6 +80,20 @@ const CONN = RAW_CONN
   : "postgresql://user:pass@localhost/placeholder";
 const sql = neon(CONN);
 export const db = drizzle(sql);
+
+/** Best-effort roster lookup for a sign-off role. Substring match in both
+ *  directions so a team member listed as "PM" or "Senior Project Manager"
+ *  both resolve. Returns null when nothing matches — the row still gets
+ *  created, just without a pre-filled name. */
+function matchSignerName(roster: TeamMember[], role: string): string | null {
+  const aliases = SIGNER_ROLE_ALIASES[role] ?? [role.toLowerCase()];
+  const hit = roster.find((m) => {
+    const r = (m.role ?? "").trim().toLowerCase();
+    if (!r) return false;
+    return aliases.some((a) => r === a || r.includes(a) || a.includes(r));
+  });
+  return hit?.name ?? null;
+}
 
 async function migrate() {
   // Idempotent CREATE TABLE statements — Postgres syntax.
@@ -482,8 +500,82 @@ async function migrate() {
     status TEXT NOT NULL DEFAULT 'open',
     notes TEXT
   )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_signatures (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    name TEXT,
+    title TEXT,
+    signed_date TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS mobilization_section_notes (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    section TEXT NOT NULL,
+    narrative TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL,
+    updated_by_id INTEGER
+  )`;
+  // The upsert in updateMobilizationSectionNote targets this constraint.
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS mobilization_section_notes_project_section_idx
+    ON mobilization_section_notes (project_id, section)`;
   await sql`CREATE INDEX IF NOT EXISTS mobilization_items_project_idx ON mobilization_items (project_id)`;
   await sql`CREATE INDEX IF NOT EXISTS mobilization_permits_project_idx ON mobilization_permits (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS mobilization_signatures_project_idx ON mobilization_signatures (project_id)`;
+
+  // Expanded mobilization plan fields. Additive only — every column is
+  // nullable so existing plan rows stay valid without a backfill.
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS owner_rep TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS owner_rep_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS owner_rep_email TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS architect TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS architect_firm TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS architect_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS architect_email TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS engineer_of_record TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS engineer_firm TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS engineer_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS engineer_email TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS jurisdiction TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS permit_expediter TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS permit_expediter_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS project_type TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS square_footage INTEGER`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS stories INTEGER`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS occupancy_type TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS weather_station TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS truck_routes TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS delivery_hours TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS crane_picks TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS laydown_areas TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS gate_schedule TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS neighbor_comms_plan TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS noise_ordinance_hours TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS objectives_narrative TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS scope_summary TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS exclusions TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS assumptions TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS work_not_included TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS site_specific_hazards TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS eap_details TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS hospital_name TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS hospital_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS hospital_route TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS muster_point TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS secondary_muster_point TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS spill_response_plan TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS msds_location TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS environmental_narrative TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS superintendent_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS project_manager_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS safety_officer_name TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS safety_officer_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS emergency_contact_24h_name TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS emergency_contact_24h_phone TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS on_call_rotation TEXT`;
+  await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS subcontractor_foremen TEXT`;
 
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
@@ -891,6 +983,12 @@ export interface IStorage {
   createMobilizationRisk(data: InsertMobilizationRisk): Promise<MobilizationRisk>;
   updateMobilizationRisk(id: number, data: Partial<InsertMobilizationRisk>): Promise<MobilizationRisk | undefined>;
   deleteMobilizationRisk(id: number): Promise<void>;
+  getMobilizationSignatures(projectId: number): Promise<MobilizationSignature[]>;
+  createMobilizationSignature(data: InsertMobilizationSignature): Promise<MobilizationSignature>;
+  updateMobilizationSignature(id: number, data: Partial<InsertMobilizationSignature>): Promise<MobilizationSignature | undefined>;
+  deleteMobilizationSignature(id: number): Promise<void>;
+  getMobilizationSectionNotes(projectId: number): Promise<MobilizationSectionNote[]>;
+  upsertMobilizationSectionNote(projectId: number, section: string, data: { narrative: string; updatedById?: number | null }): Promise<MobilizationSectionNote>;
 
   getMessages(projectId: number): Promise<Message[]>;
   createMessage(data: InsertMessage): Promise<Message>;
@@ -1481,6 +1579,23 @@ class DatabaseStorage implements IStorage {
         status: "pending",
       })),
     );
+
+    // Sign-off block. Names are a best-effort match against the org roster —
+    // an unmatched role still gets a row so the PDF renders a blank to sign.
+    // Scoped to the project's organization; an unscoped roster read would pull
+    // names from other tenants.
+    const project = await this.getProject(projectId);
+    const roster = project?.organizationId != null
+      ? await this.getTeam(project.organizationId)
+      : [];
+    await db.insert(mobilizationSignatures).values(
+      DEFAULT_SIGNER_ROLES.map((role, i) => ({
+        projectId,
+        role,
+        name: matchSignerName(roster, role),
+        sortOrder: i,
+      })),
+    );
   }
 
   async getMobilizationPlan(projectId: number): Promise<MobilizationPlan | undefined> {
@@ -1640,6 +1755,52 @@ class DatabaseStorage implements IStorage {
   async deleteMobilizationRisk(id: number): Promise<void> {
     await ensureReady();
     await db.delete(mobilizationRisks).where(eq(mobilizationRisks.id, id));
+  }
+
+  async getMobilizationSignatures(projectId: number): Promise<MobilizationSignature[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationSignatures)
+      .where(eq(mobilizationSignatures.projectId, projectId))
+      .orderBy(mobilizationSignatures.sortOrder, mobilizationSignatures.id);
+  }
+  async createMobilizationSignature(data: InsertMobilizationSignature): Promise<MobilizationSignature> {
+    await ensureReady();
+    const [row] = await db.insert(mobilizationSignatures).values(data).returning();
+    return row;
+  }
+  async updateMobilizationSignature(id: number, data: Partial<InsertMobilizationSignature>): Promise<MobilizationSignature | undefined> {
+    await ensureReady();
+    const [row] = await db.update(mobilizationSignatures).set(data).where(eq(mobilizationSignatures.id, id)).returning();
+    return row;
+  }
+  async deleteMobilizationSignature(id: number): Promise<void> {
+    await ensureReady();
+    await db.delete(mobilizationSignatures).where(eq(mobilizationSignatures.id, id));
+  }
+
+  async getMobilizationSectionNotes(projectId: number): Promise<MobilizationSectionNote[]> {
+    await ensureReady();
+    return await db.select().from(mobilizationSectionNotes)
+      .where(eq(mobilizationSectionNotes.projectId, projectId));
+  }
+  // Rows are never pre-seeded, so the first save for a section inserts and
+  // every later save updates — hence the upsert on (project_id, section).
+  async upsertMobilizationSectionNote(
+    projectId: number,
+    section: string,
+    data: { narrative: string; updatedById?: number | null },
+  ): Promise<MobilizationSectionNote> {
+    await ensureReady();
+    const updatedAt = new Date().toISOString();
+    const updatedById = data.updatedById ?? null;
+    const [row] = await db.insert(mobilizationSectionNotes)
+      .values({ projectId, section, narrative: data.narrative, updatedAt, updatedById })
+      .onConflictDoUpdate({
+        target: [mobilizationSectionNotes.projectId, mobilizationSectionNotes.section],
+        set: { narrative: data.narrative, updatedAt, updatedById },
+      })
+      .returning();
+    return row;
   }
 
   async getMessages(projectId: number): Promise<Message[]> {
