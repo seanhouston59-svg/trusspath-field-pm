@@ -1558,6 +1558,78 @@ export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({ i
 export type DemoRequest = typeof demoRequests.$inferSelect;
 export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
 
+/* ----------------------------- Contracts -------------------------------- */
+// Executive OS contracts register. One row per contract or subcontract on a
+// project. Money as text (parsed defensively) matches the pattern used by
+// financials / change-orders in the newer surfaces. Purpose-built (not lean)
+// because contracts have structured fields the lean shell can't express:
+// party, insurance certificate, bond, expiration dates.
+export const contracts = pgTable("contracts", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull(),
+  projectId: integer("project_id"), // null = org-level / MSA
+  counterpartyName: text("counterparty_name").notNull(),
+  counterpartyType: text("counterparty_type").notNull(), // "subcontractor" | "vendor" | "owner" | "consultant" | "other"
+  scopeSummary: text("scope_summary").notNull(),
+  contractValue: text("contract_value"), // USD, text so we don't lose precision
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  insuranceCertNumber: text("insurance_cert_number"),
+  insuranceCertExpiration: text("insurance_cert_expiration"),
+  bondNumber: text("bond_number"),
+  status: text("status").notNull().default("draft"), // "draft" | "executed" | "expired" | "terminated"
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+  counterpartyName: z.string().min(1),
+  counterpartyType: z.enum(["subcontractor", "vendor", "owner", "consultant", "other"]),
+  scopeSummary: z.string().min(1),
+  status: z.enum(["draft", "executed", "expired", "terminated"]).default("draft"),
+  contractValue: z.string().optional().nullable(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  insuranceCertNumber: z.string().optional().nullable(),
+  insuranceCertExpiration: z.string().optional().nullable(),
+  bondNumber: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  projectId: z.number().optional().nullable(),
+});
+export type Contract = typeof contracts.$inferSelect;
+export type InsertContract = z.infer<typeof insertContractSchema>;
+
+/* ----------------------------- Inspections ------------------------------ */
+// Executive OS inspections log. AHJ and third-party inspections across the
+// portfolio: type, inspector, date, result, follow-up items.
+export const inspections = pgTable("inspections", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull(),
+  projectId: integer("project_id").notNull(),
+  inspectionType: text("inspection_type").notNull(), // "foundation" | "framing" | "mep-rough" | "final" | ...
+  inspector: text("inspector").notNull(),
+  inspectorAgency: text("inspector_agency"), // AHJ, third-party lab, etc.
+  inspectionDate: text("inspection_date").notNull(),
+  result: text("result").notNull(), // "pass" | "fail" | "conditional" | "scheduled"
+  followUpItems: text("follow_up_items"),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const insertInspectionSchema = createInsertSchema(inspections).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+  inspectionType: z.string().min(1),
+  inspector: z.string().min(1),
+  inspectionDate: z.string().min(1),
+  result: z.enum(["pass", "fail", "conditional", "scheduled"]),
+  inspectorAgency: z.string().optional().nullable(),
+  followUpItems: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+export type Inspection = typeof inspections.$inferSelect;
+export type InsertInspection = z.infer<typeof insertInspectionSchema>;
+
 /* ------------------------------- Types ---------------------------------- */
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type InsertTask = z.infer<typeof insertTaskSchema>;

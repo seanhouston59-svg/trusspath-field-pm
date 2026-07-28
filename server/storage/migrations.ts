@@ -855,6 +855,46 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS lean_module_item_attachments_project_module_idx
     ON lean_module_item_attachments (project_id, module_id)`;
 
+  // Executive OS: purpose-built Contracts register.
+  await sql`CREATE TABLE IF NOT EXISTS contracts (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER NOT NULL,
+    project_id INTEGER,
+    counterparty_name TEXT NOT NULL,
+    counterparty_type TEXT NOT NULL,
+    scope_summary TEXT NOT NULL,
+    contract_value TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    insurance_cert_number TEXT,
+    insurance_cert_expiration TEXT,
+    bond_number TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS contracts_org_idx ON contracts (organization_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS contracts_project_idx ON contracts (project_id)`;
+
+  // Executive OS: purpose-built Inspections register.
+  await sql`CREATE TABLE IF NOT EXISTS inspections (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    inspection_type TEXT NOT NULL,
+    inspector TEXT NOT NULL,
+    inspector_agency TEXT,
+    inspection_date TEXT NOT NULL,
+    result TEXT NOT NULL,
+    follow_up_items TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS inspections_org_idx ON inspections (organization_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS inspections_project_idx ON inspections (project_id)`;
+
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
   // aren't locked out of their own app. Everyone else stays in the state they were in.

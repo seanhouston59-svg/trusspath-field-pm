@@ -27,6 +27,7 @@ import {
   insertPreConstructionBidPackageSchema, insertPreConstructionLongLeadItemSchema,
   insertPreConstructionSignatureSchema,
   insertLeanModuleStateSchema, insertLeanModuleItemSchema,
+  insertContractSchema, insertInspectionSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
   isAccountInGoodStanding, isSubscriptionActive, isDemoExpired,
@@ -3126,6 +3127,94 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         sourceType: "executive_os",
       });
     }
+  });
+
+  /* ----------------------- Executive OS: Contracts ----------------------- */
+  // Purpose-built contracts register. Org-scoped everywhere; projectId is
+  // optional so org-level MSAs and umbrella agreements can live here too.
+  app.get("/api/executive-os/contracts", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
+    const rows = await storage.contracts.list(req.organizationId, Number.isFinite(projectId) ? projectId : undefined);
+    res.json(rows);
+  });
+
+  app.get("/api/executive-os/contracts/:id", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
+    const row = await storage.contracts.get(req.organizationId, id);
+    if (!row) return res.status(404).json({ message: "not found" });
+    res.json(row);
+  });
+
+  app.post("/api/executive-os/contracts", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const parsed = insertContractSchema.safeParse({ ...req.body, organizationId: req.organizationId });
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    const row = await storage.contracts.create(req.organizationId, parsed.data);
+    res.status(201).json(row);
+  });
+
+  app.patch("/api/executive-os/contracts/:id", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
+    const row = await storage.contracts.update(req.organizationId, id, req.body ?? {});
+    if (!row) return res.status(404).json({ message: "not found" });
+    res.json(row);
+  });
+
+  app.delete("/api/executive-os/contracts/:id", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
+    const ok = await storage.contracts.remove(req.organizationId, id);
+    if (!ok) return res.status(404).json({ message: "not found" });
+    res.json({ ok: true });
+  });
+
+  /* ---------------------- Executive OS: Inspections ---------------------- */
+  app.get("/api/executive-os/inspections", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
+    const rows = await storage.inspections.list(req.organizationId, Number.isFinite(projectId) ? projectId : undefined);
+    res.json(rows);
+  });
+
+  app.get("/api/executive-os/inspections/:id", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
+    const row = await storage.inspections.get(req.organizationId, id);
+    if (!row) return res.status(404).json({ message: "not found" });
+    res.json(row);
+  });
+
+  app.post("/api/executive-os/inspections", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const parsed = insertInspectionSchema.safeParse({ ...req.body, organizationId: req.organizationId });
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
+    const row = await storage.inspections.create(req.organizationId, parsed.data);
+    res.status(201).json(row);
+  });
+
+  app.patch("/api/executive-os/inspections/:id", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
+    const row = await storage.inspections.update(req.organizationId, id, req.body ?? {});
+    if (!row) return res.status(404).json({ message: "not found" });
+    res.json(row);
+  });
+
+  app.delete("/api/executive-os/inspections/:id", async (req: any, res) => {
+    if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
+    const ok = await storage.inspections.remove(req.organizationId, id);
+    if (!ok) return res.status(404).json({ message: "not found" });
+    res.json({ ok: true });
   });
 
   app.get("/api/executive-os/pre-construction", async (req: any, res) => {

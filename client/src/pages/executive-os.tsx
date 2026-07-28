@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sparkles, Rocket, ClipboardList, Ruler, DollarSign, FileText, ChevronRight } from "lucide-react";
+import { Sparkles, Rocket, ClipboardList, Ruler, DollarSign, FileText, FileSignature, ClipboardCheck, ChevronRight } from "lucide-react";
 import { LeanPortfolioRollup } from "@/components/executive-os/lean-portfolio-rollup";
 
 type ModuleCard = {
@@ -40,6 +40,22 @@ const MODULES: ModuleCard[] = [
     description:
       "Readiness across every project — checklist, permits, equipment, utilities, onboarding, milestones, and risks from Notice to Proceed through the first day of earthwork.",
     testId: "exec-os-mobilization-link",
+  },
+  {
+    href: "/executive-os/contracts",
+    label: "Contracts Register",
+    Icon: FileSignature,
+    description:
+      "Owner contract, subcontracts, and vendor agreements in one register — party, scope, value, dates, insurance certs, bonds, and status across every project.",
+    testId: "exec-os-contracts-link",
+  },
+  {
+    href: "/executive-os/inspections",
+    label: "Inspections",
+    Icon: ClipboardCheck,
+    description:
+      "Every third-party and AHJ inspection across the portfolio — type, inspector, result, and follow-up items — with pass/fail rollup and open-item drill-down.",
+    testId: "exec-os-inspections-link",
   },
   {
     href: "/executive-os/financials",

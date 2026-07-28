@@ -85,6 +85,10 @@ import PreConstructionPortfolio from "@/pages/executive-os/pre-construction-port
 import PreConstructionDetail from "@/pages/executive-os/pre-construction-detail";
 import FinancialsPortfolio from "@/pages/executive-os/financials-portfolio";
 import BoardPackets from "@/pages/executive-os/board-packets";
+import ContractsPortfolio from "@/pages/executive-os/contracts-portfolio";
+import ContractDetail from "@/pages/executive-os/contracts-detail";
+import InspectionsPortfolio from "@/pages/executive-os/inspections-portfolio";
+import InspectionDetail from "@/pages/executive-os/inspections-detail";
 import { LEAN_MODULES } from "@shared/lean-modules-catalog";
 import { LeanModuleDetailPage, LeanModulePortfolioPage } from "@/pages/executive-os/lean-module";
 import InviteAcceptPage from "@/pages/invite-accept";
@@ -163,6 +167,10 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   // component so we don't have to duplicate the moduleId binding.
   "/executive-os/financials/:id": () => <LeanModuleDetailPage moduleId="financials" />,
   "/executive-os/board-packets": BoardPackets,
+  "/executive-os/contracts": ContractsPortfolio,
+  "/executive-os/contracts/:id": ContractDetail,
+  "/executive-os/inspections": InspectionsPortfolio,
+  "/executive-os/inspections/:id": InspectionDetail,
   "/field": FieldHub,
   "/field/daily-log": FieldDailyLog,
   "/field/timecard": FieldTimecard,

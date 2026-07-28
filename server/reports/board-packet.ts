@@ -85,6 +85,13 @@ export async function generateBoardPacket(
   // Fetch mobilization risks for every project once. Sequential to be
   // conservative with the Neon pool on large portfolios; risks tables are
   // small so per-project latency dominates anyway.
+  //
+  // NOTE: The Executive OS "Risk Register" lean module (slug: risk-register)
+  // stores generic items in lean_module_items and is a separate surface for
+  // cross-lifecycle risk tracking outside the mobilization gate. It is NOT
+  // consolidated into the board packet yet — consumers should treat the board
+  // risk table as the mobilization-derived view. Future work: merge both.
+
   const allRisks: Array<{
     projectName: string;
     risk: string;

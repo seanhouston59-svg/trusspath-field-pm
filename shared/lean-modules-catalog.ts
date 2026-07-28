@@ -170,8 +170,41 @@ export const LEAN_MODULES: LeanModuleDef[] = [
     },
   },
   {
+    slug: "material-tracking",
+    title: "Material Tracking",
+    blurb:
+      "On-site material inventory and status: what's ordered, what's arrived, what's stored where, and what's been consumed. Separate from procurement/long-lead which tracks the buy; this tracks the physical goods.",
+    itemNoun: "Material Item",
+    itemNounPlural: "Material Items",
+    categories: [
+      "Concrete / Rebar",
+      "Steel",
+      "Framing Lumber",
+      "Sheathing / Drywall",
+      "Roofing",
+      "Cladding",
+      "Glazing",
+      "Insulation",
+      "MEP Fixture",
+      "Finish Material",
+      "Owner-Furnished",
+      "Attic Stock",
+    ],
+    placeholders: {
+      overview: "On-site material inventory strategy, storage locations, and consumption tracking. e.g. \u201cLaydown Yard 2 for envelope; owner-furnished FF&E in Zone C storage.\u201d",
+      risks: "e.g. \u201cWeather-sensitive drywall stored outdoors\u201d; \u201cFinish tile arrived damaged\u201d.",
+      nextSteps: "e.g. \u201cInventory attic stock before turnover\u201d; \u201cReconcile steel deliveries against fab tickets\u201d.",
+      ownerName: "e.g. Priya Shah, Material Coordinator",
+      itemTitle: "e.g. Curtain wall unitized panels \u2013 Zone A delivery",
+      itemOwner: "e.g. Glazing Sub",
+      itemNotes: "e.g. 48 panels received, stored in Yard 2, inspected clean",
+    },
+  },
+  {
     slug: "envelope",
-    title: "Envelope",
+    // "Building Envelope" is the industry-standard term; the slug stays
+    // "envelope" to keep existing URLs + lean_module_state rows valid.
+    title: "Building Envelope",
     blurb:
       "Roofing, cladding, curtain wall, glazing, waterproofing, and air/vapor barriers through dry-in.",
     itemNoun: "Envelope Activity",
@@ -316,8 +349,11 @@ export const LEAN_MODULES: LeanModuleDef[] = [
   {
     slug: "site-improvements",
     title: "Site Improvements & Landscaping",
+    // Scheduled AFTER most building work is complete so heavy equipment is no
+    // longer driving across finished paving, curbs, or planting. Lives late in
+    // the lifecycle (after Vertical Transportation, before Commissioning).
     blurb:
-      "Paving, striping, curbs, sidewalks, hardscape, irrigation, planting, site furnishings, and final grading.",
+      "Paving, striping, curbs, sidewalks, hardscape, irrigation, planting, site furnishings, and final grading. Sequenced after building work wraps so heavy equipment doesn't cross finished improvements.",
     itemNoun: "Site Improvement",
     itemNounPlural: "Site Improvements",
     categories: [
@@ -397,9 +433,12 @@ export const LEAN_MODULES: LeanModuleDef[] = [
   },
   {
     slug: "closeout",
-    title: "Closeout & Turnover",
+    // Narrowed to regulatory closeout; the O&M/as-built/training/turnover
+    // detail lives in the four dedicated modules that follow. Slug preserved
+    // so existing project data isn't orphaned.
+    title: "Closeout & C of O",
     blurb:
-      "O&M manuals, warranties, as-builts, attic stock, training, C of O, keys, and turnover packages.",
+      "Certificate of Occupancy, final lien waivers, retainage release, keys, and warranty start-date confirmation. Detailed deliverables (O&M, as-builts, training, turnover package) live in their own modules.",
     itemNoun: "Closeout Item",
     itemNounPlural: "Closeout Items",
     categories: [
@@ -422,6 +461,122 @@ export const LEAN_MODULES: LeanModuleDef[] = [
       itemTitle: "e.g. Submit HVAC O&M manuals",
       itemOwner: "e.g. Mechanical Sub",
       itemNotes: "e.g. Include warranty start dates and training records",
+    },
+  },
+  {
+    slug: "om-manuals",
+    title: "O&M Manuals",
+    blurb:
+      "Operations & Maintenance documentation for every installed system: HVAC, plumbing, electrical, roofing, envelope, elevators, and specialty equipment. Collected from subs, indexed, and formatted per owner spec.",
+    itemNoun: "O&M Deliverable",
+    itemNounPlural: "O&M Deliverables",
+    categories: [
+      "HVAC",
+      "Plumbing",
+      "Electrical",
+      "Fire Protection",
+      "Roofing",
+      "Envelope",
+      "Elevators / VT",
+      "Controls / BAS",
+      "Specialty Equipment",
+      "Owner-Furnished Equipment",
+    ],
+    placeholders: {
+      overview: "O&M format (bound/digital), delivery cadence, owner acceptance criteria. e.g. \u201cDigital PDF + hard copies, delivered at 90% completion.\u201d",
+      risks: "e.g. \u201cSub not responsive on chiller O&M\u201d; \u201cOwner rejected format \u2013 needs rework\u201d.",
+      nextSteps: "e.g. \u201cCompile HVAC O&M into master binder\u201d; \u201cReview format with owner rep\u201d.",
+      ownerName: "e.g. Sam Rodriguez, Closeout Lead",
+      itemTitle: "e.g. Rooftop unit O&M (RTU-1 through RTU-6)",
+      itemOwner: "e.g. Mechanical Sub",
+      itemNotes: "e.g. Includes warranty registration + service contact info",
+    },
+  },
+  {
+    slug: "as-builts",
+    title: "As-Built Drawings",
+    blurb:
+      "Redlines from construction rolled up into a final as-built set: architectural, structural, MEP, and civil. Deliverable to owner and required by most authorities before final C of O.",
+    itemNoun: "As-Built Item",
+    itemNounPlural: "As-Built Items",
+    categories: [
+      "Architectural",
+      "Structural",
+      "Civil",
+      "Mechanical",
+      "Electrical",
+      "Plumbing",
+      "Fire Protection",
+      "Landscape",
+      "Redline Sheet",
+      "Final As-Built Set",
+    ],
+    placeholders: {
+      overview: "Redline collection process, drafting responsibility, delivery format. e.g. \u201cSubs redline weekly; final CAD delivery by GC drafter.\u201d",
+      risks: "e.g. \u201cRedlines missing from Level 3 MEP\u201d; \u201cCivil grade changes not captured\u201d.",
+      nextSteps: "e.g. \u201cCollect Q3 redlines from subs\u201d; \u201cIssue draft as-built set for owner review\u201d.",
+      ownerName: "e.g. Alicia Cheng, Project Manager",
+      itemTitle: "e.g. Compile MEP as-built set\u2014Level 1 through Roof",
+      itemOwner: "e.g. MEP Coordinator",
+      itemNotes: "e.g. Requires field verification of hidden runs",
+    },
+  },
+  {
+    slug: "owner-training",
+    title: "Owner Training",
+    blurb:
+      "Training sessions for owner facilities staff on every operable system delivered with the building. Documented with attendee lists, recordings, and sign-off sheets.",
+    itemNoun: "Training Session",
+    itemNounPlural: "Training Sessions",
+    categories: [
+      "HVAC",
+      "BAS / Controls",
+      "Plumbing",
+      "Electrical",
+      "Fire / Life Safety",
+      "Elevators",
+      "Roofing",
+      "Security / Access",
+      "Specialty Equipment",
+      "Emergency Systems",
+    ],
+    placeholders: {
+      overview: "Training curriculum, schedule, and attendee list. e.g. \u201c14 sessions across 3 weeks; sign-in sheets + video capture per owner spec.\u201d",
+      risks: "e.g. \u201cOwner facilities lead unavailable during training window\u201d; \u201cControls sub not scheduled\u201d.",
+      nextSteps: "e.g. \u201cPublish training calendar to owner\u201d; \u201cRecord fire alarm session\u201d.",
+      ownerName: "e.g. Devon Park, Closeout Lead",
+      itemTitle: "e.g. BAS training \u2013 facilities engineering team",
+      itemOwner: "e.g. Controls Sub",
+      itemNotes: "e.g. 3 hrs, 6 attendees, video + sign-in on file",
+    },
+  },
+  {
+    slug: "turnover-package",
+    title: "Turnover Package",
+    blurb:
+      "The consolidated deliverable handed to the owner at substantial completion: keys, warranties, O&Ms, as-builts, training records, spare parts inventory, contact list, and any commissioning reports.",
+    itemNoun: "Turnover Item",
+    itemNounPlural: "Turnover Items",
+    categories: [
+      "Keys / Access Fobs",
+      "Warranties",
+      "O&M Manuals",
+      "As-Built Drawings",
+      "Training Records",
+      "Attic Stock / Spare Parts",
+      "Emergency Contact List",
+      "Commissioning Report",
+      "System Startup Reports",
+      "Owner Sign-Off",
+    ],
+    placeholders: {
+      overview: "Turnover package format, target delivery date, owner sign-off protocol. e.g. \u201cDigital + physical package on 11/1; formal handoff meeting 11/8.\u201d",
+      risks: "e.g. \u201cAttic stock inventory incomplete\u201d; \u201cKey management protocol not agreed with owner\u201d.",
+      nextSteps: "e.g. \u201cReconcile attic stock against submittals\u201d; \u201cSchedule turnover meeting\u201d.",
+      ownerName: "e.g. Chris Patel, PM",
+      itemTitle: "e.g. Master turnover binder \u2013 all systems",
+      itemOwner: "e.g. Project Manager",
+      itemNotes: "e.g. 12 systems, indexed with cross-references to as-builts",
     },
   },
   {
@@ -565,14 +720,78 @@ export const LEAN_MODULES: LeanModuleDef[] = [
     },
   },
   {
-    slug: "risk",
-    title: "Risk & Insurance",
+    slug: "risk-register",
+    title: "Risk Register",
     blurb:
-      "Risk register, insurance certificates, subcontractor insurance tracking, claims, bonds, indemnifications, and risk mitigation actions.",
-    itemNoun: "Risk Item",
-    itemNounPlural: "Risk Items",
+      "Cross-lifecycle strategic risks with likelihood, impact, and mitigation owner. Distinct from insurance/COI (which handles compliance) and mobilization risks (which are startup-specific).",
+    itemNoun: "Risk",
+    itemNounPlural: "Risks",
     categories: [
-      "Risk Register Entry",
+      "Schedule",
+      "Cost / Budget",
+      "Design",
+      "Site / Environmental",
+      "Regulatory / Permitting",
+      "Subcontractor",
+      "Supply Chain",
+      "Weather",
+      "Labor / Trade",
+      "Safety",
+      "Quality",
+      "Stakeholder / Owner",
+      "Financial / Cash Flow",
+    ],
+    placeholders: {
+      overview: "Risk methodology, scoring approach, review cadence. e.g. \u201cQuarterly executive review; scored L/M/H likelihood \u00d7 L/M/H impact.\u201d",
+      risks: "e.g. \u201cLong-lead switchgear 40-week lead\u201d; \u201cInsufficient concrete crew for peak weeks\u201d.",
+      nextSteps: "e.g. \u201cReview top 10 risks with executive team\u201d; \u201cAssign mitigation owner for supply chain items\u201d.",
+      ownerName: "e.g. Elena Brooks, Risk Manager",
+      itemTitle: "e.g. Curtain wall vendor at capacity risk",
+      itemOwner: "e.g. Project Executive",
+      itemNotes: "e.g. Likelihood M / Impact H; mitigation: dual-source engaged",
+    },
+  },
+  {
+    slug: "meetings",
+    title: "Meetings & Minutes",
+    blurb:
+      "Standing project meetings and one-offs: OAC, subcontractor coordination, design review, safety, and pull planning. Agenda, attendees, decisions, and action items in one place.",
+    itemNoun: "Meeting",
+    itemNounPlural: "Meetings",
+    categories: [
+      "OAC (Owner/Architect/Contractor)",
+      "Sub Coordination",
+      "Design Review",
+      "Pre-Con",
+      "Kickoff",
+      "Pull Planning",
+      "Safety",
+      "Quality / QAQC",
+      "Commissioning",
+      "Closeout",
+      "Executive / Owner",
+      "Ad-hoc",
+    ],
+    placeholders: {
+      overview: "Standing meeting cadence, attendee lists, minute-taking protocol. e.g. \u201cWeekly OAC Tuesdays 9am; sub coord Thursdays; minutes distributed within 24h.\u201d",
+      risks: "e.g. \u201cOwner PM missing last 3 OACs\u201d; \u201cAction items not being closed between meetings\u201d.",
+      nextSteps: "e.g. \u201cPublish August meeting calendar\u201d; \u201cChase overdue action items from 7/15 OAC\u201d.",
+      ownerName: "e.g. Alicia Cheng, Project Manager",
+      itemTitle: "e.g. OAC #14 \u2013 8/13/2026",
+      itemOwner: "e.g. Project Manager",
+      itemNotes: "e.g. 12 attendees, 6 action items, minutes filed",
+    },
+  },
+  {
+    slug: "risk",
+    // Narrowed to insurance/COI compliance; a new dedicated cross-lifecycle
+    // Risk Register module lives below. Slug preserved for existing data.
+    title: "Insurance & COI Compliance",
+    blurb:
+      "Certificates of insurance, subcontractor COI tracking, bonds, umbrella policies, waivers of subrogation, and claims. The strategic risk register with likelihood/impact scoring lives in its own module.",
+    itemNoun: "Insurance Item",
+    itemNounPlural: "Insurance Items",
+    categories: [
       "COI (Certificate of Insurance)",
       "Sub COI",
       "Claim",

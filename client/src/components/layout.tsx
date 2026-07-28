@@ -13,6 +13,9 @@ import {
   Truck, Mountain, Layers, Home, Cable, Boxes, Paintbrush, ArrowUpDown, Trees,
   Gauge, ListTodo, PackageCheck, BadgeCheck, HardHat, CheckCheck, DollarSign,
   CalendarClock, ShieldAlert,
+  // Icons for Executive OS lifecycle overhaul (Jul 2026).
+  PackageSearch, ClipboardCheck, BookOpen, GraduationCap, PackageOpen,
+  FileSignature, AlertOctagon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -45,6 +48,9 @@ const ICONS: Record<string, any> = {
   Truck, Mountain, Layers, Home, Cable, Boxes, Paintbrush, ArrowUpDown, Trees,
   Gauge, ListTodo, PackageCheck, BadgeCheck, HardHat, CheckCheck, DollarSign,
   CalendarClock, ShieldAlert,
+  // Lifecycle overhaul (Jul 2026).
+  PackageSearch, ClipboardCheck, BookOpen, GraduationCap, PackageOpen,
+  FileSignature, AlertOctagon,
 };
 
 // Collapse state is persisted per-group in localStorage. Missing entries

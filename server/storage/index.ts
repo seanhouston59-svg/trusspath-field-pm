@@ -23,6 +23,8 @@ import { EventsRepo } from "./events";
 import { JarvisRepo } from "./jarvis";
 import { TimesheetsRepo } from "./timesheets";
 import { SystemRepo } from "./system";
+import { ContractsRepo } from "./contracts";
+import { InspectionsRepo } from "./inspections";
 
 /**
  * The single storage facade. Every member is a one-line delegation to a
@@ -57,6 +59,11 @@ export class DatabaseStorage implements IStorage {
   private readonly jarvis = new JarvisRepo();
   private readonly timesheets = new TimesheetsRepo();
   private readonly system = new SystemRepo(this);
+  // Purpose-built exec-os registers (contracts + inspections). Exposed as
+  // public members so route handlers can call them directly — they are not
+  // part of IStorage yet to avoid churning the interface.
+  public readonly contracts = new ContractsRepo();
+  public readonly inspections = new InspectionsRepo();
 
   getTeam: IStorage["getTeam"] = (...a) => this.accounts.getTeam(...a);
   getTeamMember: IStorage["getTeamMember"] = (...a) => this.accounts.getTeamMember(...a);
