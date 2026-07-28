@@ -239,6 +239,9 @@ export const punchItems = pgTable("punch_items", {
   // stay valid. Kept as free text so we can extend the picklist without a
   // schema change.
   priority: text("priority").default("Medium"),
+  // Optional free-text work notes / description. Populated by the Field kit's
+  // work-notes templates plus the desktop create dialog.
+  notes: text("notes"),
   assigneeId: integer("assignee_id"),
 });
 

@@ -1187,6 +1187,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const location = req.body?.location ? String(req.body.location).slice(0, 200) : "";
     const trade = req.body?.trade ? String(req.body.trade).slice(0, 80) : "General";
     const status = req.body?.status ? String(req.body.status).slice(0, 40) : "Open";
+    const notes = req.body?.notes ? String(req.body.notes).slice(0, 4000).trim() || undefined : undefined;
     const clientId = req.body?.clientId ? String(req.body.clientId).slice(0, 64) : null;
 
     // Dedupe: prune expired entries then check.
@@ -1210,6 +1211,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       location,
       trade,
       status,
+      notes,
       assigneeId: req.body?.assigneeId != null ? Number(req.body.assigneeId) : undefined,
     });
     if (idempKey) fieldPunchItemIdemp.set(idempKey, { id: created.id, ts: now });

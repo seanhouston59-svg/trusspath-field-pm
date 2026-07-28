@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, ClipboardList, Loader2, CheckCircle2, WifiOff, Circle, CheckCircle, X } from "lucide-react";
+import { ArrowLeft, ClipboardList, Loader2, CheckCircle2, WifiOff, Circle, CheckCircle, X, Sparkles } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useProjects } from "@/hooks/use-data";
 import { queueRequest, subscribeQueue } from "@/lib/offline-queue";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { PunchItem } from "@shared/schema";
 import { PUNCH_ITEM_TEMPLATES, tradeForItem } from "@/lib/punch-catalog";
+import { PUNCH_NOTES_TEMPLATES, PUNCH_NOTES_TRADES } from "@/lib/punch-notes-catalog";
 
 /**
  * Field punch item flow. Two things in one page:
@@ -67,6 +70,9 @@ export default function FieldPunch() {
   const titleWrapRef = useRef<HTMLDivElement | null>(null);
   const [location, setLocation] = useState("");
   const [trade, setTrade] = useState("General");
+  const [notes, setNotes] = useState("");
+  const [notesTemplatesOpen, setNotesTemplatesOpen] = useState(false);
+  const [notesTemplateTrade, setNotesTemplateTrade] = useState<string>("General");
   const [submitting, setSubmitting] = useState(false);
   const [items, setItems] = useState<PunchItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -158,6 +164,7 @@ export default function FieldPunch() {
         location: location.trim(),
         trade,
         status: "Open",
+        notes: notes.trim() || undefined,
         clientId,
       };
       localStorage.setItem("trusspath.field.lastProjectId", String(projectId));
@@ -195,6 +202,7 @@ export default function FieldPunch() {
           location: location.trim(),
           trade,
           status: "Open",
+          notes: notes.trim() || null,
           assigneeId: null,
         } as PunchItem,
         ...prev,
@@ -247,7 +255,17 @@ export default function FieldPunch() {
     setTitleOpen(false);
     setLocation("");
     setTrade("General");
+    setNotes("");
   };
+
+  // When the user changes the trade tile, jump the notes-templates sheet to
+  // the matching trade so it opens on the most relevant list.
+  const notesTradeForCurrentTile = useMemo(() => {
+    return PUNCH_NOTES_TRADES.includes(trade) ? trade : "General";
+  }, [trade]);
+  useEffect(() => {
+    setNotesTemplateTrade(notesTradeForCurrentTile);
+  }, [notesTradeForCurrentTile]);
 
   const isItemOpen = (item: PunchItem) => item.status !== "Complete" && item.status !== "complete" && item.status !== "closed";
 
@@ -394,6 +412,95 @@ export default function FieldPunch() {
               ))}
             </div>
           </div>
+          {/* Work notes / description with template picker */}
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between">
+              <Label className="block text-xs font-semibold uppercase text-muted-foreground">Work notes (optional)</Label>
+              <button
+                type="button"
+                onClick={() => setNotesTemplatesOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                data-testid="field-punch-notes-templates-open"
+              >
+                <Sparkles className="size-3.5" /> Templates
+              </button>
+            </div>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              placeholder="What needs to be done? Quantities, materials, who to coordinate with…"
+              className="text-base"
+              maxLength={4000}
+              data-testid="field-punch-notes"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Tap Templates to append a common description — stack a few and fill in the bracketed bits.
+            </p>
+          </div>
+
+          {/* Notes template bottom sheet */}
+          <Sheet open={notesTemplatesOpen} onOpenChange={setNotesTemplatesOpen}>
+            <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-2xl p-0">
+              <SheetHeader className="border-b border-border px-4 py-3 text-left">
+                <SheetTitle className="flex items-center gap-2 text-lg">
+                  <Sparkles className="size-5 text-primary" /> Work notes templates
+                </SheetTitle>
+                <SheetDescription className="text-xs">
+                  Tap one to add it. Existing text is kept — templates are appended.
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-3 py-2 backdrop-blur">
+                <div className="flex gap-1.5 overflow-x-auto">
+                  {PUNCH_NOTES_TRADES.map((tr) => (
+                    <button
+                      key={tr}
+                      type="button"
+                      onClick={() => setNotesTemplateTrade(tr)}
+                      className={cn(
+                        "shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                        notesTemplateTrade === tr
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background hover:bg-accent",
+                      )}
+                      data-testid={`field-punch-notes-template-trade-${tr.toLowerCase()}`}
+                    >
+                      {tr}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <ul className="divide-y divide-border">
+                {PUNCH_NOTES_TEMPLATES.filter((t) => t.trade === notesTemplateTrade).map((t) => (
+                  <li key={t.label}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotes((prev) => {
+                          const base = prev.trimEnd();
+                          return base ? `${base}\n\n${t.text}` : t.text;
+                        });
+                        setNotesTemplatesOpen(false);
+                      }}
+                      className="flex w-full flex-col items-start gap-1 px-4 py-3 text-left hover:bg-accent"
+                      data-testid={`field-punch-notes-template-${t.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                    >
+                      <span className="text-sm font-semibold">{t.label}</span>
+                      <span className="line-clamp-2 text-xs text-muted-foreground">{t.text}</span>
+                    </button>
+                  </li>
+                ))}
+                {PUNCH_NOTES_TEMPLATES.filter((t) => t.trade === notesTemplateTrade).length === 0 && (
+                  <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    No templates in this category yet.
+                  </li>
+                )}
+              </ul>
+            </SheetContent>
+          </Sheet>
+
           <Button
             type="button"
             onClick={add}

@@ -312,6 +312,7 @@ async function migrate() {
   await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS trade TEXT`;
   await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS trade TEXT`;
   await sql`ALTER TABLE submittals ADD COLUMN IF NOT EXISTS trade TEXT`;
+  await sql`ALTER TABLE punch_items ADD COLUMN IF NOT EXISTS notes TEXT`;
 
   // Heal access_level for seed rows still at the default 'project_manager'.
   await sql`UPDATE team_members SET access_level = CASE
@@ -2245,12 +2246,12 @@ class DatabaseStorage implements IStorage {
     for (const l of logsSeed) await db.insert(dailyLogs).values(l);
 
     const punchSeed: Omit<PunchItem, "id">[] = [
-      { projectId: p[0].id, title: "Touch up drywall at Room 112 corner", location: "Level 1, Rm 112", trade: "Drywall", status: "Open", priority: "Medium", assigneeId: t[6].id },
-      { projectId: p[0].id, title: "Missing outlet cover plates — east corridor", location: "Level 1, Corridor E", trade: "Electrical", status: "Open", priority: "Medium", assigneeId: t[4].id },
-      { projectId: p[0].id, title: "Caulk joint at storefront door", location: "Main lobby", trade: "Glazing", status: "In Progress", priority: "Low", assigneeId: null },
-      { projectId: p[1].id, title: "Paint touch-up stair 4 landings", location: "Stair 4", trade: "Painting", status: "Open", priority: "Medium", assigneeId: null },
-      { projectId: p[1].id, title: "Replace scratched door — Fl. 7 unit 712", location: "Fl. 7, Unit 712", trade: "Doors", status: "Open", priority: "High", assigneeId: t[6].id },
-      { projectId: p[2].id, title: "Re-grade swale at southeast corner", location: "Southeast lot", trade: "Civil", status: "In Progress", priority: "Medium", assigneeId: t[3].id },
+      { projectId: p[0].id, title: "Touch up drywall at Room 112 corner", location: "Level 1, Rm 112", trade: "Drywall", status: "Open", priority: "Medium", notes: null, assigneeId: t[6].id },
+      { projectId: p[0].id, title: "Missing outlet cover plates — east corridor", location: "Level 1, Corridor E", trade: "Electrical", status: "Open", priority: "Medium", notes: null, assigneeId: t[4].id },
+      { projectId: p[0].id, title: "Caulk joint at storefront door", location: "Main lobby", trade: "Glazing", status: "In Progress", priority: "Low", notes: null, assigneeId: null },
+      { projectId: p[1].id, title: "Paint touch-up stair 4 landings", location: "Stair 4", trade: "Painting", status: "Open", priority: "Medium", notes: null, assigneeId: null },
+      { projectId: p[1].id, title: "Replace scratched door — Fl. 7 unit 712", location: "Fl. 7, Unit 712", trade: "Doors", status: "Open", priority: "High", notes: null, assigneeId: t[6].id },
+      { projectId: p[2].id, title: "Re-grade swale at southeast corner", location: "Southeast lot", trade: "Civil", status: "In Progress", priority: "Medium", notes: null, assigneeId: t[3].id },
     ];
     for (const x of punchSeed) await db.insert(punchItems).values(x);
 

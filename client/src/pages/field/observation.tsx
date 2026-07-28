@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, ShieldAlert, Wrench, HelpCircle, AlertOctagon, MapPin, Loader2, CheckCircle2, WifiOff } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Wrench, HelpCircle, AlertOctagon, MapPin, Loader2, CheckCircle2, WifiOff, X } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { useProjects } from "@/hooks/use-data";
 import { queueRequest, subscribeQueue } from "@/lib/offline-queue";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { titlesForObservationKind } from "@/lib/observation-catalog";
 
 /**
  * Field observation quick-capture. Four kinds:
@@ -74,6 +75,8 @@ export default function FieldObservation() {
   const [kind, setKind] = useState<Kind>("safety");
   const [severity, setSeverity] = useState<Severity>("normal");
   const [title, setTitle] = useState("");
+  const [titleOpen, setTitleOpen] = useState(false);
+  const titleWrapRef = useRef<HTMLDivElement | null>(null);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -90,6 +93,29 @@ export default function FieldObservation() {
   useEffect(() => {
     if (projectId == null && projects.length > 0) setProjectId(projects[0].id);
   }, [projects, projectId]);
+
+  // Close the title suggestions on outside pointerdown — same pattern the
+  // Field kit punch title uses so it feels consistent on mobile.
+  useEffect(() => {
+    if (!titleOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const el = titleWrapRef.current;
+      if (!el) return;
+      if (!el.contains(e.target as Node)) setTitleOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [titleOpen]);
+
+  // Filter title templates by current kind, then narrow further by whatever
+  // the user has typed. If nothing has been typed we still show the kind's
+  // full list so it works as a browser.
+  const titleSuggestions = useMemo(() => {
+    const list = titlesForObservationKind(kind);
+    const q = title.trim().toLowerCase();
+    if (!q) return list.slice(0, 12);
+    return list.filter((t) => t.label.toLowerCase().includes(q)).slice(0, 12);
+  }, [kind, title]);
 
   const submit = async () => {
     if (submitting) return;
@@ -151,6 +177,7 @@ export default function FieldObservation() {
 
   const resetAll = () => {
     setTitle("");
+    setTitleOpen(false);
     setBody("");
     setSeverity("normal");
   };
@@ -243,17 +270,65 @@ export default function FieldObservation() {
           </div>
         </div>
 
-        {/* Title */}
+        {/* Title with kind-aware typeahead */}
         <div className="mt-5">
           <Label className="mb-1.5 block text-xs font-semibold uppercase text-muted-foreground">Title</Label>
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Missing handrail on scaffold, level 3"
-            className="h-12 text-base"
-            maxLength={200}
-            data-testid="field-obs-title"
-          />
+          <div ref={titleWrapRef} className="relative">
+            <Input
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleOpen(true);
+              }}
+              onFocus={() => setTitleOpen(true)}
+              placeholder="Missing handrail on scaffold, level 3"
+              className="h-12 pr-10 text-base"
+              maxLength={200}
+              data-testid="field-obs-title"
+            />
+            {title && (
+              <button
+                type="button"
+                aria-label="Clear title"
+                onClick={() => {
+                  setTitle("");
+                  setTitleOpen(true);
+                }}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+            {titleOpen && titleSuggestions.length > 0 && (
+              <ul
+                role="listbox"
+                className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
+                data-testid="field-obs-title-suggestions"
+              >
+                {titleSuggestions.map((s) => (
+                  <li key={s.label}>
+                    <button
+                      type="button"
+                      // preventDefault on pointerdown keeps the input focused
+                      // long enough for the onClick to fire on mobile.
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setTitle(s.label);
+                        setTitleOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                      data-testid={`field-obs-title-suggestion-${s.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                    >
+                      <span className="flex-1">{s.label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Suggestions match the selected kind — change Kind to see different ones.
+          </p>
         </div>
 
         {/* Details */}
