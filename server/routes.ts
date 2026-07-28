@@ -993,6 +993,13 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     } catch (e) {
       console.error("[project-setup] seed failed for project", created.id, e);
     }
+    // Pre-Construction sits between the two, so it seeds on the same create.
+    // Its own try/catch for the same reason as above.
+    try {
+      await storage.seedPreConstruction(created.id, created.organizationId ?? null);
+    } catch (e) {
+      console.error("[pre-construction] seed failed for project", created.id, e);
+    }
     logEvent(req, {
       projectId: created.id,
       kind: EVENT_KINDS.PROJECT_CREATED,

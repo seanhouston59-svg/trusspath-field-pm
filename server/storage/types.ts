@@ -1,5 +1,5 @@
 import { integrations, accounts } from '@shared/schema';
-import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, PunchItem, TeamMember, Contact, Equipment, MaintenanceLog, InsertMaintenanceLog, Photo, DocumentRow, CompanyDocument, DeletedItem, Blueprint, DroneCapture, Message, Note, Integration, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertDailyLog, InsertPunchItem, InsertContact, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember, Milestone, InsertMilestone, Account, AccountPublic, Session, PasswordResetToken, Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest, JarvisMemory, InsertJarvisMemory, Timesheet, InsertTimesheet, TimeEntry, InsertTimeEntry, FieldPunch, InsertFieldPunch, FieldObservation, InsertFieldObservation, MobilizationPlan, InsertMobilizationPlan, MobilizationItem, InsertMobilizationItem, MobilizationPermit, InsertMobilizationPermit, MobilizationEquipment, InsertMobilizationEquipment, MobilizationUtility, InsertMobilizationUtility, MobilizationStaff, InsertMobilizationStaff, MobilizationSub, InsertMobilizationSub, MobilizationRisk, InsertMobilizationRisk, MobilizationSignature, InsertMobilizationSignature, MobilizationSectionNote, ProjectSetup, InsertProjectSetup, ProjectSetupStakeholder, InsertProjectSetupStakeholder, ProjectSetupContractDoc, InsertProjectSetupContractDoc, ProjectSetupDeliverable, InsertProjectSetupDeliverable, ProjectSetupSignature, InsertProjectSetupSignature } from '@shared/schema';
+import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, PunchItem, TeamMember, Contact, Equipment, MaintenanceLog, InsertMaintenanceLog, Photo, DocumentRow, CompanyDocument, DeletedItem, Blueprint, DroneCapture, Message, Note, Integration, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertDailyLog, InsertPunchItem, InsertContact, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember, Milestone, InsertMilestone, Account, AccountPublic, Session, PasswordResetToken, Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest, JarvisMemory, InsertJarvisMemory, Timesheet, InsertTimesheet, TimeEntry, InsertTimeEntry, FieldPunch, InsertFieldPunch, FieldObservation, InsertFieldObservation, MobilizationPlan, InsertMobilizationPlan, MobilizationItem, InsertMobilizationItem, MobilizationPermit, InsertMobilizationPermit, MobilizationEquipment, InsertMobilizationEquipment, MobilizationUtility, InsertMobilizationUtility, MobilizationStaff, InsertMobilizationStaff, MobilizationSub, InsertMobilizationSub, MobilizationRisk, InsertMobilizationRisk, MobilizationSignature, InsertMobilizationSignature, MobilizationSectionNote, ProjectSetup, InsertProjectSetup, ProjectSetupStakeholder, InsertProjectSetupStakeholder, ProjectSetupContractDoc, InsertProjectSetupContractDoc, ProjectSetupDeliverable, InsertProjectSetupDeliverable, ProjectSetupSignature, InsertProjectSetupSignature, PreConstruction, InsertPreConstruction, PreConstructionDesignDoc, InsertPreConstructionDesignDoc, PreConstructionDesignRfi, InsertPreConstructionDesignRfi, PreConstructionVeItem, InsertPreConstructionVeItem, PreConstructionPermit, InsertPreConstructionPermit, PreConstructionPrequalSub, InsertPreConstructionPrequalSub, PreConstructionBidPackage, InsertPreConstructionBidPackage, PreConstructionLongLeadItem, InsertPreConstructionLongLeadItem, PreConstructionSignature, InsertPreConstructionSignature } from '@shared/schema';
 
 // Scoping contract for the org-scoped list reads below (getTeam, getProjects,
 // getContacts, getEquipment, getCompanyDocuments): passing `undefined` reads
@@ -144,6 +144,46 @@ export interface IStorage {
   createSetupSignature(data: InsertProjectSetupSignature): Promise<ProjectSetupSignature>;
   updateSetupSignature(id: number, data: Partial<InsertProjectSetupSignature>): Promise<ProjectSetupSignature | undefined>;
   deleteSetupSignature(id: number): Promise<void>;
+
+  // ----- Pre-Construction (Executive OS) -----
+  seedPreConstruction(projectId: number, organizationId: number | null): Promise<void>;
+  getPreConstruction(projectId: number): Promise<PreConstruction | null>;
+  getPreConstructionBundle(projectId: number): Promise<{
+    preCon: PreConstruction | null;
+    designDocs: PreConstructionDesignDoc[];
+    designRfis: PreConstructionDesignRfi[];
+    veItems: PreConstructionVeItem[];
+    permits: PreConstructionPermit[];
+    prequalSubs: PreConstructionPrequalSub[];
+    bidPackages: PreConstructionBidPackage[];
+    longLeadItems: PreConstructionLongLeadItem[];
+    signatures: PreConstructionSignature[];
+  }>;
+  updatePreConstruction(projectId: number, patch: Partial<InsertPreConstruction>): Promise<PreConstruction | null>;
+  createDesignDoc(data: InsertPreConstructionDesignDoc): Promise<PreConstructionDesignDoc>;
+  updateDesignDoc(id: number, data: Partial<InsertPreConstructionDesignDoc>): Promise<PreConstructionDesignDoc | undefined>;
+  deleteDesignDoc(id: number): Promise<void>;
+  createDesignRfi(data: InsertPreConstructionDesignRfi): Promise<PreConstructionDesignRfi>;
+  updateDesignRfi(id: number, data: Partial<InsertPreConstructionDesignRfi>): Promise<PreConstructionDesignRfi | undefined>;
+  deleteDesignRfi(id: number): Promise<void>;
+  createVeItem(data: InsertPreConstructionVeItem): Promise<PreConstructionVeItem>;
+  updateVeItem(id: number, data: Partial<InsertPreConstructionVeItem>): Promise<PreConstructionVeItem | undefined>;
+  deleteVeItem(id: number): Promise<void>;
+  createPermit(data: InsertPreConstructionPermit): Promise<PreConstructionPermit>;
+  updatePermit(id: number, data: Partial<InsertPreConstructionPermit>): Promise<PreConstructionPermit | undefined>;
+  deletePermit(id: number): Promise<void>;
+  createPrequalSub(data: InsertPreConstructionPrequalSub): Promise<PreConstructionPrequalSub>;
+  updatePrequalSub(id: number, data: Partial<InsertPreConstructionPrequalSub>): Promise<PreConstructionPrequalSub | undefined>;
+  deletePrequalSub(id: number): Promise<void>;
+  createBidPackage(data: InsertPreConstructionBidPackage): Promise<PreConstructionBidPackage>;
+  updateBidPackage(id: number, data: Partial<InsertPreConstructionBidPackage>): Promise<PreConstructionBidPackage | undefined>;
+  deleteBidPackage(id: number): Promise<void>;
+  createLongLeadItem(data: InsertPreConstructionLongLeadItem): Promise<PreConstructionLongLeadItem>;
+  updateLongLeadItem(id: number, data: Partial<InsertPreConstructionLongLeadItem>): Promise<PreConstructionLongLeadItem | undefined>;
+  deleteLongLeadItem(id: number): Promise<void>;
+  createPreconSignature(data: InsertPreConstructionSignature): Promise<PreConstructionSignature>;
+  updatePreconSignature(id: number, data: Partial<InsertPreConstructionSignature>): Promise<PreConstructionSignature | undefined>;
+  deletePreconSignature(id: number): Promise<void>;
 
   getMessages(projectId: number): Promise<Message[]>;
   createMessage(data: InsertMessage): Promise<Message>;

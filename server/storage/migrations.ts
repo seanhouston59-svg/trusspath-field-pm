@@ -593,6 +593,210 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS project_setup_signatures_project_idx
     ON project_setup_signatures (project_id)`;
 
+  // Pre-Construction (Executive OS). Sits between Project Setup and
+  // Mobilization — design tracking, VE, permitting, prequal, buyout and
+  // long-lead procurement. One row per project, everything else on project_id.
+  // Money is TEXT so a numeric round-trip can't shift a bid or PO value.
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'in_progress',
+    design_phase TEXT,
+    design_completion_percent INTEGER,
+    permit_target_date TEXT,
+    permit_received_date TEXT,
+    buyout_target_date TEXT,
+    buyout_complete_date TEXT,
+    bid_packages_count INTEGER NOT NULL DEFAULT 0,
+    bid_packages_bought_out_count INTEGER NOT NULL DEFAULT 0,
+    precon_lead_name TEXT,
+    precon_lead_phone TEXT,
+    precon_lead_email TEXT,
+    estimator_name TEXT,
+    estimator_phone TEXT,
+    estimator_email TEXT,
+    design_narrative TEXT,
+    design_assumptions TEXT,
+    design_exclusions TEXT,
+    ve_strategy TEXT,
+    constructability_findings TEXT,
+    constructability_summary TEXT,
+    site_conditions_notes TEXT,
+    logistics_considerations TEXT,
+    permit_strategy TEXT,
+    jurisdictional_narrative TEXT,
+    open_conditions_narrative TEXT,
+    prequal_criteria TEXT,
+    bid_strategy TEXT,
+    bidder_outreach_narrative TEXT,
+    buyout_strategy TEXT,
+    long_lead_strategy TEXT,
+    delivery_risk_narrative TEXT,
+    overall_risks TEXT,
+    overall_assumptions TEXT,
+    open_issues TEXT,
+    next_steps TEXT,
+    precon_plan_approved_at TEXT,
+    precon_plan_approved_by_id INTEGER,
+    created_at TEXT,
+    updated_at TEXT
+  )`;
+  // 1:1 with project. seedPreConstruction relies on this to stay idempotent
+  // under a concurrent retry, not just the read-then-write check.
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS pre_construction_project_idx
+    ON pre_construction (project_id)`;
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction_design_docs (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    discipline TEXT,
+    doc_type TEXT,
+    label TEXT NOT NULL,
+    revision TEXT,
+    issued_date TEXT,
+    received_date TEXT,
+    status TEXT,
+    location TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction_design_rfis (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    rfi_number TEXT,
+    subject TEXT NOT NULL,
+    discipline TEXT,
+    question TEXT,
+    response TEXT,
+    status TEXT,
+    asked_by_id INTEGER,
+    asked_date TEXT,
+    responded_by_id INTEGER,
+    responded_date TEXT,
+    impact TEXT,
+    cost_impact_usd TEXT,
+    schedule_impact_days INTEGER,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction_ve_items (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    ve_number TEXT,
+    description TEXT NOT NULL,
+    discipline TEXT,
+    status TEXT,
+    estimated_savings_usd TEXT,
+    schedule_impact_days INTEGER,
+    proposed_by_id INTEGER,
+    proposed_date TEXT,
+    decision_date TEXT,
+    decision_notes TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction_permits (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    permit_type TEXT,
+    permit_number TEXT,
+    jurisdiction TEXT,
+    application_date TEXT,
+    hearing_date TEXT,
+    issued_date TEXT,
+    expiration_date TEXT,
+    status TEXT,
+    expediter TEXT,
+    expediter_phone TEXT,
+    fee_paid TEXT,
+    conditions TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction_prequal_subs (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    company_name TEXT NOT NULL,
+    trade TEXT,
+    contact TEXT,
+    phone TEXT,
+    email TEXT,
+    insurance_expires TEXT,
+    insurance_limit TEXT,
+    bond_capacity TEXT,
+    emr_rating TEXT,
+    prequal_status TEXT,
+    prequal_date TEXT,
+    prequal_expires TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction_bid_packages (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    package_number TEXT,
+    label TEXT NOT NULL,
+    csi_division TEXT,
+    estimated_value_usd TEXT,
+    bid_due_date TEXT,
+    bids_received_count INTEGER NOT NULL DEFAULT 0,
+    awarded_to TEXT,
+    awarded_date TEXT,
+    awarded_value_usd TEXT,
+    status TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction_long_lead_items (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    item_number TEXT,
+    description TEXT NOT NULL,
+    discipline TEXT,
+    csi_division TEXT,
+    ordered_date TEXT,
+    submitted_date TEXT,
+    approved_date TEXT,
+    fabrication_start_date TEXT,
+    expected_delivery_date TEXT,
+    actual_delivery_date TEXT,
+    lead_time_weeks INTEGER,
+    status TEXT,
+    supplier TEXT,
+    supplier_contact TEXT,
+    supplier_phone TEXT,
+    po_number TEXT,
+    po_value_usd TEXT,
+    alternatives TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE TABLE IF NOT EXISTS pre_construction_signatures (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    name TEXT,
+    title TEXT,
+    signed_date TEXT,
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS pre_construction_design_docs_project_idx
+    ON pre_construction_design_docs (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS pre_construction_design_rfis_project_idx
+    ON pre_construction_design_rfis (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS pre_construction_ve_items_project_idx
+    ON pre_construction_ve_items (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS pre_construction_permits_project_idx
+    ON pre_construction_permits (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS pre_construction_prequal_subs_project_idx
+    ON pre_construction_prequal_subs (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS pre_construction_bid_packages_project_idx
+    ON pre_construction_bid_packages (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS pre_construction_long_lead_items_project_idx
+    ON pre_construction_long_lead_items (project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS pre_construction_signatures_project_idx
+    ON pre_construction_signatures (project_id)`;
+
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
   // aren't locked out of their own app. Everyone else stays in the state they were in.
