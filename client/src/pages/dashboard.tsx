@@ -139,10 +139,21 @@ function useDashboardCtx() {
     sub: subs.filter((s) => s.projectId === id && s.status !== "Closed").length,
     co: changeOrders.filter((c) => c.projectId === id && c.status === "Pending").length,
   });
+  // Chart data — auto-scale the Y-axis unit so a portfolio of $50k projects
+  // looks the same as a portfolio of $50M projects. We used to hard-divide by
+  // 1_000_000 which floored everything under a million dollars to 0, leaving
+  // the chart empty for smaller orgs. Now we pick K / M / "$" based on the
+  // biggest raw value across all budgets + spent numbers.
+  const rawMax = projects.reduce((m, p) => Math.max(m, p.budget, p.spent), 0);
+  const chartUnit: "M" | "K" | "" =
+    rawMax >= 1_000_000 ? "M" : rawMax >= 1_000 ? "K" : "";
+  const chartDivisor = chartUnit === "M" ? 1_000_000 : chartUnit === "K" ? 1_000 : 1;
   const chartData = projects.map((p) => ({
-    name: p.name.split(" ")[0],
-    Budget: Math.round(p.budget / 1_000_000),
-    Spent: Math.round(p.spent / 1_000_000),
+    name: p.name.split(" ")[0] || p.name,
+    // Use one decimal when the divisor could round otherwise-nonzero values to
+    // zero (e.g. $200k / 1M = 0.2 — we want the bar to show).
+    Budget: Number((p.budget / chartDivisor).toFixed(chartDivisor === 1 ? 0 : 1)),
+    Spent: Number((p.spent / chartDivisor).toFixed(chartDivisor === 1 ? 0 : 1)),
   }));
   type FeedItem = { id: string; kind: "Blocked" | "Overdue RFI" | "Pending CO"; title: string; meta: string; priority?: string; testid: string; href: string };
   const feed: FeedItem[] = [
@@ -157,7 +168,7 @@ function useDashboardCtx() {
     account, projects, tasks, rfis, subs, punch, dailyLogs, changeOrders, team,
     activeProjects, openRfis, overdueRfis, pendingCOs, dueThisWeek, openPunch,
     blockedTasks, totalBudget, totalSpent, portfolioProgress, spendPct, showMoney,
-    projectCounts, chartData, feed,
+    projectCounts, chartData, chartUnit, feed,
   };
 }
 
@@ -406,11 +417,24 @@ const WIDGET_REGISTRY: WidgetDef[] = [
           <TrendingUp className="size-5 text-muted-foreground" />
         </div>
         <div className="relative mt-4 h-64 w-full">
+          {c.chartData.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center">
+              <TrendingUp className="size-5 text-muted-foreground" />
+              <div className="text-sm font-medium">No projects yet</div>
+              <div className="text-xs text-muted-foreground">Create a project with a budget to see budget-vs-spent bars here.</div>
+            </div>
+          ) : c.totalBudget === 0 && c.totalSpent === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center">
+              <TrendingUp className="size-5 text-muted-foreground" />
+              <div className="text-sm font-medium">No budget data</div>
+              <div className="text-xs text-muted-foreground">Set a budget on your projects to populate this chart. Edit a project → Budget field.</div>
+            </div>
+          ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={c.chartData} barGap={4} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} interval={0} />
-              <YAxis tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} unit="M" />
+              <YAxis tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} unit={c.chartUnit} />
               <Tooltip
                 contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--popover-border))", borderRadius: 8, fontSize: 12 }}
                 cursor={{ fill: "hsl(var(--muted))" }}
@@ -419,6 +443,7 @@ const WIDGET_REGISTRY: WidgetDef[] = [
               <Bar dataKey="Spent" radius={[4, 4, 0, 0]} fill="hsl(var(--chart-1))" />
             </BarChart>
           </ResponsiveContainer>
+          )}
         </div>
         <div className="relative mt-3 flex items-center gap-4 border-t border-border pt-3 text-xs">
           <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-primary" />Spent</span>
