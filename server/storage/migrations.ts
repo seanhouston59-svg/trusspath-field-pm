@@ -836,6 +836,25 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS lean_module_items_project_module_idx
     ON lean_module_items (project_id, module_id)`;
 
+  await sql`CREATE TABLE IF NOT EXISTS lean_module_item_attachments (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    module_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    mime_type TEXT,
+    size_bytes INTEGER,
+    uploaded_by_account_id INTEGER,
+    uploaded_by_name TEXT,
+    uploaded_at TEXT NOT NULL
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS lean_module_item_attachments_item_idx
+    ON lean_module_item_attachments (item_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS lean_module_item_attachments_project_module_idx
+    ON lean_module_item_attachments (project_id, module_id)`;
+
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
   // aren't locked out of their own app. Everyone else stays in the state they were in.

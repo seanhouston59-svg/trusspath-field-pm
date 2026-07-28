@@ -240,6 +240,10 @@ export class DatabaseStorage implements IStorage {
   bulkCreateLeanModuleItems: IStorage["bulkCreateLeanModuleItems"] = (...a) => this.leanModules.bulkCreateItems(...a);
   updateLeanModuleItem: IStorage["updateLeanModuleItem"] = (...a) => this.leanModules.updateItem(...a);
   deleteLeanModuleItem: IStorage["deleteLeanModuleItem"] = (...a) => this.leanModules.deleteItem(...a);
+  listLeanModuleItemAttachments: IStorage["listLeanModuleItemAttachments"] = (...a) => this.leanModules.listAttachments(...a);
+  createLeanModuleItemAttachment: IStorage["createLeanModuleItemAttachment"] = (...a) => this.leanModules.createAttachment(...a);
+  updateLeanModuleItemAttachmentUrl: IStorage["updateLeanModuleItemAttachmentUrl"] = (...a) => this.leanModules.updateAttachmentUrl(...a);
+  deleteLeanModuleItemAttachment: IStorage["deleteLeanModuleItemAttachment"] = (...a) => this.leanModules.deleteAttachment(...a);
   getLeanModuleRollup: IStorage["getLeanModuleRollup"] = (...a) => this.leanModules.getRollupForProjects(...a);
   getMessages: IStorage["getMessages"] = (...a) => this.messages.getMessages(...a);
   createMessage: IStorage["createMessage"] = (...a) => this.messages.createMessage(...a);

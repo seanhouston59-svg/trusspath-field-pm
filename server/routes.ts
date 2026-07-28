@@ -366,6 +366,43 @@ const photoUpload = multer({
   },
 });
 
+// Attachments uploaded against a specific lean-module item row.
+//
+// Caveat: on Vercel `/tmp` is ephemeral per invocation, so attachments are
+// scoped to that runtime lifetime. This matches the behavior of every other
+// upload path in this codebase; the DB row persists but the file may be gone
+// on the next cold start. Wiring a proper object store (S3, Vercel Blob)
+// is a follow-up outside the scope of this feature.
+const LEAN_ATTACHMENT_DIR = process.env.VERCEL
+  ? "/tmp/uploads/lean-attachments"
+  : path.resolve(process.cwd(), "uploads/lean-attachments");
+try { fs.mkdirSync(LEAN_ATTACHMENT_DIR, { recursive: true }); } catch {}
+
+const leanAttachmentUpload = multer({
+  storage: multer.diskStorage({
+    destination: LEAN_ATTACHMENT_DIR,
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || "";
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB, matches other uploads
+  // Broad allow-list — PDFs, images, common office formats. Rejecting exotic
+  // types up-front prevents storing executables.
+  fileFilter: (_req, file, cb) => {
+    const ok =
+      ALLOWED_MIME.has(file.mimetype) ||
+      file.mimetype.startsWith("application/vnd.openxmlformats-officedocument.") ||
+      file.mimetype === "application/msword" ||
+      file.mimetype === "application/vnd.ms-excel" ||
+      file.mimetype === "application/vnd.ms-powerpoint" ||
+      file.mimetype === "text/plain" ||
+      file.mimetype === "text/csv";
+    if (ok) cb(null, true);
+    else cb(new Error("Unsupported file type."));
+  },
+});
+
 const DRONE_DIR = process.env.VERCEL
   ? "/tmp/uploads/drone"
   : path.resolve(process.cwd(), "uploads/drone");
@@ -2774,6 +2811,120 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const created = await storage.bulkCreateLeanModuleItems(projectId, moduleId, parsedRows);
     res.status(201).json({ created, count: created.length });
   });
+
+  /**
+   * Attachments for a lean-module item row. Uploads land on local disk
+   * (`LEAN_ATTACHMENT_DIR`); metadata + relative URL are persisted in
+   * `lean_module_item_attachments`. The file stream endpoint below verifies
+   * project access before serving bytes so private attachments stay private.
+   */
+  app.get("/api/projects/:id/modules/:moduleId/items/:itemId/attachments", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    const itemId = parseInt(req.params.itemId, 10);
+    if (!Number.isFinite(projectId) || !Number.isFinite(itemId)) {
+      return res.status(400).json({ message: "Invalid id" });
+    }
+    const moduleId = String(req.params.moduleId);
+    if (!validateModuleSlug(res, moduleId)) return;
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const rows = await storage.listLeanModuleItemAttachments(projectId, moduleId, itemId);
+    res.json(rows);
+  });
+
+  app.post(
+    "/api/projects/:id/modules/:moduleId/items/:itemId/attachments",
+    leanAttachmentUpload.single("file"),
+    async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(itemId)) {
+        return res.status(400).json({ message: "Invalid id" });
+      }
+      const moduleId = String(req.params.moduleId);
+      if (!validateModuleSlug(res, moduleId)) return;
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      const file = req.file;
+      if (!file) return res.status(400).json({ message: "No file provided." });
+      const kind = file.mimetype.startsWith("image/") ? "photo" : "file";
+      // Encode the multer-generated stored filename into a `?f=` query on the
+      // stream URL so we don't need a dedicated `stored_file` DB column. The
+      // stream endpoint parses it back out and path-guards before serving.
+      // Row id is a placeholder in the URL until after insert; we patch the
+      // final URL in a second update once we know the id.
+      const created = await storage.createLeanModuleItemAttachment({
+        itemId,
+        projectId,
+        moduleId,
+        url: `pending?f=${encodeURIComponent(file.filename)}`,
+        filename: file.originalname,
+        kind,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        uploadedByAccountId: req.account?.id ?? null,
+        uploadedByName: req.account?.name ?? req.account?.email ?? null,
+        uploadedAt: new Date().toISOString(),
+      } as any);
+      const finalUrl =
+        `/api/projects/${projectId}/modules/${moduleId}/items/${itemId}` +
+        `/attachments/${created.id}/file?f=${encodeURIComponent(file.filename)}`;
+      await storage.updateLeanModuleItemAttachmentUrl(created.id, finalUrl);
+      res.status(201).json({ ...created, url: finalUrl });
+    },
+  );
+
+  // Stream a single attachment's bytes. The multer-generated storedFile lives
+  // in the URL's ?f= query so we don't need an extra DB column.
+  app.get(
+    "/api/projects/:id/modules/:moduleId/items/:itemId/attachments/:attachmentId/file",
+    async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      const attachmentId = parseInt(req.params.attachmentId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(itemId) || !Number.isFinite(attachmentId)) {
+        return res.status(400).json({ message: "Invalid id" });
+      }
+      const moduleId = String(req.params.moduleId);
+      if (!validateModuleSlug(res, moduleId)) return;
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      const rows = await storage.listLeanModuleItemAttachments(projectId, moduleId, itemId);
+      const row = rows.find((r) => r.id === attachmentId);
+      if (!row) return res.status(404).json({ message: "Attachment not found." });
+      // Pull the stored filename out of the url column's ?f= param.
+      const match = /[?&]f=([^&]+)/.exec(row.url);
+      const storedFile = match ? decodeURIComponent(match[1]) : null;
+      if (!storedFile) return res.status(404).json({ message: "File missing from storage." });
+      const abs = path.resolve(LEAN_ATTACHMENT_DIR, storedFile);
+      // Path-traversal guard: reject anything that escapes the upload dir.
+      if (!abs.startsWith(LEAN_ATTACHMENT_DIR + path.sep) || !fs.existsSync(abs)) {
+        return res.status(404).json({ message: "File missing from storage." });
+      }
+      res.setHeader("Content-Type", row.mimeType || "application/octet-stream");
+      const disposition = row.kind === "photo" ? "inline" : "attachment";
+      res.setHeader(
+        "Content-Disposition",
+        `${disposition}; filename="${row.filename.replace(/"/g, "")}"`,
+      );
+      fs.createReadStream(abs).pipe(res);
+    },
+  );
+
+  app.delete(
+    "/api/projects/:id/modules/:moduleId/items/:itemId/attachments/:attachmentId",
+    async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const itemId = parseInt(req.params.itemId, 10);
+      const attachmentId = parseInt(req.params.attachmentId, 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(itemId) || !Number.isFinite(attachmentId)) {
+        return res.status(400).json({ message: "Invalid id" });
+      }
+      const moduleId = String(req.params.moduleId);
+      if (!validateModuleSlug(res, moduleId)) return;
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      const ok = await storage.deleteLeanModuleItemAttachment(attachmentId, projectId, moduleId);
+      if (!ok) return res.status(404).json({ message: "Not found" });
+      res.json({ deleted: true });
+    },
+  );
 
   app.patch("/api/projects/:id/modules/:moduleId/items/:itemId", async (req: any, res) => {
     const projectId = parseInt(req.params.id, 10);

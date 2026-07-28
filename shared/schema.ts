@@ -1307,6 +1307,30 @@ export const leanModuleItems = pgTable("lean_module_items", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
+/**
+ * Photos and files attached to a specific lean-module item row.
+ *
+ * itemId is the FK; projectId + moduleId are denormalized so we can enforce
+ * scoping without a join and drop attachments in bulk when an item is deleted.
+ * `url` is a server-relative path served by the upload directory route.
+ */
+export const leanModuleItemAttachments = pgTable("lean_module_item_attachments", {
+  id: serial("id").primaryKey(),
+  itemId: integer("item_id").notNull(),
+  projectId: integer("project_id").notNull(),
+  moduleId: text("module_id").notNull(),
+  url: text("url").notNull(),
+  filename: text("filename").notNull(),
+  // "photo" for images, "file" for everything else. Client uses this to pick
+  // between an image preview and a document icon.
+  kind: text("kind").notNull(),
+  mimeType: text("mime_type"),
+  sizeBytes: integer("size_bytes"),
+  uploadedByAccountId: integer("uploaded_by_account_id"),
+  uploadedByName: text("uploaded_by_name"),
+  uploadedAt: text("uploaded_at").notNull(),
+});
+
 export const preConstructionSignatures = pgTable("pre_construction_signatures", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").notNull(),
@@ -1410,10 +1434,13 @@ export const insertPreConstructionSignatureSchema = createInsertSchema(preConstr
 /* -------- Lean module insert schemas + types -------- */
 export const insertLeanModuleStateSchema = createInsertSchema(leanModuleState).omit({ id: true });
 export const insertLeanModuleItemSchema = createInsertSchema(leanModuleItems).omit({ id: true });
+export const insertLeanModuleItemAttachmentSchema = createInsertSchema(leanModuleItemAttachments).omit({ id: true });
 export type LeanModuleState = typeof leanModuleState.$inferSelect;
 export type InsertLeanModuleState = typeof leanModuleState.$inferInsert;
 export type LeanModuleItem = typeof leanModuleItems.$inferSelect;
 export type InsertLeanModuleItem = typeof leanModuleItems.$inferInsert;
+export type LeanModuleItemAttachment = typeof leanModuleItemAttachments.$inferSelect;
+export type InsertLeanModuleItemAttachment = typeof leanModuleItemAttachments.$inferInsert;
 
 export type PreConstruction = typeof preConstruction.$inferSelect;
 export type InsertPreConstruction = typeof preConstruction.$inferInsert;

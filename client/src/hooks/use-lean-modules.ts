@@ -4,6 +4,7 @@ import type {
   InsertLeanModuleItem,
   InsertLeanModuleState,
   LeanModuleItem,
+  LeanModuleItemAttachment,
   LeanModuleState,
 } from "@shared/schema";
 
@@ -108,6 +109,79 @@ export function useDeleteLeanModuleItem(projectId: number, moduleId: string) {
       await apiRequest("DELETE", `/api/projects/${projectId}/modules/${moduleId}/items/${id}`);
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys(projectId, moduleId).bundle });
+    },
+  });
+}
+
+// ---- Attachments ---------------------------------------------------------
+
+function attachmentKey(projectId: number | undefined, moduleId: string, itemId: number | undefined) {
+  return ["/api/projects", projectId, "modules", moduleId, "items", itemId, "attachments"] as const;
+}
+
+/**
+ * Attachments for a single item row. Enabled only when both ids are known so
+ * the popover can safely mount before the parent row is available.
+ */
+export function useLeanModuleItemAttachments(
+  projectId: number | undefined,
+  moduleId: string,
+  itemId: number | undefined,
+) {
+  return useQuery<LeanModuleItemAttachment[]>({
+    queryKey: attachmentKey(projectId, moduleId, itemId),
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/projects/${projectId}/modules/${moduleId}/items/${itemId}/attachments`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error(`Failed to load attachments: ${res.status}`);
+      return res.json();
+    },
+    enabled: projectId !== undefined && itemId !== undefined,
+  });
+}
+
+/**
+ * Upload a single file to a lean-module item. Uses FormData so multer can
+ * receive the multipart body. Invalidates both the per-item attachment list
+ * and the module bundle (in case the count strip is derived from bundle).
+ */
+export function useUploadLeanModuleItemAttachment(projectId: number, moduleId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId, file }: { itemId: number; file: File }) => {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(
+        `/api/projects/${projectId}/modules/${moduleId}/items/${itemId}/attachments`,
+        { method: "POST", credentials: "include", body: form },
+      );
+      if (!res.ok) {
+        const msg = await res.text().catch(() => `Upload failed (${res.status})`);
+        throw new Error(msg || `Upload failed (${res.status})`);
+      }
+      return res.json() as Promise<LeanModuleItemAttachment>;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: attachmentKey(projectId, moduleId, vars.itemId) });
+      qc.invalidateQueries({ queryKey: keys(projectId, moduleId).bundle });
+    },
+  });
+}
+
+export function useDeleteLeanModuleItemAttachment(projectId: number, moduleId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ itemId, attachmentId }: { itemId: number; attachmentId: number }) => {
+      await apiRequest(
+        "DELETE",
+        `/api/projects/${projectId}/modules/${moduleId}/items/${itemId}/attachments/${attachmentId}`,
+      );
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: attachmentKey(projectId, moduleId, vars.itemId) });
       qc.invalidateQueries({ queryKey: keys(projectId, moduleId).bundle });
     },
   });

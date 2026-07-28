@@ -40,6 +40,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeanItemPasteDialog } from "@/components/executive-os/lean-item-paste-dialog";
+import { LeanItemAttachmentsButton } from "@/components/executive-os/lean-item-attachments-button";
 import { cn } from "@/lib/utils";
 import type { Project } from "@shared/schema";
 import {
@@ -625,19 +626,27 @@ function LeanModuleDetail({ moduleId, projectId }: { moduleId: string; projectId
                           />
                         </td>
                         <td className="px-2 py-2 text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            onClick={() => {
-                              if (confirm(`Delete "${row.title}"?`)) {
-                                deleteItem.mutate(row.id);
-                              }
-                            }}
-                            data-testid={`lean-${moduleId}-delete-${row.id}`}
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <LeanItemAttachmentsButton
+                              projectId={projectId}
+                              moduleId={moduleId}
+                              itemId={row.id}
+                              itemTitle={row.title}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7"
+                              onClick={() => {
+                                if (confirm(`Delete "${row.title}"?`)) {
+                                  deleteItem.mutate(row.id);
+                                }
+                              }}
+                              data-testid={`lean-${moduleId}-delete-${row.id}`}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

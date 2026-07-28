@@ -10,12 +10,14 @@
  * rows can be migrated out of these two tables into the new schema and its
  * slug removed from LEAN_MODULES.
  */
-import { and, eq, inArray } from "drizzle-orm";
-import { leanModuleItems, leanModuleState } from "@shared/schema";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { leanModuleItems, leanModuleItemAttachments, leanModuleState } from "@shared/schema";
 import type {
   InsertLeanModuleItem,
+  InsertLeanModuleItemAttachment,
   InsertLeanModuleState,
   LeanModuleItem,
+  LeanModuleItemAttachment,
   LeanModuleState,
 } from "@shared/schema";
 import { isLeanModuleSlug } from "@shared/lean-modules-catalog";
@@ -291,6 +293,11 @@ export class LeanModulesRepo {
   async deleteItem(id: number, projectId: number, moduleId: string): Promise<boolean> {
     this.assertSlug(moduleId);
     await ensureReady();
+    // Drop any attachments for this item first so we don't leave orphan rows.
+    // The upload files themselves are left on disk — same policy as every
+    // other upload path in this codebase; a nightly sweeper is a separate
+    // problem to solve.
+    await db.delete(leanModuleItemAttachments).where(eq(leanModuleItemAttachments.itemId, id));
     const rows = await db
       .delete(leanModuleItems)
       .where(
@@ -303,4 +310,70 @@ export class LeanModulesRepo {
       .returning({ id: leanModuleItems.id });
     return rows.length > 0;
   }
+
+  // ---- Attachments ------------------------------------------------------
+
+  async listAttachments(
+    projectId: number,
+    moduleId: string,
+    itemId?: number,
+  ): Promise<LeanModuleItemAttachment[]> {
+    this.assertSlug(moduleId);
+    await ensureReady();
+    const conditions = [
+      eq(leanModuleItemAttachments.projectId, projectId),
+      eq(leanModuleItemAttachments.moduleId, moduleId),
+    ];
+    if (itemId !== undefined) {
+      conditions.push(eq(leanModuleItemAttachments.itemId, itemId));
+    }
+    return db
+      .select()
+      .from(leanModuleItemAttachments)
+      .where(and(...conditions))
+      .orderBy(desc(leanModuleItemAttachments.uploadedAt));
+  }
+
+  async createAttachment(
+    row: InsertLeanModuleItemAttachment,
+  ): Promise<LeanModuleItemAttachment> {
+    this.assertSlug(row.moduleId);
+    await ensureReady();
+    const inserted = await db.insert(leanModuleItemAttachments).values(row).returning();
+    return inserted[0];
+  }
+
+  /**
+   * The stream URL for an attachment includes its DB id, which is only known
+   * after insert. Routes call this to patch the URL once the row exists so
+   * clients receive a stable link they can hit directly.
+   */
+  async updateAttachmentUrl(id: number, url: string): Promise<void> {
+    await ensureReady();
+    await db
+      .update(leanModuleItemAttachments)
+      .set({ url })
+      .where(eq(leanModuleItemAttachments.id, id));
+  }
+
+  async deleteAttachment(
+    id: number,
+    projectId: number,
+    moduleId: string,
+  ): Promise<boolean> {
+    this.assertSlug(moduleId);
+    await ensureReady();
+    const rows = await db
+      .delete(leanModuleItemAttachments)
+      .where(
+        and(
+          eq(leanModuleItemAttachments.id, id),
+          eq(leanModuleItemAttachments.projectId, projectId),
+          eq(leanModuleItemAttachments.moduleId, moduleId),
+        ),
+      )
+      .returning({ id: leanModuleItemAttachments.id });
+    return rows.length > 0;
+  }
+
 }
