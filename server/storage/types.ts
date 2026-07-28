@@ -215,6 +215,12 @@ export interface IStorage {
   ensureLeanModuleState(projectId: number, moduleId: string): Promise<LeanModuleState>;
   updateLeanModuleState(projectId: number, moduleId: string, patch: Partial<InsertLeanModuleState>): Promise<LeanModuleState | null>;
   createLeanModuleItem(data: InsertLeanModuleItem): Promise<LeanModuleItem>;
+  /** Bulk-create a batch of items in one shot (paste-import flow). */
+  bulkCreateLeanModuleItems(
+    projectId: number,
+    moduleId: string,
+    rows: Array<Omit<InsertLeanModuleItem, "projectId" | "moduleId">>,
+  ): Promise<LeanModuleItem[]>;
   updateLeanModuleItem(id: number, projectId: number, moduleId: string, patch: Partial<InsertLeanModuleItem>): Promise<LeanModuleItem | null>;
   deleteLeanModuleItem(id: number, projectId: number, moduleId: string): Promise<boolean>;
   /**

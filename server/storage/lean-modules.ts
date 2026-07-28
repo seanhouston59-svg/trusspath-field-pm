@@ -114,6 +114,45 @@ export class LeanModulesRepo {
     return inserted[0];
   }
 
+  /**
+   * Bulk-create items in a single transaction. Used by the paste-import
+   * flow so a user can dump a TSV block from a spreadsheet and materialize
+   * dozens of rows in one shot. Returns the created rows in the same order.
+   *
+   * Notes:
+   * - The parent state row is ensured once, not per-item.
+   * - We insert as a single VALUES tuple list so this is fast even for a few
+   *   hundred rows (well below the plausible paste size).
+   * - Duplicate detection is intentionally NOT here: pasting the same block
+   *   twice legitimately creates dupes. Callers can dedupe upstream if they
+   *   want.
+   */
+  async bulkCreateItems(
+    projectId: number,
+    moduleId: string,
+    rows: Array<Omit<InsertLeanModuleItem, "projectId" | "moduleId">>,
+  ): Promise<LeanModuleItem[]> {
+    this.assertSlug(moduleId);
+    if (rows.length === 0) return [];
+    await ensureReady();
+    await this.ensureState(projectId, moduleId);
+    // Find the current max sortOrder so appended rows land after existing ones.
+    const existing = await db
+      .select({ sortOrder: leanModuleItems.sortOrder })
+      .from(leanModuleItems)
+      .where(and(eq(leanModuleItems.projectId, projectId), eq(leanModuleItems.moduleId, moduleId)));
+    const startSort = existing.reduce((max, r) => Math.max(max, r.sortOrder ?? 0), -1) + 1;
+    const values = rows.map((r, i) => ({
+      ...r,
+      projectId,
+      moduleId,
+      // Only default sortOrder when the caller didn't provide one; preserve
+      // any explicit ordering the client wants (e.g. clipboard row order).
+      sortOrder: r.sortOrder ?? startSort + i,
+    }));
+    return db.insert(leanModuleItems).values(values).returning();
+  }
+
   async updateItem(
     id: number,
     projectId: number,

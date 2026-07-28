@@ -2737,6 +2737,44 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.status(201).json(created);
   });
 
+  /**
+   * Bulk import items. Body: { items: [ { title, category?, ownerName?, ... }, ... ] }.
+   *
+   * Powers the paste-import dialog on any lean module page: a user drops a TSV
+   * block from a spreadsheet and every row is validated with the same zod
+   * schema as single-item creation. If any row fails, the whole request is
+   * rejected (with the offending index in the error) rather than partially
+   * inserted, so the client can highlight the bad row and let the user fix it.
+   */
+  app.post("/api/projects/:id/modules/:moduleId/items/bulk", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const moduleId = String(req.params.moduleId);
+    if (!validateModuleSlug(res, moduleId)) return;
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const items = Array.isArray(req.body?.items) ? req.body.items : null;
+    if (!items) return res.status(400).json({ message: "Expected { items: [...] }" });
+    // Hard cap prevents a runaway paste from wedging the DB. 500 is well past
+    // any realistic paste; if we ever hit it we'll raise it explicitly.
+    if (items.length > 500) {
+      return res.status(400).json({ message: "Max 500 items per bulk import" });
+    }
+    const parsedRows: Array<Omit<typeof items[number], "projectId" | "moduleId">> = [];
+    for (let i = 0; i < items.length; i += 1) {
+      const parsed = leanModuleItemCreateSchema.safeParse(items[i] ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: `Row ${i + 1} invalid`,
+          issues: parsed.error.issues,
+          rowIndex: i,
+        });
+      }
+      parsedRows.push(parsed.data);
+    }
+    const created = await storage.bulkCreateLeanModuleItems(projectId, moduleId, parsedRows);
+    res.status(201).json({ created, count: created.length });
+  });
+
   app.patch("/api/projects/:id/modules/:moduleId/items/:itemId", async (req: any, res) => {
     const projectId = parseInt(req.params.id, 10);
     const itemId = parseInt(req.params.itemId, 10);

@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LeanItemPasteDialog } from "@/components/executive-os/lean-item-paste-dialog";
 import { cn } from "@/lib/utils";
 import type { Project } from "@shared/schema";
 import {
@@ -294,11 +295,19 @@ function LeanModuleDetail({ moduleId, projectId }: { moduleId: string; projectId
         {/* Item list */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
+            <CardTitle className="flex items-center justify-between gap-2 text-base">
               <span>{def.itemNounPlural}</span>
-              <span className="text-xs font-normal text-muted-foreground">
-                {items.length} {items.length === 1 ? "item" : "items"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-normal text-muted-foreground">
+                  {items.length} {items.length === 1 ? "item" : "items"}
+                </span>
+                <LeanItemPasteDialog
+                  projectId={projectId}
+                  moduleId={moduleId}
+                  itemNounPlural={def.itemNounPlural}
+                  currentItemCount={items.length}
+                />
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>

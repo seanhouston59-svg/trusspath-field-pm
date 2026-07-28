@@ -60,6 +60,30 @@ export function useCreateLeanModuleItem(projectId: number, moduleId: string) {
   });
 }
 
+/**
+ * Bulk-create items from a paste block. Send an array of partial items and
+ * the server materializes them all in one go. Invalidates the same bundle key
+ * as single-item creation so the list refreshes.
+ */
+export function useBulkCreateLeanModuleItems(projectId: number, moduleId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      items: Array<Omit<InsertLeanModuleItem, "projectId" | "moduleId">>,
+    ) => {
+      const res = await apiRequest(
+        "POST",
+        `/api/projects/${projectId}/modules/${moduleId}/items/bulk`,
+        { items },
+      );
+      return res.json() as Promise<{ created: LeanModuleItem[]; count: number }>;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: keys(projectId, moduleId).bundle });
+    },
+  });
+}
+
 export function useUpdateLeanModuleItem(projectId: number, moduleId: string) {
   const qc = useQueryClient();
   return useMutation({
