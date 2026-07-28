@@ -8,7 +8,7 @@ import {
   GanttChartSquare, Plug, PencilRuler, Plane, Settings as SettingsIcon, ShieldCheck,
   LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2, Smartphone,
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2, ChevronRight,
-  Video, FileSpreadsheet,
+  Video, FileSpreadsheet, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
@@ -36,7 +36,7 @@ const ICONS: Record<string, any> = {
   GanttChartSquare, Plug, PencilRuler, Plane, Settings: SettingsIcon, Trash2, Network,
   ShieldCheck, Smartphone,
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2,
-  Video, FileSpreadsheet,
+  Video, FileSpreadsheet, Sparkles,
 };
 
 // Collapse state is persisted per-group in localStorage. Missing entries
@@ -116,17 +116,20 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
               aria-expanded={!isCollapsed}
               aria-controls={`nav-group-${group.title.replace(/\s+/g, "-")}`}
               data-testid={`nav-group-toggle-${group.title.toLowerCase().replace(/\s+/g, "-")}`}
-              className="group flex w-full items-center gap-1 rounded-md px-3 py-1 text-left text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50 transition-colors hover:text-sidebar-foreground/80"
+              // Category headers: intentionally bigger and bolder in a distinct
+              // color so the sidebar reads as a set of labelled sections rather
+              // than one flat list of links.
+              className="group mt-2 flex w-full items-center gap-1.5 rounded-md px-3 py-1.5 text-left text-[13px] font-extrabold uppercase tracking-wide text-primary transition-colors hover:bg-primary/5 hover:text-primary"
             >
               <ChevronRight
                 className={cn(
-                  "size-3 shrink-0 transition-transform text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70",
+                  "size-3.5 shrink-0 transition-transform text-primary/70 group-hover:text-primary",
                   !isCollapsed && "rotate-90",
                 )}
               />
               <span className="flex-1">{group.title}</span>
               {isCollapsed && (
-                <span className="rounded-full bg-sidebar-accent/50 px-1.5 py-0.5 text-[9px] font-bold text-sidebar-foreground/60">
+                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
                   {items.length}
                 </span>
               )}

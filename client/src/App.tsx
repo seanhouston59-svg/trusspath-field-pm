@@ -75,6 +75,7 @@ import AdminSignups from "@/pages/admin-signups";
 import Cpm from "@/pages/cpm";
 import Paywall from "@/pages/paywall";
 import TeamSettingsPage from "@/pages/team-settings";
+import ExecutiveOs from "@/pages/executive-os";
 import InviteAcceptPage from "@/pages/invite-accept";
 import FieldHub from "@/pages/field/hub";
 import FieldDailyLog from "@/pages/field/daily-log";
@@ -117,6 +118,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/deleted-items": DeletedItemsPage,
   "/settings": SettingsPage,
   "/settings/team": TeamSettingsPage,
+  "/executive-os": ExecutiveOs,
   "/field": FieldHub,
   "/field/daily-log": FieldDailyLog,
   "/field/timecard": FieldTimecard,

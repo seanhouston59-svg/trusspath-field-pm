@@ -311,6 +311,7 @@ async function migrate() {
   await sql`ALTER TABLE punch_items ADD COLUMN IF NOT EXISTS priority TEXT`;
   await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS trade TEXT`;
   await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS trade TEXT`;
+  await sql`ALTER TABLE submittals ADD COLUMN IF NOT EXISTS trade TEXT`;
 
   // Heal access_level for seed rows still at the default 'project_manager'.
   await sql`UPDATE team_members SET access_level = CASE
@@ -2209,11 +2210,11 @@ class DatabaseStorage implements IStorage {
     for (const x of rfisSeed) await db.insert(rfis).values(x);
 
     const subsSeed: Omit<Submittal, "id">[] = [
-      { projectId: p[0].id, number: "SUB-042", subject: "Curtainwall shop drawings", type: "Shop Drawing", status: "Approved", assigneeId: t[2].id, dateSubmitted: "2026-05-10", dueDate: "2026-05-24" },
-      { projectId: p[0].id, number: "SUB-051", subject: "Med-gas piping — material certs", type: "Material", status: "Open", assigneeId: t[2].id, dateSubmitted: "2026-07-08", dueDate: "2026-07-22" },
-      { projectId: p[0].id, number: "SUB-049", subject: "Structural steel connections", type: "Shop Drawing", status: "Revise", assigneeId: t[2].id, dateSubmitted: "2026-06-20", dueDate: "2026-07-05" },
-      { projectId: p[1].id, number: "SUB-077", subject: "Cooling tower performance data", type: "Data", status: "Open", assigneeId: t[2].id, dateSubmitted: "2026-07-12", dueDate: "2026-07-26" },
-      { projectId: p[2].id, number: "SUB-012", subject: "Storm detention vault precast", type: "Shop Drawing", status: "Approved", assigneeId: t[2].id, dateSubmitted: "2026-06-15", dueDate: "2026-06-29" },
+      { projectId: p[0].id, number: "SUB-042", subject: "Curtainwall shop drawings", type: "Shop Drawing", trade: "Curtain Wall", status: "Approved", assigneeId: t[2].id, dateSubmitted: "2026-05-10", dueDate: "2026-05-24" },
+      { projectId: p[0].id, number: "SUB-051", subject: "Med-gas piping — material certs", type: "Material", trade: "Plumbing", status: "Open", assigneeId: t[2].id, dateSubmitted: "2026-07-08", dueDate: "2026-07-22" },
+      { projectId: p[0].id, number: "SUB-049", subject: "Structural steel connections", type: "Shop Drawing", trade: "Steel — Structural", status: "Revise", assigneeId: t[2].id, dateSubmitted: "2026-06-20", dueDate: "2026-07-05" },
+      { projectId: p[1].id, number: "SUB-077", subject: "Cooling tower performance data", type: "Data", trade: "HVAC", status: "Open", assigneeId: t[2].id, dateSubmitted: "2026-07-12", dueDate: "2026-07-26" },
+      { projectId: p[2].id, number: "SUB-012", subject: "Storm detention vault precast", type: "Shop Drawing", trade: "Site Utilities", status: "Approved", assigneeId: t[2].id, dateSubmitted: "2026-06-15", dueDate: "2026-06-29" },
     ];
     for (const x of subsSeed) await db.insert(submittals).values(x);
 

@@ -17,6 +17,7 @@ export const APP_ROUTES: RoutePattern[] = [
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings", "/settings/team",
   "/teams", "/excel",
+  "/executive-os",
   "/field", "/field/daily-log", "/field/timecard", "/field/photo", "/field/observation", "/field/punch",
 ];
 
@@ -97,6 +98,14 @@ export const APP_NAV: NavGroup[] = [
       { href: "/settings", label: "Settings", icon: "Settings" },
       { href: "/settings/team", label: "Team & Access", icon: "ShieldCheck" },
       { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" },
+    ],
+  },
+  {
+    // Executive OS — exec-only surface. Contents grow over time; for now a
+    // single Overview link points at a “coming soon” placeholder.
+    title: "Executive OS",
+    items: [
+      { href: "/executive-os", label: "Overview", icon: "Sparkles" },
     ],
   },
 ];

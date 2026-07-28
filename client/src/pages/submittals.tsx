@@ -4,6 +4,8 @@ import { Layout } from "@/components/layout";
 import { GhostState, GhostSubmittalRows } from "@/components/ghost-state";
 import { SubmittalTable } from "@/components/tables";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
+import { PUNCH_TRADES } from "@/lib/punch-catalog";
+import { subjectsForTrade, tradeForSubmittalSubject } from "@/lib/submittal-catalog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
@@ -61,16 +63,30 @@ export default function SubmittalsPage() {
 
   const projectName = (id: number) => projectList.find((p) => p.id === id)?.name;
 
-  const fields: FieldDef[] = [
+  // Subject + Trade are combo boxes sourced from a shared catalog. Picking a
+  // subject auto-fills Trade (when Trade is empty); picking a Trade narrows
+  // the Subject list. Free-typing works on both.
+  const tradeOptions = PUNCH_TRADES.map((v) => ({ value: v, label: v }));
+
+  const baseFields: FieldDef[] = [
     { name: "projectId", label: "Project", type: "select", options: projectOptions, required: true, half: true },
     { name: "number", label: "Submittal #", type: "text", placeholder: "SUB-001", required: true, half: true },
-    { name: "subject", label: "Subject", type: "text", required: true, placeholder: "HVAC equipment cut sheets — rooftop units" },
+    { name: "subject", label: "Subject", type: "combo", required: true, placeholder: "Type or pick a subject…" },
+    { name: "trade", label: "Trade", type: "combo", options: tradeOptions, half: true, placeholder: "Type or pick a trade…" },
     { name: "type", label: "Type", type: "select", options: ["Shop Drawings", "Product Data", "Samples", "Calculations", "Other"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "status", label: "Status", type: "select", options: ["Draft", "Submitted", "In Review", "Approved", "Rejected"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "assigneeId", label: "Assignee", type: "select", options: teamOptions, half: true },
     { name: "dateSubmitted", label: "Date Submitted", type: "date", required: true, half: true },
     { name: "dueDate", label: "Due Date", type: "date", required: true, half: true },
   ];
+
+  const fieldsForValues = (values: Record<string, string | number>): FieldDef[] => {
+    const currentTrade = String(values.trade ?? "");
+    const subjectOptions = subjectsForTrade(currentTrade).map((s) => ({ value: s.label, label: s.label }));
+    return baseFields.map((f) =>
+      f.name === "subject" ? { ...f, options: subjectOptions } : f
+    );
+  };
 
   const peopleOptions = [
     { value: "0", label: "Unassigned" },
@@ -90,8 +106,17 @@ export default function SubmittalsPage() {
         open={open}
         onOpenChange={setOpen}
         title="New Submittal"
-        fields={fields}
-        defaults={{ status: "Draft", type: "Shop Drawings", assigneeId: "0" }}
+        fields={baseFields}
+        fieldsForValues={fieldsForValues}
+        // Picking a known subject auto-fills Trade (only if Trade is empty).
+        onFieldChange={(name, value, next) => {
+          if (name === "subject" && !String(next.trade ?? "").trim()) {
+            const trade = tradeForSubmittalSubject(String(value));
+            if (trade) return { trade };
+          }
+          return;
+        }}
+        defaults={{ status: "Draft", type: "Shop Drawings", assigneeId: "0", subject: "", trade: "" }}
         submitLabel="Create Submittal"
         isPending={create.isPending}
         onSubmit={(v) =>
@@ -99,6 +124,7 @@ export default function SubmittalsPage() {
             projectId: Number(v.projectId),
             number: String(v.number),
             subject: String(v.subject),
+            trade: String(v.trade || "").trim() || undefined,
             type: String(v.type),
             status: String(v.status),
             assigneeId: v.assigneeId === "0" ? undefined : Number(v.assigneeId),
@@ -213,6 +239,7 @@ export default function SubmittalsPage() {
             isStatusPending={updateStatus.isPending}
             fields={[
               { label: "Type", value: selected.type },
+              { label: "Trade", value: selected.trade || "—" },
               { label: "Assignee", value: a?.name ?? "Unassigned" },
               { label: "Project", value: projectName(selected.projectId), full: true },
               { label: "Date submitted", value: shortDate(selected.dateSubmitted), mono: true },

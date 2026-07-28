@@ -182,6 +182,9 @@ export const submittals = pgTable("submittals", {
   assigneeId: integer("assignee_id"),
   dateSubmitted: text("date_submitted").notNull(),
   dueDate: text("due_date").notNull(),
+  // Optional trade tag — auto-filled from the submittal subject catalog
+  // when the user picks a known subject, editable freely otherwise.
+  trade: text("trade"),
 });
 
 /* --------------------------- Change orders ----------------------------- */
