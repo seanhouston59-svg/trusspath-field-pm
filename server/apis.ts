@@ -371,6 +371,107 @@ export async function getNearbyPlaces(address: string, query: string): Promise<s
   }
 }
 
+/* ---------------------- Places Autocomplete (New API) ---------------------- */
+// Uses the new v1 Places API. It's cheaper than legacy Autocomplete when paired
+// with session tokens: all keystrokes in one "session" (until the user picks a
+// suggestion) count as one autocomplete request instead of one per keystroke.
+//
+// Docs: https://developers.google.com/maps/documentation/places/web-service/place-autocomplete
+//
+// The client sends a fresh sessionToken (UUID) per address-input focus, we
+// pipe it to Google, and reuse it for the follow-up Place Details lookup that
+// happens when the user picks a suggestion. Google groups them into one billing
+// event. If we ever miss the details call, we just eat a slightly higher cost —
+// no functional problem.
+
+export type AddressSuggestion = {
+  placeId: string;
+  /** Full formatted address, e.g. "123 Main St, Boulder, CO 80302, USA" */
+  description: string;
+  /** Main line (usually the street address). Used for compact list rendering. */
+  primaryText: string;
+  /** Secondary line (usually the city/state). */
+  secondaryText: string;
+};
+
+export async function placesAutocomplete(
+  input: string,
+  sessionToken: string,
+  opts: { countryBias?: string } = {},
+): Promise<AddressSuggestion[]> {
+  if (!GOOGLE_MAPS_KEY) return [];
+  const trimmed = input.trim();
+  if (trimmed.length < 3) return []; // no-op below 3 chars — cuts spurious calls
+  try {
+    const body: any = {
+      input: trimmed,
+      sessionToken,
+      // "address" primary type = street addresses only — no businesses, no POIs.
+      // That's what a "job site address" field wants.
+      includedPrimaryTypes: ["street_address", "premise", "subpremise", "route"],
+    };
+    if (opts.countryBias) {
+      body.includedRegionCodes = [opts.countryBias.toUpperCase()];
+    }
+    const res = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_KEY,
+        // Field mask keeps the response small — we only want the id + display text.
+        "X-Goog-FieldMask":
+          "suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return [];
+    const data: any = await res.json();
+    const suggestions: any[] = data?.suggestions || [];
+    return suggestions
+      .map((s) => s?.placePrediction)
+      .filter(Boolean)
+      .map((p: any) => ({
+        placeId: p.placeId,
+        description: p?.text?.text || "",
+        primaryText: p?.structuredFormat?.mainText?.text || p?.text?.text || "",
+        secondaryText: p?.structuredFormat?.secondaryText?.text || "",
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export type PlaceDetails = {
+  formattedAddress: string;
+  lat: number | null;
+  lon: number | null;
+};
+
+export async function placeDetails(
+  placeId: string,
+  sessionToken: string,
+): Promise<PlaceDetails | null> {
+  if (!GOOGLE_MAPS_KEY || !placeId) return null;
+  try {
+    const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?sessionToken=${encodeURIComponent(sessionToken)}`;
+    const res = await fetch(url, {
+      headers: {
+        "X-Goog-Api-Key": GOOGLE_MAPS_KEY,
+        "X-Goog-FieldMask": "formattedAddress,location",
+      },
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    return {
+      formattedAddress: data?.formattedAddress || "",
+      lat: data?.location?.latitude ?? null,
+      lon: data?.location?.longitude ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /* ------------------------- Availability checks ------------------------- */
 
 export function hasWeatherApi(): boolean {

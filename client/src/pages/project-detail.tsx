@@ -13,6 +13,7 @@ import {
 import { formatCurrency, shortDate, formatDate } from "@/lib/format";
 import { googleMapsUrl } from "@/lib/maps";
 import { cn } from "@/lib/utils";
+import { AddressAutocomplete } from "@/components/address-autocomplete";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: DollarSign },
@@ -257,7 +258,15 @@ export default function ProjectDetail() {
               </div>
               <div>
                 <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Address</label>
-                <input value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm" data-testid="input-edit-address" />
+                <div className="mt-1">
+                  <AddressAutocomplete
+                    value={form.address ?? ""}
+                    onChange={(v) => setForm({ ...form, address: v })}
+                    placeholder="Start typing the job site address…"
+                    multiline
+                    data-testid="input-edit-address"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

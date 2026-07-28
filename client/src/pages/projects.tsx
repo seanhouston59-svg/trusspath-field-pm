@@ -55,7 +55,7 @@ export default function Projects() {
     { name: "client", label: "Client", type: "text", required: true, half: true },
     { name: "type", label: "Type", type: "select", options: ["Commercial", "Residential", "Healthcare", "Education", "Industrial", "Civic"].map((v) => ({ value: v, label: v })), required: true, half: true },
     { name: "status", label: "Status", type: "select", options: ["Planning", "Active", "On Hold", "Complete"].map((v) => ({ value: v, label: v })), required: true, half: true },
-    { name: "address", label: "Address", type: "textarea", required: true },
+    { name: "address", label: "Address", type: "address", required: true, placeholder: "Start typing the job site address…" },
     { name: "startDate", label: "Start Date", type: "date", required: true, half: true },
     { name: "endDate", label: "End Date", type: "date", required: true, half: true },
     { name: "budget", label: "Budget ($)", type: "number", required: true, half: true },

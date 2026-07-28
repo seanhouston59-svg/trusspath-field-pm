@@ -10,11 +10,12 @@ import { ImagePlus, X } from "lucide-react";
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
+import { AddressAutocomplete } from "@/components/address-autocomplete";
 
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "number" | "date" | "textarea" | "select" | "photo" | "info";
+  type?: "text" | "number" | "date" | "textarea" | "select" | "photo" | "info" | "address";
   options?: { value: string; label: string }[];
   placeholder?: string;
   required?: boolean;
@@ -113,6 +114,15 @@ export function CreateEntityDialog({
                     value={String(values[f.name] ?? "")}
                     placeholder={f.placeholder}
                     onChange={(e) => set(f.name, e.target.value)}
+                    data-testid={`field-${f.name}`}
+                  />
+                ) : ctype === "address" ? (
+                  <AddressAutocomplete
+                    id={f.name}
+                    value={String(values[f.name] ?? "")}
+                    onChange={(v) => set(f.name, v)}
+                    placeholder={f.placeholder ?? "Start typing an address…"}
+                    multiline
                     data-testid={`field-${f.name}`}
                   />
                 ) : ctype === "photo" ? (

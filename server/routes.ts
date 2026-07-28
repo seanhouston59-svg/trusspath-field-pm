@@ -4,7 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import multer from "multer";
 import { storage } from "./storage";
-import { getDailyLogWeather } from "./apis";
+import { getDailyLogWeather, placesAutocomplete, placeDetails, hasPlacesApi } from "./apis";
 import { jarvisChat, jarvisBrief } from "./jarvis";
 import { localJarvisChat, buildRichLocalBrief, buildSafetyBrief } from "./jarvis-local";
 import { buildContext } from "./jarvis";
@@ -804,6 +804,38 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     // long enough to survive form re-renders / focus events.
     res.set("Cache-Control", "private, max-age=900");
     res.json(result);
+  });
+
+  // GET /api/places/autocomplete?q=...&session=UUID&country=US
+  //
+  // Server-side proxy for Google Places Autocomplete. Keeps GOOGLE_MAPS_API_KEY
+  // off the client, and can be swapped out for OpenStreetMap/etc. later without
+  // any UI changes. Returns [] when the key isn't configured so the client just
+  // silently degrades to plain text input.
+  app.get("/api/places/autocomplete", async (req: any, res) => {
+    const q = typeof req.query.q === "string" ? req.query.q : "";
+    const session = typeof req.query.session === "string" ? req.query.session : "";
+    const country = typeof req.query.country === "string" ? req.query.country : undefined;
+    if (!hasPlacesApi()) return res.json({ suggestions: [], available: false });
+    if (!q.trim() || !session) return res.json({ suggestions: [], available: true });
+    const suggestions = await placesAutocomplete(q, session, { countryBias: country });
+    res.set("Cache-Control", "private, max-age=30"); // tiny cache smooths rapid typing
+    res.json({ suggestions, available: true });
+  });
+
+  // GET /api/places/details?placeId=...&session=UUID
+  //
+  // Called when the user picks a suggestion; returns the canonical formatted
+  // address. Server enforces that a sessionToken is supplied so we keep the
+  // billing session-scoped instead of paying per keystroke.
+  app.get("/api/places/details", async (req: any, res) => {
+    const placeId = typeof req.query.placeId === "string" ? req.query.placeId : "";
+    const session = typeof req.query.session === "string" ? req.query.session : "";
+    if (!hasPlacesApi()) return res.status(404).json({ message: "Places API not configured" });
+    if (!placeId || !session) return res.status(400).json({ message: "placeId and session required" });
+    const details = await placeDetails(placeId, session);
+    if (!details) return res.status(404).json({ message: "Place not found" });
+    res.json(details);
   });
 
   // Projects
