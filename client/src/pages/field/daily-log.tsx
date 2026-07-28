@@ -347,7 +347,7 @@ export default function FieldDailyLog() {
               className="text-base"
             />
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Tip: pick a template to insert starter text, then fill in the bracketed bits.
+              Tip: tap Templates to append starter text — stack a few and fill in the bracketed bits.
             </p>
           </div>
         </div>
@@ -360,7 +360,7 @@ export default function FieldDailyLog() {
                 <Sparkles className="size-5 text-primary" /> Work summary templates
               </SheetTitle>
               <SheetDescription className="text-xs">
-                Tap one to insert. It replaces the current text.
+                Tap one to add it to your summary. Existing text is kept — templates are appended.
               </SheetDescription>
             </SheetHeader>
 
@@ -393,7 +393,12 @@ export default function FieldDailyLog() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSummary(t.text);
+                      // Append the template to whatever's already in the box.
+                      // Separate with a blank line so combined entries stay readable.
+                      setSummary((prev) => {
+                        const base = prev.trimEnd();
+                        return base ? `${base}\n\n${t.text}` : t.text;
+                      });
                       setTemplatesOpen(false);
                     }}
                     className="flex w-full flex-col items-start gap-1 px-4 py-3 text-left hover:bg-accent"
@@ -413,16 +418,8 @@ export default function FieldDailyLog() {
 
             {summary.trim() && (
               <div className="border-t border-border bg-muted/30 px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Append instead of replace — useful when combining trades.
-                    // (Only shown when the box already has text.)
-                  }}
-                  className="hidden"
-                />
                 <p className="text-[11px] text-muted-foreground">
-                  Tapping a template replaces the current text. Copy anything you’ve written before switching.
+                  Templates are appended to what’s already in the box — tap multiple to stack a full day’s work.
                 </p>
               </div>
             )}
