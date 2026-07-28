@@ -14,11 +14,17 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Filter,
   Plus,
+  Search,
   Trash2,
+  X,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -201,6 +207,87 @@ function LeanModuleDetail({ moduleId, projectId }: { moduleId: string; projectId
   const items = useMemo(() => data?.items ?? [], [data]);
   const state = data?.state ?? null;
 
+  // --- Filter / sort / search state -------------------------------------
+  //
+  // All client-side: the item list for a single module is bounded (dozens,
+  // occasionally low hundreds), so filtering / sorting in the browser is
+  // instant and avoids a round-trip on every keystroke.
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("__all__");
+  const [statusFilter, setStatusFilter] = useState<string>("__all__");
+  const [sortKey, setSortKey] = useState<"title" | "category" | "ownerName" | "dueDate" | "status" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = (key: typeof sortKey) => {
+    if (!key) return;
+    if (sortKey === key) {
+      // Same column clicked twice — flip direction. Third click clears sort
+      // so users can get back to the default insertion order.
+      if (sortDir === "asc") setSortDir("desc");
+      else {
+        setSortKey(null);
+        setSortDir("asc");
+      }
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = items.filter((row) => {
+      if (categoryFilter !== "__all__" && (row.category ?? "") !== categoryFilter) return false;
+      if (statusFilter !== "__all__" && (row.status ?? "not_started") !== statusFilter) return false;
+      if (!q) return true;
+      const hay = `${row.title} ${row.ownerName ?? ""} ${row.notes ?? ""} ${row.category ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+    if (!sortKey) return filtered;
+    const sign = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const av = (a[sortKey] ?? "") as string;
+      const bv = (b[sortKey] ?? "") as string;
+      // Blanks sort last regardless of direction — empty owner/due/etc
+      // shouldn't hijack the top of the list.
+      if (av === "" && bv !== "") return 1;
+      if (bv === "" && av !== "") return -1;
+      return av.localeCompare(bv) * sign;
+    });
+  }, [items, search, categoryFilter, statusFilter, sortKey, sortDir]);
+
+  const hasActiveFilter = search.trim() !== "" || categoryFilter !== "__all__" || statusFilter !== "__all__";
+  const clearFilters = () => {
+    setSearch("");
+    setCategoryFilter("__all__");
+    setStatusFilter("__all__");
+  };
+
+  const SortHeader = ({
+    label,
+    keyName,
+  }: {
+    label: string;
+    keyName: Exclude<typeof sortKey, null>;
+  }) => {
+    const active = sortKey === keyName;
+    const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(keyName)}
+        className={cn(
+          "inline-flex items-center gap-1 rounded px-1 py-0.5 text-left font-semibold hover:bg-muted",
+          active && "text-foreground",
+        )}
+        data-testid={`lean-${moduleId}-sort-${keyName}`}
+      >
+        {label}
+        <Icon className={cn("size-3", active ? "text-primary" : "text-muted-foreground/70")} />
+      </button>
+    );
+  };
+
   if (!def) return null;
 
   return (
@@ -371,28 +458,90 @@ function LeanModuleDetail({ moduleId, projectId }: { moduleId: string; projectId
               </Button>
             </div>
 
+            {items.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[200px] flex-1">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={`Search ${def.itemNounPlural.toLowerCase()}…`}
+                    className="h-9 pl-8 text-sm"
+                    data-testid={`lean-${moduleId}-search`}
+                  />
+                </div>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="h-9 w-[170px] text-xs" data-testid={`lean-${moduleId}-filter-category`}>
+                    <Filter className="mr-1 size-3" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All categories</SelectItem>
+                    {def.categories.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-9 w-[150px] text-xs" data-testid={`lean-${moduleId}-filter-status`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All statuses</SelectItem>
+                    {LEAN_MODULE_ITEM_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {ITEM_STATUS_LABELS[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {hasActiveFilter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-9 px-2 text-xs"
+                    data-testid={`lean-${moduleId}-clear-filters`}
+                  >
+                    <X className="mr-1 size-3" />
+                    Clear
+                  </Button>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {filteredItems.length}
+                  {filteredItems.length !== items.length && ` of ${items.length}`}
+                </span>
+              </div>
+            )}
+
             {isLoading ? (
               <Skeleton className="h-32 w-full" />
             ) : items.length === 0 ? (
               <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
                 No {def.itemNounPlural.toLowerCase()} yet. Add your first one above.
               </div>
+            ) : filteredItems.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No {def.itemNounPlural.toLowerCase()} match the current filters.
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-xs uppercase text-muted-foreground">
                     <tr className="border-b border-border">
-                      <th className="px-2 py-2 text-left font-semibold">Title</th>
-                      <th className="px-2 py-2 text-left font-semibold">Category</th>
-                      <th className="px-2 py-2 text-left font-semibold">Owner</th>
-                      <th className="px-2 py-2 text-left font-semibold">Due</th>
-                      <th className="px-2 py-2 text-left font-semibold">Status</th>
+                      <th className="px-2 py-2 text-left"><SortHeader label="Title" keyName="title" /></th>
+                      <th className="px-2 py-2 text-left"><SortHeader label="Category" keyName="category" /></th>
+                      <th className="px-2 py-2 text-left"><SortHeader label="Owner" keyName="ownerName" /></th>
+                      <th className="px-2 py-2 text-left"><SortHeader label="Due" keyName="dueDate" /></th>
+                      <th className="px-2 py-2 text-left"><SortHeader label="Status" keyName="status" /></th>
                       <th className="px-2 py-2 text-left font-semibold">Notes</th>
                       <th className="px-2 py-2" />
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((row) => (
+                    {filteredItems.map((row) => (
                       <tr key={row.id} className="border-b border-border/60 last:border-b-0">
                         <td className="px-2 py-2">
                           <CellText
