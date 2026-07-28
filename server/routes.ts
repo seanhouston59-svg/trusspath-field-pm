@@ -22,6 +22,10 @@ import {
   insertMobilizationRiskSchema, insertMobilizationSignatureSchema, insertMobilizationPlanSchema,
   insertProjectSetupSchema, insertProjectSetupStakeholderSchema, insertProjectSetupContractDocSchema,
   insertProjectSetupDeliverableSchema, insertProjectSetupSignatureSchema,
+  insertPreConstructionSchema, insertPreConstructionDesignDocSchema, insertPreConstructionDesignRfiSchema,
+  insertPreConstructionVeItemSchema, insertPreConstructionPermitSchema, insertPreConstructionPrequalSubSchema,
+  insertPreConstructionBidPackageSchema, insertPreConstructionLongLeadItemSchema,
+  insertPreConstructionSignatureSchema,
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
   isAccountInGoodStanding, isSubscriptionActive, isDemoExpired,
@@ -32,6 +36,7 @@ import { EVENT_KINDS } from "@shared/project-event-kinds";
 import { MOBILIZATION_SECTIONS } from "@shared/mobilization-catalog";
 import { mobilizationRollup } from "./mobilization-rollup";
 import { projectSetupRollup } from "./project-setup-rollup";
+import { preConstructionRollup } from "./pre-construction-rollup";
 import { computeMobilizationGate } from "@shared/lifecycle-gates";
 import { generateMobilizationPlan } from "./reports/mobilization-plan";
 import { generateProjectCharter } from "./reports/project-charter";
@@ -1840,13 +1845,20 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     });
   });
 
-  // Soft gate: what Project Setup still owes Mobilization. Warnings only — the
-  // PM can always proceed, the banner just makes the cost visible.
+  // Soft gate: what Project Setup and Pre-Construction still owe Mobilization.
+  // Warnings only — the PM can always proceed, the banner just makes the cost
+  // visible.
   app.get("/api/projects/:id/mobilization/gate", async (req: any, res) => {
     const projectId = parseInt(req.params.id, 10);
     if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
     if (!(await requireProjectAccess(req, res, projectId))) return;
-    res.json(computeMobilizationGate(await projectSetupRollup(projectId)));
+    const [setup, precon] = await Promise.all([
+      projectSetupRollup(projectId),
+      preConstructionRollup(projectId),
+    ]);
+    // A project that predates the pre-con module has no row to judge, so pass
+    // null and let the gate stay silent rather than warn about unasked work.
+    res.json(computeMobilizationGate(setup, precon.seeded ? precon : null));
   });
 
   // Mobilization Plan PDF. Streams straight into the response, so once
@@ -2270,6 +2282,273 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const h = await projectSetupRollup(p.id);
       return { projectId: p.id, projectName: p.name, ...h };
     }));
+    res.json(rows);
+  });
+
+  /* ----------------------- Pre-Construction (Executive OS) ------------------
+   * Same shape as the two blocks above: everything nested under
+   * /api/projects/:id so requireProjectAccess is the only authorization check,
+   * plus one org-derived portfolio route at the bottom.
+   * ------------------------------------------------------------------------ */
+
+  app.get("/api/projects/:id/pre-construction", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const bundle = await storage.getPreConstructionBundle(projectId);
+    res.json({ ...bundle, seeded: bundle.preCon != null });
+  });
+
+  // Every column optional so the intake form can autosave a field at a time.
+  const preConstructionPatchSchema = insertPreConstructionSchema.omit({ projectId: true }).partial();
+
+  app.patch("/api/projects/:id/pre-construction", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    const { id: _id, projectId: _pid, ...body } = req.body ?? {};
+    const parsed = preConstructionPatchSchema.safeParse(body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+    const patch: Record<string, any> = { ...parsed.data };
+
+    // Read before write so the approval event fires on the transition rather
+    // than on every autosave that happens to include the same timestamp.
+    const before = await storage.getPreConstruction(projectId);
+    if (!before) return res.status(404).json({ message: "Pre-Construction not initialized" });
+
+    // Whoever sent the approving PATCH is the approver unless the client named
+    // someone else — an approval with no attributed approver is not auditable.
+    if (patch.preconPlanApprovedAt && !before.preconPlanApprovedAt && patch.preconPlanApprovedById == null) {
+      patch.preconPlanApprovedById = req.account?.id ?? null;
+    }
+
+    const updated = await storage.updatePreConstruction(projectId, patch);
+    if (!updated) return res.status(404).json({ message: "Pre-Construction not initialized" });
+    if (!before.preconPlanApprovedAt && updated.preconPlanApprovedAt) {
+      logEvent(req, {
+        projectId, kind: EVENT_KINDS.PRECON_PLAN_APPROVED,
+        title: "Pre-Construction Plan approved",
+        subtitle: updated.preconPlanApprovedAt,
+        sourceType: "pre_construction", sourceId: updated.id,
+        meta: { approvedById: updated.preconPlanApprovedById, designPhase: updated.designPhase },
+      });
+    }
+    res.json(updated);
+  });
+
+  // Opt-in seed for projects that predate this module. Idempotent — a second
+  // call reports the existing row instead of creating a duplicate.
+  app.post("/api/projects/:id/pre-construction/seed", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    const project = await requireProjectAccess(req, res, projectId);
+    if (!project) return;
+    const existing = await storage.getPreConstruction(projectId);
+    if (existing) return res.json({ alreadySeeded: true, preCon: existing });
+    await storage.seedPreConstruction(projectId, project.organizationId ?? null);
+    res.json({ seeded: true, preCon: await storage.getPreConstruction(projectId) });
+  });
+
+  app.get("/api/projects/:id/pre-construction/health", async (req: any, res) => {
+    const projectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+    if (!(await requireProjectAccess(req, res, projectId))) return;
+    res.json(await preConstructionRollup(projectId));
+  });
+
+  // Read-before-write for a child row. IStorage exposes no per-collection
+  // getter — only the 9-way bundle — so a transition check costs one bundle
+  // read. `watch` below gates this so only event-emitting patches pay for it.
+  async function preconChildBefore(projectId: number, collection: string, rowId: number) {
+    const bundle: Record<string, any> = await storage.getPreConstructionBundle(projectId);
+    return (bundle[collection] as any[] | undefined)?.find((r) => r.id === rowId) ?? null;
+  }
+
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  const PRE_CONSTRUCTION_RESOURCES: {
+    path: string;
+    param: string;
+    collection: string;
+    schema: any;
+    create: (data: any) => Promise<any>;
+    update: (id: number, data: any) => Promise<any>;
+    remove: (id: number) => Promise<void>;
+    // Patch keys whose transition emits an event. Presence of any of them is
+    // what makes the handler read the row before updating it.
+    watch?: string[];
+    stamp?: (before: any, patch: any) => void;
+    onTransition?: (req: any, before: any, after: any) => void;
+  }[] = [
+    { path: "design-docs", param: "docId", collection: "designDocs",
+      schema: insertPreConstructionDesignDocSchema,
+      create: storage.createDesignDoc.bind(storage),
+      update: storage.updateDesignDoc.bind(storage),
+      remove: storage.deleteDesignDoc.bind(storage) },
+    { path: "design-rfis", param: "rfiId", collection: "designRfis",
+      schema: insertPreConstructionDesignRfiSchema,
+      create: storage.createDesignRfi.bind(storage),
+      update: storage.updateDesignRfi.bind(storage),
+      remove: storage.deleteDesignRfi.bind(storage) },
+    { path: "ve-items", param: "veId", collection: "veItems",
+      schema: insertPreConstructionVeItemSchema,
+      create: storage.createVeItem.bind(storage),
+      update: storage.updateVeItem.bind(storage),
+      remove: storage.deleteVeItem.bind(storage) },
+    { path: "permits", param: "permitId", collection: "permits",
+      schema: insertPreConstructionPermitSchema,
+      create: storage.createPermit.bind(storage),
+      update: storage.updatePermit.bind(storage),
+      remove: storage.deletePermit.bind(storage),
+      watch: ["status"],
+      stamp: (before, patch) => {
+        // A permit that is issued but carries no issue date can't be checked
+        // against its expiration, so fill it rather than accept the gap.
+        if (patch.status === "issued" && before.status !== "issued" && !patch.issuedDate && !before.issuedDate) {
+          patch.issuedDate = today();
+        }
+      },
+      onTransition: (req, before, after) => {
+        if (before.status === "issued" || after.status !== "issued") return;
+        logEvent(req, {
+          projectId: after.projectId, kind: EVENT_KINDS.PRECON_PERMIT_ISSUED,
+          title: `Permit issued: ${after.permitType ?? "permit"}${after.permitNumber ? ` #${after.permitNumber}` : ""}`,
+          subtitle: after.jurisdiction ?? after.issuedDate,
+          sourceType: "pre_construction_permit", sourceId: after.id,
+          meta: {
+            permitId: after.id, permitType: after.permitType, permitNumber: after.permitNumber,
+            jurisdiction: after.jurisdiction, issuedDate: after.issuedDate,
+          },
+        });
+      } },
+    { path: "prequal-subs", param: "subId", collection: "prequalSubs",
+      schema: insertPreConstructionPrequalSubSchema,
+      create: storage.createPrequalSub.bind(storage),
+      update: storage.updatePrequalSub.bind(storage),
+      remove: storage.deletePrequalSub.bind(storage) },
+    { path: "bid-packages", param: "bpId", collection: "bidPackages",
+      schema: insertPreConstructionBidPackageSchema,
+      create: storage.createBidPackage.bind(storage),
+      update: storage.updateBidPackage.bind(storage),
+      remove: storage.deleteBidPackage.bind(storage),
+      watch: ["status"],
+      stamp: (before, patch) => {
+        if (patch.status === "awarded" && before.status !== "awarded" && !patch.awardedDate && !before.awardedDate) {
+          patch.awardedDate = today();
+        }
+      },
+      onTransition: (req, before, after) => {
+        if (before.status === "awarded" || after.status !== "awarded") return;
+        logEvent(req, {
+          projectId: after.projectId, kind: EVENT_KINDS.PRECON_BID_PACKAGE_AWARDED,
+          title: `Bid package awarded: ${after.label}`,
+          subtitle: after.awardedTo ?? after.awardedDate,
+          sourceType: "pre_construction_bid_package", sourceId: after.id,
+          meta: {
+            bidPackageId: after.id, packageNumber: after.packageNumber, label: after.label,
+            awardedTo: after.awardedTo, awardedValueUsd: after.awardedValueUsd, awardedDate: after.awardedDate,
+          },
+        });
+      } },
+    { path: "long-lead-items", param: "llId", collection: "longLeadItems",
+      schema: insertPreConstructionLongLeadItemSchema,
+      create: storage.createLongLeadItem.bind(storage),
+      update: storage.updateLongLeadItem.bind(storage),
+      remove: storage.deleteLongLeadItem.bind(storage),
+      watch: ["orderedDate", "actualDeliveryDate"],
+      onTransition: (req, before, after) => {
+        if (!before.orderedDate && after.orderedDate) {
+          logEvent(req, {
+            projectId: after.projectId, kind: EVENT_KINDS.PRECON_LONG_LEAD_ORDERED,
+            title: `Long-lead item ordered: ${after.description}`,
+            subtitle: after.supplier ?? after.orderedDate,
+            sourceType: "pre_construction_long_lead_item", sourceId: after.id,
+            meta: {
+              longLeadItemId: after.id, itemNumber: after.itemNumber, description: after.description,
+              supplier: after.supplier, poNumber: after.poNumber, orderedDate: after.orderedDate,
+              expectedDeliveryDate: after.expectedDeliveryDate,
+            },
+          });
+        }
+        if (!before.actualDeliveryDate && after.actualDeliveryDate) {
+          logEvent(req, {
+            projectId: after.projectId, kind: EVENT_KINDS.PRECON_LONG_LEAD_DELIVERED,
+            title: `Long-lead item delivered: ${after.description}`,
+            subtitle: after.actualDeliveryDate,
+            sourceType: "pre_construction_long_lead_item", sourceId: after.id,
+            meta: {
+              longLeadItemId: after.id, itemNumber: after.itemNumber, description: after.description,
+              supplier: after.supplier, expectedDeliveryDate: after.expectedDeliveryDate,
+              actualDeliveryDate: after.actualDeliveryDate,
+            },
+          });
+        }
+      } },
+    { path: "signatures", param: "sigId", collection: "signatures",
+      schema: insertPreConstructionSignatureSchema,
+      create: storage.createPreconSignature.bind(storage),
+      update: storage.updatePreconSignature.bind(storage),
+      remove: storage.deletePreconSignature.bind(storage) },
+  ];
+
+  for (const resource of PRE_CONSTRUCTION_RESOURCES) {
+    const patchSchema = resource.schema.omit({ projectId: true }).partial();
+
+    app.post(`/api/projects/:id/pre-construction/${resource.path}`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      const parsed = resource.schema.safeParse({ ...(req.body ?? {}), projectId });
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+      res.status(201).json(await resource.create(parsed.data));
+    });
+
+    app.patch(`/api/projects/:id/pre-construction/${resource.path}/:${resource.param}`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const rowId = parseInt(req.params[resource.param], 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      const { id: _id, projectId: _pid, ...body } = req.body ?? {};
+      const parsed = patchSchema.safeParse(body);
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.issues });
+      const patch: Record<string, any> = { ...parsed.data };
+
+      const needsBefore = !!resource.watch?.some((k) => k in patch);
+      const before = needsBefore ? await preconChildBefore(projectId, resource.collection, rowId) : null;
+      if (needsBefore && (!before || before.projectId !== projectId)) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (before) resource.stamp?.(before, patch);
+
+      const updated = await resource.update(rowId, patch);
+      if (!updated || updated.projectId !== projectId) return res.status(404).json({ message: "Not found" });
+      if (before) resource.onTransition?.(req, before, updated);
+      res.json(updated);
+    });
+
+    app.delete(`/api/projects/:id/pre-construction/${resource.path}/:${resource.param}`, async (req: any, res) => {
+      const projectId = parseInt(req.params.id, 10);
+      const rowId = parseInt(req.params[resource.param], 10);
+      if (!Number.isFinite(projectId) || !Number.isFinite(rowId)) return res.status(400).json({ message: "Invalid id" });
+      if (!(await requireProjectAccess(req, res, projectId))) return;
+      await resource.remove(rowId);
+      res.json({ deleted: true });
+    });
+  }
+
+  app.get("/api/executive-os/pre-construction", async (req: any, res) => {
+    const orgProjects = req.account?.role === "owner"
+      // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —
+      // the single OWNER_EMAIL admin account sees every tenant by design.
+      ? await storage.getProjects()
+      // Org-scoped: prevents a null-org account from reading every tenant's
+      // portfolio. `?? null` (not `?? undefined`) keeps this fail-closed.
+      : await storage.getProjects(req.organizationId ?? null);
+    const rows = await Promise.all(orgProjects.map(async (p: Project) => ({
+      project: p,
+      preCon: await storage.getPreConstruction(p.id),
+      health: await preConstructionRollup(p.id),
+    })));
     res.json(rows);
   });
 

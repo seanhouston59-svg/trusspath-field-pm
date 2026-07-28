@@ -55,6 +55,13 @@ export const EVENT_KINDS = {
   PROJECT_SETUP_KICKOFF_SCHEDULED: "project_setup.kickoff_scheduled",
   PROJECT_SETUP_CHARTER_REPORT_GENERATED: "project_setup.charter_report_generated",
   PROJECT_SETUP_KICKOFF_AGENDA_GENERATED: "project_setup.kickoff_agenda_generated",
+
+  // Pre-Construction (Executive OS)
+  PRECON_PLAN_APPROVED: "pre_construction.plan_approved",
+  PRECON_PERMIT_ISSUED: "pre_construction.permit_issued",
+  PRECON_BID_PACKAGE_AWARDED: "pre_construction.bid_package_awarded",
+  PRECON_LONG_LEAD_ORDERED: "pre_construction.long_lead_ordered",
+  PRECON_LONG_LEAD_DELIVERED: "pre_construction.long_lead_delivered",
 } as const;
 
 export type EventKind = typeof EVENT_KINDS[keyof typeof EVENT_KINDS];
@@ -125,6 +132,11 @@ export const EVENT_KIND_META: Record<string, EventKindMeta> = {
   [EVENT_KINDS.PROJECT_SETUP_KICKOFF_SCHEDULED]: { label: "Kickoff meeting scheduled", category: "project" },
   [EVENT_KINDS.PROJECT_SETUP_CHARTER_REPORT_GENERATED]: { label: "Project Charter generated", category: "doc" },
   [EVENT_KINDS.PROJECT_SETUP_KICKOFF_AGENDA_GENERATED]: { label: "Kickoff Agenda generated", category: "doc" },
+  [EVENT_KINDS.PRECON_PLAN_APPROVED]: { label: "Pre-Construction Plan approved", category: "project" },
+  [EVENT_KINDS.PRECON_PERMIT_ISSUED]: { label: "Permit issued", category: "project" },
+  [EVENT_KINDS.PRECON_BID_PACKAGE_AWARDED]: { label: "Bid package awarded", category: "project" },
+  [EVENT_KINDS.PRECON_LONG_LEAD_ORDERED]: { label: "Long-lead item ordered", category: "project" },
+  [EVENT_KINDS.PRECON_LONG_LEAD_DELIVERED]: { label: "Long-lead item delivered", category: "project" },
 };
 
 // Kinds grouped by category \u2014 used by the client to render filter chips and
