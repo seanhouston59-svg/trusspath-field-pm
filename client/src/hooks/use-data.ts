@@ -805,8 +805,24 @@ export function useIntegrationEnabled(key: IntegrationKey): boolean {
   return disabled[key] !== true;
 }
 
+// Extended payload from /api/org/current — the server now includes plan pricing
+// so seat-charge previews ("adding this member costs $X/mo") can render inline.
+// `pendingInvites` counts still-redeemable invites, which will convert to seats.
+export type CurrentOrgResponse = {
+  organization: OrgSummary;
+  membership: Membership;
+  seats: { active: number; included: number | null; overage: number | null; pendingInvites?: number };
+  pricing: {
+    tier: "starter" | "pro" | "enterprise";
+    displayName: string;
+    billing: "monthly" | "annual";
+    includedSeats: number;
+    seatAmountCents: number;
+    baseAmountCents: number;
+  } | null;
+};
 export function useCurrentOrg() {
-  return useQuery<{ organization: OrgSummary; membership: Membership; seats: { active: number; included: number | null; overage: number | null } }>({
+  return useQuery<CurrentOrgResponse>({
     queryKey: ["/api/org/current"],
     retry: false,
   });

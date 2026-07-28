@@ -2389,12 +2389,18 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
    * ================================================================ */
 
   // GET /api/org/current — the caller's active org (with billing + seats).
+  // Also returns the seat-price cents for the org's current plan + billing cycle so
+  // clients can render "adding this member will cost $X/mo" warnings before invite.
   app.get("/api/org/current", async (req: any, res) => {
     if (!req.organizationId) return res.status(404).json({ message: "No active organization" });
     const org = await getOrganization(req.organizationId);
     if (!org) return res.status(404).json({ message: "Organization not found" });
     const seats = await countActiveSeats(org.id);
     const plan = org.subscriptionPlan ? PLANS[org.subscriptionPlan as PlanTier] : null;
+    const billing = (org.subscriptionBilling === "annual" ? "annual" : "monthly") as Billing;
+    // Also count pending, still-redeemable invites — they'll flip into active seats when
+    // accepted, so clients should factor them into "how many seats after this action".
+    const pending = await listPendingInvites(org.id);
     res.json({
       organization: org,
       membership: req.membership,
@@ -2402,7 +2408,16 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         active: seats,
         included: plan?.includedSeats ?? null,
         overage: plan ? Math.max(0, seats - plan.includedSeats) : null,
+        pendingInvites: pending.length,
       },
+      pricing: plan ? {
+        tier: plan.tier,
+        displayName: plan.displayName,
+        billing,
+        includedSeats: plan.includedSeats,
+        seatAmountCents: plan[billing].seatAmount,
+        baseAmountCents: plan[billing].baseAmount,
+      } : null,
     });
   });
 

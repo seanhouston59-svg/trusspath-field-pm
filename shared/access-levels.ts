@@ -171,6 +171,36 @@ export const ACCESS_BY_SLUG: Record<AccessLevel, AccessLevelDef> = Object.fromEn
 
 export const DEFAULT_ACCESS_LEVEL: AccessLevel = "project_executive";
 
+/**
+ * Maps a project-roster access level to the org-level login role (OrgRole).
+ * Used when converting a Team roster entry into a paid seat via the
+ * "Invite as user" flow. The mapping is intentionally conservative — project
+ * roles that carry admin/finance/team-management responsibility become the
+ * closest OrgRole with those capabilities; field roles collapse to "foreman";
+ * everyone else gets read-only "viewer".
+ *
+ * Mapping table:
+ *   project_executive  → owner   (billing, members, projects, all data)
+ *   project_manager    → admin   (members + projects, no billing)
+ *   superintendent     → pm      (projects + editing, no member mgmt)
+ *   foreman            → foreman (crew lead, edit assigned projects only)
+ *   subcontractor      → viewer  (external; read-only via project scope)
+ *   viewer             → viewer
+ *
+ * Note: "owner" is the highest-privilege role. Server-side invite creation
+ * additionally requires the inviter to already BE an owner — non-owners
+ * inviting a project_executive will be automatically stepped down to admin
+ * by the client before submit. See client/src/pages/team.tsx.
+ */
+export const ACCESS_LEVEL_TO_ORG_ROLE: Record<AccessLevel, "owner" | "admin" | "pm" | "foreman" | "viewer"> = {
+  project_executive: "owner",
+  project_manager:   "admin",
+  superintendent:    "pm",
+  foreman:           "foreman",
+  subcontractor:     "viewer",
+  viewer:            "viewer",
+};
+
 export function isRouteAllowed(level: AccessLevel, path: string): boolean {
   if (path === "/" || path === "") return true;
   const def = ACCESS_BY_SLUG[level];

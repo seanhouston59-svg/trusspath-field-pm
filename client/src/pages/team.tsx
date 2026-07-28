@@ -1,13 +1,20 @@
-import { useState } from "react";
-import { Mail, Phone, Building2, Plus, Pencil, Trash2, ShieldCheck } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Mail, Phone, Building2, Plus, Pencil, Trash2, ShieldCheck, UserPlus, CheckCircle2, Clock } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Avatar } from "@/components/bits";
 import { CreateEntityDialog, type FieldDef } from "@/components/create-entity-dialog";
-import { useTeam, useCreateTeamMember, useUpdateTeamMember, useDeleteTeamMember } from "@/hooks/use-data";
+import {
+  useTeam, useCreateTeamMember, useUpdateTeamMember, useDeleteTeamMember,
+  useCurrentOrg, useOrgMembers, useOrgInvites, useCreateInvite,
+} from "@/hooks/use-data";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAccess } from "@/lib/access";
-import { ACCESS_LEVELS, ACCESS_BY_SLUG } from "@shared/access-levels";
+import { ACCESS_LEVELS, ACCESS_BY_SLUG, ACCESS_LEVEL_TO_ORG_ROLE } from "@shared/access-levels";
 import type { AccessLevel } from "@shared/access-levels";
 import type { TeamMember } from "@shared/schema";
 
@@ -107,6 +114,48 @@ export default function Team() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
 
+  // Org / seat context — used to gate the "Invite as user" button and render the
+  // seat-usage indicator. `useCurrentOrg` may be null while loading or if the
+  // account isn't in an org yet; treat missing data as "can't invite".
+  const { data: orgData } = useCurrentOrg();
+  const { data: membersData } = useOrgMembers();
+  const { data: invitesData } = useOrgInvites();
+  const createInvite = useCreateInvite();
+
+  const myMembershipRole = orgData?.membership?.role;
+  const canInviteMembers = myMembershipRole === "owner" || myMembershipRole === "admin";
+
+  // Fast lookups: email → already a member?  email → pending invite?
+  // Both are lower-cased so we can compare against team-member emails safely.
+  const activeMemberEmails = useMemo(() => {
+    const s = new Set<string>();
+    (membersData?.members ?? []).forEach((m) => {
+      if (m.status === "active" && m.email) s.add(m.email.toLowerCase());
+    });
+    return s;
+  }, [membersData]);
+  const pendingInviteEmails = useMemo(() => {
+    const s = new Set<string>();
+    (invitesData?.invites ?? []).forEach((i) => {
+      if (!i.acceptedAt && new Date(i.expiresAt) > new Date()) s.add(i.email.toLowerCase());
+    });
+    return s;
+  }, [invitesData]);
+
+  // Seat state for the header + confirmation preview.
+  const seats = orgData?.seats;
+  const pricing = orgData?.pricing;
+  const activeSeats = seats?.active ?? 0;
+  const includedSeats = seats?.included ?? null;
+  const pendingCount = seats?.pendingInvites ?? 0;
+  // Effective seat count after all pending invites are accepted — this is the
+  // number that will drive Stripe's next sync, so use it in "will you go over?"
+  // math and warnings.
+  const projectedSeats = activeSeats + pendingCount;
+
+  // Confirmation dialog state for the invite flow.
+  const [inviteTarget, setInviteTarget] = useState<TeamMember | null>(null);
+
   const levelLabel = (slug: string) => (ACCESS_BY_SLUG as Record<string, { label: string }>)[slug]?.label ?? slug;
   // If we're editing an existing member whose legacy free-text role isn't in POSITIONS,
   // surface it as an extra option so the Select still renders their current value.
@@ -189,10 +238,102 @@ export default function Team() {
     del.mutate(m.id, { onSuccess: () => toast({ title: "Team member removed" }) });
   };
 
+  /**
+   * Compute the org role we'll use when inviting this team member as a user.
+   * Uses ACCESS_LEVEL_TO_ORG_ROLE, with one safety step-down: only owners can
+   * invite other owners, so admins inviting a Project Executive quietly land
+   * on "admin" instead of tripping the server's 403.
+   */
+  const mappedOrgRole = (m: TeamMember): "owner" | "admin" | "pm" | "foreman" | "viewer" => {
+    const raw = ACCESS_LEVEL_TO_ORG_ROLE[(m.accessLevel ?? "project_manager") as AccessLevel];
+    if (raw === "owner" && myMembershipRole !== "owner") return "admin";
+    return raw;
+  };
+
+  /** Human-friendly label for the org roles (matches Settings → Team & Access). */
+  const ORG_ROLE_LABEL: Record<string, string> = {
+    owner: "Owner", admin: "Admin", pm: "Project Manager",
+    foreman: "Foreman", viewer: "Viewer",
+  };
+
+  /**
+   * Given the current active seat count, decide whether adding one more will
+   * bump us into overage territory. Returns the incremental $/mo (in cents) or
+   * 0 if the new seat is still inside the included allotment. Assumes we're
+   * committing +1 seat on top of `projectedSeats` (which already counts pending).
+   */
+  const overageChargeCents = (): number => {
+    if (!pricing || includedSeats === null) return 0;
+    const nextSeats = projectedSeats + 1;
+    if (nextSeats <= includedSeats) return 0;
+    return pricing.seatAmountCents;
+  };
+
+  /** Format cents as "$29" or "$29.50". */
+  const fmtCents = (cents: number): string => {
+    const dollars = cents / 100;
+    return dollars % 1 === 0 ? `$${dollars.toFixed(0)}` : `$${dollars.toFixed(2)}`;
+  };
+
+  const doInvite = async () => {
+    if (!inviteTarget) return;
+    const email = (inviteTarget.email || "").trim().toLowerCase();
+    const role = mappedOrgRole(inviteTarget);
+    try {
+      await createInvite.mutateAsync({ email, role });
+      toast({
+        title: `Invite sent to ${inviteTarget.name}`,
+        description: `${email} will get an email to set their password and join as ${ORG_ROLE_LABEL[role]}.`,
+      });
+      setInviteTarget(null);
+    } catch (err: any) {
+      toast({
+        title: "Invite failed",
+        description: err?.message || "Could not send invite. See console for details.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  /**
+   * Compute the current invite-status chip for a team member.
+   * - null email       → "no email" (can't invite)
+   * - active member    → "active user" chip
+   * - pending invite   → "invite pending" chip
+   * - otherwise         → null (button will show)
+   */
+  const inviteStatus = (m: TeamMember): "active" | "pending" | "noEmail" | "invitable" => {
+    const email = (m.email || "").trim().toLowerCase();
+    if (!email) return "noEmail";
+    if (activeMemberEmails.has(email)) return "active";
+    if (pendingInviteEmails.has(email)) return "pending";
+    return "invitable";
+  };
+
   return (
     <Layout title="Project Team" actions={
       canManage ? <Button size="sm" onClick={openNew} data-testid="button-new-member"><Plus className="size-4" /> Add Member</Button> : undefined
     }>
+      {/* Seat-usage header — visible to anyone who can see the Team page, but
+          only when the org is on a paid plan (pricing != null). Keeps seat
+          state visible in the place where you're most likely to want to add
+          users. Same numbers you'd see in Settings → Team & Access. */}
+      {orgData && pricing && includedSeats !== null && (
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm shadow-sm" data-testid="seat-usage-header">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-display text-lg font-bold text-foreground">{activeSeats}</span>
+            <span className="text-muted-foreground">of {includedSeats} included seat{includedSeats === 1 ? "" : "s"}</span>
+            <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">{pricing.displayName} · {pricing.billing}</span>
+          </div>
+          {pendingCount > 0 && (
+            <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">+{pendingCount} pending invite{pendingCount === 1 ? "" : "s"}</span>
+          )}
+          {activeSeats > includedSeats && (
+            <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">+{activeSeats - includedSeats} overage · {fmtCents(pricing.seatAmountCents)}/seat/{pricing.billing === "annual" ? "yr" : "mo"}</span>
+          )}
+          <span className="ml-auto text-xs text-muted-foreground">Each additional seat · <span className="font-medium text-foreground">{fmtCents(pricing.seatAmountCents)}/{pricing.billing === "annual" ? "yr" : "mo"}</span></span>
+        </div>
+      )}
       {canManage && (
       <CreateEntityDialog
         open={open}
@@ -228,6 +369,38 @@ export default function Team() {
                 </div>
                 )}
               </div>
+              {/* Invite-as-user row — either a status chip (already invited /
+                  active user / no email on file) or the invite button. Only
+                  members with billing.manageMembers capability (owner/admin)
+                  see the button; everyone still sees the informational chip. */}
+              {(() => {
+                const st = inviteStatus(m);
+                if (st === "active") return (
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-400" data-testid={`chip-active-user-${m.id}`}>
+                    <CheckCircle2 className="size-3.5" /> Active user
+                  </div>
+                );
+                if (st === "pending") return (
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400" data-testid={`chip-invite-pending-${m.id}`}>
+                    <Clock className="size-3.5" /> Invite pending
+                  </div>
+                );
+                if (st === "noEmail") return (
+                  <div className="mt-3 text-xs italic text-muted-foreground/70" data-testid={`chip-no-email-${m.id}`}>
+                    Add an email to invite this member as a user
+                  </div>
+                );
+                if (!canInviteMembers) return null;
+                return (
+                  <button
+                    onClick={() => setInviteTarget(m)}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-dashed border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+                    data-testid={`button-invite-user-${m.id}`}
+                  >
+                    <UserPlus className="size-3.5" /> Invite as user
+                  </button>
+                );
+              })()}
               <div className="mt-4 space-y-1.5 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   {m.companyPhoto ? (
@@ -245,6 +418,65 @@ export default function Team() {
           ))}
         </div>
       )}
+
+      {/* Invite confirmation dialog — shows mapped org role, seat impact, and any
+          overage charge before we actually POST /api/org/invites. Only rendered
+          when we have a target; the AlertDialog controls its own trigger via
+          the `open` prop instead of AlertDialogTrigger so we can drive it from
+          the per-card button. */}
+      <AlertDialog open={inviteTarget !== null} onOpenChange={(v) => !v && setInviteTarget(null)}>
+        <AlertDialogContent data-testid="dialog-invite-confirm">
+          {inviteTarget && (() => {
+            const role = mappedOrgRole(inviteTarget);
+            const extraCents = overageChargeCents();
+            const willOverage = extraCents > 0;
+            const seatsAfter = projectedSeats + 1;
+            const period = pricing?.billing === "annual" ? "yr" : "mo";
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Invite {inviteTarget.name} as a user?</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3 pt-2">
+                      <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-foreground">
+                        <div>An invite email will be sent to <span className="font-medium">{inviteTarget.email}</span>. They'll create their own password and join with the login role:</div>
+                        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"><ShieldCheck className="size-3" /> {ORG_ROLE_LABEL[role]}</div>
+                        <div className="mt-2 text-xs text-muted-foreground">Mapped from their access level: <span className="font-medium">{ACCESS_BY_SLUG[(inviteTarget.accessLevel ?? "project_manager") as AccessLevel].label}</span></div>
+                      </div>
+
+                      {pricing && includedSeats !== null ? (
+                        willOverage ? (
+                          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+                            <div className="font-medium">Seat overage · +{fmtCents(extraCents)}/{period}</div>
+                            <div className="mt-1 text-xs">This will bring you to {seatsAfter} seat{seatsAfter === 1 ? "" : "s"} (plan includes {includedSeats}). Your next invoice will add {fmtCents(extraCents)} for this seat.</div>
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-200">
+                            <div className="font-medium">No extra charge</div>
+                            <div className="mt-1 text-xs">This will use {seatsAfter} of {includedSeats} included seat{includedSeats === 1 ? "" : "s"} on your {pricing.displayName} plan.</div>
+                          </div>
+                        )
+                      ) : (
+                        <div className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">Seat pricing unavailable — your org may not be on a paid plan yet.</div>
+                      )}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={createInvite.isPending}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => { e.preventDefault(); doInvite(); }}
+                    disabled={createInvite.isPending}
+                    data-testid="button-confirm-invite"
+                  >
+                    {createInvite.isPending ? "Sending…" : willOverage ? `Send invite · +${fmtCents(extraCents)}/${period}` : "Send invite"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
