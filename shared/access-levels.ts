@@ -32,6 +32,10 @@ const R = {
   notifications: "/notifications",
   projects: "/projects",
   projectDetail: "/projects/:id",
+  // Sub Drop Portal PM-side inbox: review, categorize, and act on documents
+  // that subs uploaded via the /drop/:token portal. PM/exec workflow only —
+  // gated below to PE, PM, and Super.
+  projectSubUploads: "/projects/:id/sub-uploads",
   schedule: "/schedule",
   gantt: "/gantt",
   cpm: "/cpm",
@@ -178,7 +182,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: false, canManageSettings: false, canManageIntegrations: false,
     canViewFinancials: false, canDelete: false, canCreateEdit: true, canResetData: false,
     allowedRoutes: [
-      R.dashboard, R.notifications, R.projects, R.projectDetail, R.schedule, R.gantt, R.cpm,
+      R.dashboard, R.notifications, R.projects, R.projectDetail, R.projectSubUploads, R.schedule, R.gantt, R.cpm,
       R.tasks, R.actionItems, R.rfis, R.submittals, R.changeOrders, R.punch,
       R.dailyLogs, R.photos, R.documents, R.companyDocuments, R.blueprints, R.equipment, R.drone,
       R.contacts, R.messages, R.notes, R.timesheets,
