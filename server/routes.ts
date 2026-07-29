@@ -847,6 +847,221 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(mine);
   });
 
+  // ==== Sub-side RFI / Change Order / Task endpoints =====================
+  // All of these:
+  //   1. Require a valid sub session (resolveSubSession middleware)
+  //   2. Verify the sub is attached to the project (isSubAttached)
+  //   3. Check the project isn't closed (isProjectClosedToSubs) — returns 410
+  //      "job_closed" so the client can show the friendly closed-portal UI
+  //   4. Land RFI/CO submissions as `sub_draft` status — they only enter the
+  //      real workflow after a PM accepts. This keeps quality high and lets
+  //      the PM edit fields (assignee, spec ref, etc.) during review.
+  //
+  // Nothing here writes to sub_uploads. If we want to persist the RFI/CO
+  // attachment for the PM inbox as well, we'll wire that in a follow-up.
+
+  // Helper: shared preflight for every sub-side RFI/CO/Task endpoint.
+  async function subProjectGate(req: any, res: any): Promise<Project | null> {
+    const projectId = parseInt(req.params.projectId, 10);
+    if (!Number.isFinite(projectId)) { res.status(400).json({ message: "Invalid project id." }); return null; }
+    const attached = await storage.isSubAttached(req.subCompany.id, projectId);
+    if (!attached) { res.status(403).json({ message: "Not attached to this project." }); return null; }
+    const project = await storage.getProject(projectId);
+    if (!project) { res.status(404).json({ message: "Project not found." }); return null; }
+    if (isProjectClosedToSubs(project)) { respondJobClosed(res, project.name); return null; }
+    return project;
+  }
+
+  // Synthetic req-shape used to funnel sub-authored events through logEvent().
+  // logEvent reads req.account for actor name/id — for sub actions we surface
+  // the sub company as the actor name, and leave actorAccountId null so the
+  // event JOINs don't try to look up a phantom user row.
+  function subActorReq(sub: any, organizationId: number | null): any {
+    return {
+      organizationId,
+      account: { id: null, name: `${sub.companyName} (sub)`, email: sub.contactEmail },
+    };
+  }
+
+  // ---- Sub submits an RFI (lands as sub_draft) ---------------------------
+  app.post("/api/sub/projects/:projectId/rfis", resolveSubSession, async (req: any, res) => {
+    const project = await subProjectGate(req, res);
+    if (!project) return;
+    const b = req.body || {};
+    const subject = String(b.subject || "").trim();
+    const body = b.body ? String(b.body).trim() : "";
+    const trade = b.trade ? String(b.trade).trim() : (req.subCompany.trade || null);
+    const priority = b.priority ? String(b.priority).trim() : "Medium";
+    const dueDate = b.dueDate ? String(b.dueDate).trim() : new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const specSection = b.specSection ? String(b.specSection).trim() : null;
+    const drawingRef = b.drawingRef ? String(b.drawingRef).trim() : null;
+    if (!subject) return res.status(400).json({ message: "Subject is required." });
+    if (!body) return res.status(400).json({ message: "Question detail is required." });
+    const number = await storage.nextRfiNumber(project.id);
+    const created = await storage.createRfi({
+      projectId: project.id,
+      number,
+      subject,
+      status: "sub_draft",
+      assigneeId: null,
+      dateCreated: new Date().toISOString().slice(0, 10),
+      dueDate,
+      trade,
+      body,
+      specSection,
+      drawingRef,
+      priority,
+      submittedBySubCompanyId: req.subCompany.id,
+    });
+    logEvent(subActorReq(req.subCompany, project.organizationId!), {
+      projectId: project.id,
+      kind: "rfi.sub_draft",
+      title: `${number} draft from ${req.subCompany.companyName} \u2014 ${subject}`,
+      sourceType: "rfi",
+      sourceId: created.id,
+      meta: { number, status: "sub_draft", submittedBySubCompanyId: req.subCompany.id },
+    });
+    res.status(201).json(created);
+  });
+
+  // ---- Sub lists their own RFIs on a project -----------------------------
+  app.get("/api/sub/projects/:projectId/rfis", resolveSubSession, async (req: any, res) => {
+    const project = await subProjectGate(req, res);
+    if (!project) return;
+    const rows = await storage.listRfisSubmittedBySub(project.id, req.subCompany.id);
+    res.json(rows);
+  });
+
+  // ---- Sub submits a Change Order (lands as sub_draft) -------------------
+  app.post("/api/sub/projects/:projectId/change-orders", resolveSubSession, async (req: any, res) => {
+    const project = await subProjectGate(req, res);
+    if (!project) return;
+    const b = req.body || {};
+    const title = String(b.title || "").trim();
+    const description = b.description ? String(b.description).trim() : "";
+    const trade = b.trade ? String(b.trade).trim() : (req.subCompany.trade || null);
+    const category = b.category ? String(b.category).trim() : null;
+    const amount = Number.isFinite(Number(b.amount)) ? Number(b.amount) : 0;
+    const scheduleImpact = Number.isFinite(Number(b.scheduleImpact)) ? Number(b.scheduleImpact) : 0;
+    if (!title) return res.status(400).json({ message: "Title is required." });
+    if (!description) return res.status(400).json({ message: "Description is required." });
+    const number = await storage.nextChangeOrderNumber(project.id);
+    const created = await storage.createChangeOrder({
+      projectId: project.id,
+      number,
+      title,
+      status: "sub_draft",
+      amount,
+      scheduleImpact,
+      dateIssued: new Date().toISOString().slice(0, 10),
+      trade,
+      description,
+      category,
+      submittedBySubCompanyId: req.subCompany.id,
+    });
+    logEvent(subActorReq(req.subCompany, project.organizationId!), {
+      projectId: project.id,
+      kind: "change_order.sub_draft",
+      title: `${number} draft from ${req.subCompany.companyName} \u2014 ${title}`,
+      sourceType: "change_order",
+      sourceId: created.id,
+      meta: { number, status: "sub_draft", amount, scheduleImpact, submittedBySubCompanyId: req.subCompany.id },
+    });
+    res.status(201).json(created);
+  });
+
+  // ---- Sub lists their own COs on a project (with PM decision) -----------
+  app.get("/api/sub/projects/:projectId/change-orders", resolveSubSession, async (req: any, res) => {
+    const project = await subProjectGate(req, res);
+    if (!project) return;
+    const rows = await storage.listChangeOrdersSubmittedBySub(project.id, req.subCompany.id);
+    res.json(rows);
+  });
+
+  // ---- Sub lists tasks assigned to their company -------------------------
+  app.get("/api/sub/projects/:projectId/tasks", resolveSubSession, async (req: any, res) => {
+    const project = await subProjectGate(req, res);
+    if (!project) return;
+    const rows = await storage.listTasksForSub(project.id, req.subCompany.id);
+    res.json(rows);
+  });
+
+  // ---- Sub marks an assigned task complete -------------------------------
+  // Attachment is optional — sent multipart when the sub adds a photo/receipt.
+  // If none is sent, the request goes through as plain JSON.
+  app.post(
+    "/api/sub/tasks/:taskId/complete",
+    resolveSubSession,
+    subDropUpload.single("attachment"),
+    async (req: any, res) => {
+      const taskId = parseInt(req.params.taskId, 10);
+      if (!Number.isFinite(taskId)) return res.status(400).json({ message: "Invalid task id." });
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found." });
+      if (task.assignedSubCompanyId !== req.subCompany.id) {
+        return res.status(403).json({ message: "This task isn't assigned to your company." });
+      }
+      const project = await storage.getProject(task.projectId);
+      if (!project) return res.status(404).json({ message: "Project not found." });
+      if (isProjectClosedToSubs(project)) return respondJobClosed(res, project.name);
+      const attached = await storage.isSubAttached(req.subCompany.id, project.id);
+      if (!attached) return res.status(403).json({ message: "Not attached to this project." });
+
+      const note = req.body?.note ? String(req.body.note).trim() : null;
+      const file: Express.Multer.File | undefined = req.file;
+
+      const { task: updated, completion } = await storage.markTaskCompleteBySub({
+        taskId,
+        projectId: project.id,
+        organizationId: project.organizationId!,
+        subCompanyId: req.subCompany.id,
+        note,
+        attachmentOriginalName: file?.originalname ?? null,
+        attachmentStoredName: file?.filename ?? null,
+      });
+
+      // Also index the attachment in the PM's Sub Uploads inbox so it lives
+      // alongside the sub's other files. Classified as "Photos" when the mime
+      // is an image, otherwise let the classifier decide.
+      if (file) {
+        const { category, confidence } = classifyUpload(file.originalname, file.mimetype);
+        await storage.createSubUpload({
+          organizationId: project.organizationId!,
+          projectId: project.id,
+          dropTokenId: 0, // task-attached, not from a drop QR
+          subCompanyId: req.subCompany.id,
+          subName: req.subCompany.contactName,
+          subCompany: req.subCompany.companyName,
+          subTrade: req.subCompany.trade,
+          subPhone: req.subCompany.contactPhone,
+          originalFileName: file.originalname,
+          storedFileName: file.filename,
+          mimeType: file.mimetype,
+          fileSizeBytes: file.size,
+          category,
+          categoryConfidence: confidence,
+          categoryOverriddenById: null,
+          status: "new",
+          reviewedByAccountId: null,
+          reviewedAt: null,
+          notes: `Attached to task \u201C${task.title}\u201D (task #${task.id})`,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      logEvent(subActorReq(req.subCompany, project.organizationId!), {
+        projectId: project.id,
+        kind: "task.completed",
+        title: `Task completed by ${req.subCompany.companyName} \u2014 ${task.title}`,
+        sourceType: "task",
+        sourceId: task.id,
+        meta: { subCompanyId: req.subCompany.id, hasAttachment: Boolean(file), completionId: completion.id },
+      });
+
+      res.status(201).json({ task: updated, completion });
+    },
+  );
+
   // ---- Sub drop: the actual file upload ---------------------------------
   // Signed-in subs only. The drop-token in the URL is validated for project
   // authorization but the sub's identity comes from their session, not from
@@ -1727,6 +1942,25 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(updated);
   });
 
+  // General PATCH for tasks — currently accepts assigneeId,
+  // assignedSubCompanyId, priority, title, description, dueDate. Used by the
+  // PM UI to reassign a task to a sub company (or unassign by sending null).
+  app.patch("/api/tasks/:id", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid task id." });
+    const b = req.body || {};
+    const patch: any = {};
+    if ("assigneeId" in b) patch.assigneeId = b.assigneeId == null ? null : Number(b.assigneeId) || null;
+    if ("assignedSubCompanyId" in b) patch.assignedSubCompanyId = b.assignedSubCompanyId == null ? null : Number(b.assignedSubCompanyId) || null;
+    if ("priority" in b && b.priority != null) patch.priority = String(b.priority);
+    if ("title" in b && b.title != null) patch.title = String(b.title);
+    if ("trade" in b) patch.trade = b.trade == null ? null : String(b.trade);
+    if ("dueDate" in b) patch.dueDate = b.dueDate == null ? null : String(b.dueDate);
+    const updated = await storage.patchTask(id, patch);
+    if (!updated) return res.status(404).json({ message: "Task not found." });
+    res.json(updated);
+  });
+
   // RFIs
   app.get("/api/rfis", scopeProjectQuery, async (req: any, res) => {
     const rows = await storage.getRfis(pid(req));
@@ -1819,6 +2053,104 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         meta: { number: updated.number, amount: updated.amount ?? null, status },
       });
     }
+    res.json(updated);
+  });
+
+  // ---- PM accepts a sub-submitted draft RFI ----------------------------
+  // Body may include an optional patch of fields the PM tweaked during review
+  // (assignee, spec ref, drawing ref, etc.). Status flips sub_draft → Open.
+  // 404 if the RFI is not in sub_draft state (guards against double-accepts).
+  app.post("/api/rfis/:id/accept-sub-draft", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid RFI id." });
+    const rfi = await storage.getRfi(id);
+    if (!rfi) return res.status(404).json({ message: "RFI not found." });
+    const project = await requireProjectAccess(req, res, rfi.projectId);
+    if (!project) return;
+    if (rfi.status !== "sub_draft") return res.status(409).json({ message: "This RFI is not in draft state." });
+    const b = req.body || {};
+    const patch: any = {};
+    if (b.subject != null) patch.subject = String(b.subject);
+    if (b.trade != null) patch.trade = String(b.trade);
+    if (b.assigneeId != null) patch.assigneeId = Number(b.assigneeId) || null;
+    if (b.dueDate != null) patch.dueDate = String(b.dueDate);
+    if (b.specSection != null) patch.specSection = String(b.specSection);
+    if (b.drawingRef != null) patch.drawingRef = String(b.drawingRef);
+    if (b.priority != null) patch.priority = String(b.priority);
+    if (b.body != null) patch.body = String(b.body);
+    const updated = await storage.acceptSubDraftRfi(id, req.account.id, patch);
+    if (!updated) return res.status(409).json({ message: "This RFI could not be accepted (already processed?)." });
+    logEvent(req, {
+      projectId: updated.projectId,
+      kind: EVENT_KINDS.RFI_CREATED,
+      title: `${updated.number} accepted \u2014 ${updated.subject}`,
+      sourceType: "rfi",
+      sourceId: updated.id,
+      meta: { number: updated.number, status: updated.status, acceptedFromSubCompanyId: updated.submittedBySubCompanyId },
+    });
+    res.json(updated);
+  });
+
+  // ---- PM accepts a sub-submitted draft Change Order --------------------
+  app.post("/api/change-orders/:id/accept-sub-draft", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid CO id." });
+    const co = await storage.getChangeOrder(id);
+    if (!co) return res.status(404).json({ message: "Change order not found." });
+    const project = await requireProjectAccess(req, res, co.projectId);
+    if (!project) return;
+    if (co.status !== "sub_draft") return res.status(409).json({ message: "This change order is not in draft state." });
+    const b = req.body || {};
+    const patch: any = {};
+    if (b.title != null) patch.title = String(b.title);
+    if (b.trade != null) patch.trade = String(b.trade);
+    if (b.amount != null) patch.amount = Number(b.amount) || 0;
+    if (b.scheduleImpact != null) patch.scheduleImpact = Number(b.scheduleImpact) || 0;
+    if (b.description != null) patch.description = String(b.description);
+    if (b.category != null) patch.category = String(b.category);
+    const updated = await storage.acceptSubDraftChangeOrder(id, req.account.id, patch);
+    if (!updated) return res.status(409).json({ message: "This CO could not be accepted (already processed?)." });
+    logEvent(req, {
+      projectId: updated.projectId,
+      kind: EVENT_KINDS.CHANGE_ORDER_CREATED,
+      title: `${updated.number} accepted \u2014 ${updated.title}`,
+      sourceType: "change_order",
+      sourceId: updated.id,
+      meta: { number: updated.number, amount: updated.amount, status: updated.status, acceptedFromSubCompanyId: updated.submittedBySubCompanyId },
+    });
+    res.json(updated);
+  });
+
+  // ---- PM records a decision the sub will see on their /drop portal -----
+  // Decision is independent of the base status column — a CO can be flagged
+  // "approved" for the sub while its internal status is still "Executing".
+  app.post("/api/change-orders/:id/sub-decision", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid CO id." });
+    const co = await storage.getChangeOrder(id);
+    if (!co) return res.status(404).json({ message: "Change order not found." });
+    const project = await requireProjectAccess(req, res, co.projectId);
+    if (!project) return;
+    if (!co.submittedBySubCompanyId) {
+      return res.status(400).json({ message: "This CO was not submitted by a sub \u2014 nothing to notify." });
+    }
+    const decision = String(req.body?.decision || "").trim();
+    if (!/^(approved|rejected|needs_changes)$/.test(decision)) {
+      return res.status(400).json({ message: "decision must be approved, rejected, or needs_changes." });
+    }
+    const comment = req.body?.comment ? String(req.body.comment).trim() : null;
+    const updated = await storage.recordSubDecisionOnChangeOrder(
+      id, decision as any, comment, req.account.id,
+    );
+    if (!updated) return res.status(404).json({ message: "Change order not found." });
+    logEvent(req, {
+      projectId: updated.projectId,
+      kind: "change_order.sub_decision",
+      title: `${updated.number} decision: ${decision.replace("_", " ")}`,
+      sourceType: "change_order",
+      sourceId: updated.id,
+      meta: { number: updated.number, decision, comment, submittedBySubCompanyId: updated.submittedBySubCompanyId },
+    });
     res.json(updated);
   });
 

@@ -1,5 +1,5 @@
 import { integrations, accounts } from '@shared/schema';
-import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, DailyLog, PunchItem, TeamMember, Contact, Equipment, MaintenanceLog, InsertMaintenanceLog, Photo, DocumentRow, CompanyDocument, DeletedItem, Blueprint, DroneCapture, Message, Note, Integration, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertDailyLog, InsertPunchItem, InsertContact, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember, Milestone, InsertMilestone, Account, AccountPublic, Session, PasswordResetToken, Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest, JarvisMemory, InsertJarvisMemory, Timesheet, InsertTimesheet, TimeEntry, InsertTimeEntry, FieldPunch, InsertFieldPunch, FieldObservation, InsertFieldObservation, MobilizationPlan, InsertMobilizationPlan, MobilizationItem, InsertMobilizationItem, MobilizationPermit, InsertMobilizationPermit, MobilizationEquipment, InsertMobilizationEquipment, MobilizationUtility, InsertMobilizationUtility, MobilizationStaff, InsertMobilizationStaff, MobilizationSub, InsertMobilizationSub, MobilizationRisk, InsertMobilizationRisk, MobilizationSignature, InsertMobilizationSignature, MobilizationSectionNote, ProjectSetup, InsertProjectSetup, ProjectSetupStakeholder, InsertProjectSetupStakeholder, ProjectSetupContractDoc, InsertProjectSetupContractDoc, ProjectSetupDeliverable, InsertProjectSetupDeliverable, ProjectSetupSignature, InsertProjectSetupSignature, PreConstruction, InsertPreConstruction, PreConstructionDesignDoc, InsertPreConstructionDesignDoc, PreConstructionDesignRfi, InsertPreConstructionDesignRfi, PreConstructionVeItem, InsertPreConstructionVeItem, PreConstructionPermit, InsertPreConstructionPermit, PreConstructionPrequalSub, InsertPreConstructionPrequalSub, PreConstructionBidPackage, InsertPreConstructionBidPackage, PreConstructionLongLeadItem, InsertPreConstructionLongLeadItem, PreConstructionSignature, InsertPreConstructionSignature, LeanModuleState, InsertLeanModuleState, LeanModuleItem, InsertLeanModuleItem, LeanModuleItemAttachment, InsertLeanModuleItemAttachment } from '@shared/schema';
+import type { Project, Task, Rfi, Submittal, ChangeOrder, ActionItem, SubTaskCompletion, DailyLog, PunchItem, TeamMember, Contact, Equipment, MaintenanceLog, InsertMaintenanceLog, Photo, DocumentRow, CompanyDocument, DeletedItem, Blueprint, DroneCapture, Message, Note, Integration, InsertProject, InsertTask, InsertRfi, InsertSubmittal, InsertChangeOrder, InsertActionItem, InsertDailyLog, InsertPunchItem, InsertContact, InsertEquipment, InsertPhoto, InsertDocument, InsertCompanyDocument, InsertBlueprint, InsertDroneCapture, InsertMessage, InsertNote, InsertTeamMember, Milestone, InsertMilestone, Account, AccountPublic, Session, PasswordResetToken, Subscriber, DemoRequest, InsertSubscriber, InsertDemoRequest, JarvisMemory, InsertJarvisMemory, Timesheet, InsertTimesheet, TimeEntry, InsertTimeEntry, FieldPunch, InsertFieldPunch, FieldObservation, InsertFieldObservation, MobilizationPlan, InsertMobilizationPlan, MobilizationItem, InsertMobilizationItem, MobilizationPermit, InsertMobilizationPermit, MobilizationEquipment, InsertMobilizationEquipment, MobilizationUtility, InsertMobilizationUtility, MobilizationStaff, InsertMobilizationStaff, MobilizationSub, InsertMobilizationSub, MobilizationRisk, InsertMobilizationRisk, MobilizationSignature, InsertMobilizationSignature, MobilizationSectionNote, ProjectSetup, InsertProjectSetup, ProjectSetupStakeholder, InsertProjectSetupStakeholder, ProjectSetupContractDoc, InsertProjectSetupContractDoc, ProjectSetupDeliverable, InsertProjectSetupDeliverable, ProjectSetupSignature, InsertProjectSetupSignature, PreConstruction, InsertPreConstruction, PreConstructionDesignDoc, InsertPreConstructionDesignDoc, PreConstructionDesignRfi, InsertPreConstructionDesignRfi, PreConstructionVeItem, InsertPreConstructionVeItem, PreConstructionPermit, InsertPreConstructionPermit, PreConstructionPrequalSub, InsertPreConstructionPrequalSub, PreConstructionBidPackage, InsertPreConstructionBidPackage, PreConstructionLongLeadItem, InsertPreConstructionLongLeadItem, PreConstructionSignature, InsertPreConstructionSignature, LeanModuleState, InsertLeanModuleState, LeanModuleItem, InsertLeanModuleItem, LeanModuleItemAttachment, InsertLeanModuleItemAttachment } from '@shared/schema';
 
 // Scoping contract for the org-scoped list reads below (getTeam, getProjects,
 // getContacts, getEquipment, getCompanyDocuments): passing `undefined` reads
@@ -18,17 +18,52 @@ export interface IStorage {
   updateProject(id: number, data: Partial<InsertProject>): Promise<Project | undefined>;
   deleteProject(id: number): Promise<boolean>;
   getTasks(projectId?: number): Promise<Task[]>;
+  getTask(id: number): Promise<Task | undefined>;
   createTask(data: InsertTask): Promise<Task>;
   updateTaskStatus(id: number, status: string): Promise<Task | undefined>;
+  patchTask(id: number, patch: Partial<Pick<Task, "assigneeId" | "assignedSubCompanyId" | "priority" | "title" | "dueDate" | "status" | "trade">>): Promise<Task | undefined>;
+  listTasksForSub(projectId: number, subCompanyId: number): Promise<Task[]>;
+  markTaskCompleteBySub(params: {
+    taskId: number;
+    projectId: number;
+    organizationId: number;
+    subCompanyId: number;
+    note?: string | null;
+    attachmentOriginalName?: string | null;
+    attachmentStoredName?: string | null;
+  }): Promise<{ task: Task | undefined; completion: SubTaskCompletion }>;
+  listSubTaskCompletions(taskId: number): Promise<SubTaskCompletion[]>;
   updateRfiStatus(id: number, status: string): Promise<Rfi | undefined>;
   updateSubmittalStatus(id: number, status: string): Promise<Submittal | undefined>;
   updateChangeOrderStatus(id: number, status: string): Promise<ChangeOrder | undefined>;
   getRfis(projectId?: number): Promise<Rfi[]>;
+  getRfi(id: number): Promise<Rfi | undefined>;
   createRfi(data: InsertRfi): Promise<Rfi>;
+  acceptSubDraftRfi(
+    id: number,
+    acceptedByAccountId: number,
+    patch?: Partial<Pick<Rfi, "subject" | "trade" | "assigneeId" | "dueDate" | "specSection" | "drawingRef" | "priority" | "body">>,
+  ): Promise<Rfi | undefined>;
+  listRfisSubmittedBySub(projectId: number, subCompanyId: number): Promise<Rfi[]>;
+  nextRfiNumber(projectId: number): Promise<string>;
   getSubmittals(projectId?: number): Promise<Submittal[]>;
   createSubmittal(data: InsertSubmittal): Promise<Submittal>;
   getChangeOrders(projectId?: number): Promise<ChangeOrder[]>;
+  getChangeOrder(id: number): Promise<ChangeOrder | undefined>;
   createChangeOrder(data: InsertChangeOrder): Promise<ChangeOrder>;
+  acceptSubDraftChangeOrder(
+    id: number,
+    acceptedByAccountId: number,
+    patch?: Partial<Pick<ChangeOrder, "title" | "trade" | "amount" | "scheduleImpact" | "description" | "category">>,
+  ): Promise<ChangeOrder | undefined>;
+  recordSubDecisionOnChangeOrder(
+    id: number,
+    decision: "approved" | "rejected" | "needs_changes",
+    comment: string | null,
+    decidedByAccountId: number,
+  ): Promise<ChangeOrder | undefined>;
+  listChangeOrdersSubmittedBySub(projectId: number, subCompanyId: number): Promise<ChangeOrder[]>;
+  nextChangeOrderNumber(projectId: number): Promise<string>;
   createActionItem(data: InsertActionItem): Promise<ActionItem>;
   getActionItems(projectId?: number): Promise<ActionItem[]>;
   updateActionItemStatus(id: number, status: string): Promise<ActionItem | undefined>;

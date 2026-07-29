@@ -17,7 +17,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useRoute } from "wouter";
-import { Loader2, Upload, LogOut, CheckCircle2, AlertTriangle, FileText, Info, X, ShieldCheck, FolderTree, ScanLine, PackageCheck } from "lucide-react";
+import { Loader2, Upload, LogOut, CheckCircle2, AlertTriangle, FileText, Info, X, ShieldCheck, FolderTree, ScanLine, PackageCheck, Inbox, DollarSign, ClipboardList, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,7 +119,7 @@ export default function SubDropPage() {
       />
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-6">
         {me ? (
-          <UploadPanel
+          <SubHomeTabs
             me={me}
             token={token}
             projectId={tokenInfo.projectId}
@@ -681,4 +681,471 @@ function UploadRowItem({ u }: { u: UploadRow }) {
       </span>
     </li>
   );
+}
+
+/* ------------------- Sub Home: tabbed shell over Upload + RFIs + COs + Tasks ------------------- */
+
+type SubTabKey = "upload" | "rfis" | "cos" | "tasks";
+
+type SubTab = { key: SubTabKey; label: string; icon: React.ComponentType<{ className?: string }> };
+const SUB_TABS: SubTab[] = [
+  { key: "upload", label: "Upload", icon: Upload },
+  { key: "rfis", label: "RFIs", icon: Inbox },
+  { key: "cos", label: "COs", icon: DollarSign },
+  { key: "tasks", label: "Tasks", icon: ClipboardList },
+];
+
+function SubHomeTabs(props: {
+  me: SubCompany;
+  token: string;
+  projectId: number;
+  onJobClosed: () => void;
+}) {
+  const [tab, setTab] = useState<SubTabKey>("upload");
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-4 gap-1 rounded-md border border-slate-200 bg-slate-50 p-1 text-xs dark:border-slate-800 dark:bg-slate-900">
+        {SUB_TABS.map(t => {
+          const Icon = t.icon;
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center justify-center gap-1.5 rounded-sm px-2 py-2 font-medium transition ${active ? "bg-white text-primary shadow-sm dark:bg-slate-950" : "text-slate-600 hover:text-slate-900 dark:text-slate-400"}`}
+            >
+              <Icon className="h-4 w-4" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      {tab === "upload" && (
+        <UploadPanel me={props.me} token={props.token} projectId={props.projectId} onJobClosed={props.onJobClosed} />
+      )}
+      {tab === "rfis" && (
+        <RfisPanel projectId={props.projectId} me={props.me} onJobClosed={props.onJobClosed} />
+      )}
+      {tab === "cos" && (
+        <ChangeOrdersPanel projectId={props.projectId} me={props.me} onJobClosed={props.onJobClosed} />
+      )}
+      {tab === "tasks" && (
+        <TasksPanel projectId={props.projectId} me={props.me} onJobClosed={props.onJobClosed} />
+      )}
+    </div>
+  );
+}
+
+/* ---------- Types for sub-side RFI/CO/Task rows (loose — server sends more fields we ignore) ---------- */
+type SubRfiRow = {
+  id: number; number: string; subject: string; status: string; dueDate: string;
+  trade?: string | null; priority?: string | null; subAcceptedAt?: string | null;
+};
+type SubCoRow = {
+  id: number; number: string; title: string; status: string; amount: number;
+  scheduleImpact: number; subDecision?: string | null; subDecisionComment?: string | null;
+  subDecisionAt?: string | null; subAcceptedAt?: string | null;
+};
+type SubTaskRow = {
+  id: number; title: string; status: string; trade?: string | null;
+  dueDate?: string | null; priority?: string | null;
+  subCompletedAt?: string | null; subCompletionNote?: string | null;
+};
+
+/* ---------------------------- RFIs panel ---------------------------- */
+
+function RfisPanel(props: { projectId: number; me: SubCompany; onJobClosed: () => void }) {
+  const [rows, setRows] = useState<SubRfiRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [priority, setPriority] = useState("Medium");
+  const [dueDate, setDueDate] = useState(defaultDueDate());
+  const [specSection, setSpecSection] = useState("");
+  const [drawingRef, setDrawingRef] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await subJson<SubRfiRow[]>("GET", `/api/sub/projects/${props.projectId}/rfis`);
+      if (res) setRows(res);
+    } catch (err) {
+      if (err instanceof JobClosedError) props.onJobClosed();
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [props.projectId]);
+
+  async function submit() {
+    if (!subject.trim() || !body.trim()) { setError("Subject and question are required."); return; }
+    setSaving(true); setError(null);
+    try {
+      await subJson<SubRfiRow>("POST", `/api/sub/projects/${props.projectId}/rfis`, {
+        subject, body, priority, dueDate,
+        specSection: specSection || null, drawingRef: drawingRef || null,
+      });
+      setSubject(""); setBody(""); setPriority("Medium"); setDueDate(defaultDueDate());
+      setSpecSection(""); setDrawingRef(""); setShowForm(false);
+      await load();
+    } catch (err: any) {
+      if (err instanceof JobClosedError) { props.onJobClosed(); return; }
+      setError(err?.message || "Could not submit RFI.");
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">Your RFIs on this job</h2>
+        {!showForm && <Button size="sm" onClick={() => setShowForm(true)}>New RFI</Button>}
+      </div>
+      {showForm && (
+        <Card className="space-y-3 p-4">
+          <FormRow label="Subject"><Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. Missing dimensions on grid line C-4" /></FormRow>
+          <FormRow label="Question detail">
+            <textarea value={body} onChange={e => setBody(e.target.value)} rows={4}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+              placeholder="Describe the issue and what you need clarified." />
+          </FormRow>
+          <div className="grid grid-cols-2 gap-3">
+            <FormRow label="Priority">
+              <select value={priority} onChange={e => setPriority(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
+                {["Low","Medium","High","Urgent"].map(p => <option key={p}>{p}</option>)}
+              </select>
+            </FormRow>
+            <FormRow label="Due date">
+              <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+            </FormRow>
+            <FormRow label="Spec section (optional)">
+              <Input value={specSection} onChange={e => setSpecSection(e.target.value)} placeholder="03 30 00" />
+            </FormRow>
+            <FormRow label="Drawing ref (optional)">
+              <Input value={drawingRef} onChange={e => setDrawingRef(e.target.value)} placeholder="A-201" />
+            </FormRow>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => { setShowForm(false); setError(null); }}>Cancel</Button>
+            <Button onClick={submit} disabled={saving}>{saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Sending</> : "Submit RFI"}</Button>
+          </div>
+          <p className="text-xs text-slate-500">RFI lands as a draft in your PM's queue for review.</p>
+        </Card>
+      )}
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin"/>Loading…</div>
+      ) : rows.length === 0 ? (
+        <EmptyRow icon={Inbox} label="No RFIs submitted yet." />
+      ) : (
+        <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white text-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
+          {rows.map(r => (
+            <li key={r.id} className="p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{r.number} · {r.subject}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">Due {r.dueDate}{r.trade ? ` · ${r.trade}` : ""}{r.priority ? ` · ${r.priority}` : ""}</div>
+                </div>
+                <StatusPill status={r.status} accepted={!!r.subAcceptedAt} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------- Change Orders panel ---------------------------- */
+
+function ChangeOrdersPanel(props: { projectId: number; me: SubCompany; onJobClosed: () => void }) {
+  const [rows, setRows] = useState<SubCoRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
+  const [amount, setAmount] = useState("");
+  const [scheduleImpact, setScheduleImpact] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [decisionForId, setDecisionForId] = useState<number | null>(null);
+  const [decisionComment, setDecisionComment] = useState("");
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await subJson<SubCoRow[]>("GET", `/api/sub/projects/${props.projectId}/change-orders`);
+      if (res) setRows(res);
+    } catch (err) {
+      if (err instanceof JobClosedError) props.onJobClosed();
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [props.projectId]);
+
+  async function submit() {
+    if (!title.trim() || !description.trim()) { setError("Title and description are required."); return; }
+    setSaving(true); setError(null);
+    try {
+      await subJson<SubCoRow>("POST", `/api/sub/projects/${props.projectId}/change-orders`, {
+        title, description, category: category || null,
+        amount: Number(amount) || 0, scheduleImpact: Number(scheduleImpact) || 0,
+      });
+      setTitle(""); setDescription(""); setCategory(""); setAmount(""); setScheduleImpact("");
+      setShowForm(false); await load();
+    } catch (err: any) {
+      if (err instanceof JobClosedError) { props.onJobClosed(); return; }
+      setError(err?.message || "Could not submit change order.");
+    } finally { setSaving(false); }
+  }
+
+  async function decide(id: number, decision: "approved" | "rejected" | "needs_changes") {
+    try {
+      await subJson(`POST`, `/api/sub/change-orders/${id}/decision`, {
+        decision, comment: decisionComment.trim() || null,
+      });
+      setDecisionForId(null); setDecisionComment("");
+      await load();
+    } catch (err: any) {
+      if (err instanceof JobClosedError) { props.onJobClosed(); return; }
+      setError(err?.message || "Could not record decision.");
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">Your change orders</h2>
+        {!showForm && <Button size="sm" onClick={() => setShowForm(true)}>New CO</Button>}
+      </div>
+      {showForm && (
+        <Card className="space-y-3 p-4">
+          <FormRow label="Title"><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Added waterproofing at footings" /></FormRow>
+          <FormRow label="Description">
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+              placeholder="What changed and why? Include a short scope + backup if you have it." />
+          </FormRow>
+          <div className="grid grid-cols-2 gap-3">
+            <FormRow label="Category (optional)">
+              <Input value={category} onChange={e => setCategory(e.target.value)} placeholder="Scope change" />
+            </FormRow>
+            <FormRow label="Amount ($)">
+              <Input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" />
+            </FormRow>
+            <FormRow label="Schedule impact (days)">
+              <Input inputMode="decimal" value={scheduleImpact} onChange={e => setScheduleImpact(e.target.value)} placeholder="0" />
+            </FormRow>
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => { setShowForm(false); setError(null); }}>Cancel</Button>
+            <Button onClick={submit} disabled={saving}>{saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Sending</> : "Submit CO"}</Button>
+          </div>
+          <p className="text-xs text-slate-500">Change order lands as a draft in your PM's queue.</p>
+        </Card>
+      )}
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin"/>Loading…</div>
+      ) : rows.length === 0 ? (
+        <EmptyRow icon={DollarSign} label="No change orders submitted yet." />
+      ) : (
+        <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white text-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
+          {rows.map(r => (
+            <li key={r.id} className="p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{r.number} · {r.title}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">
+                    ${Number(r.amount || 0).toLocaleString()} · {Number(r.scheduleImpact || 0)}d
+                    {r.subDecision ? ` · You: ${r.subDecision}` : ""}
+                  </div>
+                </div>
+                <StatusPill status={r.status} accepted={!!r.subAcceptedAt} />
+              </div>
+              {/* Once the PM has issued the CO (status past sub_draft/pending), let sub weigh in. */}
+              {["approved","pending","issued","in_review"].includes(r.status) && !r.subDecision && (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900">
+                  {decisionForId === r.id ? (
+                    <div className="space-y-2">
+                      <textarea rows={2} value={decisionComment} onChange={e => setDecisionComment(e.target.value)}
+                        placeholder="Optional comment"
+                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950" />
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => decide(r.id, "approved")}>Approve</Button>
+                        <Button size="sm" variant="outline" onClick={() => decide(r.id, "needs_changes")}>Needs changes</Button>
+                        <Button size="sm" variant="outline" onClick={() => decide(r.id, "rejected")}>Reject</Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setDecisionForId(null); setDecisionComment(""); }}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
+                      <span>PM issued this CO. Approve or push back?</span>
+                      <Button size="sm" variant="outline" onClick={() => setDecisionForId(r.id)}>Respond</Button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {r.subDecisionComment && (
+                <p className="text-xs italic text-slate-500">Your note: {r.subDecisionComment}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------- Tasks panel ---------------------------- */
+
+function TasksPanel(props: { projectId: number; me: SubCompany; onJobClosed: () => void }) {
+  const [rows, setRows] = useState<SubTaskRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [noteFor, setNoteFor] = useState<number | null>(null);
+  const [note, setNote] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await subJson<SubTaskRow[]>("GET", `/api/sub/projects/${props.projectId}/tasks`);
+      if (res) setRows(res);
+    } catch (err) {
+      if (err instanceof JobClosedError) props.onJobClosed();
+    } finally { setLoading(false); }
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [props.projectId]);
+
+  async function complete(taskId: number) {
+    setBusyId(taskId); setError(null);
+    try {
+      const fd = new FormData();
+      if (note.trim()) fd.append("note", note.trim());
+      if (file) fd.append("attachment", file);
+      await subUpload(`/api/sub/tasks/${taskId}/complete`, fd);
+      setNoteFor(null); setNote(""); setFile(null);
+      await load();
+    } catch (err: any) {
+      if (err instanceof JobClosedError) { props.onJobClosed(); return; }
+      setError(err?.message || "Could not mark complete.");
+    } finally { setBusyId(null); }
+  }
+
+  const open = rows.filter(r => !r.subCompletedAt && r.status !== "completed");
+  const done = rows.filter(r => r.subCompletedAt || r.status === "completed");
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">Tasks assigned to {props.me.companyName}</h2>
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin"/>Loading…</div>
+      ) : rows.length === 0 ? (
+        <EmptyRow icon={ClipboardList} label="No tasks assigned yet." />
+      ) : (
+        <>
+          <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white text-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
+            {open.map(t => (
+              <li key={t.id} className="p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{t.title}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">
+                      {t.dueDate ? `Due ${t.dueDate}` : "No due date"}
+                      {t.trade ? ` · ${t.trade}` : ""}
+                      {t.priority ? ` · ${t.priority}` : ""}
+                    </div>
+                  </div>
+                  <StatusPill status={t.status} />
+                </div>
+                {noteFor === t.id ? (
+                  <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900">
+                    <textarea rows={2} value={note} onChange={e => setNote(e.target.value)}
+                      placeholder="Optional note for your PM"
+                      className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-950" />
+                    <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                      <Paperclip className="h-4 w-4" />
+                      <span>{file ? file.name : "Attach photo/receipt (optional)"}</span>
+                      <input type="file" className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
+                    </label>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => { setNoteFor(null); setNote(""); setFile(null); }}>Cancel</Button>
+                      <Button size="sm" onClick={() => complete(t.id)} disabled={busyId === t.id}>
+                        {busyId === t.id ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Sending</> : "Confirm complete"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-end">
+                    <Button size="sm" variant="outline" onClick={() => setNoteFor(t.id)}>Mark complete</Button>
+                  </div>
+                )}
+              </li>
+            ))}
+            {open.length === 0 && (
+              <li className="p-3 text-sm text-slate-500">All caught up — no open tasks.</li>
+            )}
+          </ul>
+          {done.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Completed</h3>
+              <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white text-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
+                {done.map(t => (
+                  <li key={t.id} className="p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{t.title}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          {t.subCompletedAt ? `You marked complete ${new Date(t.subCompletedAt).toLocaleDateString()}` : "Marked complete"}
+                        </div>
+                      </div>
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    </div>
+                    {t.subCompletionNote && (
+                      <p className="mt-1 text-xs italic text-slate-500">Note: {t.subCompletionNote}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+/* ---------------------------- Shared bits ---------------------------- */
+
+function EmptyRow(props: { icon: React.ComponentType<{ className?: string }>; label: string }) {
+  const Icon = props.icon;
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-dashed border-slate-200 p-4 text-sm text-slate-500 dark:border-slate-800">
+      <Icon className="h-4 w-4" /> {props.label}
+    </div>
+  );
+}
+
+function StatusPill(props: { status: string; accepted?: boolean }) {
+  const isDraft = props.status === "sub_draft" && !props.accepted;
+  const isDone = props.status === "completed" || props.status === "approved" || props.status === "closed";
+  const cls = isDraft
+    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+    : isDone
+    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
+  return (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${cls}`}>
+      {isDraft ? "Draft" : props.status.replaceAll("_", " ")}
+    </span>
+  );
+}
+
+function defaultDueDate(): string {
+  const d = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
 }

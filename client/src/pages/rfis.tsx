@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, HelpCircle, Search, MessageSquare, Archive } from "lucide-react";
+import { Plus, HelpCircle, Search, MessageSquare, Archive, UserCheck } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout";
 import { GhostState, GhostRfiRows } from "@/components/ghost-state";
 import { RfiTable } from "@/components/tables";
@@ -24,9 +27,10 @@ import { shortDate, isOverdue } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Rfi } from "@shared/schema";
 
-type Status = "Open" | "In Review" | "Answered" | "Closed";
+type Status = "sub_draft" | "Open" | "In Review" | "Answered" | "Closed";
 
 const COLUMNS: BoardColumn<Status>[] = [
+  { status: "sub_draft", label: "Sub draft", icon: UserCheck, accent: "text-amber-600" },
   { status: "Open", label: "Open", icon: HelpCircle, accent: "text-amber-500" },
   { status: "In Review", label: "In Review", icon: Search, accent: "text-primary" },
   { status: "Answered", label: "Answered", icon: MessageSquare, accent: "text-blue-500" },
@@ -44,6 +48,24 @@ export default function RfisPage() {
   const create = useCreateRfi();
   const updateStatus = useUpdateRfiStatus();
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Accepts a sub-submitted RFI draft into the PM's real queue. Server flips
+  // status "sub_draft" \u2192 "Open" and stamps sub_accepted_at/by.
+  const acceptSubDraft = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/rfis/${id}/accept-sub-draft`, {});
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rfis"] });
+      toast({ title: "RFI accepted", description: "Now visible in the Open column." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not accept RFI", description: err?.message || "Try again.", variant: "destructive" });
+    },
+  });
 
   // Dashboard badges deep-link here as "/rfis?project=<id>", so seed the
   // project filter from the hash and re-apply it if the param changes while
@@ -233,7 +255,7 @@ export default function RfisPage() {
             title={selected.subject}
             subtitle={projectName(selected.projectId)}
             currentStatus={selected.status}
-            statusOptions={["Open", "In Review", "Answered", "Closed"]}
+            statusOptions={selected.status === "sub_draft" ? ["sub_draft", "Open", "In Review", "Answered", "Closed"] : ["Open", "In Review", "Answered", "Closed"]}
             onStatusChange={(s) => {
               updateStatus.mutate({ id: selected.id, status: s as Status });
               setSelected({ ...selected, status: s });
@@ -246,6 +268,22 @@ export default function RfisPage() {
               { label: "Date created", value: shortDate(selected.dateCreated), mono: true },
               { label: "Due date", value: shortDate(selected.dueDate), mono: true },
             ]}
+            footer={selected.status === "sub_draft" ? (
+              <div className="space-y-2">
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  <div className="flex items-center gap-2 font-medium"><UserCheck className="size-4" /> Draft from sub</div>
+                  <p className="mt-1 text-xs">Review the details, then accept to promote this into the Open queue.</p>
+                </div>
+                <Button
+                  className="w-full"
+                  disabled={acceptSubDraft.isPending}
+                  onClick={() => acceptSubDraft.mutateAsync(selected.id).then(() => { setSelected({ ...selected, status: "Open" }); })}
+                  data-testid="button-accept-sub-draft-rfi"
+                >
+                  {acceptSubDraft.isPending ? "Accepting\u2026" : "Accept draft"}
+                </Button>
+              </div>
+            ) : undefined}
           />
         );
       })()}

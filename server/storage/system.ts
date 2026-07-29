@@ -111,7 +111,7 @@ export class SystemRepo {
       p.push(row);
     }
 
-    const tasksSeed: Omit<Task, "id">[] = [
+    const tasksSeed: (typeof tasks.$inferInsert)[] = [
       { projectId: p[0].id, title: "Site work & utilities", trade: "Civil", status: "Complete", priority: "High", assigneeId: t[3].id, dueDate: "2025-11-15", startDate: "2025-09-02", endDate: "2025-11-15", seq: 1, dependsOn: null },
       { projectId: p[0].id, title: "Foundations & slab", trade: "Concrete", status: "Complete", priority: "High", assigneeId: t[3].id, dueDate: "2026-01-20", startDate: "2025-11-20", endDate: "2026-01-30", seq: 2, dependsOn: "1" },
       { projectId: p[0].id, title: "Structural steel — L1-L3", trade: "Steel", status: "In Progress", priority: "High", assigneeId: t[3].id, dueDate: "2026-04-15", startDate: "2026-02-02", endDate: "2026-04-30", seq: 3, dependsOn: "2" },
@@ -123,7 +123,7 @@ export class SystemRepo {
     ];
     for (const x of tasksSeed) await db.insert(tasks).values(x);
 
-    const rfisSeed: Omit<Rfi, "id">[] = [
+    const rfisSeed: (typeof rfis.$inferInsert)[] = [
       { projectId: p[0].id, number: "RFI-014", subject: "Clearance at med-gas panels — ICU", trade: "Plumbing", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-12", dueDate: "2026-07-23" },
       { projectId: p[0].id, number: "RFI-015", subject: "Curtainwall anchor detail revision", trade: "Curtain Wall", status: "Open", assigneeId: t[1].id, dateCreated: "2026-07-15", dueDate: "2026-07-21" },
       { projectId: p[0].id, number: "RFI-012", subject: "Slab opening for mechanical chase", trade: "Concrete", status: "Answered", assigneeId: t[2].id, dateCreated: "2026-06-28", dueDate: "2026-07-10" },
@@ -142,7 +142,7 @@ export class SystemRepo {
     ];
     for (const x of subsSeed) await db.insert(submittals).values(x);
 
-    const coSeed: Omit<ChangeOrder, "id">[] = [
+    const coSeed: (typeof changeOrders.$inferInsert)[] = [
       { projectId: p[0].id, number: "CO-008", title: "Add 4th-floor terrace upgrade", trade: "General Conditions", status: "Approved", amount: 184000, scheduleImpact: 5, dateIssued: "2026-06-12" },
       { projectId: p[0].id, number: "CO-011", title: "Med-gas manifold expansion", trade: "Plumbing", status: "Pending", amount: 96000, scheduleImpact: 3, dateIssued: "2026-07-09" },
       { projectId: p[0].id, number: "CO-012", title: "Curtainwall IGU upgrade", trade: "Curtain Wall", status: "Pending", amount: 142000, scheduleImpact: 0, dateIssued: "2026-07-15" },

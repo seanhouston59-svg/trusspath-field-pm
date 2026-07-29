@@ -143,6 +143,12 @@ export const tasks = pgTable("tasks", {
   seq: integer("seq"),
   // comma-separated list of predecessor task ids (finish-to-start)
   dependsOn: text("depends_on"),
+  // Sub Portal: PMs can assign a task to a sub company (in addition to — or
+  // instead of — an internal assignee). Subs see these on their /drop portal
+  // and can mark complete. Nullable; existing tasks unaffected.
+  assignedSubCompanyId: integer("assigned_sub_company_id"),
+  subCompletedAt: text("sub_completed_at"),
+  subCompletionNote: text("sub_completion_note"),
 });
 
 /* ------------------------------ Milestones ------------------------------ */
@@ -169,6 +175,18 @@ export const rfis = pgTable("rfis", {
   // Optional trade tag — auto-filled from the RFI subject catalog when the
   // user picks a known subject, editable freely otherwise.
   trade: text("trade"),
+  // Sub Portal fields. When a sub submits an RFI via /drop, it lands as a
+  // draft (status="sub_draft") until a PM accepts. Accepting stamps the
+  // accept_at + accepted_by columns and flips status to "open".
+  submittedBySubCompanyId: integer("submitted_by_sub_company_id"),
+  subAcceptedAt: text("sub_accepted_at"),
+  subAcceptedByAccountId: integer("sub_accepted_by_account_id"),
+  // Rich body captured on the sub-side form. Preserved after PM acceptance
+  // so the accepted RFI carries the sub's original question detail.
+  body: text("body"),
+  specSection: text("spec_section"),
+  drawingRef: text("drawing_ref"),
+  priority: text("priority"),
 });
 
 /* ----------------------------- Submittals ------------------------------ */
@@ -200,6 +218,19 @@ export const changeOrders = pgTable("change_orders", {
   // Optional trade tag — auto-filled from the CO title catalog when the
   // user picks a known title, editable freely otherwise.
   trade: text("trade"),
+  // Sub Portal fields. Same draft flow as RFIs plus a PM decision loop:
+  // subs can see whether their CO was approved, rejected, or needs changes
+  // along with a PM comment. sub_decision is null until PM records one.
+  submittedBySubCompanyId: integer("submitted_by_sub_company_id"),
+  subAcceptedAt: text("sub_accepted_at"),
+  subAcceptedByAccountId: integer("sub_accepted_by_account_id"),
+  description: text("description"),
+  category: text("category"),
+  // One of: "approved" | "rejected" | "needs_changes". Nullable = no decision yet.
+  subDecision: text("sub_decision"),
+  subDecisionComment: text("sub_decision_comment"),
+  subDecisionAt: text("sub_decision_at"),
+  subDecisionByAccountId: integer("sub_decision_by_account_id"),
 });
 
 /* ---------------------------- Action items ----------------------------- */
@@ -1815,6 +1846,26 @@ export const subCompanyProjects = pgTable("sub_company_projects", {
   detachedAt: text("detached_at"),
 });
 
+// Audit trail for sub-side task completions. One row per completion event so
+// we can capture the note, the sub who marked it complete, and any attached
+// photo path without stomping the base task row. The task row still holds
+// the terminal state (sub_completed_at) for fast list rendering; this table
+// holds the story.
+export const subTaskCompletions = pgTable("sub_task_completions", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull(),
+  projectId: integer("project_id").notNull(),
+  taskId: integer("task_id").notNull(),
+  subCompanyId: integer("sub_company_id").notNull(),
+  completedAt: text("completed_at").notNull(),
+  note: text("note"),
+  // Optional attachment: filename + stored path. Uploaded via the same handler
+  // that ingests sub docs, so it lands in the standard sub-uploads bucket and
+  // shows up in the PM's sub-drop inbox too.
+  attachmentOriginalName: text("attachment_original_name"),
+  attachmentStoredName: text("attachment_stored_name"),
+});
+
 // Session tokens for sub company logins. Separate from GC `sessions` so a
 // leaked sub cookie can't be replayed against GC endpoints and vice versa.
 // Same shape and rotation semantics as GC sessions.
@@ -1882,6 +1933,8 @@ export type SubCompanyPublic = Omit<SubCompany, "passwordHash">;
 
 export type ProjectDropToken = typeof projectDropTokens.$inferSelect;
 export type SubUpload = typeof subUploads.$inferSelect;
+export type SubTaskCompletion = typeof subTaskCompletions.$inferSelect;
+export type InsertSubTaskCompletion = typeof subTaskCompletions.$inferInsert;
 export type InsertProjectDropToken = z.infer<typeof insertProjectDropTokenSchema>;
 export type InsertSubUpload = z.infer<typeof insertSubUploadSchema>;
 
