@@ -52,12 +52,39 @@ export async function subFetch(
   return res;
 }
 
+/**
+ * Signaled by the server (410 Gone with code=job_closed) when the underlying
+ * project has been marked complete. Thrown up to the /drop page which then
+ * pivots to the friendly closed-portal screen. We use a real Error subclass
+ * so `instanceof` works across the register/login/upload call sites without
+ * fragile status-code checking in every handler.
+ */
+export class JobClosedError extends Error {
+  projectName?: string;
+  constructor(message: string, projectName?: string) {
+    super(message);
+    this.name = "JobClosedError";
+    this.projectName = projectName;
+  }
+}
+
+/** Best-effort: pull the server's message + optional projectName off a 410. */
+async function readJobClosedFromResponse(res: Response): Promise<JobClosedError> {
+  try {
+    const body = await res.json();
+    return new JobClosedError(body?.message || "This job is complete.", body?.projectName);
+  } catch {
+    return new JobClosedError("This job is complete.");
+  }
+}
+
 /** JSON convenience wrapper. Returns `null` on 401 so callers can branch. */
 export async function subJson<T>(
   method: string, url: string, data?: unknown,
 ): Promise<T | null> {
   const res = await subFetch(method, url, data);
   if (res.status === 401) return null;
+  if (res.status === 410) throw await readJobClosedFromResponse(res);
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     throw new Error(text || `Request failed: ${res.status}`);
@@ -65,7 +92,8 @@ export async function subJson<T>(
   return (await res.json()) as T;
 }
 
-/** Multipart upload. Same auth semantics as subFetch. */
+/** Multipart upload. Same auth semantics as subFetch. Throws JobClosedError
+ *  on 410 so the drop page can pivot without inspecting statuses inline. */
 export async function subUpload<T = unknown>(url: string, form: FormData): Promise<T> {
   const res = await fetch(`${SUB_API_BASE}${url}`, {
     method: "POST",
@@ -73,6 +101,7 @@ export async function subUpload<T = unknown>(url: string, form: FormData): Promi
     headers: headers(),
     credentials: FETCH_CREDS,
   });
+  if (res.status === 410) throw await readJobClosedFromResponse(res);
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     throw new Error(text || `Upload failed: ${res.status}`);

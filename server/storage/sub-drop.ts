@@ -58,6 +58,25 @@ export class SubDropRepo {
       ));
   }
 
+  /** Revoke every outstanding QR for a project in a single UPDATE. Called when
+   *  a PM flips project.status to `complete` — mass revocation ensures any
+   *  QR posters still on the trailer wall stop working immediately, even for
+   *  subs who haven't registered yet. Only unrevoked tokens are touched so
+   *  we preserve the original revokedAt on previously-manual revokes. */
+  async revokeAllDropTokensForProject(organizationId: number, projectId: number): Promise<number> {
+    await ensureReady();
+    const now = new Date().toISOString();
+    const rows = await db.update(projectDropTokens)
+      .set({ revokedAt: now })
+      .where(and(
+        eq(projectDropTokens.organizationId, organizationId),
+        eq(projectDropTokens.projectId, projectId),
+        isNull(projectDropTokens.revokedAt),
+      ))
+      .returning({ id: projectDropTokens.id });
+    return rows.length;
+  }
+
   /** Called from the /drop endpoint after a successful upload so the PM can
    *  see when the token last saw activity. Fire-and-forget by callers. */
   async touchDropToken(tokenId: number): Promise<void> {

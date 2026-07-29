@@ -323,6 +323,7 @@ export class DatabaseStorage implements IStorage {
   listDropTokens: SubDropRepo["listDropTokens"] = (...a) => this.subDrop.listDropTokens(...a);
   createDropToken: SubDropRepo["createDropToken"] = (...a) => this.subDrop.createDropToken(...a);
   revokeDropToken: SubDropRepo["revokeDropToken"] = (...a) => this.subDrop.revokeDropToken(...a);
+  revokeAllDropTokensForProject: SubDropRepo["revokeAllDropTokensForProject"] = (...a) => this.subDrop.revokeAllDropTokensForProject(...a);
   touchDropToken: SubDropRepo["touchDropToken"] = (...a) => this.subDrop.touchDropToken(...a);
   createSubUpload: SubDropRepo["createSubUpload"] = (...a) => this.subDrop.createSubUpload(...a);
   listSubUploads: SubDropRepo["listSubUploads"] = (...a) => this.subDrop.listSubUploads(...a);
