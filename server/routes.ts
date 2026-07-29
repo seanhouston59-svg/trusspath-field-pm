@@ -3,7 +3,7 @@ import type { Server } from "node:http";
 import path from "node:path";
 import fs from "node:fs";
 import multer from "multer";
-import { storage } from "./storage";
+import { storage, db } from "./storage";
 import { getDailyLogWeather, placesAutocomplete, placeDetails, hasPlacesApi } from "./apis";
 import { jarvisChat, jarvisBrief } from "./jarvis";
 import { localJarvisChat, buildRichLocalBrief, buildSafetyBrief } from "./jarvis-local";
@@ -32,6 +32,7 @@ import {
   insertSubscriberSchema, insertDemoRequestSchema,
   signupSchema, loginSchema,
   isAccountInGoodStanding, isSubscriptionActive, isDemoExpired,
+  processedStripeEvents,
   ORG_ROLES, type OrgRole,
   type Project, type MobilizationSectionNote,
 } from "@shared/schema";
@@ -78,6 +79,12 @@ import { randomBytes as randomBytesForToken } from "node:crypto";
 
 function pid(req: any): number | undefined {
   return req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
+}
+
+// Postgres unique_violation (SQLSTATE 23505). Drizzle wraps driver errors, so
+// the neon error carrying `code` can sit one level down in `cause`.
+function isPgUniqueViolation(err: any): boolean {
+  return err?.code === "23505" || err?.cause?.code === "23505";
 }
 
 // Fire-and-forget Project Timeline event logger. Every mutation route calls
@@ -4696,6 +4703,33 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     } catch (e: any) {
       return res.status(400).send(`Webhook Error: ${e.message}`);
     }
+
+    // Idempotency: claim this event.id before dispatching. Stripe retries on
+    // any non-2xx and can redeliver out of order, so without this ledger every
+    // handler below runs again on each retry.
+    //
+    // Trade-off: the claim is NOT rolled back if a handler throws, so a genuine
+    // failure below marks the event as processed and the next retry skips it.
+    // Accepted deliberately — every handler here is a pure reconcile today:
+    // updateOrgBilling writes values read straight off the event, and
+    // syncExecOsSeatsForOrg re-derives Stripe quantities from the current DB
+    // state rather than incrementing. So a dropped retry costs at most a stale
+    // column that the next real Stripe event corrects. Rolling the row back on
+    // failure would reopen the double-process window this guard exists to close.
+    // If a non-idempotent handler is ever added here, revisit this.
+    try {
+      await db.insert(processedStripeEvents).values({
+        eventId: event.id,
+        eventType: event.type,
+      });
+    } catch (err) {
+      if (isPgUniqueViolation(err)) {
+        // Already processed — ack with 200 so Stripe stops retrying.
+        return res.status(200).json({ received: true, duplicate: true });
+      }
+      throw err;
+    }
+
     try {
       // Helper: resolve the org for this Stripe event. Prefers metadata.organizationId,
       // falls back to lookup by customer id. Also mirrors updates to any legacy

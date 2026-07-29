@@ -1078,6 +1078,16 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS voice_notes_account_idx ON voice_notes (account_id)`;
   await sql`CREATE INDEX IF NOT EXISTS voice_notes_org_idx ON voice_notes (organization_id)`;
 
+  // Stripe webhook idempotency ledger. The webhook inserts event.id here before
+  // dispatching, so retried events conflict on the primary key and are skipped.
+  // Grows unboundedly — see the follow-up note on processedStripeEvents in
+  // shared/schema.ts about pruning rows older than 30 days.
+  await sql`CREATE TABLE IF NOT EXISTS processed_stripe_events (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+
   // Owner bootstrap — configured owner email is always the app admin: role='owner',
   // approval_status='approved', and (best-effort) subscription_status='active' so they
   // aren't locked out of their own app. Everyone else stays in the state they were in.
