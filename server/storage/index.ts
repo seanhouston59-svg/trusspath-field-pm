@@ -26,6 +26,8 @@ import { SystemRepo } from "./system";
 import { ContractsRepo } from "./contracts";
 import { InspectionsRepo } from "./inspections";
 import { VoiceNotesRepo } from "./voice-notes";
+import { SubDropRepo } from "./sub-drop";
+import { SubCompaniesRepo } from "./sub-companies";
 
 /**
  * The single storage facade. Every member is a one-line delegation to a
@@ -314,6 +316,33 @@ export class DatabaseStorage implements IStorage {
   recordEvent: EventsRepo["recordEvent"] = (...a) => this.events.recordEvent(...a);
   getProjectEvents: EventsRepo["getProjectEvents"] = (...a) => this.events.getProjectEvents(...a);
   getProjectEventKindCounts: EventsRepo["getProjectEventKindCounts"] = (...a) => this.events.getProjectEventKindCounts(...a);
+  // Sub Drop Portal — not part of IStorage (feature-scoped repo). Exposed via
+  // direct repo typing, matching the EventsRepo pattern above.
+  private readonly subDrop = new SubDropRepo();
+  getDropTokenByToken: SubDropRepo["getDropTokenByToken"] = (...a) => this.subDrop.getDropTokenByToken(...a);
+  listDropTokens: SubDropRepo["listDropTokens"] = (...a) => this.subDrop.listDropTokens(...a);
+  createDropToken: SubDropRepo["createDropToken"] = (...a) => this.subDrop.createDropToken(...a);
+  revokeDropToken: SubDropRepo["revokeDropToken"] = (...a) => this.subDrop.revokeDropToken(...a);
+  touchDropToken: SubDropRepo["touchDropToken"] = (...a) => this.subDrop.touchDropToken(...a);
+  createSubUpload: SubDropRepo["createSubUpload"] = (...a) => this.subDrop.createSubUpload(...a);
+  listSubUploads: SubDropRepo["listSubUploads"] = (...a) => this.subDrop.listSubUploads(...a);
+  getSubUpload: SubDropRepo["getSubUpload"] = (...a) => this.subDrop.getSubUpload(...a);
+  updateSubUpload: SubDropRepo["updateSubUpload"] = (...a) => this.subDrop.updateSubUpload(...a);
+  countSubUploadsByCategory: SubDropRepo["countSubUploadsByCategory"] = (...a) => this.subDrop.countSubUploadsByCategory(...a);
+  private readonly subCompanies = new SubCompaniesRepo();
+  registerSubCompany: SubCompaniesRepo["register"] = (...a) => this.subCompanies.register(...a);
+  loginSubCompany: SubCompaniesRepo["login"] = (...a) => this.subCompanies.login(...a);
+  resolveSubSession: SubCompaniesRepo["resolveSession"] = (...a) => this.subCompanies.resolveSession(...a);
+  getSubCompanyById: SubCompaniesRepo["getById"] = (...a) => this.subCompanies.getById(...a);
+  getSubCompanyByEmail: SubCompaniesRepo["getByEmail"] = (...a) => this.subCompanies.getByEmail(...a);
+  suspendSubCompany: SubCompaniesRepo["suspend"] = (...a) => this.subCompanies.suspend(...a);
+  unsuspendSubCompany: SubCompaniesRepo["unsuspend"] = (...a) => this.subCompanies.unsuspend(...a);
+  attachSubToProject: SubCompaniesRepo["attachToProject"] = (...a) => this.subCompanies.attachToProject(...a);
+  detachSubFromProject: SubCompaniesRepo["detachFromProject"] = (...a) => this.subCompanies.detachFromProject(...a);
+  isSubAttached: SubCompaniesRepo["isAttached"] = (...a) => this.subCompanies.isAttached(...a);
+  listProjectsForSub: SubCompaniesRepo["listProjectsForSub"] = (...a) => this.subCompanies.listProjectsForSub(...a);
+  listSubsForProject: SubCompaniesRepo["listSubsForProject"] = (...a) => this.subCompanies.listSubsForProject(...a);
+  listSubsForOrg: SubCompaniesRepo["listSubsForOrg"] = (...a) => this.subCompanies.listSubsForOrg(...a);
   getTimesheets: IStorage["getTimesheets"] = (...a) => this.timesheets.getTimesheets(...a);
   getTimesheetsForAccount: IStorage["getTimesheetsForAccount"] = (...a) => this.timesheets.getTimesheetsForAccount(...a);
   getTimesheet: IStorage["getTimesheet"] = (...a) => this.timesheets.getTimesheet(...a);

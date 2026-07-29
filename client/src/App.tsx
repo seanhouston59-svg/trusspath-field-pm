@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { lazy, Suspense, type ComponentType } from "react";
 import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 
@@ -67,6 +67,7 @@ import Dashboard from "@/pages/dashboard";
 import NotificationsPage from "@/pages/notifications";
 import Projects from "@/pages/projects";
 import ProjectDetail from "@/pages/project-detail";
+import SubUploadsPage from "@/pages/sub-uploads";
 import Tasks from "@/pages/tasks";
 import Rfis from "@/pages/rfis";
 import Submittals from "@/pages/submittals";
@@ -117,6 +118,9 @@ import InspectionDetail from "@/pages/executive-os/inspections-detail";
 import { LEAN_MODULES } from "@shared/lean-modules-catalog";
 import { LeanModuleDetailPage, LeanModulePortfolioPage } from "@/pages/executive-os/lean-module";
 import InviteAcceptPage from "@/pages/invite-accept";
+// Lazy: subs never touch the rest of the app, and PMs never touch this page.
+// Keeping it out of the main chunk trims the initial bundle for both.
+const SubDropPage = lazy(() => import("@/pages/drop"));
 import FieldHub from "@/pages/field/hub";
 import FieldDailyLog from "@/pages/field/daily-log";
 import FieldTimecard from "@/pages/field/timecard";
@@ -133,6 +137,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/notifications": NotificationsPage,
   "/projects": Projects,
   "/projects/:id": ProjectDetail,
+  "/projects/:id/sub-uploads": SubUploadsPage,
   "/schedule": Schedule,
   "/gantt": Gantt,
   "/cpm": Cpm,
@@ -340,7 +345,7 @@ function AppChrome() {
   const { isAuthenticated } = useAuth();
   // Jarvis is only useful once you’re inside the app.
   if (!isAuthenticated) return null;
-  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup" || loc.startsWith("/signup") || loc === "/paywall" || loc.startsWith("/invite/")) return null;
+  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup" || loc.startsWith("/signup") || loc === "/paywall" || loc.startsWith("/invite/") || loc.startsWith("/drop/")) return null;
   // Jarvis lives in a boundary because it drives async voice/speech APIs that
   // can throw in ways we don't want to blank out the whole app.
   return (
@@ -365,6 +370,14 @@ function RootRouter() {
       <Route path="/paywall" component={PaywallGate} />
       {/* Invite acceptance is public: unauthenticated users can view the invite and sign up. */}
       <Route path="/invite/:token" component={InviteAcceptPage} />
+      {/* Sub Drop Portal is public: subs scan a QR, register, and drop files. */}
+      <Route path="/drop/:token">
+        {(params) => (
+          <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>}>
+            <SubDropPage />
+          </Suspense>
+        )}
+      </Route>
       {/* Everything else is a protected app route. */}
       <Route>
         <RequireAuth>

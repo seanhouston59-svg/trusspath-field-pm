@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import {
   MapPin, Calendar, Building2, DollarSign, ListChecks, HelpCircle, ClipboardList, CheckSquare,
-  ExternalLink, Pencil, X, Clock, Trash2, Loader2,
+  ExternalLink, Pencil, X, Clock, Trash2, Loader2, QrCode,
 } from "lucide-react";
+import { SubDropQrDialog } from "@/components/sub-drop-qr-dialog";
 import { Layout } from "@/components/layout";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
 import { TaskTable, RfiTable, DailyLogList, PunchList } from "@/components/tables";
@@ -72,6 +73,7 @@ export default function ProjectDetail() {
   const { toast } = useToast();
   const { can } = useAccess();
   const [editing, setEditing] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   // Controlled so a failed delete can leave the confirmation open.
   const [confirming, setConfirming] = useState(false);
@@ -166,6 +168,22 @@ export default function ProjectDetail() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:bg-muted"
             >
               <Pencil className="size-3.5" /> Edit Project
+            </button>
+            <button
+              onClick={() => setQrOpen(true)}
+              data-testid="button-sub-drop-qr"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:bg-muted"
+              title="Generate a QR code for subs to drop files"
+            >
+              <QrCode className="size-3.5" /> Sub Drop QR
+            </button>
+            <button
+              onClick={() => navigate(`/projects/${projectId}/sub-uploads`)}
+              data-testid="button-sub-uploads"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:bg-muted"
+              title="View documents subs have dropped"
+            >
+              <ListChecks className="size-3.5" /> Sub Uploads
             </button>
             {googleMapsUrl(project.address) ? (
               <a
@@ -400,6 +418,14 @@ export default function ProjectDetail() {
           </div>
         </div>
       )}
+
+      {/* Sub Drop QR dialog — mounted here so it overlays regardless of tab. */}
+      <SubDropQrDialog
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        projectId={projectId}
+        projectName={project.name}
+      />
     </Layout>
   );
 }
