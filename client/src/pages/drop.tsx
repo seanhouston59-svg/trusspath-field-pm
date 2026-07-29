@@ -17,12 +17,12 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useRoute } from "wouter";
-import { Loader2, Upload, LogOut, CheckCircle2, AlertTriangle, FileText, Info, X, ShieldCheck, FolderTree, ScanLine } from "lucide-react";
+import { Loader2, Upload, LogOut, CheckCircle2, AlertTriangle, FileText, Info, X, ShieldCheck, FolderTree, ScanLine, PackageCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { subFetch, subJson, subUpload, setSubBearer, SUB_API_BASE } from "@/lib/sub-api";
+import { subFetch, subJson, subUpload, setSubBearer, SUB_API_BASE, JobClosedError } from "@/lib/sub-api";
 
 const TRADES = [
   "Concrete","Framing","Roofing","Plumbing","Electrical","HVAC","Drywall",
@@ -30,7 +30,16 @@ const TRADES = [
   "Mechanical","Fire Protection","Low Voltage / Data","Other",
 ] as const;
 
-type TokenInfo = { projectId: number; projectName: string; organizationName: string };
+type TokenInfo = {
+  projectId: number;
+  projectName: string;
+  organizationName: string;
+  // Set true when the PM has flipped the project to "Complete". Client uses
+  // this to render a friendly closed-portal page instead of the auth or
+  // upload UI. The server also enforces this on every subsequent call — the
+  // flag is only a hint for the initial render.
+  closed?: boolean;
+};
 type SubCompany = {
   id: number; companyName: string; trade: string; contactName: string;
   contactEmail: string; contactPhone: string | null;
@@ -59,6 +68,10 @@ export default function SubDropPage() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [me, setMe] = useState<SubCompany | null>(null);
   const [checkingMe, setCheckingMe] = useState(true);
+  // Separately tracked because a token may still be valid while its parent
+  // job has been completed. We render a distinct "Job closed" screen for that
+  // — different UX from a bare invalid-token 404.
+  const [jobClosed, setJobClosed] = useState<{ projectName: string } | null>(null);
 
   // Load the token preview (project name) and whether the user is signed in.
   // Both run in parallel: if they already have a sub cookie we jump straight
@@ -70,6 +83,7 @@ export default function SubDropPage() {
         const info = await subJson<TokenInfo>("GET", `/api/drop/${token}/info`);
         if (!info) throw new Error("Invalid or revoked link.");
         setTokenInfo(info);
+        if (info.closed) setJobClosed({ projectName: info.projectName });
       } catch (e: any) {
         setTokenError(e?.message || "Invalid link.");
       }
@@ -89,6 +103,7 @@ export default function SubDropPage() {
   // ------- screen selection -------------------------------------------------
   if (tokenError) return <FullPageMessage icon={<AlertTriangle className="h-10 w-10 text-red-500" />} title="This link isn't valid" body={tokenError} />;
   if (!tokenInfo || checkingMe) return <FullPageMessage icon={<Loader2 className="h-8 w-8 animate-spin" />} title="Loading\u2026" body="" />;
+  if (jobClosed) return <JobClosedPage projectName={jobClosed.projectName} orgName={tokenInfo.organizationName} />;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
@@ -104,9 +119,19 @@ export default function SubDropPage() {
       />
       <main className="mx-auto max-w-2xl px-4 pb-24 pt-6">
         {me ? (
-          <UploadPanel me={me} token={token} projectId={tokenInfo.projectId} />
+          <UploadPanel
+            me={me}
+            token={token}
+            projectId={tokenInfo.projectId}
+            onJobClosed={() => setJobClosed({ projectName: tokenInfo.projectName })}
+          />
         ) : (
-          <AuthPanel token={token} projectName={tokenInfo.projectName} onSignedIn={(sub) => setMe(sub)} />
+          <AuthPanel
+            token={token}
+            projectName={tokenInfo.projectName}
+            onSignedIn={(sub) => setMe(sub)}
+            onJobClosed={() => setJobClosed({ projectName: tokenInfo.projectName })}
+          />
         )}
       </main>
     </div>
@@ -137,6 +162,34 @@ function Header(props: { projectName: string; orgName: string; signedInAs: strin
         ) : null}
       </div>
     </header>
+  );
+}
+
+/**
+ * Full-page "this job is complete" screen. Rendered when either the initial
+ * /info call returns `closed: true` OR any subsequent sub API call responds
+ * with 410 Gone (both signals are wired into the parent component). The tone
+ * is deliberately warm rather than alarming — job completion is normal, and
+ * the sub often had nothing to do with why the portal closed.
+ */
+function JobClosedPage(props: { projectName: string; orgName: string }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 px-6 text-center dark:from-slate-950 dark:to-slate-900">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+          <PackageCheck className="h-7 w-7" />
+        </div>
+        <div className="text-xs uppercase tracking-wide text-slate-500">{props.orgName}</div>
+        <h1 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-50">{props.projectName} is complete</h1>
+        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          This job wrapped up, so the document drop portal for {props.projectName} is closed.
+          Everything you already submitted is with the PM.
+        </p>
+        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          If you have another active job with the same GC, ask them for that project's QR code.
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -198,7 +251,15 @@ function SubWelcome(props: { projectName: string }) {
   );
 }
 
-function AuthPanel(props: { token: string; onSignedIn: (sub: SubCompany) => void; projectName: string }) {
+function AuthPanel(props: {
+  token: string;
+  onSignedIn: (sub: SubCompany) => void;
+  projectName: string;
+  // Bubble up when the server tells us this job is complete. Parent swaps in
+  // JobClosedPage — we don't want the auth form re-rendering with an error
+  // string because "try again" won't help.
+  onJobClosed: () => void;
+}) {
   const [mode, setMode] = useState<"login" | "register">("register");
   return (
     <>
@@ -220,9 +281,9 @@ function AuthPanel(props: { token: string; onSignedIn: (sub: SubCompany) => void
       </div>
       <div className="p-4 sm:p-6">
         {mode === "register" ? (
-          <RegisterForm token={props.token} onSignedIn={props.onSignedIn} onSwitchToLogin={() => setMode("login")} />
+          <RegisterForm token={props.token} onSignedIn={props.onSignedIn} onJobClosed={props.onJobClosed} onSwitchToLogin={() => setMode("login")} />
         ) : (
-          <LoginForm token={props.token} onSignedIn={props.onSignedIn} onSwitchToRegister={() => setMode("register")} />
+          <LoginForm token={props.token} onSignedIn={props.onSignedIn} onJobClosed={props.onJobClosed} onSwitchToRegister={() => setMode("register")} />
         )}
       </div>
     </Card>
@@ -230,7 +291,7 @@ function AuthPanel(props: { token: string; onSignedIn: (sub: SubCompany) => void
   );
 }
 
-function RegisterForm(props: { token: string; onSignedIn: (sub: SubCompany) => void; onSwitchToLogin: () => void }) {
+function RegisterForm(props: { token: string; onSignedIn: (sub: SubCompany) => void; onJobClosed: () => void; onSwitchToLogin: () => void }) {
   const [companyName, setCompanyName] = useState("");
   const [trade, setTrade] = useState<string>("");
   const [contactName, setContactName] = useState("");
@@ -254,6 +315,13 @@ function RegisterForm(props: { token: string; onSignedIn: (sub: SubCompany) => v
       });
       if (resp.status === 409) {
         setError("That email is already registered. Try signing in instead.");
+        return;
+      }
+      // 410 Gone — the PM completed the job between the QR scan and the form
+      // submission. Hand control back to the parent so it can render the
+      // "Job closed" screen instead of showing an error under the form.
+      if (resp.status === 410) {
+        props.onJobClosed();
         return;
       }
       if (!resp.ok) {
@@ -314,7 +382,7 @@ function RegisterForm(props: { token: string; onSignedIn: (sub: SubCompany) => v
   );
 }
 
-function LoginForm(props: { token: string; onSignedIn: (sub: SubCompany) => void; onSwitchToRegister: () => void }) {
+function LoginForm(props: { token: string; onSignedIn: (sub: SubCompany) => void; onJobClosed: () => void; onSwitchToRegister: () => void }) {
   const [contactEmail, setContactEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -331,6 +399,11 @@ function LoginForm(props: { token: string; onSignedIn: (sub: SubCompany) => void
         body: JSON.stringify({ dropToken: props.token, contactEmail, password }),
         credentials: "include",
       });
+      // Same "job completed while I was typing my password" case as register.
+      if (resp.status === 410) {
+        props.onJobClosed();
+        return;
+      }
       if (!resp.ok) {
         const t = await resp.text();
         try { setError(JSON.parse(t).message || t); } catch { setError(t); }
@@ -380,7 +453,15 @@ function FormRow(props: { label: string; children: React.ReactNode }) {
 
 /* --------------------------- Upload UI ---------------------------------- */
 
-function UploadPanel(props: { me: SubCompany; token: string; projectId: number }) {
+function UploadPanel(props: {
+  me: SubCompany;
+  token: string;
+  projectId: number;
+  // Signaled up when a 410 lands on either the history fetch or an upload.
+  // Parent pivots to JobClosedPage so the sub doesn't stare at a rejected
+  // upload and wonder if it's a bug.
+  onJobClosed: () => void;
+}) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploads, setUploads] = useState<UploadRow[]>([]);
@@ -394,9 +475,13 @@ function UploadPanel(props: { me: SubCompany; token: string; projectId: number }
       try {
         const res = await subJson<UploadRow[]>("GET", `/api/sub/projects/${props.projectId}/uploads`);
         if (res) setUploads(res);
-      } catch { /* silent \u2014 empty state is fine */ }
+      } catch (err) {
+        // Silent for empty state, BUT surface a job-closed 410 up to the
+        // parent so we don't render the upload UI on a dead job.
+        if (err instanceof JobClosedError) props.onJobClosed();
+      }
     })();
-  }, [props.projectId]);
+  }, [props.projectId, props.onJobClosed]);
 
   async function upload(files: FileList | File[]) {
     const list = Array.from(files);
@@ -412,6 +497,13 @@ function UploadPanel(props: { me: SubCompany; token: string; projectId: number }
       // Auto-hide the toast so the UI stays clean.
       setTimeout(() => setLastToast(null), 4000);
     } catch (err: any) {
+      // 410 from subUpload means the PM just marked the job complete. Bubble
+      // up so the whole screen swaps to the closed-portal message rather than
+      // an inline red error banner.
+      if (err instanceof JobClosedError) {
+        props.onJobClosed();
+        return;
+      }
       setError(err?.message || "Upload failed.");
     } finally {
       setUploading(false);

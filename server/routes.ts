@@ -602,12 +602,44 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const project = await storage.getProject(dropToken.projectId);
     if (!project) return res.status(404).json({ message: "Project not found." });
     const org = await getOrganization(dropToken.organizationId);
+    // We still return the info envelope on a closed job — the client uses it
+    // to render a friendly "<project> is complete" page (which is much better
+    // UX than a bare 404 or 410 on a QR scan).
     res.json({
       projectId: project.id,
       projectName: project.name,
       organizationName: org?.name || "TrussPath",
+      closed: isProjectClosedToSubs(project),
     });
   });
+
+  // ---- Sub-side project gate ---------------------------------------------
+  // A project's Sub Drop portal is a first-class artifact of the job, so its
+  // lifecycle tracks the project's own lifecycle:
+  //
+  //   • `planning` / `in_progress` — subs can register, log in, and upload.
+  //   • `complete`                 — the job is done. Sub access is one-way
+  //                                   revoked. This is enforced at request
+  //                                   time (below) AND proactively at the
+  //                                   moment of completion (see the PATCH
+  //                                   /api/projects/:id handler, which
+  //                                   revokes all outstanding drop tokens).
+  //
+  // The 410 Gone status is deliberate: it tells clients "the resource used
+  // to exist and is intentionally gone", which is exactly this semantics.
+  // Client code branches on this to render the friendly "Job is closed" page.
+  function isProjectClosedToSubs(project: { status?: string | null } | null | undefined): boolean {
+    if (!project) return true;
+    return String(project.status || "").toLowerCase() === "complete";
+  }
+  function respondJobClosed(res: any, projectName?: string) {
+    return res.status(410).json({
+      code: "job_closed",
+      message: projectName
+        ? `${projectName} is complete. This drop portal is closed.`
+        : "This job is complete. The drop portal is closed.",
+    });
+  }
 
   // ---- Sub registration --------------------------------------------------
   // Called from the /drop/:token page when a first-time sub picks "Register".
@@ -619,6 +651,11 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const token = String(b.dropToken || "").trim();
       const dropToken = token ? await storage.getDropTokenByToken(token) : null;
       if (!dropToken) return res.status(400).json({ message: "Invalid or revoked link." });
+
+      // Refuse new registrations for completed jobs. Catches the edge case
+      // where a sub scrapes a QR from a poster left up past completion.
+      const gateProject = await storage.getProject(dropToken.projectId);
+      if (isProjectClosedToSubs(gateProject)) return respondJobClosed(res, gateProject?.name);
 
       // Server-side validation. Kept strict here so the client can be relaxed.
       const companyName = String(b.companyName || "").trim();
@@ -671,10 +708,18 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const email = String(b.contactEmail || "").trim().toLowerCase();
     const password = String(b.password || "");
     if (!email || !password) return res.status(400).json({ message: "Email and password are required." });
+    // Peek at the token's project BEFORE authenticating: if a sub scanned a
+    // QR from a completed job, deny with the friendly "job closed" response
+    // regardless of credentials (401 would just make them think they typed
+    // the wrong password).
+    const dropToken = b.dropToken ? await storage.getDropTokenByToken(String(b.dropToken)) : null;
+    if (dropToken) {
+      const gateProject = await storage.getProject(dropToken.projectId);
+      if (isProjectClosedToSubs(gateProject)) return respondJobClosed(res, gateProject?.name);
+    }
     const session = await storage.loginSubCompany(email, password);
     if (!session) return res.status(401).json({ message: "Wrong email or password." });
     // If they came in via a QR scan, attach to that project on this login.
-    const dropToken = b.dropToken ? await storage.getDropTokenByToken(String(b.dropToken)) : null;
     if (dropToken) {
       await storage.attachSubToProject({
         subCompanyId: session.subCompany.id,
@@ -710,10 +755,14 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.get("/api/sub/projects", resolveSubSession, async (req: any, res) => {
     const joins = await storage.listProjectsForSub(req.subCompany.id);
     // Fan out to project + org names so the client renders a friendly list.
+    // We EXCLUDE completed projects from this list — subs shouldn't see closed
+    // jobs on their project picker. Historical uploads remain in the PM's
+    // inbox regardless.
     const items = [] as Array<{ projectId: number; projectName: string; organizationName: string; joinedAt: string }>;
     for (const j of joins) {
       const project = await storage.getProject(j.projectId);
       if (!project) continue;
+      if (isProjectClosedToSubs(project)) continue;
       const org = await getOrganization(j.organizationId);
       items.push({
         projectId: j.projectId,
@@ -736,6 +785,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     // list query. Sub's own scope check is via isSubAttached above.
     const project = await storage.getProject(projectId);
     if (!project) return res.status(404).json({ message: "Project not found." });
+    if (isProjectClosedToSubs(project)) return respondJobClosed(res, project.name);
     const uploads = await storage.listSubUploads(project.organizationId!, projectId, { limit: 100 });
     // Return only THIS sub's uploads (defense in depth: they shouldn't see
     // other subs' files even though they're attached to the same project).
@@ -755,6 +805,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       const token = String(req.params.token || "");
       const dropToken = await storage.getDropTokenByToken(token);
       if (!dropToken) return res.status(400).json({ message: "Invalid or revoked link." });
+
+      // Reject the upload if the job is complete. Do this BEFORE any file
+      // parsing so a sub with a stale session on a closed job doesn't waste
+      // their bandwidth uploading a doc that will be rejected.
+      const gateProject = await storage.getProject(dropToken.projectId);
+      if (isProjectClosedToSubs(gateProject)) return respondJobClosed(res, gateProject?.name);
 
       // Ensure the signed-in sub is attached to the project this token points
       // to. If not (they scanned a new QR while signed in from another site),
@@ -1546,6 +1602,27 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!existing) return;
     const updated = await storage.updateProject(id, req.body);
     if (!updated) return res.status(404).json({ message: "Project not found" });
+
+    // Auto-close the Sub Drop portal when a project transitions to complete.
+    // Detecting the transition (not just the current state) means we only run
+    // the revoke sweep once, on the actual flip, and repeated PATCHes with
+    // status=complete stay idempotent. We do NOT re-open the portal if a PM
+    // later flips status back off complete — the QR is dead, they'd need to
+    // mint a new one. Sub session cookies are HMAC-stateless (30-day TTL),
+    // so they can't be centrally invalidated; the request-time gate on
+    // /api/drop/:token/upload catches them instead.
+    const wasComplete = String(existing.status || "").toLowerCase() === "complete";
+    const nowComplete = String(updated.status || "").toLowerCase() === "complete";
+    if (!wasComplete && nowComplete && updated.organizationId) {
+      try {
+        const n = await storage.revokeAllDropTokensForProject(updated.organizationId, updated.id);
+        if (n > 0) console.log(`[sub-drop] project ${updated.id} completed — revoked ${n} drop token(s)`);
+      } catch (err) {
+        // Non-fatal: request-time gate still enforces access. Log so we notice.
+        console.error(`[sub-drop] revoke sweep failed for project ${updated.id}:`, err);
+      }
+    }
+
     res.json(updated);
   });
   // Permanent delete — no recycle bin. requireCap("manageProjects") limits this
@@ -2227,6 +2304,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.post("/api/projects/:id/drop-tokens", async (req: any, res) => {
     const project = await requireProjectAccess(req, res, parseInt(req.params.id, 10));
     if (!project) return;
+    // A completed project has a dead Sub Drop portal by design — refuse to
+    // mint fresh QRs against it so PMs don't accidentally hand a sub a link
+    // that will immediately fail after registration.
+    if (isProjectClosedToSubs(project)) {
+      return res.status(409).json({ message: "This project is complete. Sub Drop is closed for this job." });
+    }
     const label = req.body?.label ? String(req.body.label).trim().slice(0, 80) : null;
     const token = randomBytesForToken(16).toString("base64url");
     const row = await storage.createDropToken({

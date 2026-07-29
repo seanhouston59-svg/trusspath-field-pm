@@ -121,6 +121,10 @@ import InviteAcceptPage from "@/pages/invite-accept";
 // Lazy: subs never touch the rest of the app, and PMs never touch this page.
 // Keeping it out of the main chunk trims the initial bundle for both.
 const SubDropPage = lazy(() => import("@/pages/drop"));
+// Standalone marketing page for the subs.trusspath.com host. Lives in its own
+// chunk so the main app doesn't pay for its bundle, and vice versa — subs who
+// land on this page never load the PM app's JS.
+const SubsLandingPage = lazy(() => import("@/pages/subs-landing"));
 import FieldHub from "@/pages/field/hub";
 import FieldDailyLog from "@/pages/field/daily-log";
 import FieldTimecard from "@/pages/field/timecard";
@@ -357,6 +361,19 @@ function AppChrome() {
 
 /** Top-level router: public shell first, protected app second. */
 function RootRouter() {
+  // Host-based redirect: when the app is served from the subs.trusspath.com
+  // subdomain (the sub-facing marketing site), send visitors to /subs on the
+  // first render. We only act when they land on "/" so deep links like
+  // /drop/:token still work if someone accidentally lands on the subs host.
+  // Guarded by typeof window for SSR safety even though this is a CSR app.
+  const [loc, navigate] = useLocation();
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hostname === "subs.trusspath.com" && loc === "/") {
+      navigate("/subs", { replace: true });
+    }
+  }, [loc, navigate]);
+
   return (
     <Switch>
       <Route path="/" component={Landing} />
@@ -377,6 +394,14 @@ function RootRouter() {
             <SubDropPage />
           </Suspense>
         )}
+      </Route>
+      {/* Subs landing page: marketing / "what is Sub Drop?" for the
+          subs.trusspath.com subdomain. Also reachable at /subs on the main
+          host so we can preview it. Public, no auth, lazy-loaded. */}
+      <Route path="/subs">
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>}>
+          <SubsLandingPage />
+        </Suspense>
       </Route>
       {/* Everything else is a protected app route. */}
       <Route>
