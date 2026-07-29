@@ -54,6 +54,12 @@ function TopBar() {
 }
 
 function Hero() {
+  // Compute the current page's own absolute URL so the QR self-references.
+  // Falls back to the production URL for SSR / hydration safety. Encoding is
+  // handled at the img src level.
+  const landingUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/#/subs`
+    : "https://www.trusspath.com/#/subs";
   return (
     <section className="mx-auto max-w-5xl px-6 py-16 sm:py-24">
       <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
@@ -85,28 +91,34 @@ function Hero() {
           </div>
         </div>
 
-        {/* Illustrative fake phone-scanning-QR card. Pure SVG/CSS, no images. */}
+        {/*
+         * Real, scannable QR pointing back to this landing page. Two purposes:
+         *   1. Prints/marketing flyers with this URL as a QR keep working —
+         *      anyone who scans lands here.
+         *   2. Removes the confusing "placeholder that says scan me" bug.
+         *
+         * We generate it via api.qrserver.com (same service the PM-side QR
+         * dialog uses) so we don't have to bundle a QR library into this
+         * marketing chunk. The URL is computed at render time so it works
+         * on both www.trusspath.com and any preview host.
+         */}
         <div className="relative mx-auto w-full max-w-sm">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-950">
             <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
-              <QrCode className="h-3.5 w-3.5" /> Sub Drop QR
+              <QrCode className="h-3.5 w-3.5" /> Sub Drop
             </div>
-            <div className="flex aspect-square items-center justify-center rounded-lg bg-slate-100 p-4 dark:bg-slate-900">
-              {/* Decorative QR-ish grid \u2014 not a real code, doesn't need to scan. */}
-              <div className="grid h-full w-full grid-cols-8 gap-0.5">
-                {Array.from({ length: 64 }).map((_, i) => {
-                  const on = ((i * 7 + 3) % 5) < 2 || i < 8 || i % 8 === 0 || i % 8 === 7 || i >= 56;
-                  return (
-                    <div
-                      key={i}
-                      className={on ? "rounded-sm bg-slate-900 dark:bg-slate-100" : "rounded-sm bg-transparent"}
-                    />
-                  );
-                })}
-              </div>
+            <div className="flex aspect-square items-center justify-center rounded-lg bg-white p-4">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=0&data=${encodeURIComponent(landingUrl)}`}
+                alt="QR code linking to the TrussPath Sub Drop landing page"
+                className="h-full w-full"
+                width={400}
+                height={400}
+                loading="lazy"
+              />
             </div>
             <div className="mt-4 rounded-md bg-slate-50 p-3 text-center text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-              Scan with your phone camera. No app needed.
+              Scan to share this page. Your job's real QR comes from your PM.
             </div>
           </div>
         </div>
