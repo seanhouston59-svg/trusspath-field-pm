@@ -82,6 +82,13 @@ export const TRIAL_DAYS = 14;
 // webhook derives the org's plan by scanning items for metadata.kind === 'base'
 // and breaking on the first match, so tagging this price 'base' would silently
 // clobber organizations.subscription_plan.
+//
+// One price id covers both billing intervals, which only works while every
+// subscription carrying the add-on is monthly. Stripe rejects items whose
+// recurring interval differs from the subscription's, so the first annual org to
+// be granted a seat will fail syncExecOsSeatsForOrg with an interval error.
+// Adding annual support means a second price id here plus selecting on
+// org.subscriptionBilling, the way PLANS already does.
 // TODO(sean): replace with real Stripe price id from dashboard
 export const EXECUTIVE_OS_ADDON_PRICE_ID = "price_TODO_EXEC_OS_ADDON";
 

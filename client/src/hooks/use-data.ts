@@ -940,22 +940,6 @@ export function useRemoveMember() {
   });
 }
 /* ------------------- Executive OS add-on (per-seat) ------------------- */
-export type ExecOsMember = {
-  id: number;
-  accountId: number;
-  role: string;
-  status: string;
-  email?: string;
-  displayName?: string;
-  hasExecutiveOs: boolean;
-};
-
-export function useExecOsMembers() {
-  return useQuery<{ members: ExecOsMember[]; seatCount: number; unitAmountCents: number }>({
-    queryKey: ["/api/org/members/exec-os"],
-  });
-}
-
 // Grant/revoke both move money, so they invalidate billing status alongside the
 // member lists — with staleTime: Infinity an omitted key shows a stale seat
 // count indefinitely.
