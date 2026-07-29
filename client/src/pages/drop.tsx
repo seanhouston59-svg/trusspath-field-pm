@@ -1,0 +1,455 @@
+/**
+ * Public Sub Drop Portal page.
+ *
+ * URL: /drop/:token \u2014 the token is the per-project QR code sub scans at the
+ * jobsite. This single component drives four screens via local state:
+ *
+ *   loading       \u2014 spin while we fetch /api/drop/:token/info
+ *   invalid       \u2014 token missing/revoked; show a friendly error
+ *   auth          \u2014 not signed in yet; show register + login tabs
+ *   upload        \u2014 signed in; show the drag-drop upload UI + recent uploads
+ *
+ * Everything below the header is intentionally simple \u2014 subs use this on a
+ * phone at a jobsite with gloves on. Big buttons, minimal chrome, no
+ * marketing copy. We reuse the existing shadcn UI kit so it matches the
+ * rest of the app, but everything runs behind the RootRouter (no GC auth
+ * required, no Jarvis, no chrome).
+ */
+import { useEffect, useMemo, useState } from "react";
+import { useRoute } from "wouter";
+import { Loader2, Upload, LogOut, CheckCircle2, AlertTriangle, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { subFetch, subJson, subUpload, setSubBearer, SUB_API_BASE } from "@/lib/sub-api";
+
+const TRADES = [
+  "Concrete","Framing","Roofing","Plumbing","Electrical","HVAC","Drywall",
+  "Painting","Flooring","Landscaping","Masonry","Steel / Structural",
+  "Mechanical","Fire Protection","Low Voltage / Data","Other",
+] as const;
+
+type TokenInfo = { projectId: number; projectName: string; organizationName: string };
+type SubCompany = {
+  id: number; companyName: string; trade: string; contactName: string;
+  contactEmail: string; contactPhone: string | null;
+};
+type UploadRow = {
+  id: number; originalFileName: string; category: string; createdAt: string;
+  fileSizeBytes: number;
+};
+
+/**
+ * Compact byte formatter for the recent-uploads list. Not internationalized
+ * because this UI is english-only for MVP.
+ */
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export default function SubDropPage() {
+  const [, params] = useRoute("/drop/:token");
+  const token = params?.token || "";
+
+  // ------- global page state ------------------------------------------------
+  const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [me, setMe] = useState<SubCompany | null>(null);
+  const [checkingMe, setCheckingMe] = useState(true);
+
+  // Load the token preview (project name) and whether the user is signed in.
+  // Both run in parallel: if they already have a sub cookie we jump straight
+  // to the upload UI without them having to re-authenticate.
+  useEffect(() => {
+    if (!token) { setTokenError("Missing link."); return; }
+    (async () => {
+      try {
+        const info = await subJson<TokenInfo>("GET", `/api/drop/${token}/info`);
+        if (!info) throw new Error("Invalid or revoked link.");
+        setTokenInfo(info);
+      } catch (e: any) {
+        setTokenError(e?.message || "Invalid link.");
+      }
+    })();
+    (async () => {
+      try {
+        const res = await subJson<{ subCompany: SubCompany }>("GET", `/api/sub/me`);
+        if (res) setMe(res.subCompany);
+      } catch {
+        // Anonymous is fine \u2014 just means we show the auth screen.
+      } finally {
+        setCheckingMe(false);
+      }
+    })();
+  }, [token]);
+
+  // ------- screen selection -------------------------------------------------
+  if (tokenError) return <FullPageMessage icon={<AlertTriangle className="h-10 w-10 text-red-500" />} title="This link isn't valid" body={tokenError} />;
+  if (!tokenInfo || checkingMe) return <FullPageMessage icon={<Loader2 className="h-8 w-8 animate-spin" />} title="Loading\u2026" body="" />;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+      <Header
+        projectName={tokenInfo.projectName}
+        orgName={tokenInfo.organizationName}
+        signedInAs={me?.companyName ?? null}
+        onSignOut={async () => {
+          await subFetch("POST", "/api/sub/logout");
+          setSubBearer(null);
+          setMe(null);
+        }}
+      />
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-6">
+        {me ? (
+          <UploadPanel me={me} token={token} projectId={tokenInfo.projectId} />
+        ) : (
+          <AuthPanel token={token} onSignedIn={(sub) => setMe(sub)} />
+        )}
+      </main>
+    </div>
+  );
+}
+
+/** Header strip \u2014 project name + optional sign-out. */
+function Header(props: { projectName: string; orgName: string; signedInAs: string | null; onSignOut: () => void }) {
+  return (
+    <header className="border-b bg-white/70 backdrop-blur dark:bg-slate-950/70">
+      <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">{props.orgName}</div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-50">{props.projectName}</div>
+        </div>
+        {props.signedInAs ? (
+          <div className="text-right">
+            <div className="text-xs text-slate-500">Signed in as</div>
+            <div className="text-sm font-medium">{props.signedInAs}</div>
+            <button
+              type="button"
+              onClick={props.onSignOut}
+              className="mt-1 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
+            >
+              <LogOut className="h-3 w-3" /> Sign out
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </header>
+  );
+}
+
+/** Reused full-page splash for loading / error states. */
+function FullPageMessage(props: { icon: React.ReactNode; title: string; body: string }) {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6 text-center dark:bg-slate-950">
+      <div className="mb-4">{props.icon}</div>
+      <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">{props.title}</h1>
+      {props.body ? <p className="mt-2 max-w-md text-sm text-slate-600 dark:text-slate-400">{props.body}</p> : null}
+    </div>
+  );
+}
+
+/* -------------------------- Auth (register / login) --------------------- */
+
+function AuthPanel(props: { token: string; onSignedIn: (sub: SubCompany) => void }) {
+  const [mode, setMode] = useState<"login" | "register">("register");
+  return (
+    <Card className="overflow-hidden">
+      <div className="grid grid-cols-2 border-b bg-slate-50 dark:bg-slate-900">
+        <button
+          className={`px-4 py-3 text-sm font-medium ${mode === "register" ? "bg-white text-slate-900 dark:bg-slate-950 dark:text-white" : "text-slate-500"}`}
+          onClick={() => setMode("register")}
+        >
+          New sub \u2014 register
+        </button>
+        <button
+          className={`px-4 py-3 text-sm font-medium ${mode === "login" ? "bg-white text-slate-900 dark:bg-slate-950 dark:text-white" : "text-slate-500"}`}
+          onClick={() => setMode("login")}
+        >
+          Returning sub \u2014 sign in
+        </button>
+      </div>
+      <div className="p-4 sm:p-6">
+        {mode === "register" ? (
+          <RegisterForm token={props.token} onSignedIn={props.onSignedIn} onSwitchToLogin={() => setMode("login")} />
+        ) : (
+          <LoginForm token={props.token} onSignedIn={props.onSignedIn} onSwitchToRegister={() => setMode("register")} />
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function RegisterForm(props: { token: string; onSignedIn: (sub: SubCompany) => void; onSwitchToLogin: () => void }) {
+  const [companyName, setCompanyName] = useState("");
+  const [trade, setTrade] = useState<string>("");
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const payload = { dropToken: props.token, companyName, trade, contactName, contactEmail, contactPhone, password };
+      const resp = await fetch(`${SUB_API_BASE}/api/sub/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      });
+      if (resp.status === 409) {
+        setError("That email is already registered. Try signing in instead.");
+        return;
+      }
+      if (!resp.ok) {
+        const t = await resp.text();
+        try { setError(JSON.parse(t).message || t); } catch { setError(t); }
+        return;
+      }
+      const body = await resp.json();
+      if (body.token) setSubBearer(body.token);
+      props.onSignedIn(body.subCompany);
+    } catch (err: any) {
+      setError(err?.message || "Registration failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        First time here? Register your company. It's free and takes 30 seconds. You'll only do this once.
+      </p>
+      <FormRow label="Company name">
+        <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} required autoComplete="organization" />
+      </FormRow>
+      <FormRow label="Trade">
+        <select
+          value={trade}
+          onChange={(e) => setTrade(e.target.value)}
+          required
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <option value="">Pick a trade\u2026</option>
+          {TRADES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </FormRow>
+      <FormRow label="Your name">
+        <Input value={contactName} onChange={(e) => setContactName(e.target.value)} required autoComplete="name" />
+      </FormRow>
+      <FormRow label="Email">
+        <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} required autoComplete="email" />
+      </FormRow>
+      <FormRow label="Phone (optional)">
+        <Input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} autoComplete="tel" />
+      </FormRow>
+      <FormRow label="Password (8+ characters)">
+        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+      </FormRow>
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">{error}</div> : null}
+      <Button type="submit" disabled={busy} className="w-full">
+        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Create account
+      </Button>
+      <div className="text-center text-xs text-slate-500">
+        Already registered? <button type="button" onClick={props.onSwitchToLogin} className="underline">Sign in</button>
+      </div>
+    </form>
+  );
+}
+
+function LoginForm(props: { token: string; onSignedIn: (sub: SubCompany) => void; onSwitchToRegister: () => void }) {
+  const [contactEmail, setContactEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const resp = await fetch(`${SUB_API_BASE}/api/sub/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dropToken: props.token, contactEmail, password }),
+        credentials: "include",
+      });
+      if (!resp.ok) {
+        const t = await resp.text();
+        try { setError(JSON.parse(t).message || t); } catch { setError(t); }
+        return;
+      }
+      const body = await resp.json();
+      if (body.token) setSubBearer(body.token);
+      props.onSignedIn(body.subCompany);
+    } catch (err: any) {
+      setError(err?.message || "Sign in failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Signing in attaches your company to this jobsite so uploads are tracked in your name.
+      </p>
+      <FormRow label="Email">
+        <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} required autoComplete="email" />
+      </FormRow>
+      <FormRow label="Password">
+        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+      </FormRow>
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">{error}</div> : null}
+      <Button type="submit" disabled={busy} className="w-full">
+        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Sign in
+      </Button>
+      <div className="text-center text-xs text-slate-500">
+        New here? <button type="button" onClick={props.onSwitchToRegister} className="underline">Register instead</button>
+      </div>
+    </form>
+  );
+}
+
+function FormRow(props: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm">{props.label}</Label>
+      {props.children}
+    </div>
+  );
+}
+
+/* --------------------------- Upload UI ---------------------------------- */
+
+function UploadPanel(props: { me: SubCompany; token: string; projectId: number }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [uploads, setUploads] = useState<UploadRow[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [lastToast, setLastToast] = useState<string | null>(null);
+
+  // Load the sub's own upload history for this project so they see what they've
+  // already sent (and don't send the same COI five times in a row).
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await subJson<UploadRow[]>("GET", `/api/sub/projects/${props.projectId}/uploads`);
+        if (res) setUploads(res);
+      } catch { /* silent \u2014 empty state is fine */ }
+    })();
+  }, [props.projectId]);
+
+  async function upload(files: FileList | File[]) {
+    const list = Array.from(files);
+    if (!list.length) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      for (const f of list) fd.append("files", f);
+      const res = await subUpload<{ uploads: UploadRow[] }>(`/api/drop/${props.token}/upload`, fd);
+      setUploads(prev => [...res.uploads, ...prev]);
+      setLastToast(`Sent ${res.uploads.length} file${res.uploads.length === 1 ? "" : "s"}. Auto-sorted by TrussPath.`);
+      // Auto-hide the toast so the UI stays clean.
+      setTimeout(() => setLastToast(null), 4000);
+    } catch (err: any) {
+      setError(err?.message || "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          if (e.dataTransfer.files.length) upload(e.dataTransfer.files);
+        }}
+        className={`border-2 border-dashed p-8 text-center transition ${dragging ? "border-primary bg-primary/5" : "border-slate-300 dark:border-slate-700"}`}
+      >
+        <Upload className="mx-auto mb-3 h-10 w-10 text-slate-400" />
+        <div className="mb-1 text-lg font-medium">Drop files here</div>
+        <div className="mb-4 text-sm text-slate-500">
+          Photos, PDFs, DWG, DOCX, XLSX \u2014 up to 25MB each
+        </div>
+        <label className="inline-flex cursor-pointer items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+          {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Choose files
+          <input
+            type="file"
+            multiple
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => { if (e.target.files) upload(e.target.files); e.currentTarget.value = ""; }}
+          />
+        </label>
+        <p className="mt-4 text-xs text-slate-500">
+          Everything you upload lands in your PM's inbox for {props.me.companyName}.
+        </p>
+      </Card>
+
+      {error ? (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">
+          {error}
+        </div>
+      ) : null}
+      {lastToast ? (
+        <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200">
+          <CheckCircle2 className="h-4 w-4" />
+          {lastToast}
+        </div>
+      ) : null}
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">Your recent uploads</h2>
+          <span className="text-xs text-slate-500">{uploads.length}</span>
+        </div>
+        {uploads.length === 0 ? (
+          <p className="rounded-md border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500 dark:border-slate-800">
+            Nothing yet. Files you drop above will show here.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white text-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
+            {uploads.map(u => <UploadRowItem key={u.id} u={u} />)}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UploadRowItem({ u }: { u: UploadRow }) {
+  const when = useMemo(() => {
+    try { return new Date(u.createdAt).toLocaleString(); } catch { return u.createdAt; }
+  }, [u.createdAt]);
+  return (
+    <li className="flex items-center justify-between gap-3 px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <FileText className="h-4 w-4 flex-shrink-0 text-slate-400" />
+        <div className="min-w-0">
+          <div className="truncate font-medium text-slate-800 dark:text-slate-100">{u.originalFileName}</div>
+          <div className="text-xs text-slate-500">{when} \u2022 {formatBytes(u.fileSizeBytes)}</div>
+        </div>
+      </div>
+      <span className="ml-3 flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+        {u.category}
+      </span>
+    </li>
+  );
+}
