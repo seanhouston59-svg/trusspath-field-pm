@@ -9,7 +9,7 @@ import { jarvisChat, jarvisBrief } from "./jarvis";
 import { localJarvisChat, buildRichLocalBrief, buildSafetyBrief } from "./jarvis-local";
 import { buildContext } from "./jarvis";
 import { runHealthScan } from "./health";
-import { sendSignupNotification, sendPasswordResetEmail, sendInviteEmail, sendSubDraftNotification } from "./mailer";
+import { sendSignupNotification, sendPasswordResetEmail, sendInviteEmail, sendSubDraftNotification, sendSubTaskCompleteNotification } from "./mailer";
 import { weekStartMonday, ensureTimesheetForWeek, rollupPunchToTimesheet, runWeeklyRolloverIfDue, findManagerForProject } from "./timesheet-auto";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
@@ -1107,6 +1107,22 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         sourceId: task.id,
         meta: { subCompanyId: req.subCompany.id, hasAttachment: Boolean(file), completionId: completion.id },
       });
+
+      // Fire-and-forget PM email. Same shape as the RFI/CO draft notifier:
+      // don't block the sub's response on Resend.
+      void (async () => {
+        const toEmails = await pmEmailsForProjectOrg(project.organizationId);
+        const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
+        await sendSubTaskCompleteNotification({
+          toEmails,
+          projectName: project.name,
+          subCompanyName: req.subCompany.companyName,
+          taskTitle: task.title,
+          note,
+          hasAttachment: Boolean(file),
+          url: `${APP_URL}/#/tasks`,
+        });
+      })();
 
       res.status(201).json({ task: updated, completion });
     },

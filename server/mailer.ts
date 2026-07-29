@@ -270,6 +270,87 @@ function formatAmount(n: number): string {
   return `${sign}$${abs.toLocaleString("en-US")}`;
 }
 
+/**
+ * Notifies PMs when a sub marks an assigned task complete from the sub
+ * portal. Same delivery contract as sendSubDraftNotification \u2014 one
+ * message per recipient, dev no-ops with a log line, fire-and-forget from
+ * the caller. Kept as a separate function (rather than folded into the
+ * draft notifier) because the task email surfaces different fields: the
+ * sub's completion note and whether they attached a photo.
+ */
+export async function sendSubTaskCompleteNotification(input: {
+  toEmails: string[];
+  projectName: string;
+  subCompanyName: string;
+  taskTitle: string;
+  note?: string | null;
+  hasAttachment: boolean;
+  url: string;                // deep link to /tasks
+}): Promise<{ ok: boolean; skipped?: boolean; sent?: number }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;
+
+  const seen = new Set<string>();
+  const recipients = input.toEmails
+    .map(e => (e || "").trim().toLowerCase())
+    .filter(e => e && !seen.has(e) && (seen.add(e), true));
+  if (recipients.length === 0) return { ok: true, skipped: true, sent: 0 };
+
+  const subject = `[${input.projectName}] ${input.subCompanyName} completed a task \u2014 ${input.taskTitle}`;
+
+  // Note is rendered as its own paragraph only when the sub actually wrote
+  // one \u2014 empty notes just clutter the email.
+  const noteBlock = input.note && input.note.trim().length > 0
+    ? `<div style="padding:12px 14px;margin:0 0 16px;background:#fafaf7;border:1px solid #ececec;border-radius:6px;"><div style="color:#666;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 4px;">Note from ${escapeHtml(input.subCompanyName)}</div><div style="font-size:14px;color:#111;white-space:pre-wrap;">${escapeHtml(input.note.trim())}</div></div>`
+    : "";
+  const attachmentRow = input.hasAttachment
+    ? `<tr><td style="padding:6px 12px;color:#666;font-size:13px;text-transform:uppercase;letter-spacing:0.04em;">Attachment</td><td style="padding:6px 12px;font-size:15px;color:#111;">Photo attached \u2014 view in Sub Uploads</td></tr>`
+    : "";
+
+  const html = `<!doctype html>
+<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:24px;background:#f7f6f4;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;">
+    <div style="padding:16px 20px;background:#0f766e;color:#fff;font-weight:600;font-size:14px;letter-spacing:0.04em;text-transform:uppercase;">Task complete</div>
+    <div style="padding:20px;">
+      <p style="font-size:15px;color:#111;margin:0 0 16px;"><strong>${escapeHtml(input.subCompanyName)}</strong> marked a task complete on <strong>${escapeHtml(input.projectName)}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 16px;border:1px solid #eee;border-radius:6px;overflow:hidden;">
+        <tr><td style="padding:6px 12px;color:#666;font-size:13px;text-transform:uppercase;letter-spacing:0.04em;">Task</td><td style="padding:6px 12px;font-size:15px;color:#111;">${escapeHtml(input.taskTitle)}</td></tr>
+        ${attachmentRow}
+      </table>
+      ${noteBlock}
+      <a href="${escapeHtml(input.url)}" style="display:inline-block;padding:12px 28px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Open Tasks</a>
+      <p style="font-size:13px;color:#999;margin:24px 0 0;">You're receiving this because you're on the team for ${escapeHtml(input.projectName)}.</p>
+    </div>
+    <div style="padding:12px 20px;color:#888;font-size:12px;border-top:1px solid #eee;">TrussPath \u2014 Field Project Management</div>
+  </div>
+</body></html>`;
+
+  const text = `${input.subCompanyName} marked a task complete on ${input.projectName}.\n\nTask: ${input.taskTitle}\n${input.hasAttachment ? "Photo attached (see Sub Uploads).\n" : ""}${input.note && input.note.trim() ? `Note: ${input.note.trim()}\n` : ""}\nOpen it here:\n${input.url}`;
+
+  if (!apiKey) {
+    console.log(`[mailer] RESEND_API_KEY not set \u2014 skipping sub-task-complete email to ${recipients.join(", ")}. Deep link: ${input.url}`);
+    return { ok: true, skipped: true, sent: 0 };
+  }
+
+  const results = await Promise.allSettled(recipients.map(to =>
+    fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [to], subject, html, text }),
+    }).then(async (resp) => {
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => "");
+        console.error(`[mailer] Resend ${resp.status} to ${to}: ${body}`);
+        return false;
+      }
+      return true;
+    }).catch((err) => { console.error(`[mailer] Send failed to ${to}:`, err); return false; })
+  ));
+  const sent = results.filter(r => r.status === "fulfilled" && r.value === true).length;
+  console.log(`[mailer] Sent sub-task-complete to ${sent}/${recipients.length} PMs on ${input.projectName}`);
+  return { ok: sent > 0, sent };
+}
+
 export async function sendPasswordResetEmail(toEmail: string, resetUrl: string): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.SIGNUP_NOTIFY_FROM || DEFAULT_FROM;
