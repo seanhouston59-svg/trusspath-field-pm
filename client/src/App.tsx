@@ -15,10 +15,34 @@ import { useHashLocation } from "wouter/use-hash-location";
  * ?field=1 flag directly from window.location, so nothing else breaks.
  */
 function useHashLocationNoQuery(): [string, (to: string, opts?: unknown) => void] {
-  const [loc, nav] = useHashLocation();
+  const [loc] = useHashLocation();
   const clean = loc.split("?")[0].split("#")[0] || "/";
-  return [clean, nav as (to: string, opts?: unknown) => void];
+  return [clean, hashNavigate];
 }
+
+/**
+ * wouter's hash navigate() peels the query off the target and assigns it to
+ * `url.search`, so navigating to "/rfis?project=3" lands on "/?project=3#/rfis"
+ * and the stale param survives the next navigation. Keep the whole target
+ * inside the hash instead.
+ */
+function hashNavigate(to: string, rawOpts?: unknown) {
+  const opts = (rawOpts ?? undefined) as { replace?: boolean; state?: unknown } | undefined;
+  const oldURL = window.location.href;
+  const path = to.replace(/^#/, "");
+  const url = new URL(window.location.href);
+  url.hash = path.startsWith("/") ? path : `/${path}`;
+  const newURL = url.href;
+  if (newURL === oldURL) return;
+  if (opts?.replace) window.history.replaceState(opts?.state ?? null, "", newURL);
+  else window.history.pushState(opts?.state ?? null, "", newURL);
+  window.dispatchEvent(new HashChangeEvent("hashchange", { oldURL, newURL }));
+}
+
+// wouter reads `hook.hrefs` to turn a Link's `href` into a real anchor href.
+// The wrapper above hides useHashLocation.hrefs, so re-declare it or every
+// <Link href="/x"> renders a non-hash anchor that reloads the app.
+useHashLocationNoQuery.hrefs = (href: string) => `#${href}`;
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";

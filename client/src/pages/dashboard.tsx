@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   FolderKanban, HelpCircle, ListChecks, CheckSquare, ArrowRight, AlertTriangle, TrendingUp,
   Activity, CircleDot, Clock, Building2, Hammer, FileWarning, GitPullRequestArrow,
@@ -85,6 +85,50 @@ function ProgressRing({ value, size = 60, stroke = 6, tone = "primary" }: { valu
   );
 }
 
+/**
+ * Clickable x-axis tick for the Budget vs Spent chart. recharts renders ticks
+ * inside the chart's <svg>, so the link has to be an SVG <a> — that keeps it a
+ * real anchor (focusable, keyboard-activatable, right-click-able) instead of an
+ * onClick on <text>. A custom tick bypasses XAxis's own `angle`/`textAnchor`
+ * props, so the rotation and the 0.71em baseline offset recharts would have
+ * applied are replicated here.
+ */
+function ProjectAxisTick({
+  rows, rotate, x, y, payload,
+}: {
+  rows: { id: number; name: string; fullName: string }[];
+  rotate: boolean;
+  x?: number;
+  y?: number;
+  payload?: { value?: string | number; index?: number };
+}) {
+  const label = String(payload?.value ?? "");
+  const row =
+    (payload?.index != null ? rows[payload.index] : undefined) ??
+    rows.find((r) => r.name === label);
+  const text = (
+    <text
+      dy="0.71em"
+      textAnchor={rotate ? "end" : "middle"}
+      transform={rotate ? "rotate(-20)" : undefined}
+      style={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }}
+    >
+      {label}
+    </text>
+  );
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      {row ? (
+        <a href={`#/projects/${row.id}`} className="chart-axis-link" aria-label={`Open ${row.fullName}`}>
+          {text}
+        </a>
+      ) : (
+        text
+      )}
+    </g>
+  );
+}
+
 /* ============================ WIDGET REGISTRY ============================
  *
  * Each widget is defined once here with:
@@ -103,8 +147,12 @@ type WidgetCtx = ReturnType<typeof useDashboardCtx>;
 // Grouped compute — every widget reads from this so we don't refetch or
 // recompute per widget.
 function useDashboardCtx() {
-  const { can } = useAccess();
+  const { can, isAllowed } = useAccess();
   const { account } = useAuth();
+  // Widget render() functions are plain functions, not components, so they
+  // can't call hooks. Anything hook-derived (like navigation for the chart
+  // bars) has to be threaded through this context.
+  const [, navigate] = useLocation();
   const { data: projects = [] } = useProjects();
   const { data: tasks = [] } = useTasks();
   const { data: rfis = [] } = useRfis();
@@ -134,6 +182,13 @@ function useDashboardCtx() {
     : 0;
   const spendPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
   const showMoney = can("canViewFinancials");
+  // Budget links point at the Executive OS financials module, but some roles
+  // (Project Manager) can see money without being allowed into /executive-os.
+  // Fall back to the projects list / project detail, which also carry budget.
+  const canOpenExecFinancials = isAllowed("/executive-os/financials");
+  const financialsHref = canOpenExecFinancials ? "/executive-os/financials" : "/projects";
+  const projectFinancialsHref = (id: number) =>
+    canOpenExecFinancials ? `/executive-os/financials/${id}` : `/projects/${id}`;
   const projectCounts = (id: number) => ({
     rfi: rfis.filter((r) => r.projectId === id && r.status === "Open").length,
     sub: subs.filter((s) => s.projectId === id && s.status !== "Closed").length,
@@ -156,6 +211,7 @@ function useDashboardCtx() {
   const chartData = projects.map((p) => {
     const shortName = p.name.length > 18 ? p.name.slice(0, 17) + "…" : p.name;
     return {
+      id: p.id,
       name: shortName,
       fullName: p.name,
       // Use one decimal when the divisor could round otherwise-nonzero values
@@ -177,9 +233,10 @@ function useDashboardCtx() {
     ...pendingCOs.map<FeedItem>((c) => ({ id: `co-${c.id}`, kind: "Pending CO", title: `${c.number} ${c.title}`, meta: `$${c.amount.toLocaleString()} · ${shortDate(c.dateIssued)}`, testid: `attention-co-${c.id}`, href: "/change-orders" })),
   ];
   return {
-    account, projects, tasks, rfis, subs, punch, dailyLogs, changeOrders, team,
+    account, navigate, projects, tasks, rfis, subs, punch, dailyLogs, changeOrders, team,
     activeProjects, openRfis, overdueRfis, pendingCOs, dueThisWeek, openPunch,
     blockedTasks, totalBudget, totalSpent, portfolioProgress, spendPct, showMoney,
+    financialsHref, projectFinancialsHref,
     projectCounts, chartData, chartUnit, feed,
   };
 }
@@ -231,7 +288,7 @@ const WIDGET_REGISTRY: WidgetDef[] = [
             <span className="hidden h-12 w-px bg-border sm:block" />
             <div className="flex gap-3">
               <Link
-                href="/projects"
+                href={c.showMoney ? c.financialsHref : "/projects"}
                 data-testid="hero-stat-committed"
                 className="group -m-2 block rounded-md p-2 text-right transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
@@ -326,10 +383,14 @@ const WIDGET_REGISTRY: WidgetDef[] = [
     render: (c) => (
       <div className="h-full">
         <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link
+            href="/projects"
+            className="group flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            data-testid="link-project-command-header"
+          >
             <Building2 className="size-4 text-primary" />
-            <h2 className="font-display text-base font-bold">Project Command</h2>
-          </div>
+            <h2 className="font-display text-base font-bold group-hover:underline">Project Command</h2>
+          </Link>
           <Link href="/projects" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
             View all <ArrowRight className="size-3.5" />
           </Link>
@@ -340,11 +401,21 @@ const WIDGET_REGISTRY: WidgetDef[] = [
             const counts = c.projectCounts(p.id);
             const tone = pct > 90 || p.status === "At Risk" ? "warning" : "primary";
             return (
-              <Link key={p.id} href={`/projects/${p.id}`} className="group block rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/50" data-testid={`dash-project-${p.id}`}>
+              // The card body links to the project, but the count badges and
+              // budget block are their own destinations. Anchors can't nest,
+              // so the project name carries a stretched overlay that makes the
+              // whole card clickable and the inner links sit above it.
+              <div key={p.id} className="group relative rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/50" data-testid={`dash-project-${p.id}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-display text-sm font-bold">{p.name}</span>
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="truncate font-display text-sm font-bold after:absolute after:inset-0 after:content-[''] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        data-testid={`dash-project-link-${p.id}`}
+                      >
+                        {p.name}
+                      </Link>
                     </div>
                     <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">{p.number} · {p.client}</div>
                   </div>
@@ -352,17 +423,22 @@ const WIDGET_REGISTRY: WidgetDef[] = [
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <ProjectStatusBadge status={p.status} />
-                  <div className="text-right">
+                  <Link
+                    href={c.projectFinancialsHref(p.id)}
+                    aria-label={`Budget for ${p.name}`}
+                    className="relative z-10 rounded-md text-right transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    data-testid={`dash-project-budget-${p.id}`}
+                  >
                     <div className="text-sm font-semibold tabular">{formatCurrency(p.spent, { compact: true })}</div>
                     <div className="text-[11px] text-muted-foreground tabular">of {formatCurrency(p.budget, { compact: true })}</div>
-                  </div>
+                  </Link>
                 </div>
-                <div className="mt-3 flex items-center gap-1.5 border-t border-border pt-2.5 text-[11px] font-medium">
-                  <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 dark:text-amber-400"><FileWarning className="size-3" />{counts.rfi} RFI</span>
-                  <span className="inline-flex items-center gap-1 rounded bg-violet-500/10 px-1.5 py-0.5 text-violet-600 dark:text-violet-400"><FileWarning className="size-3" />{counts.sub} SUB</span>
-                  <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-sky-600 dark:text-sky-400"><GitPullRequestArrow className="size-3" />{counts.co} CO</span>
+                <div className="relative z-10 mt-3 flex items-center gap-1.5 border-t border-border pt-2.5 text-[11px] font-medium">
+                  <Link href={`/rfis?project=${p.id}`} aria-label={`${counts.rfi} open RFIs on ${p.name}`} className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 transition-colors hover:bg-amber-500/20 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-amber-400" data-testid={`dash-project-rfi-${p.id}`}><FileWarning className="size-3" />{counts.rfi} RFI</Link>
+                  <Link href={`/submittals?project=${p.id}`} aria-label={`${counts.sub} open submittals on ${p.name}`} className="inline-flex items-center gap-1 rounded bg-violet-500/10 px-1.5 py-0.5 text-violet-600 transition-colors hover:bg-violet-500/20 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-violet-400" data-testid={`dash-project-sub-${p.id}`}><FileWarning className="size-3" />{counts.sub} SUB</Link>
+                  <Link href={`/change-orders?project=${p.id}`} aria-label={`${counts.co} pending change orders on ${p.name}`} className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-sky-600 transition-colors hover:bg-sky-500/20 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-sky-400" data-testid={`dash-project-co-${p.id}`}><GitPullRequestArrow className="size-3" />{counts.co} CO</Link>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>
@@ -376,13 +452,19 @@ const WIDGET_REGISTRY: WidgetDef[] = [
     icon: Activity,
     render: (c) => (
       <div className="h-full rounded-lg border border-border bg-card p-5 shadow-sm">
-        <div className="flex items-center justify-between">
+        <Link
+          href="/notifications"
+          className="group -m-1 flex items-center justify-between rounded-md p-1 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          data-testid="link-ops-feed-header"
+        >
           <div className="flex items-center gap-2">
             <Activity className="size-4 text-amber-500" />
-            <h2 className="font-display text-base font-bold">Ops Feed</h2>
+            <h2 className="font-display text-base font-bold group-hover:underline">Ops Feed</h2>
           </div>
-          <span className="ff-kicker text-muted-foreground">Needs Attention</span>
-        </div>
+          <span className="ff-kicker inline-flex items-center gap-1 text-muted-foreground group-hover:text-primary">
+            Needs Attention <ArrowRight className="size-3" />
+          </span>
+        </Link>
         <div className="mt-3 space-y-2">
           {c.feed.length === 0 && (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
@@ -418,16 +500,20 @@ const WIDGET_REGISTRY: WidgetDef[] = [
     visible: (c) => c.showMoney,
     render: (c) => (
       <div className="relative h-full overflow-hidden rounded-lg border border-border bg-card p-5 shadow-sm">
-        <div className="relative flex items-center justify-between">
+        <Link
+          href={c.financialsHref}
+          className="group relative -m-1 flex items-center justify-between rounded-md p-1 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          data-testid="link-financials-header"
+        >
           <div>
             <div className="ff-kicker text-primary">Financials</div>
-            <h2 className="font-display text-base font-bold">Budget vs. Spent</h2>
+            <h2 className="font-display text-base font-bold group-hover:underline">Budget vs. Spent</h2>
             <p className="text-xs text-muted-foreground">
               {formatCurrency(c.totalSpent, { compact: true })} of {formatCurrency(c.totalBudget, { compact: true })} committed · {c.spendPct}%
             </p>
           </div>
-          <TrendingUp className="size-5 text-muted-foreground" />
-        </div>
+          <TrendingUp className="size-5 text-muted-foreground group-hover:text-primary" />
+        </Link>
         <div className="relative mt-4 h-64 w-full">
           {c.chartData.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-muted/20 px-4 text-center">
@@ -455,12 +541,10 @@ const WIDGET_REGISTRY: WidgetDef[] = [
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }}
+                tick={<ProjectAxisTick rows={c.chartData} rotate={c.chartData.length > 4} />}
                 tickLine={false}
                 axisLine={false}
                 interval={0}
-                angle={c.chartData.length > 4 ? -20 : 0}
-                textAnchor={c.chartData.length > 4 ? "end" : "middle"}
                 height={c.chartData.length > 4 ? 44 : 24}
               />
               <YAxis tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} unit={c.chartUnit} />
@@ -487,8 +571,23 @@ const WIDGET_REGISTRY: WidgetDef[] = [
                   );
                 }}
               />
-              <Bar dataKey="Budget" radius={[4, 4, 0, 0]} fill="hsl(var(--chart-2))" fillOpacity={0.35} />
-              <Bar dataKey="Spent" radius={[4, 4, 0, 0]} fill="hsl(var(--chart-1))">
+              {/* Bars drill into the project. recharts hands the row back on
+                  the click payload, so no extra lookup is needed. */}
+              <Bar
+                dataKey="Budget"
+                radius={[4, 4, 0, 0]}
+                fill="hsl(var(--chart-2))"
+                fillOpacity={0.35}
+                cursor="pointer"
+                onClick={(d: any) => d?.payload?.id && c.navigate(`/projects/${d.payload.id}`)}
+              />
+              <Bar
+                dataKey="Spent"
+                radius={[4, 4, 0, 0]}
+                fill="hsl(var(--chart-1))"
+                cursor="pointer"
+                onClick={(d: any) => d?.payload?.id && c.navigate(`/projects/${d.payload.id}`)}
+              >
                 {/* Show "NN%" above each Spent bar so at-a-glance you can see
                     which projects are running hot without hovering. */}
                 <LabelList
@@ -505,7 +604,13 @@ const WIDGET_REGISTRY: WidgetDef[] = [
         <div className="relative mt-3 flex items-center gap-4 border-t border-border pt-3 text-xs">
           <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-primary" />Spent</span>
           <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-sky-500/40" />Budget</span>
-          <span className="ml-auto font-mono text-muted-foreground">{formatCurrency(c.totalBudget - c.totalSpent, { compact: true })} remaining</span>
+          <Link
+            href={c.financialsHref}
+            className="ml-auto font-mono text-muted-foreground transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            data-testid="link-financials-remaining"
+          >
+            {formatCurrency(c.totalBudget - c.totalSpent, { compact: true })} remaining
+          </Link>
         </div>
       </div>
     ),
@@ -518,10 +623,14 @@ const WIDGET_REGISTRY: WidgetDef[] = [
     render: (c) => (
       <div className="h-full rounded-lg border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link
+            href="/rfis"
+            className="group flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            data-testid="link-rfis-list-header"
+          >
             <HelpCircle className="size-4 text-primary" />
-            <h2 className="font-display text-base font-bold">Open RFIs</h2>
-          </div>
+            <h2 className="font-display text-base font-bold group-hover:underline">Open RFIs</h2>
+          </Link>
           <Link href="/rfis" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
             All <ArrowRight className="size-3.5" />
           </Link>
@@ -531,7 +640,9 @@ const WIDGET_REGISTRY: WidgetDef[] = [
             const proj = c.projects.find((p) => p.id === r.projectId);
             const assignee = r.assigneeId ? c.team.get(r.assigneeId) : undefined;
             return (
-              <div key={r.id} className="flex items-center gap-3 rounded-md border border-border p-3" data-testid={`dash-rfi-${r.id}`}>
+              // No per-RFI detail route exists, so a row opens the RFI list
+              // scoped to that project.
+              <Link key={r.id} href={`/rfis?project=${r.projectId}`} className="flex items-center gap-3 rounded-md border border-border p-3 transition-colors hover:border-primary/50 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid={`dash-rfi-${r.id}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs font-semibold text-primary">{r.number}</span>
@@ -543,7 +654,7 @@ const WIDGET_REGISTRY: WidgetDef[] = [
                   </div>
                 </div>
                 {assignee && <Avatar initials={assignee.initials} color={assignee.color} size={28} />}
-              </div>
+              </Link>
             );
           })}
           {c.openRfis.length === 0 && <p className="text-sm text-muted-foreground">No open RFIs.</p>}

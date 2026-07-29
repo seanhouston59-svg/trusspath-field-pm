@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useHashParam } from "@/hooks/use-hash-param";
 import { Plus, Clock, Trash2, Pencil, Check, X, ChevronLeft, FileText, Printer, Send, FolderCheck, Calendar, ChevronRight } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState } from "@/components/ghost-state";
@@ -93,21 +93,17 @@ export default function Timesheets() {
   const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [location] = useLocation();
+  const openParam = useHashParam("open");
 
   // Deep-link: /timesheets?open=<id> opens that timesheet directly. Used by
   // the field timecard "Open this week's timesheet" card and by the manager
   // approval email.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const openId = params.get("open");
-    if (openId && !selectedId) {
-      const idNum = Number(openId);
-      if (Number.isFinite(idNum) && idNum > 0) setSelectedId(idNum);
-    }
+    if (!openParam || selectedId) return;
+    const idNum = Number(openParam);
+    if (Number.isFinite(idNum) && idNum > 0) setSelectedId(idNum);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]);
+  }, [openParam]);
 
   // Fetch the caller's current timesheet so we can show a
   // "pending signature" callout at the top even if it hasn't loaded into

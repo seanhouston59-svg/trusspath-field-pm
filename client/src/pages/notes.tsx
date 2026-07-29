@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "wouter";
 import { Plus, X, CornerDownRight, Sparkles } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { useNotes, useCreateNote, useUpdateNotePosition, useDeleteNote, useAddNoteReply } from "@/hooks/use-data";
+import { useNotes, useCreateNote, useUpdateNotePosition, useDeleteNote, useAddNoteReply, useProjects } from "@/hooks/use-data";
+import { useHashParam } from "@/hooks/use-hash-param";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -128,7 +130,14 @@ export default function NotesPage() {
   // Sticky Board is org-wide: one universal corkboard shared by every user
   // in the organization. No project selector; the server scopes notes by the
   // caller's org (see /api/notes handler + storage.getNotesForOrg).
+  // ...though a note carries an optional project tag, so the dashboard Note
+  // Wall can deep-link here as "/notes?project=<id>" to narrow the board, and
+  // "/notes?note=<id>" to spotlight one sticky.
   const { data: notes = [] } = useNotes();
+  const { data: projects = [] } = useProjects();
+  const filterProjectId = Number(useHashParam("project")) || null;
+  const focusedNoteId = Number(useHashParam("note")) || null;
+  const filterProjectName = projects.find((p) => p.id === filterProjectId)?.name;
   const create = useCreateNote();
   const updatePos = useUpdateNotePosition();
   const del = useDeleteNote();
@@ -277,7 +286,11 @@ export default function NotesPage() {
   // Split notes vs stickers up front. Notes get the 2-column mobile grid;
   // stickers keep their stored x/y so a Halloween pumpkin someone placed in
   // the top-right stays roughly there (clamped to the visible frame).
-  const stickyNotes = notes.filter((n: any) => (n.type ?? "note") !== "sticker");
+  // Stickers are decorative and never project-tagged, so a project filter
+  // only narrows the notes themselves.
+  const stickyNotes = notes
+    .filter((n: any) => (n.type ?? "note") !== "sticker")
+    .filter((n: any) => filterProjectId == null || n.projectId === filterProjectId);
   const stickers = notes.filter((n: any) => (n.type ?? "note") === "sticker");
   const activeCategory = STICKER_CATEGORIES.find((c) => c.key === stickerCategory) ?? STICKER_CATEGORIES[0];
 
@@ -375,6 +388,21 @@ export default function NotesPage() {
             </>
           )}
         </div>
+        {filterProjectId != null && (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+            data-testid="notes-project-filter"
+          >
+            {filterProjectName ?? `Project ${filterProjectId}`}
+            <Link
+              href="/notes"
+              aria-label="Clear project filter"
+              className="rounded-full p-0.5 transition-colors hover:bg-primary/20"
+            >
+              <X className="size-3" />
+            </Link>
+          </span>
+        )}
         <span className="ml-auto text-xs text-muted-foreground">Drag to reposition · {stickyNotes.length} notes · {stickers.length} stickers</span>
       </div>
 
@@ -403,6 +431,11 @@ export default function NotesPage() {
         {notes.length === 0 && (
           <div className="flex h-full items-center justify-center text-sm font-medium text-white/80 drop-shadow">
             Empty corkboard. Add your first sticky above.
+          </div>
+        )}
+        {notes.length > 0 && stickyNotes.length === 0 && filterProjectId != null && (
+          <div className="flex h-full items-center justify-center text-sm font-medium text-white/80 drop-shadow">
+            No notes tagged to {filterProjectName ?? "this project"} yet.
           </div>
         )}
         {stickyNotes.map((n, i) => {
@@ -453,7 +486,9 @@ export default function NotesPage() {
                 background: c.bg,
                 color: c.text,
                 opacity: isDragging ? 0.95 : 1,
-                zIndex: isDragging ? 20 : 1 + (i % 5),
+                zIndex: isDragging ? 20 : n.id === focusedNoteId ? 15 : 1 + (i % 5),
+                outline: n.id === focusedNoteId ? "3px solid hsl(var(--primary))" : undefined,
+                outlineOffset: 3,
                 transform: `rotate(${isDragging ? 0 : rot}deg)`,
                 // Layered shadow — a soft ambient drop plus a warmer contact
                 // shadow just below the note to sell the "pinned to cork"

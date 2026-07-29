@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, HelpCircle, Search, MessageSquare, Archive } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState, GhostRfiRows } from "@/components/ghost-state";
@@ -9,6 +9,7 @@ import { subjectsForTrade, tradeForRfiSubject } from "@/lib/rfi-catalog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
+import { useHashParam } from "@/hooks/use-hash-param";
 import {
   useRfis,
   useTeamMap,
@@ -44,10 +45,18 @@ export default function RfisPage() {
   const updateStatus = useUpdateRfiStatus();
   const [open, setOpen] = useState(false);
 
+  // Dashboard badges deep-link here as "/rfis?project=<id>", so seed the
+  // project filter from the hash and re-apply it if the param changes while
+  // the page stays mounted.
+  const linkedProject = useHashParam("project");
   const [view, setView] = useState<View>("board");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>(linkedProject ?? "all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Rfi | null>(null);
+
+  useEffect(() => {
+    if (linkedProject) setProjectFilter(linkedProject);
+  }, [linkedProject]);
 
   const filtered = useMemo(() => {
     return rfis.filter((r) => {
