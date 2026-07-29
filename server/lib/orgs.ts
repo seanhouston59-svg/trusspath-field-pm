@@ -11,7 +11,8 @@ import {
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import {
-  PLANS, buildSubscriptionItems, TRIAL_DAYS, EXECUTIVE_OS_ADDON_PRICE_ID,
+  PLANS, buildSubscriptionItems, TRIAL_DAYS,
+  EXECUTIVE_OS_ADDON_PRICE_IDS, getExecOsPriceIdForSubscription,
   type PlanTier, type Billing,
 } from "./plans";
 
@@ -415,11 +416,16 @@ export async function syncSeatsForOrg(
 // Reconcile the Executive OS add-on subscription item against the number of
 // memberships holding the grant. Mirrors syncSeatsForOrg, with two differences:
 // every entitled seat is billable (there is no included-seat allowance), and the
-// item is matched by the add-on price id so it stays independent of the base and
+// item is matched by the add-on price ids so it stays independent of the base and
 // seat-overage items.
 //
 // The quantity is always read from the DB and set absolutely, never incremented,
 // so concurrent grants and retried Stripe webhooks both converge on the truth.
+//
+// The add-on price is chosen to match the subscription's interval: Stripe rejects a
+// subscription item whose recurring interval differs from the subscription's, so an
+// annual org needs the annual price. Existing items are matched against both prices
+// because an org can change billing interval over its lifetime.
 export async function syncExecOsSeatsForOrg(
   stripe: any,
   organizationId: number,
@@ -434,7 +440,9 @@ export async function syncExecOsSeatsForOrg(
   const quantity = await countExecOsSeats(organizationId);
 
   const sub = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
-  const addonItem = sub.items?.data?.find((i: any) => i.price?.id === EXECUTIVE_OS_ADDON_PRICE_ID);
+  const addonPriceId = getExecOsPriceIdForSubscription(sub);
+  const knownAddonPriceIds: string[] = Object.values(EXECUTIVE_OS_ADDON_PRICE_IDS);
+  const addonItem = sub.items?.data?.find((i: any) => knownAddonPriceIds.includes(i.price?.id));
 
   if (quantity === 0) {
     if (addonItem) {
@@ -453,7 +461,7 @@ export async function syncExecOsSeatsForOrg(
   } else {
     await stripe.subscriptionItems.create({
       subscription: org.stripeSubscriptionId,
-      price: EXECUTIVE_OS_ADDON_PRICE_ID,
+      price: addonPriceId,
       quantity,
       proration_behavior: "always_invoice",
     });
