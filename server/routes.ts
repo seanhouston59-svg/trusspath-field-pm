@@ -9,7 +9,7 @@ import { jarvisChat, jarvisBrief } from "./jarvis";
 import { localJarvisChat, buildRichLocalBrief, buildSafetyBrief } from "./jarvis-local";
 import { buildContext } from "./jarvis";
 import { runHealthScan } from "./health";
-import { sendSignupNotification, sendPasswordResetEmail, sendInviteEmail } from "./mailer";
+import { sendSignupNotification, sendPasswordResetEmail, sendInviteEmail, sendSubDraftNotification } from "./mailer";
 import { weekStartMonday, ensureTimesheetForWeek, rollupPunchToTimesheet, runWeeklyRolloverIfDue, findManagerForProject } from "./timesheet-auto";
 import {
   insertProjectSchema, insertTaskSchema, insertRfiSchema, insertSubmittalSchema,
@@ -884,6 +884,25 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   }
 
   // ---- Sub submits an RFI (lands as sub_draft) ---------------------------
+  // Returns email addresses for every team member on the project's org who
+  // has an access level of PM or PE. Empty when no PMs are set up yet (the
+  // send is then no-oped by the mailer). Kept inline so we can share the
+  // exact filter between the RFI and CO endpoints below.
+  async function pmEmailsForProjectOrg(organizationId: number | null | undefined): Promise<string[]> {
+    if (!organizationId) return [];
+    try {
+      const roster = await storage.getTeam(organizationId);
+      // 'project_manager' is default on new members \u2014 include
+      // 'project_executive' too since they own escalations in the field.
+      return roster
+        .filter(m => m.email && (m.accessLevel === "project_manager" || m.accessLevel === "project_executive"))
+        .map(m => m.email as string);
+    } catch (err) {
+      console.error("[sub-notify] Failed to load PM roster:", err);
+      return [];
+    }
+  }
+
   app.post("/api/sub/projects/:projectId/rfis", resolveSubSession, async (req: any, res) => {
     const project = await subProjectGate(req, res);
     if (!project) return;
@@ -921,6 +940,22 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       sourceId: created.id,
       meta: { number, status: "sub_draft", submittedBySubCompanyId: req.subCompany.id },
     });
+    // Fire-and-forget PM notification. We don't await so a slow SMTP path
+    // never blocks the sub's confirmation \u2014 the mailer already logs
+    // successes and failures.
+    void (async () => {
+      const toEmails = await pmEmailsForProjectOrg(project.organizationId);
+      const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
+      await sendSubDraftNotification({
+        kind: "rfi",
+        toEmails,
+        projectName: project.name,
+        subCompanyName: req.subCompany.companyName,
+        number,
+        title: subject,
+        url: `${APP_URL}/#/rfis`,
+      });
+    })();
     res.status(201).json(created);
   });
 
@@ -967,6 +1002,21 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       sourceId: created.id,
       meta: { number, status: "sub_draft", amount, scheduleImpact, submittedBySubCompanyId: req.subCompany.id },
     });
+    void (async () => {
+      const toEmails = await pmEmailsForProjectOrg(project.organizationId);
+      const APP_URL = process.env.VITE_API_BASE || "https://trusspath.com";
+      await sendSubDraftNotification({
+        kind: "change_order",
+        toEmails,
+        projectName: project.name,
+        subCompanyName: req.subCompany.companyName,
+        number,
+        title,
+        amount,
+        scheduleImpact,
+        url: `${APP_URL}/#/change-orders`,
+      });
+    })();
     res.status(201).json(created);
   });
 
