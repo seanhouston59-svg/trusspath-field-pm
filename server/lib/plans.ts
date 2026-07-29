@@ -86,9 +86,12 @@ export const TRIAL_DAYS = 14;
 // There is one price per interval because Stripe rejects a subscription item
 // whose recurring interval differs from the subscription's — an annual org can
 // only carry the annual add-on price.
-// TODO(sean): replace with real Stripe price ids from dashboard
+// TODO(sean): monthly price is the SANDBOX id (livemode:false).
+// Before production launch: create the same product/price in the LIVE Stripe
+// account (metadata.kind = "addon_exec_os") and swap this value.
+// Annual price is still a TODO — create when annual billing goes live.
 export const EXECUTIVE_OS_ADDON_PRICE_IDS = {
-  monthly: "price_TODO_EXEC_OS_ADDON_MONTHLY",
+  monthly: "price_1TyhFwCL31xFtol4GQDNjiN0",
   annual: "price_TODO_EXEC_OS_ADDON_ANNUAL",
 } as const;
 
