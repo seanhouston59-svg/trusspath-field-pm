@@ -16,6 +16,21 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Keep long-lived vendor code in its own chunks so an app deploy
+        // doesn't invalidate React/query/Radix for returning visitors.
+        // Deliberately coarse — over-splitting vendors causes request waterfalls.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("react-dom") || /node_modules\/react\//.test(id) || id.includes("scheduler")) {
+            return "react-vendor";
+          }
+          if (id.includes("@tanstack")) return "query-vendor";
+          if (id.includes("@radix-ui")) return "radix-vendor";
+        },
+      },
+    },
   },
   server: {
     fs: {

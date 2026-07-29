@@ -1,6 +1,29 @@
 import { sql } from "./db";
 
+/**
+ * Bump this whenever a statement is added or changed below.
+ *
+ * Every statement in migrate() is idempotent, but there are ~235 of them and
+ * the Neon HTTP driver gives each one its own round-trip — several seconds of
+ * cold start before the first request is served. Once a database reports this
+ * version we can skip the whole run, turning cold start into a single SELECT.
+ * Forgetting to bump it means new DDL never reaches already-migrated
+ * databases, so it has to move in lockstep with the statements below.
+ */
+const SCHEMA_VERSION = 1;
+
 export async function migrate() {
+  // Fast path: if this database is already at SCHEMA_VERSION, every statement
+  // below is a no-op. Both statements here are safe on a fresh database — the
+  // SELECT returns no rows, so we fall through and run the full migration.
+  await sql`CREATE TABLE IF NOT EXISTS schema_meta (
+    id INTEGER PRIMARY KEY,
+    version INTEGER NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`;
+  const metaRows = await sql`SELECT version FROM schema_meta WHERE id = 1`;
+  if (metaRows[0]?.version === SCHEMA_VERSION) return;
+
   // Idempotent CREATE TABLE statements — Postgres syntax.
   await sql`CREATE TABLE IF NOT EXISTS team_members (
     id SERIAL PRIMARY KEY,
@@ -1365,4 +1388,9 @@ export async function migrate() {
     // flow via recordEvent().
     console.warn("[migrate] project_events backfill skipped:", (e as Error)?.message ?? e);
   }
+
+  // Stamp the schema last, so a mid-run failure leaves the version behind and
+  // the next cold start retries the full migration rather than skipping it.
+  await sql`INSERT INTO schema_meta (id, version) VALUES (1, ${SCHEMA_VERSION})
+    ON CONFLICT (id) DO UPDATE SET version = ${SCHEMA_VERSION}, updated_at = NOW()`;
 }

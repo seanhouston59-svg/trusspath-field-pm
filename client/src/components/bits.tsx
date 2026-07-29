@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import logoUrl from "@/../public/trusspath-logo.jpg";
+import logoUrl from "@/assets/trusspath-logo.webp";
 
 /* ----------------------------- Brand logo ----------------------------- */
 /* TrussPath app icon — 3D T-mark with truss crown. */

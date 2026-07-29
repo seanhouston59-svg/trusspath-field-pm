@@ -4904,7 +4904,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!req.organizationId) {
       return res.json({ plan: null, status: null, billing: null, currentPeriodEnd: null, hasCustomer: false });
     }
-    const org = await getOrganization(req.organizationId);
+    // resolveMembership already loaded this org onto the request alongside
+    // req.organizationId, so re-fetching it here was a wasted round-trip on a
+    // request that blocks first paint.
+    const org = req.organization;
     if (!org) return res.status(404).json({ error: "Organization not found" });
     const seats = await countActiveSeats(org.id);
     const plan = org.subscriptionPlan ? PLANS[org.subscriptionPlan as PlanTier] : null;

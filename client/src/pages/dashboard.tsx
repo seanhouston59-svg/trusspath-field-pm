@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   FolderKanban, HelpCircle, ListChecks, CheckSquare, ArrowRight, AlertTriangle, TrendingUp,
@@ -23,9 +23,10 @@ import { useAuth } from "@/lib/auth";
 import { formatCurrency, shortDate, relativeDays, isOverdue } from "@/lib/format";
 import { useAccess } from "@/lib/access";
 import { NotificationsBox, WeatherBar, StickyNotepadBox, NoteWallCarouselBox, FleetServiceBox } from "@/components/dashboard-widgets";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
-} from "recharts";
+
+// recharts drags in d3 + lodash (~360 kB). It's one below-the-fold widget, so
+// keep the whole cluster out of the dashboard chunk.
+const DashboardBudgetChart = lazy(() => import("@/components/dashboard-budget-chart"));
 
 import {
   useDashboardLayout,
@@ -82,50 +83,6 @@ function ProgressRing({ value, size = 60, stroke = 6, tone = "primary" }: { valu
       </svg>
       <span className="absolute font-display text-sm font-bold tabular">{value}%</span>
     </div>
-  );
-}
-
-/**
- * Clickable x-axis tick for the Budget vs Spent chart. recharts renders ticks
- * inside the chart's <svg>, so the link has to be an SVG <a> — that keeps it a
- * real anchor (focusable, keyboard-activatable, right-click-able) instead of an
- * onClick on <text>. A custom tick bypasses XAxis's own `angle`/`textAnchor`
- * props, so the rotation and the 0.71em baseline offset recharts would have
- * applied are replicated here.
- */
-function ProjectAxisTick({
-  rows, rotate, x, y, payload,
-}: {
-  rows: { id: number; name: string; fullName: string }[];
-  rotate: boolean;
-  x?: number;
-  y?: number;
-  payload?: { value?: string | number; index?: number };
-}) {
-  const label = String(payload?.value ?? "");
-  const row =
-    (payload?.index != null ? rows[payload.index] : undefined) ??
-    rows.find((r) => r.name === label);
-  const text = (
-    <text
-      dy="0.71em"
-      textAnchor={rotate ? "end" : "middle"}
-      transform={rotate ? "rotate(-20)" : undefined}
-      style={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }}
-    >
-      {label}
-    </text>
-  );
-  return (
-    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
-      {row ? (
-        <a href={`#/projects/${row.id}`} className="chart-axis-link" aria-label={`Open ${row.fullName}`}>
-          {text}
-        </a>
-      ) : (
-        text
-      )}
-    </g>
   );
 }
 
@@ -528,77 +485,13 @@ const WIDGET_REGISTRY: WidgetDef[] = [
               <div className="text-xs text-muted-foreground">Set a budget on your projects to populate this chart. Edit a project → Budget field.</div>
             </div>
           ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            {/* barGap: gap between Budget/Spent within a project (tight, they're a pair)
-                barCategoryGap: gap BETWEEN projects (wide, so each project reads as its own group).
-                45% category gap gives clear visual separation between projects. */}
-            <BarChart
+          <Suspense fallback={<div className="h-full w-full animate-pulse rounded-lg bg-muted/30" />}>
+            <DashboardBudgetChart
               data={c.chartData}
-              barGap={2}
-              barCategoryGap="35%"
-              margin={{ top: 16, right: 8, left: -8, bottom: c.chartData.length > 4 ? 20 : 4 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis
-                dataKey="name"
-                tick={<ProjectAxisTick rows={c.chartData} rotate={c.chartData.length > 4} />}
-                tickLine={false}
-                axisLine={false}
-                interval={0}
-                height={c.chartData.length > 4 ? 44 : 24}
-              />
-              <YAxis tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} unit={c.chartUnit} />
-              <Tooltip
-                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--popover-border))", borderRadius: 8, fontSize: 12 }}
-                cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.4 }}
-                content={({ active, payload }) => {
-                  if (!active || !payload || !payload.length) return null;
-                  const row = payload[0]?.payload as (typeof c.chartData)[number] | undefined;
-                  if (!row) return null;
-                  return (
-                    <div className="rounded-lg border border-popover-border bg-popover px-3 py-2 text-xs shadow-md">
-                      <div className="mb-1 font-semibold">{row.fullName}</div>
-                      <div className="flex items-center gap-3">
-                        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-sky-500/40" />Budget</span>
-                        <span className="font-mono tabular-nums">{formatCurrency(row.budgetRaw, { compact: true })}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-sm bg-primary" />Spent</span>
-                        <span className="font-mono tabular-nums">{formatCurrency(row.spentRaw, { compact: true })}</span>
-                      </div>
-                      <div className="mt-1 border-t border-border pt-1 text-muted-foreground">{row.pct}% of budget used</div>
-                    </div>
-                  );
-                }}
-              />
-              {/* Bars drill into the project. recharts hands the row back on
-                  the click payload, so no extra lookup is needed. */}
-              <Bar
-                dataKey="Budget"
-                radius={[4, 4, 0, 0]}
-                fill="hsl(var(--chart-2))"
-                fillOpacity={0.35}
-                cursor="pointer"
-                onClick={(d: any) => d?.payload?.id && c.navigate(`/projects/${d.payload.id}`)}
-              />
-              <Bar
-                dataKey="Spent"
-                radius={[4, 4, 0, 0]}
-                fill="hsl(var(--chart-1))"
-                cursor="pointer"
-                onClick={(d: any) => d?.payload?.id && c.navigate(`/projects/${d.payload.id}`)}
-              >
-                {/* Show "NN%" above each Spent bar so at-a-glance you can see
-                    which projects are running hot without hovering. */}
-                <LabelList
-                  dataKey="pct"
-                  position="top"
-                  formatter={(v: number) => (v > 0 ? `${v}%` : "")}
-                  style={{ fontSize: 10, fontFamily: "var(--font-mono)", fill: "hsl(var(--muted-foreground))" }}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+              unit={c.chartUnit}
+              onSelectProject={(id) => c.navigate(`/projects/${id}`)}
+            />
+          </Suspense>
           )}
         </div>
         <div className="relative mt-3 flex items-center gap-4 border-t border-border pt-3 text-xs">
