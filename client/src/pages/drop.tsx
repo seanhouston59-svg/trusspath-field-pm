@@ -17,7 +17,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useRoute } from "wouter";
-import { Loader2, Upload, LogOut, CheckCircle2, AlertTriangle, FileText } from "lucide-react";
+import { Loader2, Upload, LogOut, CheckCircle2, AlertTriangle, FileText, Info, X, ShieldCheck, FolderTree, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,7 +106,7 @@ export default function SubDropPage() {
         {me ? (
           <UploadPanel me={me} token={token} projectId={tokenInfo.projectId} />
         ) : (
-          <AuthPanel token={token} onSignedIn={(sub) => setMe(sub)} />
+          <AuthPanel token={token} projectName={tokenInfo.projectName} onSignedIn={(sub) => setMe(sub)} />
         )}
       </main>
     </div>
@@ -153,10 +153,57 @@ function FullPageMessage(props: { icon: React.ReactNode; title: string; body: st
 
 /* -------------------------- Auth (register / login) --------------------- */
 
-function AuthPanel(props: { token: string; onSignedIn: (sub: SubCompany) => void }) {
+// Sub-side dismissal key. Bump the suffix if we materially change the copy so
+// returning subs see the new version.
+const SUB_WELCOME_KEY = "tp.subDrop.welcomeSeen.v1";
+
+/**
+ * First-visit welcome strip shown above the register / sign-in card. Explains
+ * what this page is ("drop docs for your PM"), sets expectations for what
+ * they'll be asked (email + password + company + trade), and reassures on
+ * cost (free) and scope (they never see other subs' files).
+ */
+function SubWelcome(props: { projectName: string }) {
+  const [visible, setVisible] = useState<boolean>(() => {
+    try { return typeof window !== "undefined" && !window.localStorage.getItem(SUB_WELCOME_KEY); }
+    catch { return true; }
+  });
+  if (!visible) return null;
+  function dismiss() {
+    try { window.localStorage.setItem(SUB_WELCOME_KEY, new Date().toISOString()); } catch { /* private mode */ }
+    setVisible(false);
+  }
+  return (
+    <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 font-medium text-primary">
+          <Info className="h-4 w-4" /> Welcome — here's how this works
+        </div>
+        <button
+          type="button"
+          onClick={dismiss}
+          className="rounded-md p-1 text-primary/80 hover:bg-primary/10"
+          aria-label="Dismiss"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <ul className="mt-3 space-y-2 text-slate-700 dark:text-slate-200">
+        <li className="flex gap-2"><ScanLine className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" /> This is <span className="font-medium">{props.projectName}</span>'s document drop. Anything you upload goes straight to the PM.</li>
+        <li className="flex gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" /> First time? Register your company below — one-time thing, takes 30 seconds. Free.</li>
+        <li className="flex gap-2"><FolderTree className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" /> Files are auto-sorted — COIs, safety docs, shop drawings, invoices, photos. Just drop, no naming rules.</li>
+        <li className="flex gap-2"><FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" /> Only your uploads are visible to you. Other subs on this job don't see them.</li>
+      </ul>
+    </div>
+  );
+}
+
+function AuthPanel(props: { token: string; onSignedIn: (sub: SubCompany) => void; projectName: string }) {
   const [mode, setMode] = useState<"login" | "register">("register");
   return (
-    <Card className="overflow-hidden">
+    <>
+      <SubWelcome projectName={props.projectName} />
+      <Card className="overflow-hidden">
       <div className="grid grid-cols-2 border-b bg-slate-50 dark:bg-slate-900">
         <button
           className={`px-4 py-3 text-sm font-medium ${mode === "register" ? "bg-white text-slate-900 dark:bg-slate-950 dark:text-white" : "text-slate-500"}`}
@@ -179,6 +226,7 @@ function AuthPanel(props: { token: string; onSignedIn: (sub: SubCompany) => void
         )}
       </div>
     </Card>
+    </>
   );
 }
 
@@ -370,8 +418,21 @@ function UploadPanel(props: { me: SubCompany; token: string; projectId: number }
     }
   }
 
+  const hasEverUploaded = uploads.length > 0;
+
   return (
     <div className="space-y-6">
+      {!hasEverUploaded ? (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-slate-700 dark:text-slate-200">
+          <div className="mb-1 flex items-center gap-2 font-medium text-primary">
+            <Info className="h-4 w-4" /> Ready when you are
+          </div>
+          <p>
+            Drag files onto the box below, or tap <span className="font-medium">Choose files</span>.
+            Multiple files at once are fine — they'll all get sorted into the right folder for your PM.
+          </p>
+        </div>
+      ) : null}
       <Card
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}

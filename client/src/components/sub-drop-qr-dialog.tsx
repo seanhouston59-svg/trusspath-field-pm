@@ -10,7 +10,7 @@
  * existing, and revoke.
  */
 import { useEffect, useState } from "react";
-import { Loader2, QrCode, Copy, Trash2, Printer, ExternalLink } from "lucide-react";
+import { Loader2, QrCode, Copy, Trash2, Printer, ExternalLink, Info, X, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
@@ -32,6 +32,64 @@ function dropUrlFor(token: string): string {
 
 function qrImageFor(url: string, size = 400): string {
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${encodeURIComponent(url)}`;
+}
+
+// Key used to remember that the PM has already seen the "how it works" panel.
+// Bumped if we change the copy meaningfully so returning users see the update.
+const PM_HOW_IT_WORKS_SEEN_KEY = "tp.subDropQr.howItWorksSeen.v1";
+
+/**
+ * First-open explainer. Auto-expanded the first time a PM opens the QR
+ * dialog on this device; collapses into a small "How it works" bar after
+ * dismissal. Nothing about this is enforced server-side — it's a UX crutch,
+ * not a permission gate, so localStorage is the right storage layer.
+ */
+function HowItWorksPanel() {
+  const [expanded, setExpanded] = useState<boolean>(() => {
+    try { return typeof window !== "undefined" && !window.localStorage.getItem(PM_HOW_IT_WORKS_SEEN_KEY); }
+    catch { return true; }
+  });
+  function dismiss() {
+    try { window.localStorage.setItem(PM_HOW_IT_WORKS_SEEN_KEY, new Date().toISOString()); } catch { /* private mode */ }
+    setExpanded(false);
+  }
+  return (
+    <div className="rounded-lg border border-primary/20 bg-primary/5 text-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+      >
+        <span className="flex items-center gap-2 font-medium text-primary">
+          <Info className="h-4 w-4" /> How Sub Drop works
+        </span>
+        {expanded ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-primary" />}
+      </button>
+      {expanded ? (
+        <div className="space-y-3 border-t border-primary/20 px-3 py-3">
+          <ol className="list-decimal space-y-1.5 pl-5 text-slate-700 dark:text-slate-200">
+            <li><span className="font-medium">Print the QR</span> — tape it to the trailer wall, gate, or safety board.</li>
+            <li><span className="font-medium">Subs scan and register once</span> — company name, trade, email, password. Free for them.</li>
+            <li><span className="font-medium">They drop files</span> — COIs, safety docs, shop drawings, photos, invoices. Up to 25 MB each.</li>
+            <li><span className="font-medium">TrussPath auto-sorts</span> into folders like Insurance / COIs, Site Photos, Shop Drawings, Financials.</li>
+            <li><span className="font-medium">You review</span> in <span className="font-mono text-xs">Sub Uploads</span> — recategorize if needed, mark reviewed, download.</li>
+          </ol>
+          <div className="rounded-md bg-white/60 p-2 text-xs text-slate-600 dark:bg-slate-900/50 dark:text-slate-300">
+            <span className="font-medium">Tips:</span> mint separate QRs per gate ("Trailer wall", "East entry") to see where subs are dropping from. Revoke a QR if a poster walks off — existing signed-in subs keep access.
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={dismiss}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary hover:bg-primary/10"
+            >
+              <X className="h-3 w-3" /> Got it
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function SubDropQrDialog(props: {
@@ -92,6 +150,7 @@ export function SubDropQrDialog(props: {
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          <HowItWorksPanel />
           <p className="text-sm text-muted-foreground">
             Post this at the jobsite. Subs scan it, register (once), and drop docs and photos.
             Files land in your Sub Uploads inbox, auto-sorted.

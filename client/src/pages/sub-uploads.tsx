@@ -15,7 +15,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "wouter";
-import { Loader2, Download, Search, Check, UserX, RotateCcw, FolderOpen } from "lucide-react";
+import { Loader2, Download, Search, Check, UserX, RotateCcw, FolderOpen, Info, X } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { apiRequest, apiUrl } from "@/lib/queryClient";
@@ -139,6 +139,7 @@ export default function SubUploadsPage() {
 
   return (
     <Layout title={`${project.name} \u2014 Sub Uploads`}>
+      <InboxHowItWorks />
       <div className="mb-4 flex items-center gap-1 border-b border-border">
         {(["inbox", "companies"] as const).map(k => (
           <button
@@ -217,6 +218,49 @@ export default function SubUploadsPage() {
         />
       )}
     </Layout>
+  );
+}
+
+// Bump the suffix if the copy meaningfully changes so returning users see it.
+const INBOX_HOW_IT_WORKS_KEY = "tp.subUploads.howItWorksSeen.v1";
+
+/**
+ * First-visit explainer for the Sub Uploads inbox. Shows the same day-in-
+ * the-life the QR dialog explains, but from the PM's inbox perspective.
+ * Dismissed with localStorage so it doesn't nag on repeat visits.
+ */
+function InboxHowItWorks() {
+  const [visible, setVisible] = useState<boolean>(() => {
+    try { return typeof window !== "undefined" && !window.localStorage.getItem(INBOX_HOW_IT_WORKS_KEY); }
+    catch { return true; }
+  });
+  if (!visible) return null;
+  function dismiss() {
+    try { window.localStorage.setItem(INBOX_HOW_IT_WORKS_KEY, new Date().toISOString()); } catch { /* private mode */ }
+    setVisible(false);
+  }
+  return (
+    <div className="mb-4 flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm">
+      <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+      <div className="flex-1 space-y-2">
+        <div className="font-medium text-primary">Everything subs drop lands here</div>
+        <ul className="list-disc space-y-1 pl-5 text-slate-700 dark:text-slate-200">
+          <li>Files are <span className="font-medium">auto-sorted</span> into folders (COIs, Safety, Site Photos, Shop Drawings, Financials, Tax / Compliance).</li>
+          <li>Click a folder in the left rail to filter. Wrong bucket? Click the category chip on any row to fix it.</li>
+          <li>Hit <span className="font-mono text-xs">✓</span> to mark reviewed, or <span className="font-mono text-xs">⬇</span> to download.</li>
+          <li>The <span className="font-medium">Sub Companies</span> tab shows every sub attached to this project — you can suspend or remove them from the job.</li>
+          <li>Need the QR code? Head to the project header → <span className="font-medium">Sub Drop QR</span>.</li>
+        </ul>
+      </div>
+      <button
+        type="button"
+        onClick={dismiss}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary hover:bg-primary/10"
+        aria-label="Dismiss"
+      >
+        <X className="h-3 w-3" /> Got it
+      </button>
+    </div>
   );
 }
 
