@@ -387,6 +387,11 @@ function LoginForm(props: { token: string; onSignedIn: (sub: SubCompany) => void
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "forgot" is the inline sub-view for the forgot-password request. It sits
+  // inside LoginForm rather than being a separate route so the sub never
+  // loses the drop-token context they scanned in with \u2014 if they cancel,
+  // they land right back on the login form.
+  const [showForgot, setShowForgot] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -419,6 +424,10 @@ function LoginForm(props: { token: string; onSignedIn: (sub: SubCompany) => void
     }
   }
 
+  if (showForgot) {
+    return <ForgotPasswordForm defaultEmail={contactEmail} onBack={() => setShowForgot(false)} />;
+  }
+
   return (
     <form onSubmit={submit} className="space-y-4">
       <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -435,8 +444,75 @@ function LoginForm(props: { token: string; onSignedIn: (sub: SubCompany) => void
         {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
         Sign in
       </Button>
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <button type="button" onClick={() => setShowForgot(true)} className="underline">Forgot password?</button>
+        <button type="button" onClick={props.onSwitchToRegister} className="underline">Register instead</button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Inline forgot-password form. Always renders success \u2014 the server responds
+ * the same way whether or not the email matches a real sub, so we don't
+ * confirm or deny existence in the UI either. Copy nudges the sub to check
+ * their inbox and to search spam if needed.
+ */
+function ForgotPasswordForm(props: { defaultEmail: string; onBack: () => void }) {
+  const [email, setEmail] = useState(props.defaultEmail);
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const resp = await fetch(`${SUB_API_BASE}/api/sub/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactEmail: email }),
+      });
+      // The server always 200s, but guard the surprise-500 case too.
+      if (!resp.ok) {
+        setError("Something went wrong. Try again.");
+        return;
+      }
+      setSent(true);
+    } catch (err: any) {
+      setError(err?.message || "Request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-md border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-800 dark:border-green-900 dark:bg-green-950/50 dark:text-green-200">
+          If an account exists for that email, we sent a reset link. Check your inbox (and spam). The link expires in 1 hour.
+        </div>
+        <Button type="button" variant="outline" className="w-full" onClick={props.onBack}>Back to sign in</Button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <p className="text-sm text-slate-600 dark:text-slate-400">
+        Enter the email you registered with. We'll send you a link to set a new password.
+      </p>
+      <FormRow label="Email">
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+      </FormRow>
+      {error ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300">{error}</div> : null}
+      <Button type="submit" disabled={busy} className="w-full">
+        {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        Send reset link
+      </Button>
       <div className="text-center text-xs text-slate-500">
-        New here? <button type="button" onClick={props.onSwitchToRegister} className="underline">Register instead</button>
+        <button type="button" onClick={props.onBack} className="underline">Back to sign in</button>
       </div>
     </form>
   );

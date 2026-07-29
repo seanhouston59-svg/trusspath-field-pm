@@ -121,6 +121,7 @@ import InviteAcceptPage from "@/pages/invite-accept";
 // Lazy: subs never touch the rest of the app, and PMs never touch this page.
 // Keeping it out of the main chunk trims the initial bundle for both.
 const SubDropPage = lazy(() => import("@/pages/drop"));
+const SubResetPage = lazy(() => import("@/pages/sub-reset"));
 // Standalone marketing page for the subs.trusspath.com host. Lives in its own
 // chunk so the main app doesn't pay for its bundle, and vice versa — subs who
 // land on this page never load the PM app's JS.
@@ -349,7 +350,7 @@ function AppChrome() {
   const { isAuthenticated } = useAuth();
   // Jarvis is only useful once you’re inside the app.
   if (!isAuthenticated) return null;
-  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup" || loc.startsWith("/signup") || loc === "/paywall" || loc.startsWith("/invite/") || loc.startsWith("/drop/")) return null;
+  if (loc === "/" || loc === "/login" || loc.startsWith("/login") || loc === "/signup" || loc.startsWith("/signup") || loc === "/paywall" || loc.startsWith("/invite/") || loc.startsWith("/drop/") || loc.startsWith("/sub-reset/")) return null;
   // Jarvis lives in a boundary because it drives async voice/speech APIs that
   // can throw in ways we don't want to blank out the whole app.
   return (
@@ -381,6 +382,15 @@ function RootRouter() {
             <SubDropPage />
           </Suspense>
         )}
+      </Route>
+      {/* Sub password reset lives outside the drop-token flow: the reset link
+          comes from the sub's inbox, not a QR scan, so we don't need (or
+          have) a project context here. Publicly reachable, sets a new
+          password, then bounces the sub to /#/subs to sign in fresh. */}
+      <Route path="/sub-reset/:token">
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>}>
+          <SubResetPage />
+        </Suspense>
       </Route>
       {/* Subs landing page: marketing / "what is Sub Drop?" for the
           subs.trusspath.com subdomain. Also reachable at /subs on the main

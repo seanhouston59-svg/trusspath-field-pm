@@ -17,9 +17,10 @@
  */
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { subCompanies, subCompanyProjects } from "@shared/schema";
+import { subCompanies, subCompanyProjects, subPasswordResetTokens } from "@shared/schema";
 import type {
   SubCompany, SubCompanyPublic, SubCompanyProject, InsertSubCompany,
+  SubPasswordResetToken,
 } from "@shared/schema";
 import { db } from "./db";
 import { ensureReady } from "./ready";
@@ -173,6 +174,69 @@ export class SubCompaniesRepo {
     await db.update(subCompanies)
       .set({ suspendedAt: null, suspendedByAccountId: null })
       .where(eq(subCompanies.id, subCompanyId));
+  }
+
+  // --- Password reset ----------------------------------------------------
+  //
+  // Mirrors the GC accounts flow (accounts.ts):
+  //   1. createPasswordResetToken()      \u2014 issue 1-hour TTL token
+  //   2. usePasswordResetToken()         \u2014 consume once (marks used_at)
+  //   3. updatePassword()                \u2014 rewrite scrypt hash
+  //
+  // The route layer is responsible for ordering these calls and mailing the
+  // token URL; this repo only owns storage semantics. All lookups return null
+  // (never distinguish "expired" from "used" from "unknown") so no one can
+  // learn anything from timing or 404 vs 400.
+
+  async createPasswordResetToken(subCompanyId: number): Promise<string> {
+    await ensureReady();
+    const token = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+    await db.insert(subPasswordResetTokens).values({ token, subCompanyId, expiresAt });
+    return token;
+  }
+
+  async getPasswordResetToken(token: string): Promise<SubPasswordResetToken | undefined> {
+    await ensureReady();
+    const rows = await db.select().from(subPasswordResetTokens).where(eq(subPasswordResetTokens.token, token));
+    return rows[0];
+  }
+
+  /** Single-use consume: returns the row iff the token existed, wasn't
+   *  already used, and hasn't expired. Stamps used_at atomically. Returns
+   *  null in every failure case \u2014 caller responds with a single generic
+   *  "invalid or expired" error so a stale link can't be probed. */
+  async usePasswordResetToken(token: string): Promise<SubPasswordResetToken | null> {
+    await ensureReady();
+    const row = await this.getPasswordResetToken(token);
+    if (!row) return null;
+    if (row.usedAt) return null;
+    if (new Date(row.expiresAt) < new Date()) return null;
+    const [updated] = await db.update(subPasswordResetTokens)
+      .set({ usedAt: new Date().toISOString() })
+      .where(eq(subPasswordResetTokens.id, row.id))
+      .returning();
+    return updated ?? null;
+  }
+
+  /** Rewrite the sub's password hash. Called by the reset route after a
+   *  successful token consume. Also invalidates all other outstanding reset
+   *  tokens for this sub so a stolen-and-unused second link can't be replayed
+   *  after a password change. */
+  async updatePassword(subCompanyId: number, newPassword: string): Promise<void> {
+    await ensureReady();
+    await db.update(subCompanies)
+      .set({ passwordHash: this.hashPassword(newPassword) })
+      .where(eq(subCompanies.id, subCompanyId));
+    // Invalidate any other outstanding tokens for this sub. Uses `used_at` so
+    // audit rows aren't destroyed \u2014 a future "why was my link rejected?"
+    // support question still has evidence to point to.
+    await db.update(subPasswordResetTokens)
+      .set({ usedAt: new Date().toISOString() })
+      .where(and(
+        eq(subPasswordResetTokens.subCompanyId, subCompanyId),
+        isNull(subPasswordResetTokens.usedAt),
+      ));
   }
 
   // --- sub_company_projects (attach / list) -------------------------------

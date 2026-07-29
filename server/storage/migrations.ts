@@ -191,6 +191,19 @@ export async function migrate() {
   // pattern) so no sub_sessions table is required at MVP. The schema.ts
   // table declaration is kept so a future switch to server-side revocation
   // is a single migration — no code refactor.
+
+  // Sub password reset tokens — one-time, single-use, 1 hour TTL. Same shape
+  // as password_reset_tokens (GC side) but scoped to sub_companies.id.
+  await sql`CREATE TABLE IF NOT EXISTS sub_password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    token TEXT NOT NULL UNIQUE,
+    sub_company_id INTEGER NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sub_password_reset_tokens_sub
+    ON sub_password_reset_tokens (sub_company_id)`;
+
   await sql`CREATE TABLE IF NOT EXISTS deleted_items (
     id SERIAL PRIMARY KEY,
     entity_type TEXT NOT NULL,
