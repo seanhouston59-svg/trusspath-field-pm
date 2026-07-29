@@ -59,80 +59,107 @@ import { Layout } from "@/components/layout";
 import { ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import NotFound from "@/pages/not-found";
-import Landing from "@/pages/landing";
-import Login from "@/pages/login";
-import Signup from "@/pages/signup";
-import Dashboard from "@/pages/dashboard";
-import NotificationsPage from "@/pages/notifications";
-import Projects from "@/pages/projects";
-import ProjectDetail from "@/pages/project-detail";
-import SubUploadsPage from "@/pages/sub-uploads";
-import Tasks from "@/pages/tasks";
-import Rfis from "@/pages/rfis";
-import Submittals from "@/pages/submittals";
-import ChangeOrders from "@/pages/change-orders";
-import ActionItems from "@/pages/action-items";
-import DailyLogs from "@/pages/daily-logs";
-import Punch from "@/pages/punch";
-import Team from "@/pages/team";
-import Contacts from "@/pages/contacts";
-import Equipment from "@/pages/equipment";
-import Photos from "@/pages/photos";
-import Documents from "@/pages/documents";
-import CompanyDocuments from "@/pages/company-documents";
-import Schedule from "@/pages/schedule";
-import Gantt from "@/pages/gantt";
-import Integrations from "@/pages/integrations";
-import TeamsPage from "@/pages/teams";
-import ExcelPage from "@/pages/excel";
-import { JarvisPanel } from "@/components/jarvis-panel";
 import { BillingBanner } from "@/components/billing-banner";
 import { ErrorBoundary } from "@/components/error-boundary";
-import Messages from "@/pages/messages";
-import Notes from "@/pages/notes";
-import Timesheets from "@/pages/timesheets";
-import Blueprints from "@/pages/blueprints";
-import Drone from "@/pages/drone";
-import SettingsPage from "@/pages/settings";
-import DeletedItemsPage from "@/pages/deleted-items";
-import { TermsOfService, PrivacyPolicy } from "@/pages/legal";
-import { ForgotPassword, ResetPassword } from "@/pages/password-reset";
-import AdminSignups from "@/pages/admin-signups";
-import Cpm from "@/pages/cpm";
-import Paywall from "@/pages/paywall";
-import TeamSettingsPage from "@/pages/team-settings";
-import ExecutiveOs from "@/pages/executive-os";
-import MobilizationPortfolio from "@/pages/executive-os/mobilization-portfolio";
-import MobilizationDetail from "@/pages/executive-os/mobilization-detail";
-import ProjectSetupPortfolio from "@/pages/executive-os/project-setup-portfolio";
-import ProjectSetupDetail from "@/pages/executive-os/project-setup-detail";
-import PreConstructionPortfolio from "@/pages/executive-os/pre-construction-portfolio";
-import PreConstructionDetail from "@/pages/executive-os/pre-construction-detail";
-import FinancialsPortfolio from "@/pages/executive-os/financials-portfolio";
-import BoardPackets from "@/pages/executive-os/board-packets";
-import ContractsPortfolio from "@/pages/executive-os/contracts-portfolio";
-import ContractDetail from "@/pages/executive-os/contracts-detail";
-import InspectionsPortfolio from "@/pages/executive-os/inspections-portfolio";
-import InspectionDetail from "@/pages/executive-os/inspections-detail";
 import { LEAN_MODULES } from "@shared/lean-modules-catalog";
-import { LeanModuleDetailPage, LeanModulePortfolioPage } from "@/pages/executive-os/lean-module";
-import InviteAcceptPage from "@/pages/invite-accept";
-// Lazy: subs never touch the rest of the app, and PMs never touch this page.
-// Keeping it out of the main chunk trims the initial bundle for both.
+
+/* ============================== PAGE CHUNKS ==============================
+ *
+ * Every page is lazy. Statically importing them put all ~62 pages — plus the
+ * one-screen-only heavyweights they pull in (xlsx, pdfjs-dist, recharts) — in
+ * a single chunk that even anonymous visitors to the marketing page had to
+ * download before anything rendered.
+ *
+ * All of these render inside the one <Suspense> in RootRouter, so a route
+ * change shows the shared fallback while its chunk streams in.
+ * ---------------------------------------------------------------------- */
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Landing = lazy(() => import("@/pages/landing"));
+const Login = lazy(() => import("@/pages/login"));
+const Signup = lazy(() => import("@/pages/signup"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const NotificationsPage = lazy(() => import("@/pages/notifications"));
+const Projects = lazy(() => import("@/pages/projects"));
+const ProjectDetail = lazy(() => import("@/pages/project-detail"));
+const SubUploadsPage = lazy(() => import("@/pages/sub-uploads"));
+const Tasks = lazy(() => import("@/pages/tasks"));
+const Rfis = lazy(() => import("@/pages/rfis"));
+const Submittals = lazy(() => import("@/pages/submittals"));
+const ChangeOrders = lazy(() => import("@/pages/change-orders"));
+const ActionItems = lazy(() => import("@/pages/action-items"));
+const DailyLogs = lazy(() => import("@/pages/daily-logs"));
+const Punch = lazy(() => import("@/pages/punch"));
+const Team = lazy(() => import("@/pages/team"));
+const Contacts = lazy(() => import("@/pages/contacts"));
+const Equipment = lazy(() => import("@/pages/equipment"));
+const Photos = lazy(() => import("@/pages/photos"));
+const Documents = lazy(() => import("@/pages/documents"));
+const CompanyDocuments = lazy(() => import("@/pages/company-documents"));
+const Schedule = lazy(() => import("@/pages/schedule"));
+const Gantt = lazy(() => import("@/pages/gantt"));
+const Integrations = lazy(() => import("@/pages/integrations"));
+const TeamsPage = lazy(() => import("@/pages/teams"));
+const ExcelPage = lazy(() => import("@/pages/excel"));
+const Messages = lazy(() => import("@/pages/messages"));
+const Notes = lazy(() => import("@/pages/notes"));
+const Timesheets = lazy(() => import("@/pages/timesheets"));
+const Blueprints = lazy(() => import("@/pages/blueprints"));
+const Drone = lazy(() => import("@/pages/drone"));
+const SettingsPage = lazy(() => import("@/pages/settings"));
+const DeletedItemsPage = lazy(() => import("@/pages/deleted-items"));
+const TermsOfService = lazy(() => import("@/pages/legal").then((m) => ({ default: m.TermsOfService })));
+const PrivacyPolicy = lazy(() => import("@/pages/legal").then((m) => ({ default: m.PrivacyPolicy })));
+const ForgotPassword = lazy(() => import("@/pages/password-reset").then((m) => ({ default: m.ForgotPassword })));
+const ResetPassword = lazy(() => import("@/pages/password-reset").then((m) => ({ default: m.ResetPassword })));
+const AdminSignups = lazy(() => import("@/pages/admin-signups"));
+const Cpm = lazy(() => import("@/pages/cpm"));
+const Paywall = lazy(() => import("@/pages/paywall"));
+const TeamSettingsPage = lazy(() => import("@/pages/team-settings"));
+const ExecutiveOs = lazy(() => import("@/pages/executive-os"));
+const MobilizationPortfolio = lazy(() => import("@/pages/executive-os/mobilization-portfolio"));
+const MobilizationDetail = lazy(() => import("@/pages/executive-os/mobilization-detail"));
+const ProjectSetupPortfolio = lazy(() => import("@/pages/executive-os/project-setup-portfolio"));
+const ProjectSetupDetail = lazy(() => import("@/pages/executive-os/project-setup-detail"));
+const PreConstructionPortfolio = lazy(() => import("@/pages/executive-os/pre-construction-portfolio"));
+const PreConstructionDetail = lazy(() => import("@/pages/executive-os/pre-construction-detail"));
+const FinancialsPortfolio = lazy(() => import("@/pages/executive-os/financials-portfolio"));
+const BoardPackets = lazy(() => import("@/pages/executive-os/board-packets"));
+const ContractsPortfolio = lazy(() => import("@/pages/executive-os/contracts-portfolio"));
+const ContractDetail = lazy(() => import("@/pages/executive-os/contracts-detail"));
+const InspectionsPortfolio = lazy(() => import("@/pages/executive-os/inspections-portfolio"));
+const InspectionDetail = lazy(() => import("@/pages/executive-os/inspections-detail"));
+const LeanModulePortfolioPage = lazy(() => import("@/pages/executive-os/lean-module").then((m) => ({ default: m.LeanModulePortfolioPage })));
+const LeanModuleDetailPage = lazy(() => import("@/pages/executive-os/lean-module").then((m) => ({ default: m.LeanModuleDetailPage })));
+const InviteAcceptPage = lazy(() => import("@/pages/invite-accept"));
+// Subs never touch the rest of the app, and PMs never touch these pages.
 const SubDropPage = lazy(() => import("@/pages/drop"));
 const SubResetPage = lazy(() => import("@/pages/sub-reset"));
 // Standalone marketing page for the subs.trusspath.com host. Lives in its own
 // chunk so the main app doesn't pay for its bundle, and vice versa — subs who
 // land on this page never load the PM app's JS.
 const SubsLandingPage = lazy(() => import("@/pages/subs-landing"));
-import FieldHub from "@/pages/field/hub";
-import FieldDailyLog from "@/pages/field/daily-log";
-import FieldTimecard from "@/pages/field/timecard";
-import FieldPhoto from "@/pages/field/photo";
-import FieldObservation from "@/pages/field/observation";
-import FieldVoiceNote from "@/pages/field/voice-note";
-import FieldPunch from "@/pages/field/punch";
+const FieldHub = lazy(() => import("@/pages/field/hub"));
+const FieldDailyLog = lazy(() => import("@/pages/field/daily-log"));
+const FieldTimecard = lazy(() => import("@/pages/field/timecard"));
+const FieldPhoto = lazy(() => import("@/pages/field/photo"));
+const FieldObservation = lazy(() => import("@/pages/field/observation"));
+const FieldVoiceNote = lazy(() => import("@/pages/field/voice-note"));
+const FieldPunch = lazy(() => import("@/pages/field/punch"));
+// Auth-gated and renders null until then, so it never needs to be in the
+// first-load chunk.
+const JarvisPanel = lazy(() => import("@/components/jarvis-panel").then((m) => ({ default: m.JarvisPanel })));
+
+/** Shared fallback while a route's chunk streams in. */
+function RouteFallback() {
+  return (
+    <div className="min-h-screen grid place-items-center bg-background">
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading…
+      </div>
+    </div>
+  );
+}
 
 // Single source of truth for routes lives in shared/app-manifest.ts (APP_ROUTES).
 // Map each manifest route pattern to its page component here.
@@ -355,58 +382,52 @@ function AppChrome() {
   // can throw in ways we don't want to blank out the whole app.
   return (
     <ErrorBoundary label="Jarvis" silent>
-      <JarvisPanel />
+      {/* Renders nothing while the chunk loads — Jarvis is a floating panel,
+          so a spinner here would just be visual noise over the page. */}
+      <Suspense fallback={null}>
+        <JarvisPanel />
+      </Suspense>
     </ErrorBoundary>
   );
 }
 
 /** Top-level router: public shell first, protected app second. */
+// One Suspense for the whole tree: every page below is a lazy chunk, and
+// AppRouter's nested <Switch> resolves under this same fallback.
 function RootRouter() {
   return (
-    <Switch>
-      <Route path="/" component={Landing} />
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={Signup} />
-      <Route path="/terms" component={TermsOfService} />
-      <Route path="/privacy" component={PrivacyPolicy} />
-      <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/reset-password" component={ResetPassword} />
-      {/* Paywall lives outside RequireAuth so pending/unpaid users can reach it. */}
-      <Route path="/paywall" component={PaywallGate} />
-      {/* Invite acceptance is public: unauthenticated users can view the invite and sign up. */}
-      <Route path="/invite/:token" component={InviteAcceptPage} />
-      {/* Sub Drop Portal is public: subs scan a QR, register, and drop files. */}
-      <Route path="/drop/:token">
-        {(params) => (
-          <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>}>
-            <SubDropPage />
-          </Suspense>
-        )}
-      </Route>
-      {/* Sub password reset lives outside the drop-token flow: the reset link
-          comes from the sub's inbox, not a QR scan, so we don't need (or
-          have) a project context here. Publicly reachable, sets a new
-          password, then bounces the sub to /#/subs to sign in fresh. */}
-      <Route path="/sub-reset/:token">
-        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>}>
-          <SubResetPage />
-        </Suspense>
-      </Route>
-      {/* Subs landing page: marketing / "what is Sub Drop?" for the
-          subs.trusspath.com subdomain. Also reachable at /subs on the main
-          host so we can preview it. Public, no auth, lazy-loaded. */}
-      <Route path="/subs">
-        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading…</div>}>
-          <SubsLandingPage />
-        </Suspense>
-      </Route>
-      {/* Everything else is a protected app route. */}
-      <Route>
-        <RequireAuth>
-          <AccessGate />
-        </RequireAuth>
-      </Route>
-    </Switch>
+    <Suspense fallback={<RouteFallback />}>
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route path="/login" component={Login} />
+        <Route path="/signup" component={Signup} />
+        <Route path="/terms" component={TermsOfService} />
+        <Route path="/privacy" component={PrivacyPolicy} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        {/* Paywall lives outside RequireAuth so pending/unpaid users can reach it. */}
+        <Route path="/paywall" component={PaywallGate} />
+        {/* Invite acceptance is public: unauthenticated users can view the invite and sign up. */}
+        <Route path="/invite/:token" component={InviteAcceptPage} />
+        {/* Sub Drop Portal is public: subs scan a QR, register, and drop files. */}
+        <Route path="/drop/:token" component={SubDropPage} />
+        {/* Sub password reset lives outside the drop-token flow: the reset link
+            comes from the sub's inbox, not a QR scan, so we don't need (or
+            have) a project context here. Publicly reachable, sets a new
+            password, then bounces the sub to /#/subs to sign in fresh. */}
+        <Route path="/sub-reset/:token" component={SubResetPage} />
+        {/* Subs landing page: marketing / "what is Sub Drop?" for the
+            subs.trusspath.com subdomain. Also reachable at /subs on the main
+            host so we can preview it. Public, no auth. */}
+        <Route path="/subs" component={SubsLandingPage} />
+        {/* Everything else is a protected app route. */}
+        <Route>
+          <RequireAuth>
+            <AccessGate />
+          </RequireAuth>
+        </Route>
+      </Switch>
+    </Suspense>
   );
 }
 

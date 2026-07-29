@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Plus, FileText, FileSpreadsheet, FileCheck, FileSignature, Receipt, Download, Eye, Maximize2, Minimize2, UploadCloud, FileWarning } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Avatar } from "@/components/bits";
@@ -12,8 +12,11 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAccess } from "@/lib/access";
 import { apiUrl } from "@/lib/queryClient";
-import { PdfViewer } from "@/components/pdf-viewer";
 import { shortDate } from "@/lib/format";
+
+// pdfjs-dist is ~400 kB and only needed once a PDF is actually previewed, so
+// keep it out of this page's chunk too.
+const PdfViewer = lazy(() => import("@/components/pdf-viewer").then((m) => ({ default: m.PdfViewer })));
 
 const TYPE_META: Record<string, { icon: any; tint: string }> = {
   Drawing: { icon: FileText, tint: "text-sky-500 bg-sky-500/12" },
@@ -32,7 +35,11 @@ function fileUrl(id: number) { return apiUrl(`/api/documents/${id}/file`); }
 /** Render the actual uploaded file, or a fallback when none/not previewable. */
 function Preview({ doc, className }: { doc: DocumentRow; className?: string }) {
   if (isPdf(doc.mimeType)) {
-    return <PdfViewer url={fileUrl(doc.id)} className={className} />;
+    return (
+      <Suspense fallback={<div className={`${className} grid place-items-center bg-muted/40 text-sm text-muted-foreground`}>Loading preview…</div>}>
+        <PdfViewer url={fileUrl(doc.id)} className={className} />
+      </Suspense>
+    );
   }
   if (isImage(doc.mimeType)) {
     return <img src={fileUrl(doc.id)} alt={doc.name} className={`${className} object-contain`} />;
