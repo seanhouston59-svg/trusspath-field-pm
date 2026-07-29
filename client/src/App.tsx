@@ -361,19 +361,6 @@ function AppChrome() {
 
 /** Top-level router: public shell first, protected app second. */
 function RootRouter() {
-  // Host-based redirect: when the app is served from the subs.trusspath.com
-  // subdomain (the sub-facing marketing site), send visitors to /subs on the
-  // first render. We only act when they land on "/" so deep links like
-  // /drop/:token still work if someone accidentally lands on the subs host.
-  // Guarded by typeof window for SSR safety even though this is a CSR app.
-  const [loc, navigate] = useLocation();
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.location.hostname === "subs.trusspath.com" && loc === "/") {
-      navigate("/subs", { replace: true });
-    }
-  }, [loc, navigate]);
-
   return (
     <Switch>
       <Route path="/" component={Landing} />
