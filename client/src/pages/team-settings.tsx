@@ -14,6 +14,7 @@ import {
   type Membership,
 } from "@/hooks/use-data";
 import { useExecutiveOsEntitlement } from "@/hooks/use-entitlements";
+import { EXEC_OS_SYSTEM_ACTOR } from "@shared/schema";
 import { BillingSection } from "@/components/billing-section";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +30,31 @@ const ROLE_DESC: Record<Role, string> = {
   foreman: "Field lead. Only sees projects they're assigned to.",
   viewer: "Read-only. Only sees projects they're assigned to.",
 };
+
+// Full ISO timestamp, unlike lib/format's formatDate which takes a date-only string.
+function auditDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+type TeamMember = Membership & { email: string; displayName?: string };
+
+// One-line attribution for the Executive OS add-on. Returns null when there is
+// nothing worth saying — no grant, or a grant that predates the audit columns.
+function execOsAuditCaption(m: TeamMember, roster: TeamMember[]): string | null {
+  if (m.hasExecutiveOs) {
+    if (!m.executiveOsGrantedAt) return null;
+    const grantor = roster.find(x => String(x.accountId) === m.executiveOsGrantedBy);
+    // A grantor missing from the roster has since been removed from the org.
+    const who = grantor ? (grantor.displayName || grantor.email) : "a former member";
+    return `Granted by ${who} · ${auditDate(m.executiveOsGrantedAt)}`;
+  }
+  // Only surface the automatic revoke: it explains access disappearing with no
+  // admin behind it. An admin's own revoke needs no caption.
+  if (m.executiveOsRevokedBy === EXEC_OS_SYSTEM_ACTOR) {
+    return "Revoked automatically (subscription lapsed)";
+  }
+  return null;
+}
 
 const ROLE_BADGE_COLOR: Record<Role, string> = {
   owner: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
@@ -257,6 +283,7 @@ export default function TeamSettingsPage() {
               const canModify = canManage && !isMe && !(isPrimaryOwner && !isOwner);
               const canModifyOwner = isOwner; // only owners can touch other owners
               const canModifyThisMember = canModify && (m.role !== "owner" || canModifyOwner);
+              const execOsCaption = execOsAuditCaption(m, members);
               return (
                 <div key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0 flex-1">
@@ -266,6 +293,11 @@ export default function TeamSettingsPage() {
                       {isPrimaryOwner && <Badge variant="outline" className="text-[10px]">primary owner</Badge>}
                     </div>
                     <div className="text-xs text-muted-foreground">{m.email}</div>
+                    {canManage && execOsCaption && (
+                      <div className="text-xs text-muted-foreground/80" data-testid={`text-exec-os-audit-${m.id}`}>
+                        {execOsCaption}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {/* Executive OS add-on. Gated on canManage rather than

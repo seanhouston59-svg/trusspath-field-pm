@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { db } from "../storage";
 import {
   organizations, memberships, invites, projectMembers,
-  ROLE_CAPS, type OrgRole,
+  ROLE_CAPS, EXEC_OS_SYSTEM_ACTOR, type OrgRole,
   type Organization, type Membership, type Invite,
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -260,18 +260,47 @@ export async function countExecOsSeats(organizationId: number): Promise<number> 
   return rows.length;
 }
 
-export async function setMembershipExecutiveOs(id: number, hasExecutiveOs: boolean): Promise<Membership | undefined> {
-  const [row] = await db.update(memberships).set({ hasExecutiveOs }).where(eq(memberships.id, id)).returning();
+// `actor` is the accounts.id of the admin making the change, or
+// EXEC_OS_SYSTEM_ACTOR when no human is behind it. A grant clears the revoked_*
+// pair so the row reads as actively granted; a revoke leaves granted_* intact so
+// the last grant stays attributable.
+export async function setMembershipExecutiveOs(
+  id: number,
+  hasExecutiveOs: boolean,
+  actor: string,
+): Promise<Membership | undefined> {
+  const now = new Date().toISOString();
+  const audit = hasExecutiveOs
+    ? {
+        executiveOsGrantedAt: now,
+        executiveOsGrantedBy: actor,
+        executiveOsRevokedAt: null,
+        executiveOsRevokedBy: null,
+      }
+    : { executiveOsRevokedAt: now, executiveOsRevokedBy: actor };
+  const [row] = await db.update(memberships)
+    .set({ hasExecutiveOs, ...audit })
+    .where(eq(memberships.id, id))
+    .returning();
   return row;
 }
 
 // Revoke the add-on from every membership in an org. Used when the org's
 // subscription is canceled — Stripe drops the add-on subscription item along
 // with the subscription, so leaving grants in place would hand out free access.
+// Scoped to rows that actually hold the grant so the revoke stamp is not written
+// onto members who never had it.
 export async function revokeAllExecOsForOrg(organizationId: number): Promise<void> {
   await db.update(memberships)
-    .set({ hasExecutiveOs: false })
-    .where(eq(memberships.organizationId, organizationId));
+    .set({
+      hasExecutiveOs: false,
+      executiveOsRevokedAt: new Date().toISOString(),
+      executiveOsRevokedBy: EXEC_OS_SYSTEM_ACTOR,
+    })
+    .where(and(
+      eq(memberships.organizationId, organizationId),
+      eq(memberships.hasExecutiveOs, true),
+    ));
 }
 
 /* ============================ Invites ============================ */

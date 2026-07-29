@@ -5832,7 +5832,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     await removeMembership(id);
     // Removal is a soft delete, so an Executive OS grant left on the row would
     // keep billing a seat nobody can use. Clear it before either sync.
-    if (target.hasExecutiveOs) await setMembershipExecutiveOs(id, false);
+    if (target.hasExecutiveOs) await setMembershipExecutiveOs(id, false, String(req.account.id));
     // Fire-and-forget seat sync so the next invoice reflects the removed seat.
     if (stripe) syncSeatsForOrg(stripe, req.organizationId).catch(e => console.error("[members:delete] seat sync failed:", e));
     if (stripe && target.hasExecutiveOs) {
@@ -5858,6 +5858,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         email: m.email,
         displayName: m.displayName,
         hasExecutiveOs: !!m.hasExecutiveOs,
+        executiveOsGrantedAt: m.executiveOsGrantedAt ?? null,
+        executiveOsGrantedBy: m.executiveOsGrantedBy ?? null,
+        executiveOsRevokedAt: m.executiveOsRevokedAt ?? null,
+        executiveOsRevokedBy: m.executiveOsRevokedBy ?? null,
       })),
       seatCount: await countExecOsSeats(req.organizationId),
       unitAmountCents: EXECUTIVE_OS_ADDON_AMOUNT_CENTS,
@@ -5885,7 +5889,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.post("/api/org/members/:membershipId/exec-os", requireCap("manageMembers"), async (req: any, res) => {
     const target = await execOsTarget(req, res);
     if (!target) return;
-    const updated = target.hasExecutiveOs ? target : await setMembershipExecutiveOs(target.id, true);
+    const updated = target.hasExecutiveOs
+      ? target
+      : await setMembershipExecutiveOs(target.id, true, String(req.account.id));
     // Awaited, not fire-and-forget: the client invalidates billing status right
     // after this resolves, so the seat count it refetches must already be real.
     if (stripe) {
@@ -5902,7 +5908,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.delete("/api/org/members/:membershipId/exec-os", requireCap("manageMembers"), async (req: any, res) => {
     const target = await execOsTarget(req, res);
     if (!target) return;
-    const updated = target.hasExecutiveOs ? await setMembershipExecutiveOs(target.id, false) : target;
+    const updated = target.hasExecutiveOs
+      ? await setMembershipExecutiveOs(target.id, false, String(req.account.id))
+      : target;
     if (stripe) {
       try {
         await syncExecOsSeatsForOrg(stripe, req.organizationId);
