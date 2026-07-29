@@ -1825,6 +1825,22 @@ export const subSessions = pgTable("sub_sessions", {
   expiresAt: text("expires_at").notNull(),
 });
 
+// One-time password-reset tokens for the Sub Portal. Same shape as the GC
+// `password_reset_tokens` table but scoped to a sub_companies.id so a leaked
+// GC reset token can't be replayed against a sub identity and vice versa.
+// Tokens expire 1 hour after issue and are single-use (used_at is stamped on
+// consume). Callers should treat expired/used rows as "invalid" without
+// distinguishing between the two \u2014 no user enumeration.
+export const subPasswordResetTokens = pgTable("sub_password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  subCompanyId: integer("sub_company_id").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  usedAt: text("used_at"),
+});
+
+export type SubPasswordResetToken = typeof subPasswordResetTokens.$inferSelect;
+
 // Canonical trade list. Matches the classifier's expectations and keeps the
 // registration dropdown and the PM filter dropdown in sync. "Other" is the
 // escape hatch — anything picked as Other doesn't get a trade nudge from

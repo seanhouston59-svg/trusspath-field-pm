@@ -741,6 +741,60 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.status(204).end();
   });
 
+  // ---- Sub forgot-password ----------------------------------------------
+  // Kicks off a password reset for the sub identified by `contactEmail`.
+  // ALWAYS responds 200 with the same body regardless of whether the email
+  // maps to a real sub \u2014 no user enumeration. When Resend is configured,
+  // fires an email with a 1-hour reset link. When it isn't, the reset URL is
+  // logged to stdout so the flow is still testable in dev/preview.
+  app.post("/api/sub/forgot-password", async (req, res) => {
+    try {
+      const email = String(req.body?.contactEmail || "").trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        // Even for malformed emails we return the opaque success shape so a
+        // scraper can't distinguish "invalid syntax" from "unknown email".
+        return res.json({ ok: true });
+      }
+      const sub = await storage.getSubCompanyByEmail(email);
+      if (sub) {
+        const token = await storage.createSubPasswordResetToken(sub.id);
+        // Origin resolution mirrors the GC forgot-password flow: prefer the
+        // request's own origin so preview deployments send preview links.
+        const origin = req.headers.origin
+          || (req.headers["x-forwarded-host"] ? `https://${req.headers["x-forwarded-host"]}` : null)
+          || `${req.protocol}://${req.get("host")}`;
+        const resetUrl = `${origin}/#/sub-reset/${token}`;
+        // Fire-and-forget: don't block the response on Resend latency and
+        // don't leak send failures to the caller.
+        sendPasswordResetEmail(sub.contactEmail, resetUrl).catch((e) =>
+          console.error("[sub-forgot-password] mail send failed", e),
+        );
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("[sub-forgot-password]", err);
+      // Same opaque success on failure so a database blip doesn't leak
+      // "this email exists" via a 500. The user retrying is a no-op.
+      res.json({ ok: true });
+    }
+  });
+
+  // ---- Sub reset-password -----------------------------------------------
+  // Consumes a one-time reset token and rewrites the sub's password hash.
+  // Deliberately does NOT auto-sign-in \u2014 the sub returns to /drop or
+  // /#/subs and logs in fresh with their new password (matches the GC flow
+  // and keeps this route stateless).
+  app.post("/api/sub/reset-password", async (req, res) => {
+    const token = String(req.body?.token || "").trim();
+    const newPassword = String(req.body?.password || "");
+    if (!token) return res.status(400).json({ message: "Reset token is required." });
+    if (newPassword.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters." });
+    const consumed = await storage.useSubPasswordResetToken(token);
+    if (!consumed) return res.status(400).json({ message: "This reset link is invalid or has expired. Request a new one." });
+    await storage.updateSubPassword(consumed.subCompanyId, newPassword);
+    res.json({ ok: true });
+  });
+
   // Return the current sub session (or 401) so the client can decide whether
   // to show the register/login form or jump straight to the upload UI.
   app.get("/api/sub/me", async (req: any, res) => {

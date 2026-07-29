@@ -344,6 +344,10 @@ export class DatabaseStorage implements IStorage {
   listProjectsForSub: SubCompaniesRepo["listProjectsForSub"] = (...a) => this.subCompanies.listProjectsForSub(...a);
   listSubsForProject: SubCompaniesRepo["listSubsForProject"] = (...a) => this.subCompanies.listSubsForProject(...a);
   listSubsForOrg: SubCompaniesRepo["listSubsForOrg"] = (...a) => this.subCompanies.listSubsForOrg(...a);
+  createSubPasswordResetToken: SubCompaniesRepo["createPasswordResetToken"] = (...a) => this.subCompanies.createPasswordResetToken(...a);
+  getSubPasswordResetToken: SubCompaniesRepo["getPasswordResetToken"] = (...a) => this.subCompanies.getPasswordResetToken(...a);
+  useSubPasswordResetToken: SubCompaniesRepo["usePasswordResetToken"] = (...a) => this.subCompanies.usePasswordResetToken(...a);
+  updateSubPassword: SubCompaniesRepo["updatePassword"] = (...a) => this.subCompanies.updatePassword(...a);
   getTimesheets: IStorage["getTimesheets"] = (...a) => this.timesheets.getTimesheets(...a);
   getTimesheetsForAccount: IStorage["getTimesheetsForAccount"] = (...a) => this.timesheets.getTimesheetsForAccount(...a);
   getTimesheet: IStorage["getTimesheet"] = (...a) => this.timesheets.getTimesheet(...a);
