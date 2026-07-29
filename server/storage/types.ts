@@ -16,6 +16,7 @@ export interface IStorage {
   getProject(id: number): Promise<Project | undefined>;
   createProject(data: InsertProject): Promise<Project>;
   updateProject(id: number, data: Partial<InsertProject>): Promise<Project | undefined>;
+  deleteProject(id: number): Promise<boolean>;
   getTasks(projectId?: number): Promise<Task[]>;
   createTask(data: InsertTask): Promise<Task>;
   updateTaskStatus(id: number, status: string): Promise<Task | undefined>;

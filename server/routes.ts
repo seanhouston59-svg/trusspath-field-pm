@@ -1210,6 +1210,16 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!updated) return res.status(404).json({ message: "Project not found" });
     res.json(updated);
   });
+  // Permanent delete — no recycle bin. requireCap("manageProjects") limits this
+  // to owner/admin/pm, and requireProjectAccess enforces the tenant boundary.
+  app.delete("/api/projects/:id", requireCap("manageProjects"), async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid id." });
+    if (!(await requireProjectAccess(req, res, id))) return;
+    const deleted = await storage.deleteProject(id);
+    if (!deleted) return res.status(404).json({ message: "Project not found" });
+    res.status(204).end();
+  });
 
   // Tasks
   app.get("/api/tasks", scopeProjectQuery, async (req: any, res) => {

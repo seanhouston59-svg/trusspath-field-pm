@@ -76,6 +76,7 @@ export class DatabaseStorage implements IStorage {
   getProject: IStorage["getProject"] = (...a) => this.projects.getProject(...a);
   createProject: IStorage["createProject"] = (...a) => this.projects.createProject(...a);
   updateProject: IStorage["updateProject"] = (...a) => this.projects.updateProject(...a);
+  deleteProject: IStorage["deleteProject"] = (...a) => this.projects.deleteProject(...a);
   getTasks: IStorage["getTasks"] = (...a) => this.tasks.getTasks(...a);
   createTask: IStorage["createTask"] = (...a) => this.tasks.createTask(...a);
   updateTaskStatus: IStorage["updateTaskStatus"] = (...a) => this.tasks.updateTaskStatus(...a);
