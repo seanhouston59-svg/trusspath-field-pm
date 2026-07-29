@@ -57,7 +57,10 @@ import { reportFilename, type PreConstructionReportContext } from "./reports/pre
 import { renderPreConstructionPlan, preConstructionPlanMeta } from "./reports/pre-construction-plan";
 import { renderDesignReviewReport, designReviewReportMeta } from "./reports/design-review-report";
 import { renderBuyoutPlan, buyoutPlanMeta } from "./reports/buyout-plan";
-import { PLANS, TRIAL_DAYS, type PlanTier, type Billing } from "./lib/plans";
+import {
+  PLANS, TRIAL_DAYS, EXECUTIVE_OS_ADDON_AMOUNT_CENTS,
+  type PlanTier, type Billing,
+} from "./lib/plans";
 import {
   bootstrapOrganizationForAccount, bootstrapDemoOrgForAccount,
   createInvite, getInviteByToken, listPendingInvites, markInviteAccepted, revokeInvite, isInviteRedeemable,
@@ -66,8 +69,9 @@ import {
   getOrganization, updateOrgBilling, getOrgByStripeCustomerId,
   updateOrgTimezone, isValidTimezone, updateOrgDisabledIntegrations, isIntegrationKey,
   countActiveSeats,
+  countExecOsSeats, setMembershipExecutiveOs, syncExecOsSeatsForOrg, revokeAllExecOsForOrg,
 } from "./lib/orgs";
-import { resolveMembership, requireCap, requireRole } from "./lib/mt-middleware";
+import { resolveMembership, requireCap, requireRole, requireExecutiveOs } from "./lib/mt-middleware";
 import { classifyUpload } from "./sub-drop-classifier";
 import { SUB_TRADES, type SubTrade } from "@shared/schema";
 import { randomBytes as randomBytesForToken } from "node:crypto";
@@ -1202,6 +1206,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.use(authMiddleware);
   // Resolve req.membership/req.organization for every authenticated request.
   app.use(resolveMembership);
+  // Enforce the Executive OS add-on entitlement on the exec-OS API surface.
+  // Runs after resolveMembership so req.membership is populated.
+  app.use(requireExecutiveOs);
 
   // ==== Multi-tenant helpers ====
   // Verify the given project belongs to the caller's org; returns 404 otherwise.
@@ -4714,6 +4721,12 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
               stripeSubscriptionId: (session.subscription as string) || undefined,
               subscriptionStatus: "trialing", // real status arrives on subscription.updated
             });
+            // Stripe deletes subscription items along with a canceled
+            // subscription, so an org that lapsed and came back has no add-on
+            // item even though grants may still exist. Without this re-sync
+            // those grants would silently stop billing.
+            await syncExecOsSeatsForOrg(stripe, orgId).catch(e =>
+              console.error("[stripe webhook] exec-os re-sync failed:", e));
           }
           break;
         }
@@ -4748,6 +4761,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
               // fires subscription.deleted and we mark status=canceled.
               cancelAtPeriodEnd: !!sub.cancel_at_period_end,
             });
+            // Defensive re-sync: plan changes and portal-driven edits can drop
+            // or reshape items behind our back.
+            await syncExecOsSeatsForOrg(stripe, orgId).catch(e =>
+              console.error("[stripe webhook] exec-os re-sync failed:", e));
           }
           break;
         }
@@ -4758,6 +4775,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
             // Cancellation is final now - clear the pending flag so future
             // reactivations start from a clean slate.
             await updateOrgBilling(orgId, { subscriptionStatus: "canceled", cancelAtPeriodEnd: false });
+            // Immediate revoke on lapse. Stripe has already dropped the add-on
+            // item, so keeping grants would hand out Executive OS for free.
+            // Deliberately not restored on resubscribe — an admin re-grants.
+            await revokeAllExecOsForOrg(orgId);
           }
           break;
         }
@@ -4901,12 +4922,19 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // (multi-tenant billing lives on the org, not the account).
   app.get("/api/billing/status", async (req: any, res) => {
     if (!req.account) return res.status(401).json({ error: "Not authenticated" });
+    // Legacy platform-owners bypass the add-on the same way requireExecutiveOs
+    // does, so the client gate agrees with what the API will actually serve.
+    const isPlatformOwner = req.account.role === "owner";
     if (!req.organizationId) {
-      return res.json({ plan: null, status: null, billing: null, currentPeriodEnd: null, hasCustomer: false });
+      return res.json({
+        plan: null, status: null, billing: null, currentPeriodEnd: null, hasCustomer: false,
+        entitlements: { executiveOs: isPlatformOwner, execOsSeatCount: 0 },
+      });
     }
     const org = await getOrganization(req.organizationId);
     if (!org) return res.status(404).json({ error: "Organization not found" });
     const seats = await countActiveSeats(org.id);
+    const execOsSeatCount = await countExecOsSeats(org.id);
     const plan = org.subscriptionPlan ? PLANS[org.subscriptionPlan as PlanTier] : null;
     res.json({
       plan: org.subscriptionPlan || null,
@@ -4920,6 +4948,10 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         active: seats,
         included: plan?.includedSeats ?? null,
         overage: plan ? Math.max(0, seats - plan.includedSeats) : null,
+      },
+      entitlements: {
+        executiveOs: isPlatformOwner || !!req.membership?.hasExecutiveOs,
+        execOsSeatCount: execOsSeatCount,
       },
     });
   });
@@ -5798,9 +5830,87 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
 
     await removeMembership(id);
+    // Removal is a soft delete, so an Executive OS grant left on the row would
+    // keep billing a seat nobody can use. Clear it before either sync.
+    if (target.hasExecutiveOs) await setMembershipExecutiveOs(id, false);
     // Fire-and-forget seat sync so the next invoice reflects the removed seat.
     if (stripe) syncSeatsForOrg(stripe, req.organizationId).catch(e => console.error("[members:delete] seat sync failed:", e));
+    if (stripe && target.hasExecutiveOs) {
+      syncExecOsSeatsForOrg(stripe, req.organizationId).catch(e => console.error("[members:delete] exec-os sync failed:", e));
+    }
     res.json({ ok: true });
+  });
+
+  /* ---------------------- Executive OS add-on grants ---------------------- */
+  // Granting spends money (a prorated $5/seat/mo charge). manageMembers is
+  // owners+admins, which is the audience that already adds billable seats by
+  // inviting members, so the same capability guards this.
+
+  // GET /api/org/members/exec-os — members plus their add-on flag.
+  app.get("/api/org/members/exec-os", requireCap("manageMembers"), async (req: any, res) => {
+    const rows = await listMembershipsForOrg(req.organizationId);
+    res.json({
+      members: rows.map(m => ({
+        id: m.id,
+        accountId: m.accountId,
+        role: m.role,
+        status: m.status,
+        email: m.email,
+        displayName: m.displayName,
+        hasExecutiveOs: !!m.hasExecutiveOs,
+      })),
+      seatCount: await countExecOsSeats(req.organizationId),
+      unitAmountCents: EXECUTIVE_OS_ADDON_AMOUNT_CENTS,
+    });
+  });
+
+  // Shared guard: the target membership must be in the caller's own org, so an
+  // admin can't grant a paid seat inside someone else's tenant.
+  async function execOsTarget(req: any, res: any) {
+    const id = parseInt(req.params.membershipId, 10);
+    if (!Number.isFinite(id)) { res.status(400).json({ message: "Invalid membership id" }); return null; }
+    const target = await getMembership(id);
+    if (!target || target.organizationId !== req.organizationId) {
+      res.status(404).json({ message: "Member not found in this org" });
+      return null;
+    }
+    if (target.status !== "active") {
+      res.status(400).json({ message: "Cannot change Executive OS for an inactive member" });
+      return null;
+    }
+    return target;
+  }
+
+  // POST /api/org/members/:membershipId/exec-os — grant the add-on.
+  app.post("/api/org/members/:membershipId/exec-os", requireCap("manageMembers"), async (req: any, res) => {
+    const target = await execOsTarget(req, res);
+    if (!target) return;
+    const updated = target.hasExecutiveOs ? target : await setMembershipExecutiveOs(target.id, true);
+    // Awaited, not fire-and-forget: the client invalidates billing status right
+    // after this resolves, so the seat count it refetches must already be real.
+    if (stripe) {
+      try {
+        await syncExecOsSeatsForOrg(stripe, req.organizationId);
+      } catch (e) {
+        console.error("[exec-os:grant] seat sync failed:", e);
+      }
+    }
+    res.json({ member: updated, seatCount: await countExecOsSeats(req.organizationId) });
+  });
+
+  // DELETE /api/org/members/:membershipId/exec-os — revoke the add-on.
+  app.delete("/api/org/members/:membershipId/exec-os", requireCap("manageMembers"), async (req: any, res) => {
+    const target = await execOsTarget(req, res);
+    if (!target) return;
+    const updated = target.hasExecutiveOs ? await setMembershipExecutiveOs(target.id, false) : target;
+    if (stripe) {
+      try {
+        await syncExecOsSeatsForOrg(stripe, req.organizationId);
+      } catch (e) {
+        console.error("[exec-os:revoke] seat sync failed:", e);
+      }
+    }
+    res.json({ member: updated, seatCount: await countExecOsSeats(req.organizationId) });
   });
 
   // GET /api/org/invites — list pending invites.

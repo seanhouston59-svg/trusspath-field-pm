@@ -10,7 +10,10 @@ import {
   type Organization, type Membership, type Invite,
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { PLANS, buildSubscriptionItems, TRIAL_DAYS, type PlanTier, type Billing } from "./plans";
+import {
+  PLANS, buildSubscriptionItems, TRIAL_DAYS, EXECUTIVE_OS_ADDON_PRICE_ID,
+  type PlanTier, type Billing,
+} from "./plans";
 
 /* ============================ Organizations ============================ */
 
@@ -245,6 +248,31 @@ export async function countActiveSeats(organizationId: number): Promise<number> 
   return rows.length;
 }
 
+// Executive OS add-on seat count = active memberships with the add-on granted.
+// This is the authoritative quantity for the Stripe add-on subscription item.
+export async function countExecOsSeats(organizationId: number): Promise<number> {
+  const rows = await db.select().from(memberships).where(and(
+    eq(memberships.organizationId, organizationId),
+    eq(memberships.status, "active"),
+    eq(memberships.hasExecutiveOs, true),
+  ));
+  return rows.length;
+}
+
+export async function setMembershipExecutiveOs(id: number, hasExecutiveOs: boolean): Promise<Membership | undefined> {
+  const [row] = await db.update(memberships).set({ hasExecutiveOs }).where(eq(memberships.id, id)).returning();
+  return row;
+}
+
+// Revoke the add-on from every membership in an org. Used when the org's
+// subscription is canceled — Stripe drops the add-on subscription item along
+// with the subscription, so leaving grants in place would hand out free access.
+export async function revokeAllExecOsForOrg(organizationId: number): Promise<void> {
+  await db.update(memberships)
+    .set({ hasExecutiveOs: false })
+    .where(eq(memberships.organizationId, organizationId));
+}
+
 /* ============================ Invites ============================ */
 
 export async function createInvite(input: {
@@ -382,6 +410,55 @@ export async function syncSeatsForOrg(
     });
   }
   return { synced: true, overageQty };
+}
+
+// Reconcile the Executive OS add-on subscription item against the number of
+// memberships holding the grant. Mirrors syncSeatsForOrg, with two differences:
+// every entitled seat is billable (there is no included-seat allowance), and the
+// item is matched by the add-on price id so it stays independent of the base and
+// seat-overage items.
+//
+// The quantity is always read from the DB and set absolutely, never incremented,
+// so concurrent grants and retried Stripe webhooks both converge on the truth.
+export async function syncExecOsSeatsForOrg(
+  stripe: any,
+  organizationId: number,
+): Promise<{ synced: boolean; quantity?: number; reason?: string }> {
+  if (!stripe) return { synced: false, reason: "no_stripe" };
+  const org = await getOrganization(organizationId);
+  if (!org) return { synced: false, reason: "org_not_found" };
+  // Demo orgs are "trialing" with no Stripe objects at all — entitlement still
+  // works locally, there is just nothing to bill.
+  if (!org.stripeSubscriptionId) return { synced: false, reason: "no_subscription" };
+
+  const quantity = await countExecOsSeats(organizationId);
+
+  const sub = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
+  const addonItem = sub.items?.data?.find((i: any) => i.price?.id === EXECUTIVE_OS_ADDON_PRICE_ID);
+
+  if (quantity === 0) {
+    if (addonItem) {
+      await stripe.subscriptionItems.del(addonItem.id, { proration_behavior: "always_invoice" });
+    }
+    return { synced: true, quantity: 0 };
+  }
+
+  if (addonItem) {
+    if (addonItem.quantity !== quantity) {
+      await stripe.subscriptionItems.update(addonItem.id, {
+        quantity,
+        proration_behavior: "always_invoice",
+      });
+    }
+  } else {
+    await stripe.subscriptionItems.create({
+      subscription: org.stripeSubscriptionId,
+      price: EXECUTIVE_OS_ADDON_PRICE_ID,
+      quantity,
+      proration_behavior: "always_invoice",
+    });
+  }
+  return { synced: true, quantity };
 }
 
 /* ============================ Signup + Stripe checkout ============================ */

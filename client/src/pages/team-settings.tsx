@@ -7,10 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   useCurrentOrg, useOrgMembers, useOrgInvites, useCreateInvite, useRevokeInvite, useUpdateMemberRole, useRemoveMember,
+  useSetMemberExecutiveOs,
   type Membership,
 } from "@/hooks/use-data";
+import { useExecutiveOsEntitlement } from "@/hooks/use-entitlements";
 import { BillingSection } from "@/components/billing-section";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -44,12 +47,17 @@ export default function TeamSettingsPage() {
   const revokeInvite = useRevokeInvite();
   const updateRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
+  const setExecOs = useSetMemberExecutiveOs();
+  const { seatCount: execOsSeatCount } = useExecutiveOsEntitlement();
   const { toast } = useToast();
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("pm");
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+  // Optimistic overrides for the Executive OS switches, keyed by membership id.
+  // Cleared once the mutation settles so the server row takes over again.
+  const [execOsPending, setExecOsPending] = useState<Record<number, boolean>>({});
 
   const members = membersData?.members || [];
   const invites = invitesData?.invites || [];
@@ -88,6 +96,31 @@ export default function TeamSettingsPage() {
       toast({ title: "Member removed", description: `${m.email} no longer has access.` });
     } catch (err: any) {
       toast({ title: "Remove failed", description: err?.message || "Could not remove member", variant: "destructive" });
+    }
+  }
+
+  async function handleToggleExecOs(m: Membership & { email: string; displayName?: string }, enabled: boolean) {
+    setExecOsPending(prev => ({ ...prev, [m.id]: enabled }));
+    try {
+      await setExecOs.mutateAsync({ id: m.id, enabled });
+      toast({
+        title: enabled ? "Executive OS enabled" : "Executive OS removed",
+        description: enabled
+          ? `${m.displayName || m.email} now has Executive OS. $5/mo was added to your subscription, prorated.`
+          : `${m.displayName || m.email} no longer has Executive OS. Your subscription drops $5/mo.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Could not update Executive OS",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExecOsPending(prev => {
+        const next = { ...prev };
+        delete next[m.id];
+        return next;
+      });
     }
   }
 
@@ -235,6 +268,21 @@ export default function TeamSettingsPage() {
                     <div className="text-xs text-muted-foreground">{m.email}</div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* Executive OS add-on. Gated on canManage rather than
+                        canModifyThisMember because owners and admins may grant
+                        the add-on to themselves — unlike a role change. */}
+                    {canManage && m.status === "active" && (
+                      <label className="flex cursor-pointer items-center gap-2 pr-1 text-xs text-muted-foreground">
+                        <Switch
+                          checked={execOsPending[m.id] ?? !!m.hasExecutiveOs}
+                          onCheckedChange={(v) => handleToggleExecOs(m, v)}
+                          disabled={execOsPending[m.id] !== undefined}
+                          data-testid={`switch-exec-os-${m.id}`}
+                        />
+                        <span className="hidden sm:inline">Executive OS ($5/mo)</span>
+                        <span className="sm:hidden">Exec OS</span>
+                      </label>
+                    )}
                     {canModifyThisMember ? (
                       <Select value={m.role} onValueChange={(v) => handleChangeRole(m, v)}>
                         <SelectTrigger className="h-8 w-[120px] text-xs" data-testid={`select-role-${m.id}`}>
@@ -277,6 +325,13 @@ export default function TeamSettingsPage() {
               );
             })}
           </div>
+          {canManage && (
+            <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+              Executive OS seats: <span className="font-semibold text-foreground">{execOsSeatCount}</span>
+              {" · "}
+              <span className="font-semibold text-foreground">${execOsSeatCount * 5}/mo</span> added to your subscription
+            </p>
+          )}
         </section>
 
         {/* Pending invites */}

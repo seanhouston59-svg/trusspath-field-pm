@@ -100,6 +100,40 @@ export function requireRole(...allowed: OrgRole[]) {
   };
 }
 
+// Executive OS is a paid per-seat add-on. Until this existed the whole
+// /executive-os surface was gated only by a client-side dropdown, so the data
+// was readable by anyone who called the API directly.
+//
+// Matched by path rather than bolted onto each handler on purpose: the
+// mobilization sub-resource routes are registered from a table in a loop, and
+// the surface is ~40 endpoints, so per-route decoration would silently miss
+// some and would not cover routes added later.
+const EXEC_OS_PATH_PATTERNS: RegExp[] = [
+  /^\/api\/executive-os\//,
+  /^\/api\/projects\/[^/]+\/(mobilization|project-setup|pre-construction)(\/|$)/,
+  /^\/api\/projects\/[^/]+\/modules(\/|$)/,
+];
+
+export function isExecutiveOsPath(path: string): boolean {
+  return EXEC_OS_PATH_PATTERNS.some(re => re.test(path));
+}
+
+export function requireExecutiveOs(req: any, res: any, next: any) {
+  const p = req.path || req.url?.split("?")[0] || "";
+  if (!isExecutiveOsPath(p)) return next();
+  // Legacy platform-owners bypass, matching resolveMembership's membership and
+  // paywall checks. They frequently have no membership row at all, so without
+  // this they would lose the surface entirely.
+  if (req.account?.role === "owner") return next();
+  if (req.membership?.hasExecutiveOs !== true) {
+    return res.status(403).json({
+      message: "Executive OS is a paid add-on. Ask an owner or admin to enable it for your seat.",
+      reason: "exec_os_not_entitled",
+    });
+  }
+  next();
+}
+
 export function requireCap(capability: keyof typeof ROLE_CAPS["owner"]) {
   return function (req: any, res: any, next: any) {
     const m = req.membership;

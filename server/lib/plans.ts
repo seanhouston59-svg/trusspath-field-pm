@@ -72,6 +72,22 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
 
 export const TRIAL_DAYS = 14;
 
+/* ------------------------------ Add-ons ------------------------------ */
+// Executive OS: a per-seat add-on billed alongside the org's base subscription
+// as a third subscription item. Price ids are hardcoded here to match how base
+// plans work — the STRIPE_PRICE_* env-var generation was abandoned and its
+// endpoint now returns 410.
+//
+// The price MUST be tagged metadata.kind = 'addon_exec_os' in Stripe. The
+// webhook derives the org's plan by scanning items for metadata.kind === 'base'
+// and breaking on the first match, so tagging this price 'base' would silently
+// clobber organizations.subscription_plan.
+// TODO(sean): replace with real Stripe price id from dashboard
+export const EXECUTIVE_OS_ADDON_PRICE_ID = "price_TODO_EXEC_OS_ADDON";
+
+/** Per-seat price of the Executive OS add-on, in cents. */
+export const EXECUTIVE_OS_ADDON_AMOUNT_CENTS = 500;
+
 /** Compute how many overage seats above the plan's included count. */
 export function overageSeats(tier: PlanTier, activeSeatCount: number): number {
   return Math.max(0, activeSeatCount - PLANS[tier].includedSeats);

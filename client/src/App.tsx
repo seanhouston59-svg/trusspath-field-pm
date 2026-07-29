@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType } from "react";
-import { Switch, Route, Router, useLocation } from "wouter";
+import { Switch, Route, Router, Redirect, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 
 /**
@@ -53,6 +53,7 @@ import { AccessProvider, useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useStickyDing } from "@/hooks/use-sticky-ding";
 import { useBillingStatus } from "@/hooks/use-data";
+import { useExecutiveOsEntitlement } from "@/hooks/use-entitlements";
 import { setPendingRedirect } from "@/lib/queryClient";
 import type { AccessLevel } from "@shared/access-levels";
 import { Layout } from "@/components/layout";
@@ -103,6 +104,7 @@ import Cpm from "@/pages/cpm";
 import Paywall from "@/pages/paywall";
 import TeamSettingsPage from "@/pages/team-settings";
 import ExecutiveOs from "@/pages/executive-os";
+import ExecutiveOsUpsell from "@/pages/executive-os-upsell";
 import MobilizationPortfolio from "@/pages/executive-os/mobilization-portfolio";
 import MobilizationDetail from "@/pages/executive-os/mobilization-detail";
 import ProjectSetupPortfolio from "@/pages/executive-os/project-setup-portfolio";
@@ -171,6 +173,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/settings": SettingsPage,
   "/settings/team": TeamSettingsPage,
   "/executive-os": ExecutiveOs,
+  "/executive-os/upsell": ExecutiveOsUpsell,
   "/executive-os/project-setup": ProjectSetupPortfolio,
   "/executive-os/project-setup/:id": ProjectSetupDetail,
   "/executive-os/pre-construction": PreConstructionPortfolio,
@@ -261,15 +264,31 @@ function AccessRestricted() {
   );
 }
 
+const EXEC_OS_UPSELL_PATH = "/executive-os/upsell";
+
 function AccessGate() {
   const [loc] = useLocation();
   const { isAllowed } = useAccess();
+  // Executive OS is a paid per-seat add-on. Gating here rather than at each of
+  // the ~60 exec-OS route patterns covers the generated lean-module routes too.
+  // This is a UX redirect only — the API is enforced by requireExecutiveOs.
+  const execOs = useExecutiveOsEntitlement();
   // Play a soft ding whenever a new sticky note or sticker appears on the
   // org's shared corkboard. Mounted here (inside the auth wall) so we don't
   // poll for anonymous users and so the hook has a session identity to skip
   // self-authored notes.
   useStickyDing();
   if (!isAllowed(loc)) return <AccessRestricted />;
+  // RequireAuth already blocks paint until billing status resolves, so there is
+  // no upsell flash here; the isLoading check is belt-and-braces.
+  if (
+    loc.startsWith("/executive-os") &&
+    loc !== EXEC_OS_UPSELL_PATH &&
+    !execOs.isLoading &&
+    !execOs.hasAccess
+  ) {
+    return <Redirect to={EXEC_OS_UPSELL_PATH} />;
+  }
   return <AppRouter />;
 }
 

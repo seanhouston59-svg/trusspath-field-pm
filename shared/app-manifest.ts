@@ -17,7 +17,8 @@ export const APP_ROUTES: RoutePattern[] = [
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings", "/settings/team",
   "/teams", "/excel",
-  "/executive-os", "/executive-os/project-setup", "/executive-os/project-setup/:id",
+  "/executive-os", "/executive-os/upsell",
+  "/executive-os/project-setup", "/executive-os/project-setup/:id",
   "/executive-os/pre-construction", "/executive-os/pre-construction/:id",
   "/executive-os/mobilization", "/executive-os/mobilization/:id",
   // Skeleton routes (modules 4-22) — placeholder pages until each ships.
@@ -179,7 +180,10 @@ export const APP_NAV: NavGroup[] = [
   },
 ];
 
-/** Landing-page feature cards (mirrors client/src/pages/landing.tsx). */
+/** Marketing-surface deep links. The redesigned landing page groups these into
+ *  thematic buckets rather than one card per route, so this list is no longer a
+ *  one-to-one mirror of the page — it stays as the route-coverage set that
+ *  server/health.ts checks for broken links. */
 export const LANDING_FEATURE_LINKS: { label: string; href: string }[] = [
   { label: "Daily Logs", href: "/daily-logs" },
   { label: "RFIs & Submittals", href: "/rfis" },

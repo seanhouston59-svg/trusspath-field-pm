@@ -298,6 +298,86 @@
       linear-gradient(to right, hsl(var(--sidebar-foreground) / 0.03) 1px, transparent 1px);
     background-size: 22px 22px;
   }
+
+  /* ---- Landing page palette (rugged / field-forward) ----
+     The marketing page runs warmer and heavier than the app chrome. Anchoring
+     it on its own vars keeps the tuning in one place instead of scattering
+     colour literals through landing.tsx, and keeps it from drifting into the
+     app's semantic tokens. Values track the product identity: safety-amber
+     accent, deep-navy slab, steel-gray rules, warm off-white paper. */
+  .lp-theme {
+    --lp-paper: 38 24% 96%;
+    --lp-paper-2: 36 18% 92%;
+    --lp-slab: 216 42% 11%;
+    --lp-steel: 215 14% 44%;
+    --lp-accent: 24 92% 48%;
+    --lp-ink: 216 34% 12%;
+  }
+  .dark .lp-theme {
+    --lp-paper: 216 26% 9%;
+    --lp-paper-2: 216 24% 12%;
+    --lp-slab: 216 46% 6%;
+    --lp-steel: 215 14% 62%;
+    --lp-accent: 28 94% 56%;
+    --lp-ink: 210 20% 94%;
+  }
+  .lp-paper {
+    background-color: hsl(var(--lp-paper));
+    color: hsl(var(--lp-ink));
+  }
+  .lp-paper-2 {
+    background-color: hsl(var(--lp-paper-2));
+    color: hsl(var(--lp-ink));
+  }
+  .lp-slab {
+    background-color: hsl(var(--lp-slab));
+    color: hsl(210 20% 94%);
+  }
+  .lp-card {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--lp-steel) / 0.22);
+  }
+  .lp-rule {
+    border-color: hsl(var(--lp-steel) / 0.22);
+  }
+  .lp-muted {
+    color: hsl(var(--lp-steel));
+  }
+  .lp-accent-text {
+    color: hsl(var(--lp-accent));
+  }
+  .lp-accent-bg {
+    background-color: hsl(var(--lp-accent));
+    color: #fff;
+  }
+  .lp-accent-soft {
+    background-color: hsl(var(--lp-accent) / 0.12);
+    color: hsl(var(--lp-accent));
+  }
+  /* Nav/footer links. Lives here rather than as `hover:` utilities because the
+     colours come from the landing vars, which Tailwind variants can't reach. */
+  .lp-link {
+    color: hsl(var(--lp-steel));
+    transition: color 150ms ease;
+  }
+  .lp-link:hover,
+  .lp-link:focus-visible {
+    color: hsl(var(--lp-accent));
+  }
+  /* Oversized editorial display type — bigger and tighter than the app uses. */
+  .lp-display {
+    font-family: var(--font-display);
+    font-weight: 900;
+    letter-spacing: -0.025em;
+    line-height: 1.02;
+  }
+  /* Faint measured-drafting texture behind photo-forward sections. */
+  .lp-grit {
+    background-image:
+      linear-gradient(to right, hsl(var(--lp-steel) / 0.09) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--lp-steel) / 0.09) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
   /* Chart axis labels that link to a detail page. Tailwind can't style the
      <text> child of an SVG <a>, so the hover/focus treatment lives here. */
   .chart-axis-link {

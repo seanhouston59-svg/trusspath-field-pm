@@ -323,6 +323,16 @@ export async function migrate() {
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'pending'`;
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_at TEXT`;
   await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS approved_by INTEGER`;
+  // `memberships` is drizzle-push managed and deliberately not created here, so
+  // a bare ALTER would throw on a database that hasn't been pushed yet. The
+  // guard keeps a cold serverless start from serving requests against a table
+  // missing the Executive OS add-on column.
+  await sql`DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'memberships') THEN
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS has_executive_os BOOLEAN NOT NULL DEFAULT false;
+      END IF;
+    END $$`;
   await sql`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
     account_id INTEGER NOT NULL,
