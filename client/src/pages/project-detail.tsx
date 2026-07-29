@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import {
   MapPin, Calendar, Building2, DollarSign, ListChecks, HelpCircle, ClipboardList, CheckSquare,
-  ExternalLink, Pencil, X, Clock,
+  ExternalLink, Pencil, X, Clock, Trash2, Loader2,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { ProjectStatusBadge, Progress } from "@/components/bits";
@@ -10,11 +10,22 @@ import { TaskTable, RfiTable, DailyLogList, PunchList } from "@/components/table
 import { ProjectTimeline } from "@/components/project-timeline";
 import {
   useProject, useTasks, useRfis, useDailyLogs, usePunchItems, useTeamMap, useUpdateProject,
+  useDeleteProject,
 } from "@/hooks/use-data";
 import { formatCurrency, shortDate, formatDate } from "@/lib/format";
 import { googleMapsUrl } from "@/lib/maps";
 import { cn } from "@/lib/utils";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useAccess } from "@/lib/access";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: DollarSign },
@@ -24,6 +35,16 @@ const TABS = [
   { key: "logs", label: "Daily Logs", icon: ClipboardList },
   { key: "punch", label: "Punch List", icon: CheckSquare },
 ] as const;
+
+/** apiRequest throws `Error("<status>: <body>")` — dig the server message out of it. */
+function serverMessage(err: unknown, fallback: string): string {
+  const body = (err instanceof Error ? err.message : String(err)).replace(/^\d+:\s*/, "");
+  try {
+    const parsed = JSON.parse(body);
+    if (typeof parsed?.message === "string") return parsed.message;
+  } catch {}
+  return body || fallback;
+}
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -46,8 +67,15 @@ export default function ProjectDetail() {
   const { data: punch = [] } = usePunchItems(projectId);
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("overview");
   const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const { can } = useAccess();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
+  // Controlled so a failed delete can leave the confirmation open.
+  const [confirming, setConfirming] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
 
   useEffect(() => {
     if (project) {
@@ -83,6 +111,24 @@ export default function ProjectDetail() {
         progress: parseInt(form.progress) || 0,
       },
     }, { onSuccess: () => setEditing(false) });
+  }
+
+  function confirmDelete() {
+    if (!project) return;
+    deleteProject.mutate(project.id, {
+      onSuccess: () => {
+        setConfirming(false);
+        setConfirmName("");
+        setEditing(false);
+        toast({ title: "Project deleted", description: `${project.name} and its records were permanently removed.` });
+        navigate("/projects");
+      },
+      onError: (err) => toast({
+        title: "Delete failed",
+        description: serverMessage(err, "The project could not be deleted."),
+        variant: "destructive",
+      }),
+    });
   }
 
   if (isLoading || !project) {
@@ -292,11 +338,64 @@ export default function ProjectDetail() {
                 </div>
               </div>
             </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setEditing(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">Cancel</button>
-              <button onClick={saveEdit} disabled={updateProject.isPending} data-testid="button-save-project" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-                {updateProject.isPending ? "Saving..." : "Save Changes"}
-              </button>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              {can("canDelete") && (
+                <AlertDialog
+                  open={confirming}
+                  onOpenChange={(open) => { setConfirming(open); if (!open) setConfirmName(""); }}
+                >
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" data-testid="button-delete-project">
+                      <Trash2 className="size-4" /> Delete Project
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {project.name}? This cannot be undone.</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This permanently deletes the project and every record attached to it — tasks,
+                        milestones, RFIs, submittals, change orders, action items, daily logs, punch
+                        items, photos, documents, blueprints, drone captures, messages, timesheets,
+                        and its Project Setup, Pre-Construction, and Mobilization plans.
+                        It does <strong>not</strong> go to Deleted Items and cannot be restored.
+                        Equipment assigned to the project is released back to the fleet.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-2">
+                      <Label htmlFor="delete-project-confirm" className="text-xs">
+                        Type <span className="font-mono font-bold">{project.name}</span> to confirm
+                      </Label>
+                      <Input
+                        id="delete-project-confirm"
+                        value={confirmName}
+                        onChange={(e) => setConfirmName(e.target.value)}
+                        className="mt-1"
+                        autoComplete="off"
+                        data-testid="input-delete-project-confirm"
+                      />
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={deleteProject.isPending}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={confirmName !== project.name || deleteProject.isPending}
+                        // Keep the dialog mounted so a failed delete stays open.
+                        onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+                        className="bg-destructive text-destructive-foreground"
+                        data-testid="button-delete-project-confirm"
+                      >
+                        {deleteProject.isPending && <Loader2 className="mr-1 size-4 animate-spin" />}
+                        {deleteProject.isPending ? "Deleting…" : "Delete project"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <div className="ml-auto flex items-center gap-2">
+                <button onClick={() => setEditing(false)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">Cancel</button>
+                <button onClick={saveEdit} disabled={updateProject.isPending} data-testid="button-save-project" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                  {updateProject.isPending ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

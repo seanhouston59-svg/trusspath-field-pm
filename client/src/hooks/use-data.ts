@@ -491,6 +491,16 @@ export function useUpdateProject() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/projects"] }); },
   });
 }
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/projects/${id}`); },
+    // A project delete cascades into every project-scoped list (tasks, RFIs,
+    // photos, timesheets, exec-os modules…), so blanket-invalidate rather than
+    // try to enumerate them.
+    onSuccess: () => { qc.invalidateQueries(); },
+  });
+}
 export function useCreateTask() {
   const qc = useQueryClient();
   return useMutation({
