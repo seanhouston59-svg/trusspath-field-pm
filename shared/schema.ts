@@ -1709,3 +1709,177 @@ export type Organization = typeof organizations.$inferSelect;
 export type Membership = typeof memberships.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
 export type ProjectMember = typeof projectMembers.$inferSelect;
+
+/* --------------------------- Sub Drop Portal ----------------------------- */
+// A single per-project QR token that subs scan at the site trailer to drop
+// documents/photos into the project. No login required — the token IS the
+// credential. Every upload made against the token is scoped to the token's
+// project_id and organization_id server-side; there is no way for a sub to
+// widen scope from the client.
+//
+// Tokens are revocable and rotatable: PM regenerates and the old QR stops
+// working immediately. A single token is reusable across many subs on the
+// same project — the QR sticker on the trailer is what identifies the
+// project, and the sub identifies themselves (name/company) at drop time.
+export const projectDropTokens = pgTable("project_drop_tokens", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull(),
+  projectId: integer("project_id").notNull(),
+  token: text("token").notNull().unique(), // opaque URL-safe id, printed into the QR
+  label: text("label"),                    // optional PM-facing name, e.g. "Site Trailer"
+  createdByAccountId: integer("created_by_account_id"),
+  createdAt: text("created_at").notNull(),
+  revokedAt: text("revoked_at"),           // when set, drops with this token are rejected
+  lastUsedAt: text("last_used_at"),
+});
+
+// One row per file dropped through a project_drop_token. Files live on disk
+// (or /tmp on serverless) exactly like the existing documents/photos tables;
+// this row holds the classification + attribution the PM needs to review.
+export const subUploads = pgTable("sub_uploads", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull(),
+  projectId: integer("project_id").notNull(),
+  dropTokenId: integer("drop_token_id").notNull(),
+  // Sub attribution — captured at drop time, no account required.
+  subName: text("sub_name"),               // "Bob Miller"
+  subCompany: text("sub_company"),         // "ABC Plumbing"
+  subTrade: text("sub_trade"),             // "Plumbing"
+  subPhone: text("sub_phone"),
+  // File metadata.
+  originalFileName: text("original_file_name").notNull(),
+  storedFileName: text("stored_file_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSizeBytes: integer("file_size_bytes").notNull(),
+  // Auto-classification output. `category` is the folder the file lands in;
+  // `categoryConfidence` is the classifier layer that decided it (1=metadata,
+  // 2=filename, 3=file-type, 4=llm, 0=uncategorized). `categoryOverriddenById`
+  // is set when a PM re-files it manually — the pair feeds future learning.
+  category: text("category").notNull().default("Needs Sorting"),
+  categoryConfidence: integer("category_confidence").notNull().default(0),
+  categoryOverriddenById: integer("category_overridden_by_id"),
+  // Workflow.
+  status: text("status").notNull().default("new"), // new | reviewed | archived
+  reviewedByAccountId: integer("reviewed_by_account_id"),
+  reviewedAt: text("reviewed_at"),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+  // Verified uploader. From v2 of the portal onward every drop must come from
+  // an authenticated sub_companies session; this column is the audit link back
+  // to the account that produced the file. Nullable only for schema evolution
+  // safety — fresh rows written by the current handler always set it.
+  subCompanyId: integer("sub_company_id"),
+});
+
+/* ------------------- Sub Company accounts (identity) --------------------- */
+// A sub company is a distinct identity primitive from `accounts` (which is
+// the GC-side user). Kept in its own table so sub sessions can never leak
+// GC-scoped data or route through GC middleware. One sub_companies row =
+// one construction subcontractor business (e.g. "ABC Plumbing"). Multiple
+// people at the same company share the login for MVP; per-user seats can
+// come later without a data migration.
+//
+// Registration is triggered by scanning a project QR while unauthenticated.
+// Login is triggered by scanning any project QR while already registered.
+// In both cases the token identifies the destination project, and a row is
+// written to sub_company_projects to record the attachment.
+export const subCompanies = pgTable("sub_companies", {
+  id: serial("id").primaryKey(),
+  companyName: text("company_name").notNull(),
+  trade: text("trade").notNull(),          // one of SUB_TRADES below
+  contactName: text("contact_name").notNull(),
+  contactEmail: text("contact_email").notNull().unique(),
+  contactPhone: text("contact_phone"),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: text("created_at").notNull(),
+  // PM (or platform admin) can suspend a sub company; suspended companies
+  // can't sign in and their uploads are rejected. Stays around for audit.
+  suspendedAt: text("suspended_at"),
+  suspendedByAccountId: integer("suspended_by_account_id"),
+});
+
+// Join table: which GC projects a sub company is attached to. Every QR scan
+// (registration or subsequent sign-in) inserts a row here if one doesn't
+// already exist for (subCompanyId, projectId). This is the source of truth
+// for "which projects does this sub see in their app?" and "which sub
+// companies are on this project?" on the PM side.
+export const subCompanyProjects = pgTable("sub_company_projects", {
+  id: serial("id").primaryKey(),
+  subCompanyId: integer("sub_company_id").notNull(),
+  organizationId: integer("organization_id").notNull(),
+  projectId: integer("project_id").notNull(),
+  joinedAt: text("joined_at").notNull(),
+  joinedViaDropTokenId: integer("joined_via_drop_token_id"),
+  // Detachment is soft — PM can remove a sub company from a project without
+  // losing the historical uploads that reference the join.
+  detachedAt: text("detached_at"),
+});
+
+// Session tokens for sub company logins. Separate from GC `sessions` so a
+// leaked sub cookie can't be replayed against GC endpoints and vice versa.
+// Same shape and rotation semantics as GC sessions.
+export const subSessions = pgTable("sub_sessions", {
+  token: text("token").primaryKey(),
+  subCompanyId: integer("sub_company_id").notNull(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+
+// Canonical trade list. Matches the classifier's expectations and keeps the
+// registration dropdown and the PM filter dropdown in sync. "Other" is the
+// escape hatch — anything picked as Other doesn't get a trade nudge from
+// the classifier, which is fine.
+export const SUB_TRADES = [
+  "Concrete",
+  "Framing",
+  "Roofing",
+  "Plumbing",
+  "Electrical",
+  "HVAC",
+  "Drywall",
+  "Painting",
+  "Flooring",
+  "Landscaping",
+  "Masonry",
+  "Steel / Structural",
+  "Mechanical",
+  "Fire Protection",
+  "Low Voltage / Data",
+  "Other",
+] as const;
+export type SubTrade = typeof SUB_TRADES[number];
+
+export const insertProjectDropTokenSchema = createInsertSchema(projectDropTokens).omit({ id: true });
+export const insertSubUploadSchema = createInsertSchema(subUploads).omit({ id: true });
+export const insertSubCompanySchema = createInsertSchema(subCompanies).omit({ id: true });
+export const insertSubCompanyProjectSchema = createInsertSchema(subCompanyProjects).omit({ id: true });
+
+export type SubCompany = typeof subCompanies.$inferSelect;
+export type SubCompanyProject = typeof subCompanyProjects.$inferSelect;
+export type SubSession = typeof subSessions.$inferSelect;
+export type InsertSubCompany = z.infer<typeof insertSubCompanySchema>;
+export type InsertSubCompanyProject = z.infer<typeof insertSubCompanyProjectSchema>;
+
+// The sub-facing view of a sub company — excludes passwordHash. Anywhere a
+// SubCompany crosses the response boundary it should be `SubCompanyPublic`.
+export type SubCompanyPublic = Omit<SubCompany, "passwordHash">;
+
+export type ProjectDropToken = typeof projectDropTokens.$inferSelect;
+export type SubUpload = typeof subUploads.$inferSelect;
+export type InsertProjectDropToken = z.infer<typeof insertProjectDropTokenSchema>;
+export type InsertSubUpload = z.infer<typeof insertSubUploadSchema>;
+
+// The eight buckets the auto-classifier can produce. Kept as a shared const
+// so the PM inbox UI, the classifier, and any future filters all reference
+// the same list.
+export const SUB_UPLOAD_CATEGORIES = [
+  "Insurance / COIs",
+  "Safety Certifications",
+  "Safety Data Sheets",
+  "Shop Drawings",
+  "Site Photos",
+  "Financials",
+  "Tax / Compliance",
+  "Needs Sorting",
+] as const;
+export type SubUploadCategory = typeof SUB_UPLOAD_CATEGORIES[number];

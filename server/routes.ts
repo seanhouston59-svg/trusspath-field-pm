@@ -68,6 +68,9 @@ import {
   countActiveSeats,
 } from "./lib/orgs";
 import { resolveMembership, requireCap, requireRole } from "./lib/mt-middleware";
+import { classifyUpload } from "./sub-drop-classifier";
+import { SUB_TRADES, type SubTrade } from "@shared/schema";
+import { randomBytes as randomBytesForToken } from "node:crypto";
 
 function pid(req: any): number | undefined {
   return req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
@@ -220,9 +223,17 @@ const PUBLIC_API = new Set<string>([
 const PUBLIC_API_PREFIXES = [
   "/api/invites/", // GET only — accept requires auth so it runs through normal middleware
 ];
+// Public path prefixes for ANY method — used by the Sub Drop Portal, which has
+// its own session token space (see resolveSubSession) and never touches GC
+// state. Every /api/sub/* handler enforces its own auth internally.
+const PUBLIC_API_ANY_METHOD_PREFIXES = [
+  "/api/sub/",
+  "/api/drop/",
+];
 function isPublicApi(path: string, method: string): boolean {
   if (PUBLIC_API.has(path)) return true;
   if (method === "GET" && PUBLIC_API_PREFIXES.some(p => path.startsWith(p))) return true;
+  if (PUBLIC_API_ANY_METHOD_PREFIXES.some(p => path.startsWith(p))) return true;
   return false;
 }
 
@@ -414,6 +425,64 @@ const DRONE_DIR = process.env.VERCEL
   : path.resolve(process.cwd(), "uploads/drone");
 try { fs.mkdirSync(DRONE_DIR, { recursive: true }); } catch {}
 
+// Sub Drop Portal uploads — wider MIME allowlist than the GC document upload
+// because subs commonly send construction docs (DWG, XLSX, DOCX, CSV) that
+// PMs never upload directly. Same 25MB cap, same disk-storage pattern. On
+// Vercel this lands in /tmp which is ephemeral — called out in the PR.
+const SUB_DROP_DIR = process.env.VERCEL
+  ? "/tmp/uploads/sub-drops"
+  : path.resolve(process.cwd(), "uploads/sub-drops");
+try { fs.mkdirSync(SUB_DROP_DIR, { recursive: true }); } catch {}
+
+const SUB_DROP_MIME = new Set<string>([
+  // Documents
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+  "text/plain",
+  // Images
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  // CAD (best-effort — browsers vary on what they report for .dwg)
+  "application/acad",
+  "application/x-dwg",
+  "image/vnd.dwg",
+  "application/octet-stream", // fallback for CAD; we still gate by extension below
+]);
+// Extension allowlist for octet-stream fallbacks so we don't accept truly
+// arbitrary binary blobs when the browser sends application/octet-stream.
+const SUB_DROP_OCTET_EXTS = new Set([".dwg", ".rvt", ".dxf", ".ifc"]);
+
+const subDropUpload = multer({
+  storage: multer.diskStorage({
+    destination: SUB_DROP_DIR,
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || "";
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
+  fileFilter: (_req, file, cb) => {
+    if (SUB_DROP_MIME.has(file.mimetype)) {
+      if (file.mimetype === "application/octet-stream") {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (!SUB_DROP_OCTET_EXTS.has(ext)) {
+          return cb(new Error("Unsupported file type."));
+        }
+      }
+      return cb(null, true);
+    }
+    return cb(new Error("Unsupported file type. Try PDF, image, DWG, DOCX, or XLSX."));
+  },
+});
+
 const droneUpload = multer({
   storage: multer.diskStorage({
     destination: DRONE_DIR,
@@ -468,6 +537,275 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (req.method === "OPTIONS") return res.status(204).end();
     next();
   });
+
+  // ========================================================================
+  //  SUB DROP PORTAL — public / sub-authenticated routes.
+  //  These MUST be declared BEFORE app.use(authMiddleware) so the GC auth
+  //  cookie is not required. Each handler enforces its own auth via
+  //  resolveSubSession where a signed-in sub is required.
+  // ========================================================================
+
+  // Cookie name for sub sessions. Deliberately distinct from SESSION_COOKIE
+  // so the GC and sub cookies never collide and their scopes stay isolated.
+  const SUB_SESSION_COOKIE = "tp_sub_session";
+
+  // Helper: read the sub session token from cookie, Bearer, or ?token= just
+  // like the GC pattern. The QR flow uses the cookie; the mobile PWA can use
+  // Bearer if it prefers header-based auth.
+  function readSubToken(req: any): string {
+    const cookies = parseCookies(req.headers?.cookie);
+    const bearer = (req.headers?.authorization || "").replace(/^Bearer\s+/i, "");
+    const q = typeof req.query?.token === "string" ? req.query.token : "";
+    return cookies[SUB_SESSION_COOKIE] || bearer || q || "";
+  }
+
+  // Middleware: resolve a sub session and put the sub company on req.subCompany.
+  // Returns 401 if the cookie/token is absent or invalid. Used only on the
+  // signed-in sub endpoints below — the /drop/:token/info lookup is truly
+  // anonymous by design.
+  async function resolveSubSession(req: any, res: any, next: any) {
+    const token = readSubToken(req);
+    const sub = await storage.resolveSubSession(token);
+    if (!sub) return res.status(401).json({ message: "Sub session required." });
+    req.subCompany = sub;
+    next();
+  }
+
+  // Set the sub cookie on login/register. Same SameSite/Secure semantics as
+  // the GC cookie helper; kept as a small local helper to avoid coupling the
+  // sub flow to the GC session-cookie code.
+  function setSubSessionCookie(res: any, token: string, expiresAt: string) {
+    const secure = process.env.NODE_ENV === "production" ? "Secure; " : "";
+    // 30-day sub session, mirroring the token TTL in SubCompaniesRepo.
+    const expiresAttr = new Date(expiresAt).toUTCString();
+    res.setHeader(
+      "Set-Cookie",
+      `${SUB_SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; ${secure}HttpOnly; SameSite=None; Expires=${expiresAttr}`,
+    );
+  }
+  function clearSubSessionCookie(res: any) {
+    const secure = process.env.NODE_ENV === "production" ? "Secure; " : "";
+    res.setHeader(
+      "Set-Cookie",
+      `${SUB_SESSION_COOKIE}=; Path=/; ${secure}HttpOnly; SameSite=None; Max-Age=0`,
+    );
+  }
+
+  // ---- Anonymous drop-token preview -------------------------------------
+  // Called from the /drop/:token client page BEFORE the sub logs in — gives
+  // them the project name so they can confirm they scanned the right QR.
+  // Never returns anything sensitive: just project name + org name.
+  app.get("/api/drop/:token/info", async (req, res) => {
+    const token = String(req.params.token || "");
+    const dropToken = await storage.getDropTokenByToken(token);
+    if (!dropToken) return res.status(404).json({ message: "Invalid or revoked link." });
+    const project = await storage.getProject(dropToken.projectId);
+    if (!project) return res.status(404).json({ message: "Project not found." });
+    const org = await getOrganization(dropToken.organizationId);
+    res.json({
+      projectId: project.id,
+      projectName: project.name,
+      organizationName: org?.name || "TrussPath",
+    });
+  });
+
+  // ---- Sub registration --------------------------------------------------
+  // Called from the /drop/:token page when a first-time sub picks "Register".
+  // Creates a sub_companies row, attaches the sub to the token's project, and
+  // issues a session cookie so the very next request can drop a file.
+  app.post("/api/sub/register", async (req, res) => {
+    try {
+      const b = req.body || {};
+      const token = String(b.dropToken || "").trim();
+      const dropToken = token ? await storage.getDropTokenByToken(token) : null;
+      if (!dropToken) return res.status(400).json({ message: "Invalid or revoked link." });
+
+      // Server-side validation. Kept strict here so the client can be relaxed.
+      const companyName = String(b.companyName || "").trim();
+      const trade = String(b.trade || "").trim() as SubTrade;
+      const contactName = String(b.contactName || "").trim();
+      const contactEmail = String(b.contactEmail || "").trim().toLowerCase();
+      const contactPhone = b.contactPhone ? String(b.contactPhone).trim() : undefined;
+      const password = String(b.password || "");
+      if (!companyName) return res.status(400).json({ message: "Company name is required." });
+      if (!SUB_TRADES.includes(trade as any)) {
+        return res.status(400).json({ message: "Pick a trade from the list." });
+      }
+      if (!contactName) return res.status(400).json({ message: "Contact name is required." });
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) {
+        return res.status(400).json({ message: "A valid email is required." });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters." });
+      }
+
+      const sub = await storage.registerSubCompany({
+        companyName, trade, contactName, contactEmail, contactPhone, password,
+      });
+      // Attach to the project immediately — the QR scan is what got them here.
+      await storage.attachSubToProject({
+        subCompanyId: sub.id,
+        organizationId: dropToken.organizationId,
+        projectId: dropToken.projectId,
+        joinedViaDropTokenId: dropToken.id,
+      });
+      // Log them in.
+      const session = await storage.loginSubCompany(contactEmail, password);
+      if (!session) return res.status(500).json({ message: "Registration succeeded but session failed." });
+      setSubSessionCookie(res, session.token, session.expiresAt);
+      res.status(201).json({ subCompany: session.subCompany, token: session.token, projectId: dropToken.projectId });
+    } catch (err: any) {
+      const msg = err?.message || "Registration failed.";
+      // 409 for the duplicate-email path so the client can pivot to "sign in instead".
+      if (/already registered/i.test(msg)) return res.status(409).json({ message: msg });
+      res.status(400).json({ message: msg });
+    }
+  });
+
+  // ---- Sub login ---------------------------------------------------------
+  // Called from the /drop/:token page when a returning sub picks "Sign in".
+  // If a drop token is provided, also (idempotently) attach the sub to that
+  // project so subsequent uploads are authorized on this jobsite too.
+  app.post("/api/sub/login", async (req, res) => {
+    const b = req.body || {};
+    const email = String(b.contactEmail || "").trim().toLowerCase();
+    const password = String(b.password || "");
+    if (!email || !password) return res.status(400).json({ message: "Email and password are required." });
+    const session = await storage.loginSubCompany(email, password);
+    if (!session) return res.status(401).json({ message: "Wrong email or password." });
+    // If they came in via a QR scan, attach to that project on this login.
+    const dropToken = b.dropToken ? await storage.getDropTokenByToken(String(b.dropToken)) : null;
+    if (dropToken) {
+      await storage.attachSubToProject({
+        subCompanyId: session.subCompany.id,
+        organizationId: dropToken.organizationId,
+        projectId: dropToken.projectId,
+        joinedViaDropTokenId: dropToken.id,
+      });
+    }
+    setSubSessionCookie(res, session.token, session.expiresAt);
+    res.json({
+      subCompany: session.subCompany,
+      token: session.token,
+      projectId: dropToken?.projectId ?? null,
+    });
+  });
+
+  app.post("/api/sub/logout", (_req, res) => {
+    clearSubSessionCookie(res);
+    res.status(204).end();
+  });
+
+  // Return the current sub session (or 401) so the client can decide whether
+  // to show the register/login form or jump straight to the upload UI.
+  app.get("/api/sub/me", async (req: any, res) => {
+    const token = readSubToken(req);
+    const sub = await storage.resolveSubSession(token);
+    if (!sub) return res.status(401).json({ message: "Not signed in." });
+    res.json({ subCompany: sub });
+  });
+
+  // List projects the signed-in sub is attached to. Powers the mobile PWA's
+  // "pick which jobsite you're on" screen for subs who work multiple jobs.
+  app.get("/api/sub/projects", resolveSubSession, async (req: any, res) => {
+    const joins = await storage.listProjectsForSub(req.subCompany.id);
+    // Fan out to project + org names so the client renders a friendly list.
+    const items = [] as Array<{ projectId: number; projectName: string; organizationName: string; joinedAt: string }>;
+    for (const j of joins) {
+      const project = await storage.getProject(j.projectId);
+      if (!project) continue;
+      const org = await getOrganization(j.organizationId);
+      items.push({
+        projectId: j.projectId,
+        projectName: project.name,
+        organizationName: org?.name || "TrussPath",
+        joinedAt: j.joinedAt,
+      });
+    }
+    res.json(items);
+  });
+
+  // List a sub's own recent uploads on a given project — shows them what
+  // they've submitted so they don't upload the same COI five times.
+  app.get("/api/sub/projects/:projectId/uploads", resolveSubSession, async (req: any, res) => {
+    const projectId = parseInt(req.params.projectId, 10);
+    if (!Number.isFinite(projectId)) return res.status(400).json({ message: "Invalid project id." });
+    const attached = await storage.isSubAttached(req.subCompany.id, projectId);
+    if (!attached) return res.status(403).json({ message: "Not attached to this project." });
+    // Fetch the project so we can pass organizationId to the tenant-scoped
+    // list query. Sub's own scope check is via isSubAttached above.
+    const project = await storage.getProject(projectId);
+    if (!project) return res.status(404).json({ message: "Project not found." });
+    const uploads = await storage.listSubUploads(project.organizationId!, projectId, { limit: 100 });
+    // Return only THIS sub's uploads (defense in depth: they shouldn't see
+    // other subs' files even though they're attached to the same project).
+    const mine = uploads.filter(u => u.subCompanyId === req.subCompany.id);
+    res.json(mine);
+  });
+
+  // ---- Sub drop: the actual file upload ---------------------------------
+  // Signed-in subs only. The drop-token in the URL is validated for project
+  // authorization but the sub's identity comes from their session, not from
+  // client-supplied fields.
+  app.post(
+    "/api/drop/:token/upload",
+    resolveSubSession,
+    subDropUpload.array("files", 10),
+    async (req: any, res) => {
+      const token = String(req.params.token || "");
+      const dropToken = await storage.getDropTokenByToken(token);
+      if (!dropToken) return res.status(400).json({ message: "Invalid or revoked link." });
+
+      // Ensure the signed-in sub is attached to the project this token points
+      // to. If not (they scanned a new QR while signed in from another site),
+      // auto-attach so the next scan is silent.
+      const isAttached = await storage.isSubAttached(req.subCompany.id, dropToken.projectId);
+      if (!isAttached) {
+        await storage.attachSubToProject({
+          subCompanyId: req.subCompany.id,
+          organizationId: dropToken.organizationId,
+          projectId: dropToken.projectId,
+          joinedViaDropTokenId: dropToken.id,
+        });
+      }
+
+      const files: Express.Multer.File[] = (req.files || []) as any;
+      if (!files.length) return res.status(400).json({ message: "No files uploaded." });
+
+      const created = [] as Array<any>;
+      for (const f of files) {
+        const { category, confidence } = classifyUpload(f.originalname, f.mimetype);
+        const row = await storage.createSubUpload({
+          organizationId: dropToken.organizationId,
+          projectId: dropToken.projectId,
+          dropTokenId: dropToken.id,
+          subCompanyId: req.subCompany.id,
+          // Snapshot the sub's identity fields onto the row so future PM views
+          // don't need to join sub_companies just to render a filename cell.
+          subName: req.subCompany.contactName,
+          subCompany: req.subCompany.companyName,
+          subTrade: req.subCompany.trade,
+          subPhone: req.subCompany.contactPhone,
+          originalFileName: f.originalname,
+          storedFileName: f.filename,
+          mimeType: f.mimetype,
+          fileSizeBytes: f.size,
+          category,
+          categoryConfidence: confidence,
+          categoryOverriddenById: null,
+          status: "new",
+          reviewedByAccountId: null,
+          reviewedAt: null,
+          notes: null,
+          createdAt: new Date().toISOString(),
+        });
+        created.push(row);
+      }
+      // Fire-and-forget: don't block the response on the touch.
+      storage.touchDropToken(dropToken.id).catch(() => {});
+      res.status(201).json({ uploads: created });
+    },
+  );
 
   // Gate all /api/* routes behind auth (except the PUBLIC_API allowlist).
   app.use(authMiddleware);
@@ -1864,6 +2202,192 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.delete("/api/company-documents/:id", async (req, res) => {
     const id = parseInt(req.params.id, 10);
     await storage.softDeleteEntity("company-documents", id);
+    res.status(204).end();
+  });
+
+  // ========================================================================
+  //  SUB DROP PORTAL — PM-side (GC-authenticated) routes.
+  //  These sit after resolveMembership so req.organizationId is populated.
+  //  Every read enforces (project.organizationId === req.organizationId) via
+  //  requireProjectAccess. No cross-tenant access is possible.
+  // ========================================================================
+
+  // --- Drop tokens (create QR / list / revoke) ---------------------------
+  app.get("/api/projects/:id/drop-tokens", async (req: any, res) => {
+    const project = await requireProjectAccess(req, res, parseInt(req.params.id, 10));
+    if (!project) return;
+    const tokens = await storage.listDropTokens(project.organizationId!, project.id);
+    res.json(tokens);
+  });
+
+  // Create a new QR/drop token. Token is 22 URL-safe chars from crypto RNG —
+  // 128 bits of entropy, indistinguishable from opaque so URL brute-force
+  // is not a threat. PMs can generate multiple (e.g. "Site Trailer", "Gate
+  // House") and revoke individually.
+  app.post("/api/projects/:id/drop-tokens", async (req: any, res) => {
+    const project = await requireProjectAccess(req, res, parseInt(req.params.id, 10));
+    if (!project) return;
+    const label = req.body?.label ? String(req.body.label).trim().slice(0, 80) : null;
+    const token = randomBytesForToken(16).toString("base64url");
+    const row = await storage.createDropToken({
+      organizationId: project.organizationId!,
+      projectId: project.id,
+      token,
+      label,
+      createdByAccountId: req.account?.id ?? null,
+      createdAt: new Date().toISOString(),
+      revokedAt: null,
+      lastUsedAt: null,
+    });
+    res.status(201).json(row);
+  });
+
+  app.post("/api/drop-tokens/:id/revoke", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid token id." });
+    // Scope is enforced inside the repo via organizationId in the WHERE clause.
+    await storage.revokeDropToken(req.organizationId!, id);
+    res.status(204).end();
+  });
+
+  // --- Sub uploads inbox --------------------------------------------------
+  // List sub uploads for the PM's org. If ?projectId= is provided the list is
+  // narrowed to that project (with a scope check). ?category=... filters to a
+  // single classifier bucket. Both filters are optional so the same endpoint
+  // powers the per-project inbox and a future org-wide view.
+  app.get("/api/sub-uploads", async (req: any, res) => {
+    const projectIdRaw = req.query.projectId;
+    let projectIdNum: number | undefined = undefined;
+    if (projectIdRaw !== undefined && projectIdRaw !== "") {
+      const pidNum = parseInt(String(projectIdRaw), 10);
+      if (!Number.isFinite(pidNum)) return res.status(400).json({ message: "Invalid projectId" });
+      const project = await requireProjectAccess(req, res, pidNum);
+      if (!project) return;
+      projectIdNum = pidNum;
+    }
+    const category = typeof req.query.category === "string" ? req.query.category : undefined;
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const rows = await storage.listSubUploads(req.organizationId!, projectIdNum, { category, status });
+    res.json(rows);
+  });
+
+  // Category counts — renders the folder header badges ("COIs (12)  Photos
+  // (147)") in the PM inbox. Same scope rules as the list.
+  app.get("/api/sub-uploads/counts", async (req: any, res) => {
+    const projectIdRaw = req.query.projectId;
+    let projectIdNum: number | undefined = undefined;
+    if (projectIdRaw !== undefined && projectIdRaw !== "") {
+      const pidNum = parseInt(String(projectIdRaw), 10);
+      if (!Number.isFinite(pidNum)) return res.status(400).json({ message: "Invalid projectId" });
+      const project = await requireProjectAccess(req, res, pidNum);
+      if (!project) return;
+      projectIdNum = pidNum;
+    }
+    const counts = await storage.countSubUploadsByCategory(req.organizationId!, projectIdNum);
+    res.json(counts);
+  });
+
+  // PATCH: PM re-categorizes or marks reviewed. Every field is optional.
+  app.patch("/api/sub-uploads/:id", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid upload id." });
+    const existing = await storage.getSubUpload(req.organizationId!, id);
+    if (!existing) return res.status(404).json({ message: "Upload not found." });
+    const b = req.body || {};
+    const patch: Record<string, unknown> = {};
+    if (typeof b.category === "string") {
+      patch.category = b.category;
+      // Track who overrode the classifier so we can measure how often it's wrong.
+      patch.categoryOverriddenById = req.account?.id ?? null;
+    }
+    if (b.status === "new" || b.status === "reviewed" || b.status === "archived") {
+      patch.status = b.status;
+      if (b.status === "reviewed") {
+        patch.reviewedByAccountId = req.account?.id ?? null;
+        patch.reviewedAt = new Date().toISOString();
+      }
+    }
+    if (typeof b.notes === "string") patch.notes = b.notes;
+    const row = await storage.updateSubUpload(req.organizationId!, id, patch);
+    res.json(row);
+  });
+
+  // Stream the actual file back to the PM. Mirrors /api/documents/:id/file
+  // exactly — same path-safety check, same content-disposition.
+  app.get("/api/sub-uploads/:id/file", async (req: any, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ message: "Invalid upload id." });
+    const upload = await storage.getSubUpload(req.organizationId!, id);
+    if (!upload) return res.status(404).json({ message: "Upload not found." });
+    const abs = path.resolve(SUB_DROP_DIR, upload.storedFileName);
+    if (!abs.startsWith(SUB_DROP_DIR + path.sep) || !fs.existsSync(abs)) {
+      return res.status(404).json({ message: "File missing from storage." });
+    }
+    res.setHeader("Content-Type", upload.mimeType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `inline; filename="${upload.originalFileName}"`);
+    fs.createReadStream(abs).pipe(res);
+  });
+
+  // --- Sub companies (PM directory) --------------------------------------
+  // List sub companies attached to a specific project. Enriches the joins
+  // with the sub_companies row so the PM sees company name / trade / contact.
+  app.get("/api/projects/:id/sub-companies", async (req: any, res) => {
+    const project = await requireProjectAccess(req, res, parseInt(req.params.id, 10));
+    if (!project) return;
+    const joins = await storage.listSubsForProject(project.organizationId!, project.id);
+    const items = [] as Array<any>;
+    for (const j of joins) {
+      const sub = await storage.getSubCompanyById(j.subCompanyId);
+      if (!sub) continue;
+      items.push({
+        joinId: j.id,
+        subCompanyId: sub.id,
+        companyName: sub.companyName,
+        trade: sub.trade,
+        contactName: sub.contactName,
+        contactEmail: sub.contactEmail,
+        contactPhone: sub.contactPhone,
+        joinedAt: j.joinedAt,
+        suspendedAt: sub.suspendedAt,
+      });
+    }
+    res.json(items);
+  });
+
+  // Suspend a sub company (org-scoped: only PMs whose project the sub is
+  // attached to can suspend). Prevents them from logging in and dropping.
+  app.post("/api/sub-companies/:id/suspend", async (req: any, res) => {
+    const subCompanyId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(subCompanyId)) return res.status(400).json({ message: "Invalid id." });
+    // Authorization: the caller's org must have this sub on at least one of
+    // its projects. Otherwise a rando could suspend anyone's sub.
+    const joins = await storage.listSubsForOrg(req.organizationId!);
+    if (!joins.some(j => j.subCompanyId === subCompanyId)) {
+      return res.status(404).json({ message: "Sub company not on your projects." });
+    }
+    await storage.suspendSubCompany(subCompanyId, req.account!.id);
+    res.status(204).end();
+  });
+
+  app.post("/api/sub-companies/:id/unsuspend", async (req: any, res) => {
+    const subCompanyId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(subCompanyId)) return res.status(400).json({ message: "Invalid id." });
+    const joins = await storage.listSubsForOrg(req.organizationId!);
+    if (!joins.some(j => j.subCompanyId === subCompanyId)) {
+      return res.status(404).json({ message: "Sub company not on your projects." });
+    }
+    await storage.unsuspendSubCompany(subCompanyId);
+    res.status(204).end();
+  });
+
+  // Detach a sub company from a specific project (softer than suspend — the
+  // sub keeps their account but loses access to this jobsite's uploads).
+  app.post("/api/projects/:id/sub-companies/:subId/detach", async (req: any, res) => {
+    const project = await requireProjectAccess(req, res, parseInt(req.params.id, 10));
+    if (!project) return;
+    const subId = parseInt(req.params.subId, 10);
+    if (!Number.isFinite(subId)) return res.status(400).json({ message: "Invalid sub id." });
+    await storage.detachSubFromProject(subId, project.id);
     res.status(204).end();
   });
 

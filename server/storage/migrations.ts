@@ -100,6 +100,97 @@ export async function migrate() {
     mime_type TEXT,
     file_size_bytes INTEGER
   )`;
+
+  // Sub Drop Portal — per-project QR tokens + inbound uploads from subs.
+  // Both tables are indexed on (organization_id, project_id) because every
+  // PM-side read filters on both, and on (token) so the public /drop/:token
+  // lookup is O(1). See shared/schema.ts for column documentation.
+  await sql`CREATE TABLE IF NOT EXISTS project_drop_tokens (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    label TEXT,
+    created_by_account_id INTEGER,
+    created_at TEXT NOT NULL,
+    revoked_at TEXT,
+    last_used_at TEXT
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_project_drop_tokens_project
+    ON project_drop_tokens (organization_id, project_id)`;
+
+  await sql`CREATE TABLE IF NOT EXISTS sub_uploads (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    drop_token_id INTEGER NOT NULL,
+    sub_name TEXT,
+    sub_company TEXT,
+    sub_trade TEXT,
+    sub_phone TEXT,
+    original_file_name TEXT NOT NULL,
+    stored_file_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    file_size_bytes INTEGER NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Needs Sorting',
+    category_confidence INTEGER NOT NULL DEFAULT 0,
+    category_overridden_by_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'new',
+    reviewed_by_account_id INTEGER,
+    reviewed_at TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sub_uploads_project
+    ON sub_uploads (organization_id, project_id, category, status)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sub_uploads_created
+    ON sub_uploads (project_id, created_at DESC)`;
+  // sub_company_id was added in v2 of the portal (verified sub accounts).
+  // ADD COLUMN IF NOT EXISTS is safe on Postgres 9.6+ and idempotent —
+  // matches the pattern used elsewhere in this file for evolving columns.
+  await sql`ALTER TABLE sub_uploads ADD COLUMN IF NOT EXISTS sub_company_id INTEGER`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sub_uploads_sub_company
+    ON sub_uploads (sub_company_id)`;
+
+  // Sub company identity: distinct table from `accounts` (GC-side). Email is
+  // the login handle so a partial-unique index is created via UNIQUE at the
+  // column level (declared in schema.ts). Session tokens live in sub_sessions;
+  // sub_company_projects is the join to GC projects.
+  await sql`CREATE TABLE IF NOT EXISTS sub_companies (
+    id SERIAL PRIMARY KEY,
+    company_name TEXT NOT NULL,
+    trade TEXT NOT NULL,
+    contact_name TEXT NOT NULL,
+    contact_email TEXT NOT NULL UNIQUE,
+    contact_phone TEXT,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    suspended_at TEXT,
+    suspended_by_account_id INTEGER
+  )`;
+
+  await sql`CREATE TABLE IF NOT EXISTS sub_company_projects (
+    id SERIAL PRIMARY KEY,
+    sub_company_id INTEGER NOT NULL,
+    organization_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    joined_at TEXT NOT NULL,
+    joined_via_drop_token_id INTEGER,
+    detached_at TEXT
+  )`;
+  // (sub_company_id, project_id) is functionally unique when detached_at IS
+  // NULL; enforced application-side rather than in schema so a sub can be
+  // re-attached to a project they previously left without violating a
+  // unique index. The composite index still keeps lookups O(log n).
+  await sql`CREATE INDEX IF NOT EXISTS idx_sub_company_projects_pair
+    ON sub_company_projects (sub_company_id, project_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sub_company_projects_project
+    ON sub_company_projects (organization_id, project_id)`;
+
+  // Sub sessions are stateless HMAC-signed tokens (mirroring the GC accounts
+  // pattern) so no sub_sessions table is required at MVP. The schema.ts
+  // table declaration is kept so a future switch to server-side revocation
+  // is a single migration — no code refactor.
   await sql`CREATE TABLE IF NOT EXISTS deleted_items (
     id SERIAL PRIMARY KEY,
     entity_type TEXT NOT NULL,
