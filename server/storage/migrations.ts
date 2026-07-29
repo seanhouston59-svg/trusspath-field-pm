@@ -355,6 +355,49 @@ export async function migrate() {
   await sql`ALTER TABLE submittals ADD COLUMN IF NOT EXISTS trade TEXT`;
   await sql`ALTER TABLE punch_items ADD COLUMN IF NOT EXISTS notes TEXT`;
 
+  // Sub two-way workflow (v1) \u2014 subs can submit RFIs/COs as drafts and
+  // mark assigned tasks complete. All columns are nullable + additive so
+  // Neon migrations are safe to run against a warm production database.
+  await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_sub_company_id INTEGER`;
+  await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sub_completed_at TEXT`;
+  await sql`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sub_completion_note TEXT`;
+  await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS submitted_by_sub_company_id INTEGER`;
+  await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS sub_accepted_at TEXT`;
+  await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS sub_accepted_by_account_id INTEGER`;
+  await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS body TEXT`;
+  await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS spec_section TEXT`;
+  await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS drawing_ref TEXT`;
+  await sql`ALTER TABLE rfis ADD COLUMN IF NOT EXISTS priority TEXT`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS submitted_by_sub_company_id INTEGER`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS sub_accepted_at TEXT`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS sub_accepted_by_account_id INTEGER`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS description TEXT`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS category TEXT`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS sub_decision TEXT`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS sub_decision_comment TEXT`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS sub_decision_at TEXT`;
+  await sql`ALTER TABLE change_orders ADD COLUMN IF NOT EXISTS sub_decision_by_account_id INTEGER`;
+
+  // Audit log of sub-side task completions (separate from the base task row
+  // so a task can accumulate multiple completion events \u2014 e.g. a sub
+  // reopens a punch item and finishes it a second time \u2014 without
+  // clobbering the stamp on the primary task row).
+  await sql`CREATE TABLE IF NOT EXISTS sub_task_completions (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    task_id INTEGER NOT NULL,
+    sub_company_id INTEGER NOT NULL,
+    completed_at TEXT NOT NULL,
+    note TEXT,
+    attachment_original_name TEXT,
+    attachment_stored_name TEXT
+  )`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sub_task_completions_task
+    ON sub_task_completions (task_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sub_task_completions_project
+    ON sub_task_completions (organization_id, project_id)`;
+
   // Heal access_level for seed rows still at the default 'project_manager'.
   await sql`UPDATE team_members SET access_level = CASE
     WHEN role LIKE '%Executive%' THEN 'project_executive'

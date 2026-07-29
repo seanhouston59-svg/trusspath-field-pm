@@ -22,8 +22,14 @@ export const EVENT_KINDS = {
   // Coordination items
   RFI_CREATED: "rfi.created",
   RFI_RESOLVED: "rfi.resolved",
+  // Sub Portal draft submissions: a sub filed an RFI/CO via /drop that a PM
+  // still needs to accept. Kept as separate kinds so the timeline can render
+  // them with a distinct "draft from sub" pill.
+  RFI_SUB_DRAFT: "rfi.sub_draft",
+  CHANGE_ORDER_SUB_DRAFT: "change_order.sub_draft",
   CHANGE_ORDER_CREATED: "change_order.created",
   CHANGE_ORDER_APPROVED: "change_order.approved",
+  CHANGE_ORDER_SUB_DECISION: "change_order.sub_decision",
   PUNCH_CREATED: "punch.created",
   PUNCH_CLOSED: "punch.closed",
 
@@ -117,8 +123,11 @@ export const EVENT_KIND_META: Record<string, EventKindMeta> = {
   [EVENT_KINDS.OBSERVATION_LOGGED]: { label: "Field observation", category: "field" },
   [EVENT_KINDS.RFI_CREATED]: { label: "RFI submitted", category: "rfi" },
   [EVENT_KINDS.RFI_RESOLVED]: { label: "RFI resolved", category: "rfi" },
+  [EVENT_KINDS.RFI_SUB_DRAFT]: { label: "RFI draft from sub", category: "rfi" },
   [EVENT_KINDS.CHANGE_ORDER_CREATED]: { label: "Change Order created", category: "change_order" },
   [EVENT_KINDS.CHANGE_ORDER_APPROVED]: { label: "Change Order approved", category: "change_order" },
+  [EVENT_KINDS.CHANGE_ORDER_SUB_DRAFT]: { label: "CO draft from sub", category: "change_order" },
+  [EVENT_KINDS.CHANGE_ORDER_SUB_DECISION]: { label: "CO decision to sub", category: "change_order" },
   [EVENT_KINDS.PUNCH_CREATED]: { label: "Punch item added", category: "punch" },
   [EVENT_KINDS.PUNCH_CLOSED]: { label: "Punch item closed", category: "punch" },
   [EVENT_KINDS.DAILY_LOG_SUBMITTED]: { label: "Daily log", category: "daily_log" },

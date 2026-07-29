@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, FileEdit, Clock, CheckCircle2, XCircle, Zap } from "lucide-react";
+import { Plus, FileEdit, Clock, CheckCircle2, XCircle, Zap, UserCheck } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout";
 import { GhostState, GhostChangeOrderRows } from "@/components/ghost-state";
 import { ChangeOrderTable } from "@/components/tables";
@@ -20,9 +23,10 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency, shortDate } from "@/lib/format";
 import type { ChangeOrder } from "@shared/schema";
 
-type Status = "Draft" | "Pending" | "Approved" | "Rejected" | "Executed";
+type Status = "sub_draft" | "Draft" | "Pending" | "Approved" | "Rejected" | "Executed";
 
 const COLUMNS: BoardColumn<Status>[] = [
+  { status: "sub_draft", label: "Sub draft", icon: UserCheck, accent: "text-amber-600" },
   { status: "Draft", label: "Draft", icon: FileEdit, accent: "text-muted-foreground" },
   { status: "Pending", label: "Pending", icon: Clock, accent: "text-amber-500" },
   { status: "Approved", label: "Approved", icon: CheckCircle2, accent: "text-emerald-500" },
@@ -38,6 +42,22 @@ export default function ChangeOrdersPage() {
   const create = useCreateChangeOrder();
   const updateStatus = useUpdateChangeOrderStatus();
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const acceptSubDraft = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/change-orders/${id}/accept-sub-draft`, {});
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/change-orders"] });
+      toast({ title: "Change order accepted", description: "Now in the Pending column." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not accept change order", description: err?.message || "Try again.", variant: "destructive" });
+    },
+  });
 
   // Dashboard badges deep-link here as "/change-orders?project=<id>".
   const linkedProject = useHashParam("project");
@@ -213,7 +233,7 @@ export default function ChangeOrdersPage() {
           title={selected.title}
           subtitle={projectName(selected.projectId)}
           currentStatus={selected.status}
-          statusOptions={["Draft", "Pending", "Approved", "Rejected", "Executed"]}
+          statusOptions={selected.status === "sub_draft" ? ["sub_draft", "Draft", "Pending", "Approved", "Rejected", "Executed"] : ["Draft", "Pending", "Approved", "Rejected", "Executed"]}
           onStatusChange={(s) => {
             updateStatus.mutate({ id: selected.id, status: s as Status });
             setSelected({ ...selected, status: s });
@@ -226,6 +246,22 @@ export default function ChangeOrdersPage() {
             { label: "Project", value: projectName(selected.projectId), full: true },
             { label: "Date issued", value: shortDate(selected.dateIssued), mono: true },
           ]}
+          footer={selected.status === "sub_draft" ? (
+            <div className="space-y-2">
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                <div className="flex items-center gap-2 font-medium"><UserCheck className="size-4" /> Draft from sub</div>
+                <p className="mt-1 text-xs">Review the amount + scope, then accept to promote this into the Pending queue.</p>
+              </div>
+              <Button
+                className="w-full"
+                disabled={acceptSubDraft.isPending}
+                onClick={() => acceptSubDraft.mutateAsync(selected.id).then(() => { setSelected({ ...selected, status: "Pending" }); })}
+                data-testid="button-accept-sub-draft-co"
+              >
+                {acceptSubDraft.isPending ? "Accepting\u2026" : "Accept draft"}
+              </Button>
+            </div>
+          ) : undefined}
         />
       )}
     </Layout>
