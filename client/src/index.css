@@ -298,4 +298,15 @@
       linear-gradient(to right, hsl(var(--sidebar-foreground) / 0.03) 1px, transparent 1px);
     background-size: 22px 22px;
   }
+  /* Chart axis labels that link to a detail page. Tailwind can't style the
+     <text> child of an SVG <a>, so the hover/focus treatment lives here. */
+  .chart-axis-link {
+    cursor: pointer;
+    outline: none;
+  }
+  .chart-axis-link:hover text,
+  .chart-axis-link:focus-visible text {
+    fill: hsl(var(--primary));
+    text-decoration: underline;
+  }
 }

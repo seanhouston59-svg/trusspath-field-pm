@@ -480,11 +480,7 @@ const WALL_COLORS: Record<string, { bg: string; bar: string; text: string; pin: 
 
 export function NoteWallCarouselBox() {
   const { data: projects = [] } = useProjects();
-  // Default to first project; give the user a chip switcher below if there
-  // are multiple. Matches /notes behavior.
-  const [projectId, setProjectId] = useState<number | undefined>(undefined);
-  const pid = projectId ?? projects[0]?.id;
-  const { data: notes = [] } = useNotes(pid);
+  const { data: notes = [] } = useNotes();
   const addReply = useAddNoteReply();
   const { toast } = useToast();
   const [idx, setIdx] = useState(0);
@@ -524,30 +520,32 @@ export function NoteWallCarouselBox() {
     <div className="flex h-full flex-col" data-testid="box-note-wall-carousel">
       {/* Header */}
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <Link
+          href="/notes"
+          className="group flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          data-testid="link-note-wall-header"
+        >
           <StickyNote className="size-4 text-primary" />
-          <h3 className="font-display text-sm font-bold">Note Wall</h3>
-        </div>
+          <h3 className="font-display text-sm font-bold group-hover:underline">Note Wall</h3>
+        </Link>
         <Link href="/notes" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline" data-testid="link-open-note-wall">
           Open <ArrowRight className="size-3" />
         </Link>
       </div>
 
-      {/* Project switcher — only if user has more than one */}
+      {/* Project chips — open the full board narrowed to that project. */}
       {projects.length > 1 && (
         <div className="mb-2 flex flex-wrap items-center gap-1">
           {projects.map((p) => (
-            <button
+            <Link
               key={p.id}
-              onClick={() => { setProjectId(p.id); setIdx(0); setReplyDraft(""); }}
+              href={`/notes?project=${p.id}`}
+              aria-label={`Notes for ${p.name}`}
               data-testid={`carousel-project-${p.id}`}
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                pid === p.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground",
-              )}
+              className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               {p.name.split(" ")[0]}
-            </button>
+            </Link>
           ))}
         </div>
       )}
@@ -571,7 +569,16 @@ export function NoteWallCarouselBox() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-white">Note</span>
               <span className="text-[10px] font-semibold text-white/85">{safeIdx + 1} / {notes.length}</span>
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm font-medium leading-snug">{current.body}</p>
+            {/* Only the body links out — the reply composer below has to stay
+                interactive, and anchors can't wrap form controls. */}
+            <Link
+              href={`/notes?note=${current.id}`}
+              aria-label="Open this note on the board"
+              className="block rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
+              data-testid={`carousel-note-body-${current.id}`}
+            >
+              <p className="whitespace-pre-wrap break-words text-sm font-medium leading-snug hover:underline">{current.body}</p>
+            </Link>
 
             {replies.length > 0 && (
               <div className="mt-2 space-y-1 border-t border-black/10 pt-2">
@@ -688,8 +695,13 @@ export function FleetServiceBox() {
 
   return (
     <div className="flex flex-col rounded-lg border border-border bg-card p-4 shadow-sm" data-testid="box-fleet-service">
-      <div className="flex items-center justify-between">
-        <h3 className="flex items-center gap-2 font-display text-sm font-bold">
+      <Link
+        href="/equipment"
+        aria-label={`Service reminders — ${totalFlagged} flagged. Open the equipment page.`}
+        className="group -m-1 flex items-center justify-between rounded-md p-1 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        data-testid="link-fleet-service-header"
+      >
+        <h3 className="flex items-center gap-2 font-display text-sm font-bold group-hover:underline">
           <Wrench className="size-4" /> Service reminders
         </h3>
         <span
@@ -700,7 +712,7 @@ export function FleetServiceBox() {
         >
           {totalFlagged}
         </span>
-      </div>
+      </Link>
       <div className="mt-3 flex-1 space-y-2">
         {items.length === 0 && (
           <p className="py-6 text-center text-xs text-muted-foreground">Everything's caught up on service.</p>

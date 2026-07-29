@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, FileEdit, Clock, CheckCircle2, XCircle, Zap } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState, GhostChangeOrderRows } from "@/components/ghost-state";
@@ -9,6 +9,7 @@ import { titlesForTrade, tradeForCoTitle } from "@/lib/co-catalog";
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
+import { useHashParam } from "@/hooks/use-hash-param";
 import {
   useChangeOrders,
   useProjects,
@@ -38,9 +39,15 @@ export default function ChangeOrdersPage() {
   const updateStatus = useUpdateChangeOrderStatus();
   const [open, setOpen] = useState(false);
 
+  // Dashboard badges deep-link here as "/change-orders?project=<id>".
+  const linkedProject = useHashParam("project");
   const [view, setView] = useState<View>("board");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>(linkedProject ?? "all");
   const [selected, setSelected] = useState<ChangeOrder | null>(null);
+
+  useEffect(() => {
+    if (linkedProject) setProjectFilter(linkedProject);
+  }, [linkedProject]);
 
   const filtered = useMemo(() => {
     return items.filter((c) => {

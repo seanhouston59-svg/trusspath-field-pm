@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, FileEdit, Send, Search, CheckCircle2, XCircle } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { GhostState, GhostSubmittalRows } from "@/components/ghost-state";
@@ -9,6 +9,7 @@ import { subjectsForTrade, tradeForSubmittalSubject } from "@/lib/submittal-cata
 import { GenericBoard, type BoardColumn } from "@/components/generic-board";
 import { ListToolbar, type View } from "@/components/list-toolbar";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
+import { useHashParam } from "@/hooks/use-hash-param";
 import {
   useSubmittals,
   useTeamMap,
@@ -45,10 +46,16 @@ export default function SubmittalsPage() {
   const updateStatus = useUpdateSubmittalStatus();
   const [open, setOpen] = useState(false);
 
+  // Dashboard badges deep-link here as "/submittals?project=<id>".
+  const linkedProject = useHashParam("project");
   const [view, setView] = useState<View>("board");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [projectFilter, setProjectFilter] = useState<string>(linkedProject ?? "all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Submittal | null>(null);
+
+  useEffect(() => {
+    if (linkedProject) setProjectFilter(linkedProject);
+  }, [linkedProject]);
 
   const filtered = useMemo(() => {
     return items.filter((s) => {
