@@ -2,6 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted webfonts. Served from our own origin out of client/public/fonts
+   so a cold load costs no third-party DNS + TLS handshake and no visitor IP
+   reaches Google or Fontshare.
+
+   The weight set here is deliberately identical to what the old remote
+   stylesheets shipped — no more, no less. Several call sites ask for a weight
+   that was never loaded (.lp-display wants 900, .ff-kicker wants 600) and rely
+   on the CSS font-matching fallback to the nearest heavier face. Adding the
+   literal weights would silently restyle those elements, so don't. */
+
+/* Satoshi — body/UI sans (--font-sans) */
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Cabinet Grotesk — headings and landing display type (--font-display) */
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/fonts/cabinet-grotesk-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/fonts/cabinet-grotesk-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/fonts/cabinet-grotesk-800.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* JetBrains Mono — numerics and .ff-kicker labels (--font-mono).
+   Latin subset, matching the unicode-range Google served for this face. */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* TRUSSPATH — field project management.
    Palette: dark slate chrome + safety-amber accent. Construction identity. */
 
