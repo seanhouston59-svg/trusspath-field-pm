@@ -371,12 +371,46 @@
     letter-spacing: -0.025em;
     line-height: 1.02;
   }
-  /* Faint measured-drafting texture behind photo-forward sections. */
-  .lp-grit {
+  /* Scrim over the full-bleed hero photo. Two stacked passes: a vertical one to
+     seat the section against the header and the band below, and a left-weighted
+     one so the headline column stays high-contrast while the crane and sunset on
+     the right of the frame still read. Lives here rather than as arbitrary
+     Tailwind values because multi-stop stacked gradients are unreadable inline. */
+  .lp-hero-scrim {
     background-image:
-      linear-gradient(to right, hsl(var(--lp-steel) / 0.09) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--lp-steel) / 0.09) 1px, transparent 1px);
-    background-size: 44px 44px;
+      linear-gradient(
+        180deg,
+        hsl(216 46% 6% / 0.48) 0%,
+        hsl(216 46% 6% / 0.42) 42%,
+        hsl(216 46% 6% / 0.74) 100%
+      ),
+      linear-gradient(
+        90deg,
+        hsl(216 46% 6% / 0.6) 0%,
+        hsl(216 46% 6% / 0.3) 60%,
+        hsl(216 46% 6% / 0.12) 100%
+      );
+  }
+  /* Below lg the copy spans the full width and the photo crops hard, so the
+     left-weighted pass stops helping — trade it for an even, heavier wash. */
+  @media (max-width: 1023px) {
+    .lp-hero-scrim {
+      background-image: linear-gradient(
+        180deg,
+        hsl(216 46% 6% / 0.66) 0%,
+        hsl(216 46% 6% / 0.64) 40%,
+        hsl(216 46% 6% / 0.88) 100%
+      );
+    }
+  }
+  /* Local contrast for hero copy sitting straight on the photo. The scrim sets
+     the overall wash; this catches the sunset hot spots behind the headline,
+     where the amber accent word would otherwise lose its edge. Cheaper than
+     darkening the whole scrim, which would flatten the photo. */
+  .lp-hero-copy {
+    text-shadow:
+      0 1px 2px hsl(216 46% 4% / 0.55),
+      0 2px 16px hsl(216 46% 4% / 0.5);
   }
   /* Chart axis labels that link to a detail page. Tailwind can't style the
      <text> child of an SVG <a>, so the hover/focus treatment lives here. */

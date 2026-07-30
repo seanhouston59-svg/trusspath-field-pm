@@ -443,68 +443,73 @@ export default function Landing() {
       </header>
 
       {/* ------------------------------ 2. Hero ------------------------------ */}
-      <section className="lp-rule lp-grit border-b">
-        <div className="mx-auto max-w-6xl px-4 py-16 md:py-24">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center">
-            <div>
-              <div className="lp-accent-soft ff-kicker inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-[10px]">
-                <HardHat className="size-3" /> Built by field people
-              </div>
-              <h1 className="lp-display mt-5 text-[2.75rem] sm:text-6xl lg:text-[4.25rem]">
-                The jobsite doesn't wait for<br className="hidden sm:block" /> the <span className="lp-accent-text">office to catch up</span>.
-              </h1>
-              <p className="lp-muted mt-6 max-w-xl text-lg leading-relaxed">
-                One platform for the paperwork and the dirt. Daily logs, RFIs, submittals, change
-                orders, punch, drawings, schedule, and fleet — reachable from a phone with one bar
-                of signal, and from a desk when you get back.
-              </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <a
-                  href={signupHref(activePlan, billing)}
-                  className="lp-accent-bg inline-flex items-center gap-2 rounded-md px-6 py-3.5 text-base font-bold transition-opacity hover:opacity-90"
-                  data-testid="button-hero-subscribe"
-                >
-                  Start free trial <ArrowRight className="size-4" />
-                </a>
-                <button
-                  onClick={() => scrollTo("product")}
-                  className="lp-rule inline-flex items-center gap-2 rounded-md border px-6 py-3.5 text-base font-semibold transition-colors hover:border-primary hover:text-primary"
-                  data-testid="button-hero-how"
-                >
-                  See how it works
-                </button>
-              </div>
-              <dl className="lp-rule mt-9 grid max-w-lg grid-cols-2 gap-x-6 gap-y-3 border-t pt-6 text-sm sm:grid-cols-4">
-                {[
-                  { icon: Smartphone, l: "Installs to phone" },
-                  { icon: WifiOff, l: "Works offline" },
-                  { icon: ShieldCheck, l: "SOC 2 in progress" },
-                  { icon: Check, l: "14-day trial" },
-                ].map(({ icon: Icon, l }) => (
-                  <div key={l} className="flex items-center gap-1.5">
-                    <Icon className="lp-accent-text size-4 shrink-0" />
-                    <dt className="lp-muted text-xs">{l}</dt>
-                  </div>
-                ))}
-              </dl>
+      <section className="lp-rule lp-slab relative overflow-hidden border-b">
+        {/* Decorative backdrop, so no alt text. Focal point sits right of center
+            to keep the figure in frame when narrow viewports crop the sides; the
+            copy occupies the left, where the sky falls off. */}
+        <img
+          src={heroImg}
+          width={1536}
+          height={1024}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 size-full object-cover object-[62%_center]"
+        />
+        <div className="lp-hero-scrim absolute inset-0" />
+        <div className="relative mx-auto max-w-6xl px-4 py-20 md:py-32">
+          {/* Wide enough that "…doesn't wait for" clears the forced break below
+              instead of orphaning "for" onto its own line at the lg type size. */}
+          <div className="max-w-4xl">
+            <div className="lp-accent-soft ff-kicker inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-[10px] ring-1 ring-inset ring-[hsl(var(--lp-accent)/0.45)] backdrop-blur-sm">
+              <HardHat className="size-3" /> Built by field people
             </div>
-            <div className="lp-rule relative overflow-hidden rounded-lg border shadow-xl">
-              <img
-                src={heroImg}
-                width={1536}
-                height={1024}
-                alt="Construction crew working on a steel-framed building at sunrise"
-                className="block h-auto w-full object-cover"
-              />
-              <div className="lp-slab absolute bottom-0 left-0 right-0 flex items-center gap-3 px-4 py-3">
-                <div className="lp-accent-bg grid size-8 shrink-0 place-items-center rounded-full">
-                  <Bot className="size-4" />
+            <h1 className="lp-display lp-hero-copy mt-5 text-[2.75rem] text-white sm:text-6xl lg:text-[4.25rem]">
+              The jobsite doesn't wait for<br className="hidden sm:block" /> the <span className="lp-accent-text">office to catch up</span>.
+            </h1>
+            <p className="lp-hero-copy mt-6 max-w-xl text-lg leading-relaxed text-white/85">
+              One platform for the paperwork and the dirt. Daily logs, RFIs, submittals, change
+              orders, punch, drawings, schedule, and fleet — reachable from a phone with one bar
+              of signal, and from a desk when you get back.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <a
+                href={signupHref(activePlan, billing)}
+                className="lp-accent-bg inline-flex items-center gap-2 rounded-md px-6 py-3.5 text-base font-bold transition-opacity hover:opacity-90"
+                data-testid="button-hero-subscribe"
+              >
+                Start free trial <ArrowRight className="size-4" />
+              </a>
+              <button
+                onClick={() => scrollTo("product")}
+                className="inline-flex items-center gap-2 rounded-md border border-white/30 px-6 py-3.5 text-base font-semibold text-white backdrop-blur-sm transition-colors hover:border-white hover:bg-white/10"
+                data-testid="button-hero-how"
+              >
+                See how it works
+              </button>
+            </div>
+            <dl className="mt-9 grid max-w-lg grid-cols-2 gap-x-6 gap-y-3 border-t border-white/20 pt-6 text-sm sm:grid-cols-4">
+              {[
+                { icon: Smartphone, l: "Installs to phone" },
+                { icon: WifiOff, l: "Works offline" },
+                { icon: ShieldCheck, l: "SOC 2 in progress" },
+                { icon: Check, l: "14-day trial" },
+              ].map(({ icon: Icon, l }) => (
+                <div key={l} className="flex items-center gap-1.5">
+                  <Icon className="lp-accent-text size-4 shrink-0" />
+                  <dt className="text-xs text-white/80">{l}</dt>
                 </div>
-                <div className="text-xs">
-                  <div className="font-display font-bold">Jarvis</div>
-                  <div className="text-white/70">"Three items need you today, boss."</div>
-                </div>
-              </div>
+              ))}
+            </dl>
+          </div>
+          {/* Held back until lg: below that it would land on top of the trust
+              strip, which earns the space more than the flavour badge does. */}
+          <div className="absolute bottom-10 right-4 hidden items-center gap-3 rounded-lg border border-white/15 bg-[hsl(216_46%_6%/0.7)] px-4 py-3 shadow-xl backdrop-blur lg:flex">
+            <div className="lp-accent-bg grid size-8 shrink-0 place-items-center rounded-full">
+              <Bot className="size-4" />
+            </div>
+            <div className="text-xs text-white">
+              <div className="font-display font-bold">Jarvis</div>
+              <div className="text-white/70">"Three items need you today, boss."</div>
             </div>
           </div>
         </div>
