@@ -385,6 +385,10 @@ function RootRouter() {
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
+      {/* Aliases redirect rather than mounting Login twice, so /login stays the
+          one canonical location the loc checks below have to know about. */}
+      <Route path="/sign-in"><Redirect to="/login" /></Route>
+      <Route path="/signin"><Redirect to="/login" /></Route>
       <Route path="/signup" component={Signup} />
       <Route path="/terms" component={TermsOfService} />
       <Route path="/privacy" component={PrivacyPolicy} />

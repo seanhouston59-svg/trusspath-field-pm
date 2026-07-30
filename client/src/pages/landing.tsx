@@ -117,6 +117,11 @@ function signupHref(plan: Plan["key"], billing: "monthly" | "annual") {
   return `/signup#/signup?plan=${plan}&billing=${billing}`;
 }
 
+// Existing-user entry point. Same path#hash shape as signupHref: the path half
+// survives a cold load (Vercel rewrites it to index.html and main.tsx seeds the
+// hash from it), the hash half drives the client router.
+const LOGIN_HREF = "/login#/login";
+
 function SubscribeForm({ defaultPlan, billing }: { defaultPlan: Plan["key"]; billing: "monthly" | "annual" }) {
   const isEnterprise = defaultPlan === "enterprise";
   if (isEnterprise) {
@@ -428,9 +433,14 @@ export default function Landing() {
             <button onClick={() => scrollTo("demo")} className="lp-link" data-testid="nav-demo">Book demo</button>
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/login">
-              <Button variant="ghost" size="sm" data-testid="button-nav-signin">Sign in</Button>
-            </Link>
+            {/* asChild so this renders a single <a>. Wrapping a <Button> in a
+                wouter <Link> nests a <button> inside the <a>, which is invalid
+                HTML — iOS Safari then swallows the tap instead of following the
+                link, leaving the neighbouring "Get started" as the only control
+                that responds. */}
+            <Button asChild variant="ghost" size="sm" data-testid="button-nav-signin">
+              <a href={LOGIN_HREF}>Sign in</a>
+            </Button>
             <a
               href={signupHref(activePlan, billing)}
               className="lp-accent-bg inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
