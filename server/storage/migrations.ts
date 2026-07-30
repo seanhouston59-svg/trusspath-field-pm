@@ -331,6 +331,13 @@ export async function migrate() {
     BEGIN
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'memberships') THEN
         ALTER TABLE memberships ADD COLUMN IF NOT EXISTS has_executive_os BOOLEAN NOT NULL DEFAULT false;
+        -- Audit trail for add-on grants/revokes. TEXT ISO-8601 to match every
+        -- other timestamp in this schema. Left unbackfilled: grants made before
+        -- these columns existed have no recorded actor.
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS executive_os_granted_at TEXT;
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS executive_os_granted_by TEXT;
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS executive_os_revoked_at TEXT;
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS executive_os_revoked_by TEXT;
       END IF;
     END $$`;
   await sql`CREATE TABLE IF NOT EXISTS sessions (

@@ -49,7 +49,22 @@ export const memberships = pgTable("memberships", {
   // driven off the count of memberships with this set, so it is the single
   // source of truth for both entitlement and the Stripe subscription quantity.
   hasExecutiveOs: boolean("has_executive_os").notNull().default(false),
+  // Audit trail for the add-on. Granted/revoked pairs are independent: a revoke
+  // leaves the granted_* values in place so the last grant stays legible.
+  // Null granted_at on a row with hasExecutiveOs = true means the grant predates
+  // this column and the grantor is unknown.
+  executiveOsGrantedAt: text("executive_os_granted_at"),
+  // Actor, not a foreign key: holds either an accounts.id (as a string) or the
+  // EXEC_OS_SYSTEM_ACTOR sentinel for revokes the Stripe webhook performs with
+  // no human behind them.
+  executiveOsGrantedBy: text("executive_os_granted_by"),
+  executiveOsRevokedAt: text("executive_os_revoked_at"),
+  executiveOsRevokedBy: text("executive_os_revoked_by"),
 });
+
+// Stand-in actor for add-on changes with no human behind them — currently only
+// the mass revoke when Stripe reports the org's subscription is gone.
+export const EXEC_OS_SYSTEM_ACTOR = "system:stripe_webhook";
 
 /* -------------------------------- Invites -------------------------------- */
 // Pending email invites to join an organization. Consumed when the invitee

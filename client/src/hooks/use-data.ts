@@ -853,7 +853,9 @@ export function useUpcomingInvoice() {
 }
 
 /* ----------------------- Organization / Team ----------------------- */
-export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string; hasExecutiveOs?: boolean };
+// The executiveOs* fields are the add-on audit trail. All nullable: grants made
+// before those columns existed carry no attribution.
+export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string; hasExecutiveOs?: boolean; executiveOsGrantedAt?: string | null; executiveOsGrantedBy?: string | null; executiveOsRevokedAt?: string | null; executiveOsRevokedBy?: string | null };
 export type Invite = { id: number; token: string; organizationId: number; email: string; role: string; createdAt: string; expiresAt: string; acceptedAt: string | null };
 export type OrgSummary = { id: number; name: string; slug: string; ownerAccountId: number; subscriptionStatus: string | null; subscriptionPlan: string | null; subscriptionBilling: string | null; trialEndsAt: string | null; timezone: string; disabledIntegrations?: Record<string, boolean> | null; };
 
