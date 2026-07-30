@@ -1,4 +1,4 @@
-import { pgTable, text, integer, serial, doublePrecision, boolean, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, doublePrecision, boolean, jsonb, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -64,6 +64,21 @@ export const invites = pgTable("invites", {
   createdAt: text("created_at").notNull(),
   expiresAt: text("expires_at").notNull(),
   acceptedAt: text("accepted_at"),
+});
+
+/* --------------------- Stripe webhook idempotency ledger ----------------- */
+// One row per Stripe event we have accepted. The webhook inserts into this
+// table before dispatching, so a retry of an already-seen event.id hits the
+// primary key and is acked without re-running any handler.
+//
+// FOLLOW-UP (not implemented): this table only grows. It needs a scheduled
+// cleanup (cron or Vercel scheduled function) deleting rows older than ~30
+// days — Stripe stops retrying long before that, so older rows are dead weight.
+export const processedStripeEvents = pgTable("processed_stripe_events", {
+  eventId: text("event_id").primaryKey(), // stripe event.id, e.g. 'evt_1AbC...'
+  eventType: text("event_type").notNull(), // e.g. 'checkout.session.completed'
+  // withTimezone matches the TIMESTAMPTZ in migrate() so db:push sees no diff.
+  processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /* ------------------------------ Roles / helpers -------------------------- */
