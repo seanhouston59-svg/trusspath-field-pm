@@ -673,10 +673,14 @@ export function Layout({ children, title, actions }: { children: ReactNode; titl
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar */}
-        {/* Topbar. min-w-0 + overflow-hidden guards against any oversized
+        {/* Topbar. min-w-0 + overflow-x-clip guards against any oversized
             child pushing the row wider than the viewport (which showed up as
-            a horizontal scroll on iPhone 15 before the mobile compaction). */}
-        <header className="flex h-14 md:h-16 shrink-0 items-center gap-2 overflow-hidden border-b border-border bg-background px-3 md:px-6">
+            a horizontal scroll on iPhone 15 before the mobile compaction).
+            Must be overflow-x-clip and not overflow-hidden: the latter clips
+            both axes, which swallowed MobileOverflowMenu's dropdown entirely
+            since it hangs below the header. `clip` on one axis leaves the
+            other axis `visible` instead of promoting it to `auto`. */}
+        <header className="flex h-14 md:h-16 shrink-0 items-center gap-2 overflow-x-clip border-b border-border bg-background px-3 md:px-6">
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
