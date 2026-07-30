@@ -5,10 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  ArrowRight, Check, HardHat, ClipboardList, FileText, GitPullRequestArrow,
-  MessagesSquare, CalendarRange, Camera, Bot, ShieldCheck, Sparkles,
-  Quote, Star, ChevronDown, ListChecks, Layers, Radar, Truck, Plug,
-  Smartphone, WifiOff, MapPin,
+  ArrowRight, Check, HardHat, ClipboardList, CalendarRange, Bot, ShieldCheck,
+  Quote, Layers, Smartphone, WifiOff, Truck, Plug, BarChart3, Upload, PencilRuler,
 } from "lucide-react";
 import { Logo } from "@/components/bits";
 import { Button } from "@/components/ui/button";
@@ -16,9 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import heroImg from "@/assets/landing/hero.webp";
+import fieldKitImg from "@/assets/landing/field_kit.webp";
+import execOsImg from "@/assets/landing/exec_os.webp";
+import subDropImg from "@/assets/landing/sub_drop.webp";
 
 /* ============================ Pricing config ============================ */
 // Kept in sync with client/src/pages/signup.tsx PLAN_INFO. Any price change
@@ -101,35 +104,42 @@ const PLANS: Plan[] = [
   },
 ];
 
+/** Price of the Executive OS per-seat add-on, in dollars/user/month.
+ *  Mirrors EXECUTIVE_OS_ADDON_AMOUNT_CENTS in server/lib/plans.ts. */
+const EXEC_OS_MONTHLY = 5;
+
 /* ============================ Subscribe CTA ============================ */
 // The landing subscribe CTA hands off to /signup which is the single source
 // of truth for pricing + Stripe checkout (see server/lib/plans.ts).
 // Do NOT call /api/billing/checkout here — that path uses stale STRIPE_PRICE_*
 // env vars from an older pricing generation.
+function signupHref(plan: Plan["key"], billing: "monthly" | "annual") {
+  return `/signup#/signup?plan=${plan}&billing=${billing}`;
+}
+
 function SubscribeForm({ defaultPlan, billing }: { defaultPlan: Plan["key"]; billing: "monthly" | "annual" }) {
   const isEnterprise = defaultPlan === "enterprise";
   if (isEnterprise) {
     return (
       <a
         href="mailto:hello@trusspath.com?subject=Enterprise%20Demo%20Request"
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
+        className="lp-rule inline-flex w-full items-center justify-center gap-1.5 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
         data-testid="button-enterprise-contact"
       >
         Talk to sales <ArrowRight className="size-3.5" />
       </a>
     );
   }
-  const signupHref = `/signup#/signup?plan=${defaultPlan}&billing=${billing}`;
   return (
     <div className="space-y-3" data-testid="form-subscribe">
       <a
-        href={signupHref}
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        href={signupHref(defaultPlan, billing)}
+        className="lp-accent-bg inline-flex w-full items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
         data-testid="button-subscribe-submit"
       >
         Continue to signup <ArrowRight className="size-4" />
       </a>
-      <p className="text-center text-[11px] text-muted-foreground">
+      <p className="lp-muted text-center text-[11px]">
         14-day free trial. Secure payment via Stripe. Cancel anytime.
       </p>
     </div>
@@ -168,7 +178,7 @@ function DemoForm() {
     return (
       <div className="rounded-lg border border-primary/40 bg-primary/5 p-6 text-center" data-testid="demo-success">
         <div className="font-display text-lg font-bold text-primary">Thanks — we'll be in touch.</div>
-        <p className="mt-1 text-sm text-muted-foreground">Expect a call or email within one business day.</p>
+        <p className="lp-muted mt-1 text-sm">Expect a call or email within one business day.</p>
       </div>
     );
   }
@@ -236,219 +246,263 @@ function DemoForm() {
   );
 }
 
-/* ============================ FAQ list ============================ */
-const FAQS: { q: string; a: string }[] = [
+/* ============================ Featured capabilities ============================ */
+const FEATURED = [
   {
-    q: "How is TrussPath different from legacy construction PM platforms?",
-    a: "Same core capabilities (RFIs, submittals, change orders, punch lists, daily logs, blueprints, drone captures, schedule, and fleet) at roughly a third of the cost, plus a mobile field kit built for the truck cab, a voice AI assistant, and no per-project fees. We're built for the field first, office second.",
+    id: "featured-field-kit",
+    kicker: "Mobile field kit",
+    title: "Runs on one bar of signal",
+    body: "Installs to the home screen from any phone browser. Daily logs, timecards, punch, and GPS-stamped photos queue on the device and drain when you're back on data.",
+    img: fieldKitImg,
+    w: 1200,
+    h: 896,
+    alt: "Superintendent filling out a daily log on a phone at a jobsite",
+    anchor: "field-kit",
   },
   {
-    q: "Does it really work offline?",
-    a: "Yes. Install TrussPath to your home screen from any modern phone browser — the field kit (daily log, timecard, punch, photo, observation) caches locally and queues everything when you're out of signal. When you're back on data or wifi, the queue drains automatically.",
+    id: "featured-exec-os",
+    kicker: "Executive OS",
+    title: "The whole book of work, one screen",
+    body: "Portfolio roll-ups across every job — setup, pre-con, mobilization, financials, contracts, inspections. Board packets generated from live project data.",
+    img: execOsImg,
+    w: 1200,
+    h: 800,
+    alt: "Executive reviewing portfolio dashboards for multiple construction projects",
+    anchor: "exec-os-addon",
+    chip: `$${EXEC_OS_MONTHLY}/user/mo add-on`,
   },
   {
-    q: "Is there a free trial?",
-    a: "Yes — 14 days on any plan, no credit card required. Import a real project and use it with your crew before you decide.",
-  },
-  {
-    q: "Can we migrate from another platform or spreadsheets?",
-    a: "Yes. Every paid plan includes a guided migration. We import projects, RFIs, submittals, daily logs, photos, and documents from your existing tools. Typical migration takes 3–5 business days.",
-  },
-  {
-    q: "How does the Jarvis AI assistant work?",
-    a: "Jarvis is a voice-and-text copilot that reads your project data and takes action. Ask \u201cwhat's overdue?\u201d, \u201cdraft an RFI to the MEP sub about the coordination clash,\u201d or \u201clog today's crew.\u201d It never trains on your data.",
-  },
-  {
-    q: "What integrations are supported?",
-    a: "Google Calendar, Google Sheets, ADP, TriNet, QuickBooks, DocuSign, and Dropbox out of the box. Pro and Enterprise plans include our REST API for custom integrations.",
-  },
-  {
-    q: "Is my data secure?",
-    a: "All data is encrypted in transit (TLS 1.3) and at rest (AES-256). We're SOC 2 Type II in progress with an expected completion in Q3. Enterprise plans include SSO/SAML and per-role permissions.",
-  },
-  {
-    q: "Can I cancel or downgrade anytime?",
-    a: "Yes. Monthly plans cancel at the end of the current billing cycle. Annual plans can downgrade at renewal. You keep read-only access to your data for 90 days after cancellation.",
-  },
-  {
-    q: "How does seat pricing work?",
-    a: "Every plan is a flat monthly rate with a fixed number of seats included (3 for Starter, 5 for Pro, 10 for Enterprise). If you add more people, extra seats are billed at the plan's overage rate ($19, $29, or $39/mo). No per-project fees. Starter caps at 5 active projects; Pro and Enterprise are unlimited.",
+    id: "featured-sub-drop",
+    kicker: "Sub Drop",
+    title: "Subs upload without a seat",
+    body: "Post a QR code in the trailer. Subs scan, register once, and drop insurance certs, submittals, and closeout docs straight into your review inbox. No license, no chasing email.",
+    img: subDropImg,
+    w: 1200,
+    h: 800,
+    alt: "Subcontractor scanning a QR code to upload documents from the field",
+    anchor: "sub-drop",
   },
 ];
 
-function FAQList() {
-  const [open, setOpen] = useState<number | null>(0);
-  return (
-    <div className="mt-10 space-y-3" data-testid="faq-list">
-      {FAQS.map((f, i) => {
-        const isOpen = open === i;
-        return (
-          <div
-            key={i}
-            className={cn(
-              "overflow-hidden rounded-xl border bg-card transition-colors",
-              isOpen ? "border-primary/40" : "border-border hover:border-primary/30",
-            )}
-            data-testid={`faq-item-${i}`}
-          >
-            <button
-              onClick={() => setOpen(isOpen ? null : i)}
-              className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              aria-expanded={isOpen}
-              data-testid={`faq-question-${i}`}
-            >
-              <span className="font-display text-sm font-bold md:text-base">{f.q}</span>
-              <ChevronDown
-                className={cn(
-                  "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200",
-                  isOpen && "rotate-180 text-primary",
-                )}
-              />
-            </button>
-            <div
-              className={cn(
-                "grid transition-all duration-200 ease-out",
-                isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-              )}
-            >
-              <div className="overflow-hidden">
-                <p className="px-5 pb-5 text-sm leading-relaxed text-muted-foreground" data-testid={`faq-answer-${i}`}>
-                  {f.a}
-                </p>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+/* ============================ Feature buckets ============================ */
+const BUCKETS = [
+  {
+    id: "field-kit",
+    icon: Smartphone,
+    title: "Mobile field kit",
+    body: "PWA install, offline queue, GPS photos, timecards, voice notes, walk-and-punch. Built for the truck cab.",
+    items: ["Offline daily log", "Timecard", "Photo + observation", "Voice note", "Punch walk"],
+  },
+  {
+    id: "field-ops",
+    icon: HardHat,
+    title: "Field ops & reporting",
+    body: "Weather-tagged daily logs, a searchable photo log, punch lists with photo proof, and aerial progress captures.",
+    items: ["Daily logs", "Photo log", "Punch lists", "Drone captures"],
+  },
+  {
+    id: "paperwork",
+    icon: ClipboardList,
+    title: "Requests & paperwork",
+    body: "Route it, track it, close it out. Due dates, assignees, and a full audit trail on every record.",
+    items: ["RFIs", "Submittals", "Change orders", "Tasks + action items"],
+  },
+  {
+    id: "schedule",
+    icon: CalendarRange,
+    title: "Schedule & sequencing",
+    body: "Month view, Gantt bars, and a CPM diagram off the same task set. Two-way sync with Google Calendar.",
+    items: ["Schedule", "Gantt", "CPM diagram", "Calendar sync"],
+  },
+  {
+    id: "drawings",
+    icon: PencilRuler,
+    title: "Drawings & documents",
+    body: "Sheet-level drawing management with cloud markups and version compare, plus project and company doc libraries.",
+    items: ["Blueprints", "Markups", "Version history", "Company docs"],
+  },
+  {
+    id: "people",
+    icon: Truck,
+    title: "People, time & fleet",
+    body: "Roster, contacts, timesheets, and an equipment register with hours and maintenance across every jobsite.",
+    items: ["Project team", "Contacts", "Timesheets", "Fleet & equipment"],
+  },
+  {
+    id: "sub-drop",
+    icon: Upload,
+    title: "Subcontractor portal",
+    body: "Sub Drop gives every sub a QR-code upload lane into your review inbox — no seat, no login sprawl, no lost attachments.",
+    items: ["QR onboarding", "Upload inbox", "PM review + categorize", "Zero seat cost"],
+  },
+  {
+    id: "exec-os",
+    icon: BarChart3,
+    title: "Executive OS",
+    body: "The portfolio layer above your projects: cross-job roll-ups, stage-gate readiness, contracts, inspections, and board packets.",
+    items: ["Portfolio roll-ups", "Financials", "Contracts register", "Board packets"],
+    chip: `$${EXEC_OS_MONTHLY}/user/mo`,
+  },
+];
+
+/* ============================ Testimonials ============================ */
+// PLACEHOLDER COPY — these three quotes and the names/companies attached to
+// them are samples written in-house, not real customer statements. Swap them
+// for approved, attributable quotes before launch. See the PR description.
+const TESTIMONIALS = [
+  {
+    quote: "Daily logs went from a 45-minute end-of-day chore to something the supers finish in the truck before they pull off site.",
+    name: "Alex M.",
+    role: "Project Manager at ExampleCo",
+  },
+  {
+    quote: "The field kit is the whole thing. My foreman punches a wall from his phone, GPS on the photo, and it's in the list before he walks back.",
+    name: "Dana R.",
+    role: "VP Operations at Sample Builders",
+  },
+  {
+    quote: "Sub Drop killed the certificate-of-insurance email chase. The subs scan the sign in the trailer and the doc lands in our inbox.",
+    name: "Chris T.",
+    role: "General Superintendent at Placeholder GC",
+  },
+];
+
+/* ============================ FAQ ============================ */
+const FAQS: { q: string; a: string }[] = [
+  {
+    q: "How does seat pricing work?",
+    a: "Every plan is a flat monthly rate with seats included — 3 on Starter, 5 on Pro, 10 on Enterprise. Extra people are billed at the plan's overage rate ($19, $29, or $39 per seat per month). No per-project fees. Starter caps at 5 active projects; Pro and Enterprise are unlimited.",
+  },
+  {
+    q: "What is the Executive OS add-on?",
+    a: `Executive OS is the portfolio layer above your projects — cross-job roll-ups, stage-gate readiness, financial summaries, contracts, inspections, and board packets. It is $${EXEC_OS_MONTHLY} per user per month, granted seat by seat by an owner or admin under Settings → Team, and prorated onto your existing subscription immediately. Turn it off any time and the charge drops at the next invoice.`,
+  },
+  {
+    q: "Do subcontractors need a paid seat?",
+    a: "No. Subs use the Sub Drop portal: you post a QR code, they scan it, register once, and upload documents into your review inbox. They never consume a seat on your subscription. Only your own staff — PMs, supers, foremen, execs — count against seats.",
+  },
+  {
+    q: "Does it really work offline?",
+    a: "Yes. Install TrussPath to your home screen from any modern phone browser. The field kit — daily log, timecard, punch, photo, observation, voice note — caches locally and queues everything while you're out of signal. The queue drains automatically when you're back on data or wifi.",
+  },
+  {
+    q: "Is my data secure?",
+    a: "All data is encrypted in transit (TLS 1.3) and at rest (AES-256). Access is scoped per organization and per role, and every record carries an audit trail. SOC 2 Type II is in progress. Enterprise plans add SSO/SAML and custom role definitions.",
+  },
+  {
+    q: "Who owns the data, and can we export it?",
+    a: "You do. Your projects, logs, photos, and documents are yours — export to CSV or Excel from any list view, pull documents and photos in bulk, or use the REST API on Pro and Enterprise. We never train AI models on your project data.",
+  },
+  {
+    q: "Is there a free trial?",
+    a: "Yes — 14 days on any plan, no credit card required. Load a real project and run it with your crew before you decide. Paid plans also include a guided migration from your existing PM tool or spreadsheets, typically 3–5 business days.",
+  },
+  {
+    q: "Can I cancel or downgrade anytime?",
+    a: "Yes. Monthly plans cancel at the end of the current billing cycle; annual plans downgrade at renewal. You keep read-only access to your data for 90 days after cancellation so you can export everything you need.",
+  },
+];
 
 /* ============================ Landing page ============================ */
 export default function Landing() {
-  const [billing, setBilling] = useState<"monthly" | "annual">("annual");
+  // Monthly is the default view: it's the price most crews are comparing
+  // against, and the annual discount reads better as a saving off it.
+  const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
   const [activePlan, setActivePlan] = useState<Plan["key"]>("pro");
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* ------------------------------ Nav ------------------------------ */}
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
+    <div className="lp-theme lp-paper min-h-screen">
+      {/* ------------------------------ 1. Sticky header ------------------------------ */}
+      <header className="lp-rule sticky top-0 z-30 border-b bg-[hsl(var(--lp-paper)/0.88)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <Logo className="size-8" />
-            <div className="font-display text-base font-bold tracking-tight">TrussPath</div>
+            <div className="lp-display text-lg">TrussPath</div>
           </div>
-          <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-            <button onClick={() => scrollTo("features")} className="hover:text-foreground" data-testid="nav-features">Features</button>
-            <button onClick={() => scrollTo("field")} className="hover:text-foreground" data-testid="nav-field">Field kit</button>
-            <button onClick={() => scrollTo("testimonials")} className="hover:text-foreground" data-testid="nav-testimonials">Testimonials</button>
-            <button onClick={() => scrollTo("pricing")} className="hover:text-foreground" data-testid="nav-pricing">Pricing</button>
-            <button onClick={() => scrollTo("faq")} className="hover:text-foreground" data-testid="nav-faq">FAQ</button>
-            <button onClick={() => scrollTo("demo")} className="hover:text-foreground" data-testid="nav-demo">Demo</button>
+          <nav className="hidden items-center gap-7 text-sm md:flex">
+            <button onClick={() => scrollTo("product")} className="lp-link" data-testid="nav-features">Product</button>
+            <button onClick={() => scrollTo("pricing")} className="lp-link" data-testid="nav-pricing">Pricing</button>
+            <button onClick={() => scrollTo("faq")} className="lp-link" data-testid="nav-faq">FAQ</button>
+            <button onClick={() => scrollTo("demo")} className="lp-link" data-testid="nav-demo">Book demo</button>
           </nav>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => scrollTo("demo")} data-testid="button-nav-demo">Book demo</Button>
             <Link href="/login">
-              <Button variant="outline" size="sm" data-testid="button-nav-signin">
-                Sign in
-              </Button>
+              <Button variant="ghost" size="sm" data-testid="button-nav-signin">Sign in</Button>
             </Link>
-            <Link href="/app">
-              <Button size="sm" data-testid="button-nav-app">
-                Open app <ArrowRight className="ml-1 size-3.5" />
-              </Button>
-            </Link>
+            <a
+              href={signupHref(activePlan, billing)}
+              className="lp-accent-bg inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
+              data-testid="button-nav-app"
+            >
+              Get started <ArrowRight className="size-3.5" />
+            </a>
           </div>
         </div>
       </header>
 
-      {/* ------------------------------ Hero ------------------------------ */}
-      <section className="relative overflow-hidden border-b border-border">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 py-16 md:grid-cols-2 md:py-24">
-          <div>
-            <div className="ff-kicker mb-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[10px]">
-              <Sparkles className="size-3 text-primary" /> Now with a full mobile field kit
-            </div>
-            <h1 className="font-display text-4xl font-black leading-[1.05] tracking-tight md:text-5xl">
-              Construction PM your crew <span className="text-primary">actually opens on the jobsite</span>.
-            </h1>
-            <p className="mt-5 max-w-lg text-base text-muted-foreground md:text-lg">
-              A PWA that installs to the home screen. GPS-stamped photos, offline daily logs and timecards, punch lists that survive a dropped connection, and voice-driven Jarvis AI — plus every office tool (RFIs, submittals, change orders, schedule, drone, fleet) in one platform.
-            </p>
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <Button size="lg" onClick={() => scrollTo("pricing")} data-testid="button-hero-subscribe">
-                Subscribe <ArrowRight className="ml-1.5 size-4" />
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => scrollTo("demo")} data-testid="button-hero-demo">
-                Book a demo
-              </Button>
-              <Link href="/app">
-                <Button size="lg" variant="ghost" data-testid="button-hero-app">Try live app →</Button>
-              </Link>
-            </div>
-            <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5"><Smartphone className="size-3.5 text-primary" /> Installs to home screen</div>
-              <div className="flex items-center gap-1.5"><WifiOff className="size-3.5 text-primary" /> Works offline</div>
-              <div className="flex items-center gap-1.5"><ShieldCheck className="size-3.5 text-primary" /> SOC 2 in progress</div>
-              <div className="flex items-center gap-1.5"><Check className="size-3.5 text-primary" /> 14-day free trial</div>
-            </div>
-          </div>
-          <div className="relative">
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-lg">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="size-2 rounded-full bg-red-400" />
-                  <div className="size-2 rounded-full bg-amber-400" />
-                  <div className="size-2 rounded-full bg-emerald-400" />
-                </div>
-                <span className="font-mono text-[10px] text-muted-foreground">trusspath.com / dashboard</span>
+      {/* ------------------------------ 2. Hero ------------------------------ */}
+      <section className="lp-rule lp-grit border-b">
+        <div className="mx-auto max-w-6xl px-4 py-16 md:py-24">
+          <div className="grid grid-cols-1 gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center">
+            <div>
+              <div className="lp-accent-soft ff-kicker inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-[10px]">
+                <HardHat className="size-3" /> Built by field people
               </div>
-              <div className="mt-4 space-y-3">
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { l: "Active Projects", v: "12", t: "text-primary" },
-                    { l: "Open RFIs", v: "8", t: "text-amber-500" },
-                    { l: "Due This Week", v: "23", t: "text-sky-500" },
-                    { l: "Open Punch", v: "17", t: "text-violet-500" },
-                  ].map((k) => (
-                    <div key={k.l} className="rounded-md border border-border bg-background/60 p-2">
-                      <div className="ff-kicker text-[9px]">{k.l}</div>
-                      <div className={cn("font-display text-lg font-bold", k.t)}>{k.v}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="rounded-md border border-border bg-background/60 p-3">
-                  <div className="ff-kicker mb-2 text-[9px]">Budget vs Actual</div>
-                  <div className="flex h-16 items-end gap-1">
-                    {[42, 55, 48, 63, 71, 68, 82, 75, 88].map((h, i) => (
-                      <div key={i} className="flex-1 rounded-t bg-primary/70" style={{ height: `${h}%` }} />
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-md border border-border bg-background/60 p-2 text-xs">
-                    <div className="ff-kicker text-[9px]">RFI-247</div>
-                    <div className="mt-0.5 font-medium">MEP coordination clash</div>
-                    <div className="text-[10px] text-amber-500">Due in 2d</div>
-                  </div>
-                  <div className="rounded-md border border-border bg-background/60 p-2 text-xs">
-                    <div className="ff-kicker text-[9px]">CO-103</div>
-                    <div className="mt-0.5 font-medium">Slab reinforcement upgrade</div>
-                    <div className="text-[10px] text-sky-500">$24,800 pending</div>
-                  </div>
-                </div>
+              <h1 className="lp-display mt-5 text-[2.75rem] sm:text-6xl lg:text-[4.25rem]">
+                The jobsite doesn't wait for<br className="hidden sm:block" /> the <span className="lp-accent-text">office to catch up</span>.
+              </h1>
+              <p className="lp-muted mt-6 max-w-xl text-lg leading-relaxed">
+                One platform for the paperwork and the dirt. Daily logs, RFIs, submittals, change
+                orders, punch, drawings, schedule, and fleet — reachable from a phone with one bar
+                of signal, and from a desk when you get back.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <a
+                  href={signupHref(activePlan, billing)}
+                  className="lp-accent-bg inline-flex items-center gap-2 rounded-md px-6 py-3.5 text-base font-bold transition-opacity hover:opacity-90"
+                  data-testid="button-hero-subscribe"
+                >
+                  Start free trial <ArrowRight className="size-4" />
+                </a>
+                <button
+                  onClick={() => scrollTo("product")}
+                  className="lp-rule inline-flex items-center gap-2 rounded-md border px-6 py-3.5 text-base font-semibold transition-colors hover:border-primary hover:text-primary"
+                  data-testid="button-hero-how"
+                >
+                  See how it works
+                </button>
               </div>
+              <dl className="lp-rule mt-9 grid max-w-lg grid-cols-2 gap-x-6 gap-y-3 border-t pt-6 text-sm sm:grid-cols-4">
+                {[
+                  { icon: Smartphone, l: "Installs to phone" },
+                  { icon: WifiOff, l: "Works offline" },
+                  { icon: ShieldCheck, l: "SOC 2 in progress" },
+                  { icon: Check, l: "14-day trial" },
+                ].map(({ icon: Icon, l }) => (
+                  <div key={l} className="flex items-center gap-1.5">
+                    <Icon className="lp-accent-text size-4 shrink-0" />
+                    <dt className="lp-muted text-xs">{l}</dt>
+                  </div>
+                ))}
+              </dl>
             </div>
-            <div className="absolute -bottom-6 -left-6 hidden rounded-xl border border-border bg-card p-3 shadow-lg md:block">
-              <div className="flex items-center gap-2">
-                <div className="grid size-8 place-items-center rounded-full bg-primary text-primary-foreground">
+            <div className="lp-rule relative overflow-hidden rounded-lg border shadow-xl">
+              <img
+                src={heroImg}
+                width={1536}
+                height={1024}
+                alt="Construction crew working on a steel-framed building at sunrise"
+                className="block h-auto w-full object-cover"
+              />
+              <div className="lp-slab absolute bottom-0 left-0 right-0 flex items-center gap-3 px-4 py-3">
+                <div className="lp-accent-bg grid size-8 shrink-0 place-items-center rounded-full">
                   <Bot className="size-4" />
                 </div>
                 <div className="text-xs">
                   <div className="font-display font-bold">Jarvis</div>
-                  <div className="text-muted-foreground">"3 items need you today, boss."</div>
+                  <div className="text-white/70">"Three items need you today, boss."</div>
                 </div>
               </div>
             </div>
@@ -456,176 +510,139 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ------------------------------ Logos band ------------------------------ */}
-      <section className="border-b border-border bg-muted/30">
-        <div className="mx-auto max-w-6xl px-4 py-6">
-          <div className="ff-kicker text-center text-[10px] text-muted-foreground">Built for GCs, developers, and owner reps</div>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm font-semibold text-muted-foreground/70">
-            <span>KIEWIT</span><span>SUFFOLK</span><span>DPR</span><span>TURNER</span><span>BALFOUR BEATTY</span><span>HENSEL PHELPS</span>
+      {/* ------------------------------ 3. Featured capabilities ------------------------------ */}
+      <section id="product" className="lp-rule lp-paper-2 border-b">
+        <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
+          <div className="max-w-2xl">
+            <div className="ff-kicker lp-accent-text">Three ways in</div>
+            <h2 className="lp-display mt-2 text-3xl md:text-4xl">
+              The field, the portfolio, and everyone outside your company.
+            </h2>
+          </div>
+          <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {FEATURED.map((f) => (
+              <article
+                key={f.id}
+                id={f.id}
+                className="lp-card flex flex-col overflow-hidden rounded-lg shadow-sm transition-shadow hover:shadow-lg"
+                data-testid={f.id}
+              >
+                <img
+                  src={f.img}
+                  width={f.w}
+                  height={f.h}
+                  alt={f.alt}
+                  loading="lazy"
+                  className="block aspect-[3/2] w-full object-cover"
+                />
+                <div className="flex flex-1 flex-col p-6">
+                  <div className="flex items-center gap-2">
+                    <span className="ff-kicker lp-accent-text text-[10px]">{f.kicker}</span>
+                    {f.chip && (
+                      <span className="lp-accent-soft rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-bold" data-testid="chip-exec-os-addon">
+                        {f.chip}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="lp-display mt-2 text-xl">{f.title}</h3>
+                  <p className="lp-muted mt-2 flex-1 text-sm leading-relaxed">{f.body}</p>
+                  <button
+                    onClick={() => scrollTo(f.anchor)}
+                    className="lp-accent-text mt-5 inline-flex items-center gap-1.5 self-start text-sm font-bold transition-transform hover:translate-x-0.5"
+                  >
+                    Learn more <ArrowRight className="size-3.5" />
+                  </button>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ------------------------------ Field kit callout (anchor for nav) ------------------------------ */}
-      <section id="field" className="border-b border-border">
+      {/* ------------------------------ 4. Full feature grid ------------------------------ */}
+      <section id="features" className="lp-rule border-b">
         <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="ff-kicker text-primary">Mobile field kit</div>
-            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Built for the truck cab, not the desk.</h2>
-            <p className="mt-3 text-muted-foreground">Installs like a native app. Works with one bar of signal. Survives a dropped connection.</p>
+          <div className="max-w-2xl">
+            <div className="ff-kicker lp-accent-text">Everything in the box</div>
+            <h2 className="lp-display mt-2 text-3xl md:text-4xl">
+              Enterprise scope. None of the enterprise ceremony.
+            </h2>
+            <p className="lp-muted mt-3">
+              Eight areas, one login, one source of truth. Nothing here is a separate purchase
+              except Executive OS.
+            </p>
           </div>
-          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { icon: Smartphone, title: "PWA install", desc: "Add to home screen from any modern phone browser. No app store, no MDM headaches." },
-              { icon: WifiOff, title: "Offline queue", desc: "Daily logs, timecards, and punch items queue locally and sync when you're back on data." },
-              { icon: MapPin, title: "GPS photos", desc: "Every jobsite photo tagged with location and timestamp — burned into the pixels." },
-              { icon: ClipboardList, title: "Punch lists", desc: "Walk-and-punch from your phone with photo proof of closeout — syncs to the office schedule." },
-            ].map((f) => (
-              <div key={f.title} className="rounded-xl border border-border bg-card p-5" data-testid={`field-${f.title.toLowerCase().replace(/\s+/g, "-")}`}>
-                <div className="grid size-9 place-items-center rounded-md bg-primary/10 text-primary">
-                  <f.icon className="size-4" />
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {BUCKETS.map((b) => (
+              <div
+                key={b.id}
+                id={b.id}
+                className="lp-card flex flex-col rounded-lg p-5 transition-colors hover:border-primary/50"
+                data-testid={`bucket-${b.id}`}
+              >
+                <div className="lp-accent-soft grid size-9 place-items-center rounded-md">
+                  <b.icon className="size-4" />
                 </div>
-                <div className="mt-4 font-display font-bold">{f.title}</div>
-                <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <h3 className="font-display font-bold">{b.title}</h3>
+                  {b.chip && (
+                    <span className="lp-accent-soft rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-bold">{b.chip}</span>
+                  )}
+                </div>
+                <p className="lp-muted mt-1.5 flex-1 text-sm leading-relaxed">{b.body}</p>
+                <ul className="lp-rule mt-4 space-y-1.5 border-t pt-3 text-xs">
+                  {b.items.map((i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <Check className="lp-accent-text mt-px size-3 shrink-0" />
+                      <span className="lp-muted">{i}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/field/hub">
-              <Button size="lg" variant="outline" data-testid="button-field-hub">Open field hub <ArrowRight className="ml-1.5 size-4" /></Button>
-            </Link>
-            <Button size="lg" variant="ghost" onClick={() => scrollTo("demo")} data-testid="button-field-demo">See it on your project</Button>
-          </div>
-        </div>
-      </section>
 
-      {/* ------------------------------ Features ------------------------------ */}
-      <section id="features" className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="ff-kicker text-primary">Features</div>
-            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Everything you'd expect from enterprise PM. None of the bloat.</h2>
-            <p className="mt-3 text-muted-foreground">Purpose-built for the field. Fast on 4G. Works from a truck cab.</p>
-          </div>
-          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { icon: HardHat, title: "Daily Logs", href: "/daily-logs", desc: "Weather-tagged logs with crew, deliveries, and on-site photos captured in seconds." },
-              { icon: ClipboardList, title: "RFIs & Submittals", href: "/rfis", desc: "Route, track, and close out with due dates, assignees, and full audit history." },
-              { icon: GitPullRequestArrow, title: "Change Orders", href: "/change-orders", desc: "Cost + schedule impact tracked from proposal to executed. No more spreadsheet drift." },
-              { icon: ListChecks, title: "Punch Lists", href: "/punch", desc: "Walk-and-punch with assignees, due dates, and photo proof of closeout — synced to the schedule." },
-              { icon: CalendarRange, title: "Schedule + Gantt", href: "/schedule", desc: "Classic month view, Gantt bars, and two-way sync with Google Calendar." },
-              { icon: Camera, title: "Photo Log", href: "/photos", desc: "GPS-stamped, project-tagged, searchable. Every image annotated in one tap." },
-              { icon: Layers, title: "Blueprints", href: "/blueprints", desc: "Sheet-level drawing management with cloud markups, version compare, and instant field access." },
-              { icon: Radar, title: "Drone Captures", href: "/drone", desc: "Aerial progress flights, orthomosaic overlays, and site-to-plan comparison over time." },
-              { icon: Truck, title: "Fleet & Equipment", href: "/equipment", desc: "Track fleet, hours, maintenance, and assignments across every jobsite from one register." },
-              { icon: FileText, title: "Documents", href: "/documents", desc: "Drawings, submittals, and contracts with version history and role-based access." },
-              { icon: MessagesSquare, title: "Messages & Notes", href: "/messages", desc: "Threaded jobsite chat plus a shared sticky board — no more lost group texts." },
-              { icon: Bot, title: "Jarvis AI", href: "/app", desc: "Voice-driven copilot. 'Log today's crew,' 'draft an RFI,' 'what's overdue?'" },
-            ].map((f) => (
-              <Link key={f.title} href={f.href} className="group block cursor-pointer rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid={`feature-${f.title.toLowerCase().replace(/\s+/g, "-")}`}>
-                <div className="grid size-9 place-items-center rounded-md bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                  <f.icon className="size-4" />
-                </div>
-                <div className="mt-4 font-display font-bold">{f.title}</div>
-                <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------ Integrations band ------------------------------ */}
-      <section className="border-b border-border bg-muted/30">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <div className="flex flex-col items-center gap-5 text-center md:flex-row md:justify-between md:text-left">
+          {/* Integrations strip */}
+          <div className="lp-card mt-8 flex flex-col items-start gap-5 rounded-lg p-6 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
-              <div className="grid size-9 place-items-center rounded-md bg-primary/10 text-primary"><Plug className="size-4" /></div>
+              <div className="lp-accent-soft grid size-9 shrink-0 place-items-center rounded-md"><Plug className="size-4" /></div>
               <div>
-                <div className="font-display font-bold">Connects to the tools your back office already runs</div>
-                <p className="text-sm text-muted-foreground">Payroll, accounting, documents, and calendars — synced to one source of truth.</p>
+                <div className="font-display font-bold">Connects to what your back office already runs</div>
+                <p className="lp-muted text-sm">Payroll, accounting, documents, and calendars on one source of truth.</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-semibold text-muted-foreground/70">
-              <span>ADP</span><span>TriNet</span><span>QuickBooks</span><span>Google Sheets</span><span>Google Calendar</span><span>DocuSign</span><span>Dropbox</span>
+            <div className="lp-muted flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-xs font-semibold uppercase tracking-wider">
+              <span>ADP</span><span>TriNet</span><span>QuickBooks</span><span>Sheets</span><span>Calendar</span><span>DocuSign</span><span>Dropbox</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ------------------------------ Testimonials ------------------------------ */}
-      <section id="testimonials" className="border-b border-border">
+      {/* ------------------------------ 5. Testimonials ------------------------------ */}
+      <section id="testimonials" className="lp-rule lp-slab border-b">
         <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="ff-kicker text-primary">Testimonials</div>
-            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Trusted from the trailer to the tower crane.</h2>
-            <p className="mt-3 text-muted-foreground">1,200+ jobsites run on TrussPath. Here's what supers, PMs, and owners say.</p>
+          <div className="max-w-2xl">
+            <div className="ff-kicker lp-accent-text">From the trailer</div>
+            <h2 className="lp-display mt-2 text-3xl md:text-4xl">What crews say once it's on the phone.</h2>
+            <p className="mt-3 text-sm text-white/60">
+              Sample quotes — representative of feedback, not yet attributed to named customers.
+            </p>
           </div>
-
-          {/* Metric strip */}
-          <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {[
-              { v: "1,200+", l: "Active jobsites" },
-              { v: "92%", l: "Faster daily log time" },
-              { v: "4.9", l: "Avg. G2 rating" },
-              { v: "$18M", l: "Change orders tracked/yr" },
-            ].map((s) => (
-              <div key={s.l} className="rounded-xl border border-border bg-card p-5 text-center">
-                <div className="font-display text-3xl font-black tracking-tight text-primary">{s.v}</div>
-                <div className="ff-kicker mt-1 text-[10px]">{s.l}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Quote cards */}
           <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3">
-            {[
-              {
-                quote: "We cut daily-log time from 45 minutes to under 5. Our supers now log from the truck before they hit the office.",
-                name: "Marco Delgado",
-                role: "Sr. Project Manager",
-                company: "Delgado Commercial",
-                initials: "MD",
-                color: "bg-amber-500",
-              },
-              {
-                quote: "The mobile field kit is the whole ballgame. My foreman punches a wall from his phone with GPS on the photo, and it's in the punch list before he walks back to the truck.",
-                name: "Sara Whitfield",
-                role: "VP of Operations",
-                company: "Ridgeline Builders",
-                initials: "SW",
-                color: "bg-sky-500",
-              },
-              {
-                quote: "Jarvis is the killer feature. My superintendent literally talks to it from the cab. It drafts RFIs while he drives.",
-                name: "James Okafor",
-                role: "General Superintendent",
-                company: "Okafor & Sons GC",
-                initials: "JO",
-                color: "bg-emerald-500",
-              },
-            ].map((t, i) => (
+            {TESTIMONIALS.map((t, i) => (
               <figure
-                key={i}
-                className="flex h-full flex-col rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
+                key={t.name}
+                className="flex h-full flex-col rounded-lg border border-white/12 bg-white/[0.04] p-6"
                 data-testid={`testimonial-${i}`}
               >
-                <Quote className="size-5 text-primary/60" />
-                <div className="mt-3 flex items-center gap-1 text-primary" aria-label="5 stars">
-                  {[0, 1, 2, 3, 4].map((n) => (
-                    <Star key={n} className="size-3.5 fill-current" />
-                  ))}
-                </div>
-                <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-foreground">
+                <Quote className="lp-accent-text size-5" />
+                <blockquote className="mt-4 flex-1 text-[15px] leading-relaxed text-white/90">
                   “{t.quote}”
                 </blockquote>
-                <figcaption className="mt-5 flex items-center gap-3 border-t border-border pt-4">
-                  <div className={cn("grid size-9 place-items-center rounded-full text-xs font-bold text-white", t.color)}>
-                    {t.initials}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold">{t.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{t.role} · {t.company}</div>
-                  </div>
+                <figcaption className="mt-6 border-t border-white/12 pt-4">
+                  <div className="text-sm font-bold">{t.name}</div>
+                  <div className="font-mono text-[11px] uppercase tracking-wider text-white/50">{t.role}</div>
+                  <div className="mt-1 text-[10px] uppercase tracking-wider text-white/35">Sample quote</div>
                 </figcaption>
               </figure>
             ))}
@@ -633,38 +650,46 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ------------------------------ Pricing ------------------------------ */}
-      <section id="pricing" className="border-b border-border bg-muted/30">
+      {/* ------------------------------ 6. Pricing ------------------------------ */}
+      <section id="pricing" className="lp-rule lp-paper-2 border-b">
         <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="ff-kicker text-primary">Pricing</div>
-            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Straight pricing. No "call for quote."</h2>
-            <p className="mt-3 text-muted-foreground">Flat monthly rate with seats included. Add more anytime. Save ~17% annually.</p>
+          <div className="max-w-2xl">
+            <div className="ff-kicker lp-accent-text">Pricing</div>
+            <h2 className="lp-display mt-2 text-3xl md:text-4xl">Published rates. No "call for a quote."</h2>
+            <p className="lp-muted mt-3">Flat monthly rate, seats included, extra seats priced up front. Annual billing saves about 17%.</p>
           </div>
 
-          {/* Billing toggle */}
-          <div className="mt-8 flex items-center justify-center">
-            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-background p-1" data-testid="billing-toggle">
+          {/* Billing toggle — monthly first and selected by default. */}
+          <div className="mt-8">
+            <div className="lp-rule inline-flex items-center gap-1 rounded-md border bg-[hsl(var(--card))] p-1" data-testid="billing-toggle">
               <button
                 onClick={() => setBilling("monthly")}
-                className={cn("rounded-full px-4 py-1.5 text-xs font-semibold transition-colors", billing === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+                className={cn(
+                  "rounded px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors",
+                  billing === "monthly" ? "lp-accent-bg" : "lp-muted hover:text-foreground",
+                )}
                 data-testid="billing-monthly"
               >
                 Monthly
               </button>
               <button
                 onClick={() => setBilling("annual")}
-                className={cn("relative rounded-full px-4 py-1.5 text-xs font-semibold transition-colors", billing === "annual" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+                className={cn(
+                  "rounded px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors",
+                  billing === "annual" ? "lp-accent-bg" : "lp-muted hover:text-foreground",
+                )}
                 data-testid="billing-annual"
               >
                 Annual
-                <span className="ml-1.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold text-primary">SAVE ~17%</span>
+                <span className={cn("ml-1.5 font-mono text-[9px]", billing === "annual" ? "text-white/80" : "lp-accent-text")}>
+                  SAVE ~17%
+                </span>
               </button>
             </div>
           </div>
 
           {/* Plan cards */}
-          <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-3">
             {PLANS.map((p) => {
               const price = billing === "monthly" ? p.baseMonthly : p.baseAnnual;
               const overage = billing === "monthly" ? p.overageMonthly : p.overageAnnual;
@@ -675,37 +700,37 @@ export default function Landing() {
                   key={p.key}
                   onClick={() => { setActivePlan(p.key); scrollTo("subscribe"); }}
                   className={cn(
-                    "group relative flex flex-col rounded-2xl border bg-card p-6 text-left transition-all",
-                    p.featured ? "border-primary shadow-lg" : "border-border hover:border-primary/40",
-                    selected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                    "lp-card relative flex flex-col rounded-lg p-6 text-left transition-all",
+                    p.featured && "shadow-lg",
+                    selected ? "border-primary ring-1 ring-primary" : "hover:border-primary/50",
                   )}
                   data-testid={`plan-${p.key}`}
                 >
                   {p.featured && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
+                    <div className="lp-accent-bg absolute -top-2.5 left-6 rounded-sm px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider">
                       Most popular
                     </div>
                   )}
                   <div className="ff-kicker text-[10px]">{p.name}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">{p.tagline}</div>
+                  <div className="lp-muted mt-1 text-sm">{p.tagline}</div>
                   <div className="mt-5 flex items-baseline gap-1.5">
-                    <span className="font-display text-5xl font-black tracking-tight">${price.toLocaleString()}</span>
-                    <span className="text-sm text-muted-foreground">{period}</span>
+                    <span className="lp-display text-5xl">${price.toLocaleString()}</span>
+                    <span className="lp-muted text-sm">{period}</span>
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {p.includedSeats} seats included · <span className="font-semibold text-foreground">Extra seats: ${overage}{period}</span>
+                  <div className="lp-muted mt-1 text-xs">
+                    {p.includedSeats} seats included · <span className="font-semibold text-foreground">Extra seats ${overage}{period}</span>
                   </div>
                   <ul className="mt-6 flex-1 space-y-2.5 text-sm">
                     {p.bullets.map((b) => (
                       <li key={b} className="flex items-start gap-2">
-                        <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                        <Check className="lp-accent-text mt-0.5 size-4 shrink-0" />
                         <span>{b}</span>
                       </li>
                     ))}
                   </ul>
                   <div className={cn(
-                    "mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-semibold transition-colors",
-                    p.featured ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border hover:border-primary hover:text-primary",
+                    "mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-bold transition-colors",
+                    p.featured ? "lp-accent-bg" : "lp-rule border hover:border-primary hover:text-primary",
                   )}>
                     {p.cta} <ArrowRight className="size-3.5" />
                   </div>
@@ -714,9 +739,37 @@ export default function Landing() {
             })}
           </div>
 
-          {/* Subscribe form beneath pricing */}
-          <div id="subscribe" className="mx-auto mt-12 max-w-md rounded-2xl border border-border bg-card p-6 shadow-sm">
-            <div className="ff-kicker text-[10px] text-primary">Subscribe</div>
+          {/* Executive OS add-on callout */}
+          <div
+            id="exec-os-addon"
+            className="lp-card mt-6 flex flex-col items-start gap-5 rounded-lg p-6 md:flex-row md:items-center md:justify-between"
+            data-testid="exec-os-addon-callout"
+          >
+            <div className="flex items-start gap-3">
+              <div className="lp-accent-soft grid size-10 shrink-0 place-items-center rounded-md"><Layers className="size-5" /></div>
+              <div>
+                <div className="font-display text-lg font-bold">
+                  + ${EXEC_OS_MONTHLY}/user/month — Executive OS add-on
+                </div>
+                <p className="lp-muted mt-1 max-w-2xl text-sm leading-relaxed">
+                  Portfolio roll-ups, stage-gate readiness, financial summaries, contracts,
+                  inspections, and board packets across every job. Granted seat by seat by an owner
+                  or admin, prorated onto your subscription, off any time.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => scrollTo("featured-exec-os")}
+              className="lp-rule inline-flex shrink-0 items-center gap-1.5 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
+              data-testid="button-exec-os-learn-more"
+            >
+              What's inside <ArrowRight className="size-3.5" />
+            </button>
+          </div>
+
+          {/* Subscribe handoff */}
+          <div id="subscribe" className="lp-card mx-auto mt-10 max-w-md rounded-lg p-6 shadow-sm">
+            <div className="ff-kicker lp-accent-text text-[10px]">Subscribe</div>
             {(() => {
               const activeP = PLANS.find((p) => p.key === activePlan)!;
               const activePrice = billing === "monthly" ? activeP.baseMonthly : activeP.baseAnnual;
@@ -724,9 +777,9 @@ export default function Landing() {
               return (
                 <>
                   <div className="mt-1 font-display text-xl font-bold">
-                    Start with {activeP.name} — <span className="text-primary">${activePrice.toLocaleString()}{activePeriod}</span>
+                    Start with {activeP.name} — <span className="lp-accent-text">${activePrice.toLocaleString()}{activePeriod}</span>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">Includes {activeP.includedSeats} seats. Billed {billing}. Change plan or cancel anytime.</p>
+                  <p className="lp-muted mt-1 text-xs">Includes {activeP.includedSeats} seats. Billed {billing}. Change plan or cancel anytime.</p>
                 </>
               );
             })()}
@@ -737,86 +790,137 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ------------------------------ FAQ ------------------------------ */}
-      <section id="faq" className="border-b border-border">
+      {/* ------------------------------ 7. FAQ ------------------------------ */}
+      <section id="faq" className="lp-rule border-b">
         <div className="mx-auto max-w-4xl px-4 py-16 md:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="ff-kicker text-primary">FAQ</div>
-            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">Common questions.</h2>
-            <p className="mt-3 text-muted-foreground">Short answers. If we missed one, <button onClick={() => scrollTo("demo")} className="font-semibold text-primary underline-offset-2 hover:underline">book a demo</button> and ask.</p>
-          </div>
-          <FAQList />
-          <div className="mt-10 rounded-xl border border-border bg-muted/40 p-5 text-center text-sm text-muted-foreground">
-            Still have questions?{" "}
-            <a href="mailto:hello@trusspath.com" className="font-semibold text-primary hover:underline">Email us</a>{" "}
-            or{" "}
-            <button onClick={() => scrollTo("demo")} className="font-semibold text-primary hover:underline" data-testid="faq-cta-demo">book a demo</button>.
+          <div className="ff-kicker lp-accent-text">FAQ</div>
+          <h2 className="lp-display mt-2 text-3xl md:text-4xl">Straight answers.</h2>
+          <Accordion type="single" collapsible defaultValue="faq-0" className="mt-8" data-testid="faq-list">
+            {FAQS.map((f, i) => (
+              <AccordionItem key={f.q} value={`faq-${i}`} className="lp-rule" data-testid={`faq-item-${i}`}>
+                <AccordionTrigger className="text-left font-display text-base font-bold" data-testid={`faq-question-${i}`}>
+                  {f.q}
+                </AccordionTrigger>
+                <AccordionContent className="lp-muted text-sm leading-relaxed" data-testid={`faq-answer-${i}`}>
+                  {f.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+          <div className="lp-card mt-8 rounded-lg p-5 text-center text-sm">
+            <span className="lp-muted">Didn't find it? </span>
+            <a href="mailto:hello@trusspath.com" className="lp-accent-text font-semibold hover:underline">Email us</a>
+            <span className="lp-muted"> or </span>
+            <button onClick={() => scrollTo("demo")} className="lp-accent-text font-semibold hover:underline" data-testid="faq-cta-demo">book a demo</button>
+            <span className="lp-muted">.</span>
           </div>
         </div>
       </section>
 
       {/* ------------------------------ Demo ------------------------------ */}
-      <section id="demo" className="border-b border-border">
+      <section id="demo" className="lp-rule lp-paper-2 border-b">
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-4 py-16 md:grid-cols-2 md:py-20">
           <div>
-            <div className="ff-kicker text-primary">Book a demo</div>
-            <h2 className="mt-2 font-display text-3xl font-black tracking-tight md:text-4xl">See TrussPath on your jobsite.</h2>
-            <p className="mt-3 text-muted-foreground">
-              30 minutes with a construction ops specialist. Bring one project — we'll show you exactly how TrussPath replaces your current stack.
+            <div className="ff-kicker lp-accent-text">Book a demo</div>
+            <h2 className="lp-display mt-2 text-3xl md:text-4xl">See it on your jobsite.</h2>
+            <p className="lp-muted mt-3">
+              Thirty minutes with a construction ops specialist. Bring one project — we'll show you
+              exactly what TrussPath replaces.
             </p>
             <ul className="mt-6 space-y-3 text-sm">
               {[
-                "Live walkthrough tailored to your workflows",
+                "Live walkthrough on your workflows",
                 "Field kit demo on a real phone (bring yours)",
-                "Migration plan from your existing PM tool or spreadsheets",
+                "Migration plan off your current tool or spreadsheets",
                 "Q&A with an ex-superintendent, not a sales rep",
                 "Custom pricing for teams of 50+",
               ].map((b) => (
                 <li key={b} className="flex items-start gap-2">
-                  <Check className="mt-0.5 size-4 shrink-0 text-primary" /> <span>{b}</span>
+                  <Check className="lp-accent-text mt-0.5 size-4 shrink-0" /> <span>{b}</span>
                 </li>
               ))}
             </ul>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <div className="lp-card rounded-lg p-6 shadow-sm">
             <DemoForm />
           </div>
         </div>
       </section>
 
-      {/* ------------------------------ CTA ------------------------------ */}
-      <section className="border-b border-border bg-primary text-primary-foreground">
-        <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-4 py-14 text-center">
-          <h2 className="font-display text-3xl font-black tracking-tight md:text-4xl">Get out of the truck. Get into TrussPath.</h2>
-          <p className="max-w-xl text-primary-foreground/80">Try the live app on your phone — installs to the home screen in one tap. Realistic seed data included.</p>
-          <div className="mt-2 flex flex-wrap justify-center gap-3">
-            <Link href="/app">
-              <Button size="lg" variant="secondary" data-testid="button-cta-app">Open the live app <ArrowRight className="ml-1.5 size-4" /></Button>
-            </Link>
-            <Button size="lg" variant="outline" onClick={() => scrollTo("demo")} className="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-cta-demo">
+      {/* ------------------------------ Closing CTA ------------------------------ */}
+      <section className="lp-slab lp-rule border-b">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-5 px-4 py-16 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="lp-display text-3xl md:text-4xl">Get out of the truck. Get into TrussPath.</h2>
+            <p className="mt-2 max-w-xl text-white/60">
+              Fourteen days free, no card. Installs to the home screen in one tap.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <a
+              href={signupHref(activePlan, billing)}
+              className="lp-accent-bg inline-flex items-center gap-2 rounded-md px-6 py-3.5 text-base font-bold transition-opacity hover:opacity-90"
+              data-testid="button-cta-signup"
+            >
+              Start free trial <ArrowRight className="size-4" />
+            </a>
+            <button
+              onClick={() => scrollTo("demo")}
+              className="inline-flex items-center rounded-md border border-white/25 px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10"
+              data-testid="button-cta-demo"
+            >
               Book a demo
-            </Button>
+            </button>
           </div>
         </div>
       </section>
 
-      {/* ------------------------------ Footer ------------------------------ */}
-      <footer className="border-b border-border">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-4 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2">
-            <Logo className="size-5" />
-            <span className="font-display text-sm font-bold text-foreground">TrussPath</span>
-            <span>© {new Date().getFullYear()}</span>
+      {/* ------------------------------ 8. Footer ------------------------------ */}
+      <footer className="lp-paper">
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-5">
+            <div className="col-span-2 md:col-span-2">
+              <div className="flex items-center gap-2.5">
+                <Logo className="size-7" />
+                <span className="lp-display text-base">TrussPath</span>
+              </div>
+              <p className="lp-muted mt-3 max-w-xs text-sm leading-relaxed">
+                Field-first construction project management. Built for crews who make decisions
+                standing up.
+              </p>
+            </div>
+            <div>
+              <div className="ff-kicker text-[10px]">Product</div>
+              <ul className="lp-muted mt-3 space-y-2 text-sm">
+                <li><button onClick={() => scrollTo("product")} className="lp-link">Overview</button></li>
+                <li><button onClick={() => scrollTo("field-kit")} className="lp-link">Field kit</button></li>
+                <li><button onClick={() => scrollTo("exec-os-addon")} className="lp-link">Executive OS</button></li>
+                <li><Link href="/subs" className="lp-link">Sub Drop</Link></li>
+                <li><button onClick={() => scrollTo("pricing")} className="lp-link">Pricing</button></li>
+              </ul>
+            </div>
+            <div>
+              <div className="ff-kicker text-[10px]">Company</div>
+              <ul className="lp-muted mt-3 space-y-2 text-sm">
+                <li><button onClick={() => scrollTo("demo")} className="lp-link">Book a demo</button></li>
+                <li><button onClick={() => scrollTo("faq")} className="lp-link">FAQ</button></li>
+                <li><Link href="/login" className="lp-link">Sign in</Link></li>
+                <li><a href={signupHref("pro", "monthly")} className="lp-link">Get started</a></li>
+              </ul>
+            </div>
+            <div>
+              <div className="ff-kicker text-[10px]">Legal & contact</div>
+              <ul className="lp-muted mt-3 space-y-2 text-sm">
+                <li><Link href="/terms" className="lp-link">Terms of service</Link></li>
+                <li><Link href="/privacy" className="lp-link">Privacy policy</Link></li>
+                <li><a href="mailto:hello@trusspath.com" className="lp-link">hello@trusspath.com</a></li>
+                <li><a href="mailto:support@trusspath.com" className="lp-link">support@trusspath.com</a></li>
+              </ul>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <button onClick={() => scrollTo("features")} className="hover:text-foreground">Features</button>
-            <button onClick={() => scrollTo("field")} className="hover:text-foreground">Field kit</button>
-            <button onClick={() => scrollTo("pricing")} className="hover:text-foreground">Pricing</button>
-            <button onClick={() => scrollTo("demo")} className="hover:text-foreground">Demo</button>
-            <Link href="/app" className="hover:text-foreground">Live app</Link>
-            <Link href="/terms" className="hover:text-foreground">Terms</Link>
-            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
-            <a href="mailto:hello@trusspath.com" className="hover:text-foreground">hello@trusspath.com</a>
+          <div className="lp-rule lp-muted mt-10 flex flex-col gap-2 border-t pt-6 text-xs sm:flex-row sm:items-center sm:justify-between">
+            <span>© {new Date().getFullYear()} TrussPath. All rights reserved.</span>
+            <span className="font-mono uppercase tracking-wider">Encrypted in transit and at rest · SOC 2 Type II in progress</span>
           </div>
         </div>
       </footer>

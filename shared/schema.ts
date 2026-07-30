@@ -45,6 +45,10 @@ export const memberships = pgTable("memberships", {
   role: text("role").notNull(), // owner | admin | pm | foreman | viewer
   status: text("status").notNull().default("active"), // active | removed
   createdAt: text("created_at").notNull(),
+  // Executive OS paid add-on, granted per seat at $5/user/month. Billing is
+  // driven off the count of memberships with this set, so it is the single
+  // source of truth for both entitlement and the Stripe subscription quantity.
+  hasExecutiveOs: boolean("has_executive_os").notNull().default(false),
 });
 
 /* -------------------------------- Invites -------------------------------- */

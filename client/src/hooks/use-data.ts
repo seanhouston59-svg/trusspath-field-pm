@@ -804,6 +804,9 @@ export type BillingStatus = {
   cancelAtPeriodEnd?: boolean;
   hasCustomer: boolean;
   seats?: { active: number; included: number | null; overage: number | null };
+  // Server-derived feature entitlements. `executiveOs` is the caller's own seat;
+  // `execOsSeatCount` is the org-wide granted count that drives the add-on line.
+  entitlements?: { executiveOs: boolean; execOsSeatCount: number };
 };
 export function useBillingStatus() {
   return useQuery<BillingStatus>({
@@ -850,7 +853,7 @@ export function useUpcomingInvoice() {
 }
 
 /* ----------------------- Organization / Team ----------------------- */
-export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string };
+export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string; hasExecutiveOs?: boolean };
 export type Invite = { id: number; token: string; organizationId: number; email: string; role: string; createdAt: string; expiresAt: string; acceptedAt: string | null };
 export type OrgSummary = { id: number; name: string; slug: string; ownerAccountId: number; subscriptionStatus: string | null; subscriptionPlan: string | null; subscriptionBilling: string | null; trialEndsAt: string | null; timezone: string; disabledIntegrations?: Record<string, boolean> | null; };
 
@@ -936,6 +939,31 @@ export function useRemoveMember() {
     },
   });
 }
+/* ------------------- Executive OS add-on (per-seat) ------------------- */
+// Grant/revoke both move money, so they invalidate billing status alongside the
+// member lists — with staleTime: Infinity an omitted key shows a stale seat
+// count indefinitely.
+function invalidateExecOs(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["/api/org/members/exec-os"] });
+  qc.invalidateQueries({ queryKey: ["/api/org/members"] });
+  qc.invalidateQueries({ queryKey: ["/api/org/current"] });
+  qc.invalidateQueries({ queryKey: ["/api/billing/status"] });
+}
+
+export function useSetMemberExecutiveOs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, enabled }: { id: number; enabled: boolean }) => {
+      const res = await apiRequest(
+        enabled ? "POST" : "DELETE",
+        `/api/org/members/${id}/exec-os`,
+      );
+      return res.json();
+    },
+    onSuccess: () => invalidateExecOs(qc),
+  });
+}
+
 export function useOrgInvites() {
   return useQuery<{ invites: Invite[] }>({ queryKey: ["/api/org/invites"] });
 }

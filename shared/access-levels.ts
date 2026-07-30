@@ -62,6 +62,7 @@ const R = {
   settings: "/settings",
   settingsTeam: "/settings/team",
   executiveOs: "/executive-os",
+  executiveOsUpsell: "/executive-os/upsell",
   executiveOsProjectSetup: "/executive-os/project-setup",
   executiveOsProjectSetupDetail: "/executive-os/project-setup/:id",
   executiveOsPreConstruction: "/executive-os/pre-construction",
@@ -172,7 +173,10 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     order: 2,
     canManageTeam: true, canManageSettings: false, canManageIntegrations: true,
     canViewFinancials: true, canDelete: true, canCreateEdit: true, canResetData: false,
-    allowedRoutes: ALL.filter((r) => r !== R.settings && r !== R.settingsTeam && r !== R.adminSignups && !r.startsWith(R.executiveOs)),
+    // Executive OS is no longer filtered out here — it is a paid per-seat
+    // add-on enforced server-side off memberships.has_executive_os, and this
+    // access-level system is a client-side preview, not authorization.
+    allowedRoutes: ALL.filter((r) => r !== R.settings && r !== R.settingsTeam && r !== R.adminSignups),
   },
   {
     slug: "superintendent",
