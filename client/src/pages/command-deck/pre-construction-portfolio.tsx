@@ -44,7 +44,7 @@ function ProjectCard({ row }: { row: PreConstructionPortfolioRow }) {
   const criticalShort = h.missingCriticalPermits.length > 0;
   return (
     <Link
-      href={`/executive-os/pre-construction/${row.project.id}`}
+      href={`/command-deck/pre-construction/${row.project.id}`}
       className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/30"
       data-testid={`precon-portfolio-card-${row.project.id}`}
     >

@@ -161,7 +161,7 @@ function ProjectRollupRow({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link
-                    href={`/executive-os/${m.slug}/${project.id}`}
+                    href={`/command-deck/${m.slug}/${project.id}`}
                     className={cn(
                       "relative flex min-h-[52px] flex-col items-start justify-between rounded-md px-2 py-1.5 text-[10px] font-semibold leading-tight transition-colors",
                       cellClass,

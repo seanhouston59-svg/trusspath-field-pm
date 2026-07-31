@@ -40,7 +40,7 @@ function StatusPill({ status }: { status: string }) {
 function ProjectCard({ row }: { row: ProjectSetupPortfolioRow }) {
   return (
     <Link
-      href={`/executive-os/project-setup/${row.projectId}`}
+      href={`/command-deck/project-setup/${row.projectId}`}
       className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/30"
       data-testid={`setup-portfolio-card-${row.projectId}`}
     >

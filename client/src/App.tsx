@@ -48,7 +48,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
-import { APP_ROUTES } from "@shared/app-manifest";
+import { APP_ROUTES, LEGACY_COMMAND_DECK_ROUTES, toCommandDeckUrl } from "@shared/app-manifest";
 import { AccessProvider, useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useStickyDing } from "@/hooks/use-sticky-ding";
@@ -175,14 +175,14 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/deleted-items": DeletedItemsPage,
   "/settings": SettingsPage,
   "/settings/team": TeamSettingsPage,
-  "/executive-os": CommandDeck,
-  "/executive-os/upsell": CommandDeckUpsell,
-  "/executive-os/project-setup": ProjectSetupPortfolio,
-  "/executive-os/project-setup/:id": ProjectSetupDetail,
-  "/executive-os/pre-construction": PreConstructionPortfolio,
-  "/executive-os/pre-construction/:id": PreConstructionDetail,
-  "/executive-os/mobilization": MobilizationPortfolio,
-  "/executive-os/mobilization/:id": MobilizationDetail,
+  "/command-deck": CommandDeck,
+  "/command-deck/upsell": CommandDeckUpsell,
+  "/command-deck/project-setup": ProjectSetupPortfolio,
+  "/command-deck/project-setup/:id": ProjectSetupDetail,
+  "/command-deck/pre-construction": PreConstructionPortfolio,
+  "/command-deck/pre-construction/:id": PreConstructionDetail,
+  "/command-deck/mobilization": MobilizationPortfolio,
+  "/command-deck/mobilization/:id": MobilizationDetail,
   // Financials + Board Packets: explicit mappings live in ROUTE_OVERRIDES below
   // so they win over the LEAN_MODULES generic fallback. See the note there.
   // Modules 4-22 all render the shared lean module page (portfolio + detail).
@@ -195,25 +195,25 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
       const Portfolio = () => <LeanModulePortfolioPage moduleId={m.slug} />;
       const Detail = () => <LeanModuleDetailPage moduleId={m.slug} />;
       return [
-        [`/executive-os/${m.slug}`, Portfolio],
-        [`/executive-os/${m.slug}/:id`, Detail],
+        [`/command-deck/${m.slug}`, Portfolio],
+        [`/command-deck/${m.slug}/:id`, Detail],
       ];
     }),
   ),
   // Explicit overrides for graduated Command Deck modules. These MUST come after
   // the LEAN_MODULES.flatMap spread above so they win the key collision on
-  // /executive-os/financials. Board packets is a fresh route with no lean-
+  // /command-deck/financials. Board packets is a fresh route with no lean-
   // module analog, but lives here to keep the graduated modules together.
-  "/executive-os/financials": FinancialsPortfolio,
+  "/command-deck/financials": FinancialsPortfolio,
   // Per-project financials still delegate to the lean-module detail page
   // (change orders + budget lines already live there). Wrap with a local
   // component so we don't have to duplicate the moduleId binding.
-  "/executive-os/financials/:id": () => <LeanModuleDetailPage moduleId="financials" />,
-  "/executive-os/board-packets": BoardPackets,
-  "/executive-os/contracts": ContractsPortfolio,
-  "/executive-os/contracts/:id": ContractDetail,
-  "/executive-os/inspections": InspectionsPortfolio,
-  "/executive-os/inspections/:id": InspectionDetail,
+  "/command-deck/financials/:id": () => <LeanModuleDetailPage moduleId="financials" />,
+  "/command-deck/board-packets": BoardPackets,
+  "/command-deck/contracts": ContractsPortfolio,
+  "/command-deck/contracts/:id": ContractDetail,
+  "/command-deck/inspections": InspectionsPortfolio,
+  "/command-deck/inspections/:id": InspectionDetail,
   "/field": FieldHub,
   "/field/daily-log": FieldDailyLog,
   "/field/timecard": FieldTimecard,
@@ -222,6 +222,24 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/field/voice-note": FieldVoiceNote,
   "/field/punch": FieldPunch,
 };
+
+/**
+ * Sends a legacy /executive-os/* hash to its /command-deck/* equivalent.
+ * Reads the raw hash rather than the wouter location so a "?field=1" tail
+ * survives the hop — useHashLocationNoQuery strips the query before matching.
+ *
+ * main.tsx handles the pathname form (someone typing the old URL) before
+ * wouter mounts; this covers hashes, which is what old bookmarks and any
+ * in-app link we missed will carry.
+ */
+function LegacyCommandDeckRedirect() {
+  const [loc, setLocation] = useLocation();
+  useEffect(() => {
+    const target = toCommandDeckUrl(window.location.hash.replace(/^#/, ""));
+    if (target) setLocation(target, { replace: true });
+  }, [loc, setLocation]);
+  return null;
+}
 
 function AppRouter() {
   return (
@@ -232,6 +250,9 @@ function AppRouter() {
       <Route path="/admin/demo-accounts" component={AdminDemoAccounts} />
       {APP_ROUTES.filter((p) => ROUTE_COMPONENTS[p]).map((p) => (
         <Route key={p} path={p} component={ROUTE_COMPONENTS[p]} />
+      ))}
+      {LEGACY_COMMAND_DECK_ROUTES.map((p) => (
+        <Route key={p} path={p} component={LegacyCommandDeckRedirect} />
       ))}
       <Route component={NotFound} />
     </Switch>
@@ -270,13 +291,13 @@ function AccessRestricted() {
   );
 }
 
-const COMMAND_DECK_UPSELL_PATH = "/executive-os/upsell";
+const COMMAND_DECK_UPSELL_PATH = "/command-deck/upsell";
 
 function AccessGate() {
   const [loc] = useLocation();
   const { isAllowed } = useAccess();
   // Command Deck is a paid per-seat add-on. Gating here rather than at each of
-  // the ~60 /executive-os route patterns covers the generated lean-module routes too.
+  // the ~60 /command-deck route patterns covers the generated lean-module routes too.
   // This is a UX redirect only — the API is enforced by requireExecutiveOs.
   const commandDeck = useCommandDeckEntitlement();
   // Play a soft ding whenever a new sticky note or sticker appears on the
@@ -288,7 +309,7 @@ function AccessGate() {
   // RequireAuth already blocks paint until billing status resolves, so there is
   // no upsell flash here; the isLoading check is belt-and-braces.
   if (
-    loc.startsWith("/executive-os") &&
+    loc.startsWith("/command-deck") &&
     loc !== COMMAND_DECK_UPSELL_PATH &&
     !commandDeck.isLoading &&
     !commandDeck.hasAccess

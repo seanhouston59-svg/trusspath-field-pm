@@ -55,7 +55,7 @@ export default function CommandDeckUpsellPage() {
         title: "Command Deck enabled",
         description: "$5/month was added to your subscription, prorated for this cycle.",
       });
-      window.location.hash = "/executive-os";
+      window.location.hash = "/command-deck";
     } catch (err: any) {
       toast({
         title: "Could not enable Command Deck",

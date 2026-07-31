@@ -41,7 +41,7 @@ export type PreConstructionHealth = {
 };
 
 /** The portfolio endpoint nests the project rather than flattening name/id onto
- *  the health row the way /executive-os/project-setup does. Kept as-is so the
+ *  the health row the way /command-deck/project-setup does. Kept as-is so the
  *  card can show the plan row's own fields (target dates, lead) without a
  *  second fetch per project. */
 export type PreConstructionPortfolioRow = {

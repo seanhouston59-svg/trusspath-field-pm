@@ -10,6 +10,79 @@
 
 export type RoutePattern = string;
 
+export const COMMAND_DECK_PREFIX = "/command-deck";
+/** Command Deck shipped as "Executive OS" and its URLs still circulate in
+ *  bookmarks, emails, and board packets, so the old prefix stays routable. */
+const LEGACY_COMMAND_DECK_PREFIX = "/executive-os";
+
+function hasPrefix(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+export function isCommandDeckPath(path: string): boolean {
+  return hasPrefix(path, COMMAND_DECK_PREFIX);
+}
+
+/** `/command-deck/mep` -> `/executive-os/mep`. Expects a Command Deck path. */
+export function toLegacyCommandDeckPath(path: string): string {
+  return LEGACY_COMMAND_DECK_PREFIX + path.slice(COMMAND_DECK_PREFIX.length);
+}
+
+/** `/executive-os/mep?x=1` -> `/command-deck/mep?x=1`, keeping any query or
+ *  fragment tail intact. Returns null when `url` is not a legacy URL. */
+export function toCommandDeckUrl(url: string): string | null {
+  const tailAt = url.search(/[?#]/);
+  const path = tailAt === -1 ? url : url.slice(0, tailAt);
+  if (!hasPrefix(path, LEGACY_COMMAND_DECK_PREFIX)) return null;
+  const tail = tailAt === -1 ? "" : url.slice(tailAt);
+  return COMMAND_DECK_PREFIX + path.slice(LEGACY_COMMAND_DECK_PREFIX.length) + tail;
+}
+
+/** Command Deck route patterns (:id = dynamic segment). */
+export const COMMAND_DECK_ROUTES: RoutePattern[] = [
+  "/command-deck", "/command-deck/upsell",
+  "/command-deck/project-setup", "/command-deck/project-setup/:id",
+  "/command-deck/pre-construction", "/command-deck/pre-construction/:id",
+  "/command-deck/mobilization", "/command-deck/mobilization/:id",
+  // Skeleton routes (modules 4-22) — placeholder pages until each ships.
+  "/command-deck/site-logistics", "/command-deck/site-logistics/:id",
+  "/command-deck/sitework", "/command-deck/sitework/:id",
+  "/command-deck/foundations", "/command-deck/foundations/:id",
+  "/command-deck/structure", "/command-deck/structure/:id",
+  "/command-deck/envelope", "/command-deck/envelope/:id",
+  "/command-deck/mep", "/command-deck/mep/:id",
+  "/command-deck/interior-framing", "/command-deck/interior-framing/:id",
+  "/command-deck/interior-finishes", "/command-deck/interior-finishes/:id",
+  "/command-deck/vertical-transportation", "/command-deck/vertical-transportation/:id",
+  "/command-deck/site-improvements", "/command-deck/site-improvements/:id",
+  "/command-deck/commissioning", "/command-deck/commissioning/:id",
+  "/command-deck/punch-list", "/command-deck/punch-list/:id",
+  "/command-deck/closeout", "/command-deck/closeout/:id",
+  "/command-deck/warranty", "/command-deck/warranty/:id",
+  "/command-deck/safety", "/command-deck/safety/:id",
+  "/command-deck/quality", "/command-deck/quality/:id",
+  "/command-deck/financials", "/command-deck/financials/:id",
+  "/command-deck/schedule", "/command-deck/schedule/:id",
+  "/command-deck/risk", "/command-deck/risk/:id",
+  // New lean modules (lifecycle overhaul, Jul 2026).
+  "/command-deck/material-tracking", "/command-deck/material-tracking/:id",
+  "/command-deck/om-manuals", "/command-deck/om-manuals/:id",
+  "/command-deck/as-builts", "/command-deck/as-builts/:id",
+  "/command-deck/owner-training", "/command-deck/owner-training/:id",
+  "/command-deck/turnover-package", "/command-deck/turnover-package/:id",
+  "/command-deck/risk-register", "/command-deck/risk-register/:id",
+  "/command-deck/meetings", "/command-deck/meetings/:id",
+  // Purpose-built (non-lean) Command Deck surfaces.
+  "/command-deck/contracts", "/command-deck/contracts/:id",
+  "/command-deck/inspections", "/command-deck/inspections/:id",
+  "/command-deck/board-packets",
+];
+
+/** The pre-rename URLs. Registered as real routes so legacy links resolve to a
+ *  redirect instead of the 404 page, and so the health scan doesn't flag them. */
+export const LEGACY_COMMAND_DECK_ROUTES: RoutePattern[] =
+  COMMAND_DECK_ROUTES.map(toLegacyCommandDeckPath);
+
 /** Every route registered in App.tsx (patterns; :id = dynamic segment). */
 export const APP_ROUTES: RoutePattern[] = [
   "/", "/app", "/notifications", "/projects", "/projects/:id", "/projects/:id/sub-uploads", "/schedule", "/gantt", "/cpm", "/integrations",
@@ -17,42 +90,8 @@ export const APP_ROUTES: RoutePattern[] = [
   "/daily-logs", "/photos", "/documents", "/company-documents", "/blueprints", "/equipment", "/drone",
   "/team", "/contacts", "/messages", "/notes", "/timesheets", "/deleted-items", "/settings", "/settings/team",
   "/teams", "/excel",
-  "/executive-os", "/executive-os/upsell",
-  "/executive-os/project-setup", "/executive-os/project-setup/:id",
-  "/executive-os/pre-construction", "/executive-os/pre-construction/:id",
-  "/executive-os/mobilization", "/executive-os/mobilization/:id",
-  // Skeleton routes (modules 4-22) — placeholder pages until each ships.
-  "/executive-os/site-logistics", "/executive-os/site-logistics/:id",
-  "/executive-os/sitework", "/executive-os/sitework/:id",
-  "/executive-os/foundations", "/executive-os/foundations/:id",
-  "/executive-os/structure", "/executive-os/structure/:id",
-  "/executive-os/envelope", "/executive-os/envelope/:id",
-  "/executive-os/mep", "/executive-os/mep/:id",
-  "/executive-os/interior-framing", "/executive-os/interior-framing/:id",
-  "/executive-os/interior-finishes", "/executive-os/interior-finishes/:id",
-  "/executive-os/vertical-transportation", "/executive-os/vertical-transportation/:id",
-  "/executive-os/site-improvements", "/executive-os/site-improvements/:id",
-  "/executive-os/commissioning", "/executive-os/commissioning/:id",
-  "/executive-os/punch-list", "/executive-os/punch-list/:id",
-  "/executive-os/closeout", "/executive-os/closeout/:id",
-  "/executive-os/warranty", "/executive-os/warranty/:id",
-  "/executive-os/safety", "/executive-os/safety/:id",
-  "/executive-os/quality", "/executive-os/quality/:id",
-  "/executive-os/financials", "/executive-os/financials/:id",
-  "/executive-os/schedule", "/executive-os/schedule/:id",
-  "/executive-os/risk", "/executive-os/risk/:id",
-  // New lean modules (lifecycle overhaul, Jul 2026).
-  "/executive-os/material-tracking", "/executive-os/material-tracking/:id",
-  "/executive-os/om-manuals", "/executive-os/om-manuals/:id",
-  "/executive-os/as-builts", "/executive-os/as-builts/:id",
-  "/executive-os/owner-training", "/executive-os/owner-training/:id",
-  "/executive-os/turnover-package", "/executive-os/turnover-package/:id",
-  "/executive-os/risk-register", "/executive-os/risk-register/:id",
-  "/executive-os/meetings", "/executive-os/meetings/:id",
-  // Purpose-built exec-os surfaces.
-  "/executive-os/contracts", "/executive-os/contracts/:id",
-  "/executive-os/inspections", "/executive-os/inspections/:id",
-  "/executive-os/board-packets",
+  ...COMMAND_DECK_ROUTES,
+  ...LEGACY_COMMAND_DECK_ROUTES,
   "/field", "/field/daily-log", "/field/timecard", "/field/photo", "/field/observation", "/field/voice-note", "/field/punch",
 ];
 
@@ -144,41 +183,41 @@ export const APP_NAV: NavGroup[] = [
     // Safety, Quality, etc.) and have no natural phase slot.
     title: "Command Deck",
     items: [
-      { href: "/executive-os", label: "Overview", icon: "Sparkles" },
+      { href: "/command-deck", label: "Overview", icon: "Sparkles" },
       { subheader: "Phases" },
-      { href: "/executive-os/project-setup", label: "Project Setup", icon: "ClipboardList" },
-      { href: "/executive-os/pre-construction", label: "Pre-Construction", icon: "Ruler" },
-      { href: "/executive-os/mobilization", label: "Mobilization", icon: "Rocket" },
-      { href: "/executive-os/site-logistics", label: "Site Logistics", icon: "Truck" },
-      { href: "/executive-os/sitework", label: "Sitework & Earthwork", icon: "Mountain" },
-      { href: "/executive-os/foundations", label: "Foundations", icon: "Layers" },
-      { href: "/executive-os/structure", label: "Structure", icon: "Building2" },
-      { href: "/executive-os/envelope", label: "Building Envelope", icon: "Home" },
-      { href: "/executive-os/mep", label: "MEP Rough-in", icon: "Cable" },
-      { href: "/executive-os/interior-framing", label: "Interior Framing", icon: "Boxes" },
-      { href: "/executive-os/vertical-transportation", label: "Vertical Transportation", icon: "ArrowUpDown" },
-      { href: "/executive-os/interior-finishes", label: "Interior Finishes", icon: "Paintbrush" },
-      { href: "/executive-os/site-improvements", label: "Site Improvements", icon: "Trees" },
-      { href: "/executive-os/commissioning", label: "Commissioning", icon: "Gauge" },
-      { href: "/executive-os/inspections", label: "Inspections", icon: "ClipboardCheck" },
-      { href: "/executive-os/punch-list", label: "Punch List", icon: "ListTodo" },
-      { href: "/executive-os/closeout", label: "Closeout & C of O", icon: "PackageCheck" },
-      { href: "/executive-os/as-builts", label: "As-Built Drawings", icon: "FileSpreadsheet" },
-      { href: "/executive-os/om-manuals", label: "O&M Manuals", icon: "BookOpen" },
-      { href: "/executive-os/owner-training", label: "Owner Training", icon: "GraduationCap" },
-      { href: "/executive-os/turnover-package", label: "Turnover Package", icon: "PackageOpen" },
-      { href: "/executive-os/warranty", label: "Post-Occupancy / Warranty", icon: "BadgeCheck" },
+      { href: "/command-deck/project-setup", label: "Project Setup", icon: "ClipboardList" },
+      { href: "/command-deck/pre-construction", label: "Pre-Construction", icon: "Ruler" },
+      { href: "/command-deck/mobilization", label: "Mobilization", icon: "Rocket" },
+      { href: "/command-deck/site-logistics", label: "Site Logistics", icon: "Truck" },
+      { href: "/command-deck/sitework", label: "Sitework & Earthwork", icon: "Mountain" },
+      { href: "/command-deck/foundations", label: "Foundations", icon: "Layers" },
+      { href: "/command-deck/structure", label: "Structure", icon: "Building2" },
+      { href: "/command-deck/envelope", label: "Building Envelope", icon: "Home" },
+      { href: "/command-deck/mep", label: "MEP Rough-in", icon: "Cable" },
+      { href: "/command-deck/interior-framing", label: "Interior Framing", icon: "Boxes" },
+      { href: "/command-deck/vertical-transportation", label: "Vertical Transportation", icon: "ArrowUpDown" },
+      { href: "/command-deck/interior-finishes", label: "Interior Finishes", icon: "Paintbrush" },
+      { href: "/command-deck/site-improvements", label: "Site Improvements", icon: "Trees" },
+      { href: "/command-deck/commissioning", label: "Commissioning", icon: "Gauge" },
+      { href: "/command-deck/inspections", label: "Inspections", icon: "ClipboardCheck" },
+      { href: "/command-deck/punch-list", label: "Punch List", icon: "ListTodo" },
+      { href: "/command-deck/closeout", label: "Closeout & C of O", icon: "PackageCheck" },
+      { href: "/command-deck/as-builts", label: "As-Built Drawings", icon: "FileSpreadsheet" },
+      { href: "/command-deck/om-manuals", label: "O&M Manuals", icon: "BookOpen" },
+      { href: "/command-deck/owner-training", label: "Owner Training", icon: "GraduationCap" },
+      { href: "/command-deck/turnover-package", label: "Turnover Package", icon: "PackageOpen" },
+      { href: "/command-deck/warranty", label: "Post-Occupancy / Warranty", icon: "BadgeCheck" },
       { subheader: "Always On" },
-      { href: "/executive-os/schedule", label: "Schedule Control", icon: "CalendarClock" },
-      { href: "/executive-os/financials", label: "Financials", icon: "DollarSign" },
-      { href: "/executive-os/safety", label: "Safety", icon: "HardHat" },
-      { href: "/executive-os/quality", label: "Quality", icon: "CheckCheck" },
-      { href: "/executive-os/meetings", label: "Meetings & Minutes", icon: "Users" },
-      { href: "/executive-os/contracts", label: "Contracts Register", icon: "FileSignature" },
-      { href: "/executive-os/material-tracking", label: "Material Tracking", icon: "PackageSearch" },
-      { href: "/executive-os/risk-register", label: "Risk Register", icon: "AlertOctagon" },
-      { href: "/executive-os/risk", label: "Insurance & COI", icon: "ShieldAlert" },
-      { href: "/executive-os/board-packets", label: "Board Packets", icon: "FileText" },
+      { href: "/command-deck/schedule", label: "Schedule Control", icon: "CalendarClock" },
+      { href: "/command-deck/financials", label: "Financials", icon: "DollarSign" },
+      { href: "/command-deck/safety", label: "Safety", icon: "HardHat" },
+      { href: "/command-deck/quality", label: "Quality", icon: "CheckCheck" },
+      { href: "/command-deck/meetings", label: "Meetings & Minutes", icon: "Users" },
+      { href: "/command-deck/contracts", label: "Contracts Register", icon: "FileSignature" },
+      { href: "/command-deck/material-tracking", label: "Material Tracking", icon: "PackageSearch" },
+      { href: "/command-deck/risk-register", label: "Risk Register", icon: "AlertOctagon" },
+      { href: "/command-deck/risk", label: "Insurance & COI", icon: "ShieldAlert" },
+      { href: "/command-deck/board-packets", label: "Board Packets", icon: "FileText" },
     ],
   },
 ];

@@ -214,7 +214,7 @@ export default function FinancialsPortfolio() {
                     {sortedProjects.map((p) => (
                       <Link
                         key={p.projectId}
-                        href={`/executive-os/financials/${p.projectId}`}
+                        href={`/command-deck/financials/${p.projectId}`}
                         className="group grid grid-cols-[minmax(0,1.5fr)_1fr_1fr_1fr_1fr_auto] items-center gap-3 p-4 transition-colors hover:bg-muted/30"
                         data-testid={`financials-row-${p.projectId}`}
                       >

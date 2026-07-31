@@ -100,16 +100,22 @@ export function requireRole(...allowed: OrgRole[]) {
   };
 }
 
-// Executive OS is a paid per-seat add-on. Until this existed the whole
-// /executive-os surface was gated only by a client-side dropdown, so the data
-// was readable by anyone who called the API directly.
+// Command Deck is a paid per-seat add-on. Until this existed the whole
+// surface was gated only by a client-side dropdown, so the data was readable
+// by anyone who called the API directly.
 //
 // Matched by path rather than bolted onto each handler on purpose: the
 // mobilization sub-resource routes are registered from a table in a loop, and
 // the surface is ~40 endpoints, so per-route decoration would silently miss
 // some and would not cover routes added later.
+//
+// Both API prefixes are matched: the endpoints still live under
+// /api/executive-os (renamed separately from the UI URLs), and matching
+// /api/command-deck too means a renamed endpoint arrives already gated rather
+// than briefly open.
 const EXEC_OS_PATH_PATTERNS: RegExp[] = [
   /^\/api\/executive-os\//,
+  /^\/api\/command-deck\//,
   /^\/api\/projects\/[^/]+\/(mobilization|project-setup|pre-construction)(\/|$)/,
   /^\/api\/projects\/[^/]+\/modules(\/|$)/,
 ];

@@ -81,7 +81,7 @@ export default function ContractDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/executive-os/contracts"] });
       toast({ title: "Contract deleted" });
-      setLocation("/executive-os/contracts");
+      setLocation("/command-deck/contracts");
     },
     onError: (e: Error) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
   });
@@ -100,7 +100,7 @@ export default function ContractDetail() {
       <Layout title="Contract">
         <div className="mx-auto max-w-3xl p-4">
           <div className="text-sm text-red-500">Contract not found.</div>
-          <Link href="/executive-os/contracts" className="mt-4 inline-flex items-center gap-1 text-sm underline">
+          <Link href="/command-deck/contracts" className="mt-4 inline-flex items-center gap-1 text-sm underline">
             <ArrowLeft className="size-4" /> Back to Contracts
           </Link>
         </div>
@@ -112,7 +112,7 @@ export default function ContractDetail() {
     <Layout title={data.counterpartyName}>
       <div className="mx-auto max-w-3xl px-4 py-6">
         <Link
-          href="/executive-os/contracts"
+          href="/command-deck/contracts"
           className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> All contracts

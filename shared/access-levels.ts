@@ -1,4 +1,4 @@
-import { hrefMatchesRoute } from "./app-manifest";
+import { hrefMatchesRoute, isCommandDeckPath, toLegacyCommandDeckPath } from "./app-manifest";
 
 export type AccessLevel =
   | "project_executive"
@@ -61,74 +61,74 @@ const R = {
   deletedItems: "/deleted-items",
   settings: "/settings",
   settingsTeam: "/settings/team",
-  commandDeck: "/executive-os",
-  commandDeckUpsell: "/executive-os/upsell",
-  commandDeckProjectSetup: "/executive-os/project-setup",
-  commandDeckProjectSetupDetail: "/executive-os/project-setup/:id",
-  commandDeckPreConstruction: "/executive-os/pre-construction",
-  commandDeckPreConstructionDetail: "/executive-os/pre-construction/:id",
-  commandDeckMobilization: "/executive-os/mobilization",
-  commandDeckMobilizationDetail: "/executive-os/mobilization/:id",
+  commandDeck: "/command-deck",
+  commandDeckUpsell: "/command-deck/upsell",
+  commandDeckProjectSetup: "/command-deck/project-setup",
+  commandDeckProjectSetupDetail: "/command-deck/project-setup/:id",
+  commandDeckPreConstruction: "/command-deck/pre-construction",
+  commandDeckPreConstructionDetail: "/command-deck/pre-construction/:id",
+  commandDeckMobilization: "/command-deck/mobilization",
+  commandDeckMobilizationDetail: "/command-deck/mobilization/:id",
   // Skeleton routes for lifecycle modules 4-22. Placeholder pages until each ships.
-  commandDeckSiteLogistics: "/executive-os/site-logistics",
-  commandDeckSiteLogisticsDetail: "/executive-os/site-logistics/:id",
-  commandDeckSitework: "/executive-os/sitework",
-  commandDeckSiteworkDetail: "/executive-os/sitework/:id",
-  commandDeckFoundations: "/executive-os/foundations",
-  commandDeckFoundationsDetail: "/executive-os/foundations/:id",
-  commandDeckStructure: "/executive-os/structure",
-  commandDeckStructureDetail: "/executive-os/structure/:id",
-  commandDeckEnvelope: "/executive-os/envelope",
-  commandDeckEnvelopeDetail: "/executive-os/envelope/:id",
-  commandDeckMep: "/executive-os/mep",
-  commandDeckMepDetail: "/executive-os/mep/:id",
-  commandDeckInteriorFraming: "/executive-os/interior-framing",
-  commandDeckInteriorFramingDetail: "/executive-os/interior-framing/:id",
-  commandDeckInteriorFinishes: "/executive-os/interior-finishes",
-  commandDeckInteriorFinishesDetail: "/executive-os/interior-finishes/:id",
-  commandDeckVerticalTransportation: "/executive-os/vertical-transportation",
-  commandDeckVerticalTransportationDetail: "/executive-os/vertical-transportation/:id",
-  commandDeckSiteImprovements: "/executive-os/site-improvements",
-  commandDeckSiteImprovementsDetail: "/executive-os/site-improvements/:id",
-  commandDeckCommissioning: "/executive-os/commissioning",
-  commandDeckCommissioningDetail: "/executive-os/commissioning/:id",
-  commandDeckPunchList: "/executive-os/punch-list",
-  commandDeckPunchListDetail: "/executive-os/punch-list/:id",
-  commandDeckCloseout: "/executive-os/closeout",
-  commandDeckCloseoutDetail: "/executive-os/closeout/:id",
-  commandDeckWarranty: "/executive-os/warranty",
-  commandDeckWarrantyDetail: "/executive-os/warranty/:id",
-  commandDeckSafety: "/executive-os/safety",
-  commandDeckSafetyDetail: "/executive-os/safety/:id",
-  commandDeckQuality: "/executive-os/quality",
-  commandDeckQualityDetail: "/executive-os/quality/:id",
-  commandDeckFinancials: "/executive-os/financials",
-  commandDeckFinancialsDetail: "/executive-os/financials/:id",
-  commandDeckSchedule: "/executive-os/schedule",
-  commandDeckScheduleDetail: "/executive-os/schedule/:id",
-  commandDeckRisk: "/executive-os/risk",
-  commandDeckRiskDetail: "/executive-os/risk/:id",
+  commandDeckSiteLogistics: "/command-deck/site-logistics",
+  commandDeckSiteLogisticsDetail: "/command-deck/site-logistics/:id",
+  commandDeckSitework: "/command-deck/sitework",
+  commandDeckSiteworkDetail: "/command-deck/sitework/:id",
+  commandDeckFoundations: "/command-deck/foundations",
+  commandDeckFoundationsDetail: "/command-deck/foundations/:id",
+  commandDeckStructure: "/command-deck/structure",
+  commandDeckStructureDetail: "/command-deck/structure/:id",
+  commandDeckEnvelope: "/command-deck/envelope",
+  commandDeckEnvelopeDetail: "/command-deck/envelope/:id",
+  commandDeckMep: "/command-deck/mep",
+  commandDeckMepDetail: "/command-deck/mep/:id",
+  commandDeckInteriorFraming: "/command-deck/interior-framing",
+  commandDeckInteriorFramingDetail: "/command-deck/interior-framing/:id",
+  commandDeckInteriorFinishes: "/command-deck/interior-finishes",
+  commandDeckInteriorFinishesDetail: "/command-deck/interior-finishes/:id",
+  commandDeckVerticalTransportation: "/command-deck/vertical-transportation",
+  commandDeckVerticalTransportationDetail: "/command-deck/vertical-transportation/:id",
+  commandDeckSiteImprovements: "/command-deck/site-improvements",
+  commandDeckSiteImprovementsDetail: "/command-deck/site-improvements/:id",
+  commandDeckCommissioning: "/command-deck/commissioning",
+  commandDeckCommissioningDetail: "/command-deck/commissioning/:id",
+  commandDeckPunchList: "/command-deck/punch-list",
+  commandDeckPunchListDetail: "/command-deck/punch-list/:id",
+  commandDeckCloseout: "/command-deck/closeout",
+  commandDeckCloseoutDetail: "/command-deck/closeout/:id",
+  commandDeckWarranty: "/command-deck/warranty",
+  commandDeckWarrantyDetail: "/command-deck/warranty/:id",
+  commandDeckSafety: "/command-deck/safety",
+  commandDeckSafetyDetail: "/command-deck/safety/:id",
+  commandDeckQuality: "/command-deck/quality",
+  commandDeckQualityDetail: "/command-deck/quality/:id",
+  commandDeckFinancials: "/command-deck/financials",
+  commandDeckFinancialsDetail: "/command-deck/financials/:id",
+  commandDeckSchedule: "/command-deck/schedule",
+  commandDeckScheduleDetail: "/command-deck/schedule/:id",
+  commandDeckRisk: "/command-deck/risk",
+  commandDeckRiskDetail: "/command-deck/risk/:id",
   // New lean modules added Jul 2026 based on lifecycle overhaul feedback.
-  commandDeckMaterialTracking: "/executive-os/material-tracking",
-  commandDeckMaterialTrackingDetail: "/executive-os/material-tracking/:id",
-  commandDeckOmManuals: "/executive-os/om-manuals",
-  commandDeckOmManualsDetail: "/executive-os/om-manuals/:id",
-  commandDeckAsBuilts: "/executive-os/as-builts",
-  commandDeckAsBuiltsDetail: "/executive-os/as-builts/:id",
-  commandDeckOwnerTraining: "/executive-os/owner-training",
-  commandDeckOwnerTrainingDetail: "/executive-os/owner-training/:id",
-  commandDeckTurnoverPackage: "/executive-os/turnover-package",
-  commandDeckTurnoverPackageDetail: "/executive-os/turnover-package/:id",
-  commandDeckRiskRegister: "/executive-os/risk-register",
-  commandDeckRiskRegisterDetail: "/executive-os/risk-register/:id",
-  commandDeckMeetings: "/executive-os/meetings",
-  commandDeckMeetingsDetail: "/executive-os/meetings/:id",
-  // Purpose-built (non-lean) exec-os surfaces.
-  commandDeckContracts: "/executive-os/contracts",
-  commandDeckContractsDetail: "/executive-os/contracts/:id",
-  commandDeckInspections: "/executive-os/inspections",
-  commandDeckInspectionsDetail: "/executive-os/inspections/:id",
-  commandDeckBoardPackets: "/executive-os/board-packets",
+  commandDeckMaterialTracking: "/command-deck/material-tracking",
+  commandDeckMaterialTrackingDetail: "/command-deck/material-tracking/:id",
+  commandDeckOmManuals: "/command-deck/om-manuals",
+  commandDeckOmManualsDetail: "/command-deck/om-manuals/:id",
+  commandDeckAsBuilts: "/command-deck/as-builts",
+  commandDeckAsBuiltsDetail: "/command-deck/as-builts/:id",
+  commandDeckOwnerTraining: "/command-deck/owner-training",
+  commandDeckOwnerTrainingDetail: "/command-deck/owner-training/:id",
+  commandDeckTurnoverPackage: "/command-deck/turnover-package",
+  commandDeckTurnoverPackageDetail: "/command-deck/turnover-package/:id",
+  commandDeckRiskRegister: "/command-deck/risk-register",
+  commandDeckRiskRegisterDetail: "/command-deck/risk-register/:id",
+  commandDeckMeetings: "/command-deck/meetings",
+  commandDeckMeetingsDetail: "/command-deck/meetings/:id",
+  // Purpose-built (non-lean) Command Deck surfaces.
+  commandDeckContracts: "/command-deck/contracts",
+  commandDeckContractsDetail: "/command-deck/contracts/:id",
+  commandDeckInspections: "/command-deck/inspections",
+  commandDeckInspectionsDetail: "/command-deck/inspections/:id",
+  commandDeckBoardPackets: "/command-deck/board-packets",
   adminIndex: "/admin",
   adminSignups: "/admin/signups",
   adminAccounts: "/admin/accounts",
@@ -159,6 +159,13 @@ const FIELD_KIT_ROUTES = [
 
 const ALL = Object.values(R);
 
+/** Legacy /executive-os/* URLs have to stay allowed: the access gate runs
+ *  before the router, so without them an old bookmark hits "Access restricted"
+ *  instead of reaching the redirect that would have sent it to /command-deck/*. */
+function withLegacyCommandDeck(routes: string[]): string[] {
+  return [...routes, ...routes.filter(isCommandDeckPath).map(toLegacyCommandDeckPath)];
+}
+
 export const ACCESS_LEVELS: AccessLevelDef[] = [
   {
     slug: "project_executive",
@@ -167,7 +174,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     order: 1,
     canManageTeam: true, canManageSettings: true, canManageIntegrations: true,
     canViewFinancials: true, canDelete: true, canCreateEdit: true, canResetData: true,
-    allowedRoutes: ALL,
+    allowedRoutes: withLegacyCommandDeck(ALL),
   },
   {
     slug: "project_manager",
@@ -179,14 +186,16 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     // Command Deck is no longer filtered out here — it is a paid per-seat
     // add-on enforced server-side off memberships.has_executive_os, and this
     // access-level system is a client-side preview, not authorization.
-    allowedRoutes: ALL.filter(
-      (r) =>
-        r !== R.settings &&
-        r !== R.settingsTeam &&
-        r !== R.adminIndex &&
-        r !== R.adminSignups &&
-        r !== R.adminAccounts &&
-        r !== R.adminDemoAccounts,
+    allowedRoutes: withLegacyCommandDeck(
+      ALL.filter(
+        (r) =>
+          r !== R.settings &&
+          r !== R.settingsTeam &&
+          r !== R.adminIndex &&
+          r !== R.adminSignups &&
+          r !== R.adminAccounts &&
+          r !== R.adminDemoAccounts,
+      ),
     ),
   },
   {
