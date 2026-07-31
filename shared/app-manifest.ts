@@ -62,12 +62,15 @@ export type NavGroup = { title: string; items: NavLink[] };
 /**
  * Sidebar navigation groups (mirrors client/src/components/layout.tsx).
  *
- * Grouping principle: each section answers a single question a construction
- * PM or owner asks themselves during the day — "where do things stand?",
- * "what's on the schedule?", "what's happening in the field?", etc. Sections
- * default to collapsed (see NavList in layout.tsx) so the sidebar is a short
- * clean list of intents, not a wall of links. The group holding the active
- * route auto-expands so you always see where you are.
+ * Grouping principle: sections mirror the departments of a construction
+ * company — Home, Projects, Field, HR, Admin — so a link lives wherever the
+ * person who owns that work sits. Sections default to collapsed (see NavList
+ * in layout.tsx) so the sidebar is a short clean list, not a wall of links.
+ * The group holding the active route auto-expands so you always see where
+ * you are.
+ *
+ * /deleted-items is intentionally absent — the route still works, it's just
+ * not worth a permanent sidebar slot.
  *
  * Field kit routes are intentionally NOT in the sidebar — they're reached
  * via the dedicated Field mode (topbar hard-hat toggle or PWA homescreen).
@@ -88,10 +91,16 @@ export const APP_NAV: NavGroup[] = [
       { href: "/schedule", label: "Schedule", icon: "CalendarRange" },
       { href: "/gantt", label: "Gantt", icon: "GanttChartSquare" },
       { href: "/cpm", label: "CPM Diagram", icon: "Network" },
+      { href: "/rfis", label: "RFIs", icon: "HelpCircle" },
+      { href: "/submittals", label: "Submittals", icon: "FileStack" },
+      { href: "/change-orders", label: "Change Orders", icon: "GitPullRequestArrow" },
+      { href: "/tasks", label: "Tasks", icon: "ListChecks" },
+      { href: "/action-items", label: "Action Items", icon: "CheckSquare" },
+      { href: "/documents", label: "Project Documents", icon: "FileText" },
     ],
   },
   {
-    title: "Field Ops",
+    title: "Field",
     items: [
       { href: "/daily-logs", label: "Daily Logs", icon: "ClipboardList" },
       { href: "/photos", label: "Photo Log", icon: "Image" },
@@ -99,40 +108,26 @@ export const APP_NAV: NavGroup[] = [
       { href: "/blueprints", label: "Blueprints", icon: "PencilRuler" },
       { href: "/drone", label: "Drone Captures", icon: "Plane" },
       { href: "/equipment", label: "Fleet & Equipment", icon: "Wrench" },
-      // Requests & Tasks — collapsed into Field Ops so PMs/supers see the
-      // paperwork they own next to the daily-log tools they use every morning.
-      { href: "/rfis", label: "RFIs", icon: "HelpCircle" },
-      { href: "/submittals", label: "Submittals", icon: "FileStack" },
-      { href: "/change-orders", label: "Change Orders", icon: "GitPullRequestArrow" },
-      { href: "/tasks", label: "Tasks", icon: "ListChecks" },
-      { href: "/action-items", label: "Action Items", icon: "CheckSquare" },
     ],
   },
   {
-    title: "Documents",
-    items: [
-      { href: "/documents", label: "Project Documents", icon: "FileText" },
-      { href: "/company-documents", label: "Company Documents", icon: "Building2" },
-    ],
-  },
-  {
-    title: "People & Time",
+    title: "HR",
     items: [
       { href: "/team", label: "Project Team", icon: "Users" },
       { href: "/contacts", label: "Contacts", icon: "Contact" },
-      { href: "/messages", label: "Messages", icon: "MessageSquare" },
       { href: "/timesheets", label: "Time Tracking", icon: "Clock" },
+      { href: "/messages", label: "Messages", icon: "MessageSquare" },
     ],
   },
   {
-    title: "Apps & Admin",
+    title: "Admin",
     items: [
+      { href: "/settings", label: "Settings", icon: "Settings" },
+      { href: "/settings/team", label: "Team & Access", icon: "ShieldCheck" },
       { href: "/teams", label: "Microsoft Teams", icon: "Video" },
       { href: "/excel", label: "Microsoft Excel", icon: "FileSpreadsheet" },
       { href: "/integrations", label: "Integrations", icon: "Plug" },
-      { href: "/settings", label: "Settings", icon: "Settings" },
-      { href: "/settings/team", label: "Team & Access", icon: "ShieldCheck" },
-      { href: "/deleted-items", label: "Deleted Items", icon: "Trash2" },
+      { href: "/company-documents", label: "Company Documents", icon: "Building2" },
     ],
   },
   {
