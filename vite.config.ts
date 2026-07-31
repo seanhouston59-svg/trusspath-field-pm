@@ -12,7 +12,9 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
-  base: "./",
+  // Absolute base so cold deep links (e.g. /projects/3) resolve bundle URLs to
+  // /assets/*, not /projects/3/assets/* which vercel.json rewrites won't match.
+  base: "/",
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
