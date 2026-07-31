@@ -10,7 +10,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
-import { APP_NAV } from "@shared/app-manifest";
+import { APP_NAV, isNavLink } from "@shared/app-manifest";
 import {
   useProjects,
   useTasks,
@@ -84,7 +84,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const navItems = useMemo(() => {
     const out: { href: string; label: string; group: string; icon?: string }[] = [];
     for (const g of APP_NAV) {
-      for (const it of g.items) out.push({ href: it.href, label: it.label, group: g.title, icon: it.icon });
+      for (const it of g.items.filter(isNavLink)) out.push({ href: it.href, label: it.label, group: g.title, icon: it.icon });
     }
     return out;
   }, []);
