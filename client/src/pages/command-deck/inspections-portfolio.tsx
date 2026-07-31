@@ -1,5 +1,5 @@
 /**
- * Executive OS — Inspections Portfolio.
+ * Command Deck — Inspections Portfolio.
  *
  * Org-wide list of every AHJ / third-party inspection captured on any project.
  * Rows show type, inspector, date, and result with pass/fail traffic-light

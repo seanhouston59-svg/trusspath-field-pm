@@ -182,7 +182,7 @@ function useDashboardCtx() {
     : 0;
   const spendPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
   const showMoney = can("canViewFinancials");
-  // Budget links point at the Executive OS financials module, but some roles
+  // Budget links point at the Command Deck financials module, but some roles
   // (Project Manager) can see money without being allowed into /executive-os.
   // Fall back to the projects list / project detail, which also carry budget.
   const canOpenExecFinancials = isAllowed("/executive-os/financials");

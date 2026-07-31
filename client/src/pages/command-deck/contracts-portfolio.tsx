@@ -1,5 +1,5 @@
 /**
- * Executive OS — Contracts Portfolio.
+ * Command Deck — Contracts Portfolio.
  *
  * Org-wide contracts register. One row per contract or subcontract, with
  * counterparty, value, dates, insurance certificate, bond, and status. Rows

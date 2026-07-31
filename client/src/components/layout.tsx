@@ -9,11 +9,11 @@ import {
   LogOut, ChevronLeft, Network, MoreVertical, Pencil, Trash2, Smartphone,
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2, ChevronRight,
   Video, FileSpreadsheet, Sparkles, Rocket, Ruler,
-  // Icons for Executive OS lifecycle modules 4-22.
+  // Icons for Command Deck lifecycle modules 4-22.
   Truck, Mountain, Layers, Home, Cable, Boxes, Paintbrush, ArrowUpDown, Trees,
   Gauge, ListTodo, PackageCheck, BadgeCheck, HardHat, CheckCheck, DollarSign,
   CalendarClock, ShieldAlert,
-  // Icons for Executive OS lifecycle overhaul (Jul 2026).
+  // Icons for Command Deck lifecycle overhaul (Jul 2026).
   PackageSearch, ClipboardCheck, BookOpen, GraduationCap, PackageOpen,
   FileSignature, AlertOctagon,
 } from "lucide-react";
@@ -44,7 +44,7 @@ const ICONS: Record<string, any> = {
   ShieldCheck, Smartphone,
   ClipboardEdit, Timer, Camera, AlertTriangle, CheckCircle2,
   Video, FileSpreadsheet, Sparkles, Rocket, Ruler,
-  // Executive OS lifecycle modules 4-22.
+  // Command Deck lifecycle modules 4-22.
   Truck, Mountain, Layers, Home, Cable, Boxes, Paintbrush, ArrowUpDown, Trees,
   Gauge, ListTodo, PackageCheck, BadgeCheck, HardHat, CheckCheck, DollarSign,
   CalendarClock, ShieldAlert,

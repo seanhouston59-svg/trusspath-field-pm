@@ -53,7 +53,7 @@ import { AccessProvider, useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { useStickyDing } from "@/hooks/use-sticky-ding";
 import { useBillingStatus } from "@/hooks/use-data";
-import { useExecutiveOsEntitlement } from "@/hooks/use-entitlements";
+import { useCommandDeckEntitlement } from "@/hooks/use-entitlements";
 import { setPendingRedirect } from "@/lib/queryClient";
 import type { AccessLevel } from "@shared/access-levels";
 import { Layout } from "@/components/layout";
@@ -106,22 +106,22 @@ import AdminDemoAccounts from "@/pages/admin-demo-accounts";
 import Cpm from "@/pages/cpm";
 import Paywall from "@/pages/paywall";
 import TeamSettingsPage from "@/pages/team-settings";
-import ExecutiveOs from "@/pages/executive-os";
-import ExecutiveOsUpsell from "@/pages/executive-os-upsell";
-import MobilizationPortfolio from "@/pages/executive-os/mobilization-portfolio";
-import MobilizationDetail from "@/pages/executive-os/mobilization-detail";
-import ProjectSetupPortfolio from "@/pages/executive-os/project-setup-portfolio";
-import ProjectSetupDetail from "@/pages/executive-os/project-setup-detail";
-import PreConstructionPortfolio from "@/pages/executive-os/pre-construction-portfolio";
-import PreConstructionDetail from "@/pages/executive-os/pre-construction-detail";
-import FinancialsPortfolio from "@/pages/executive-os/financials-portfolio";
-import BoardPackets from "@/pages/executive-os/board-packets";
-import ContractsPortfolio from "@/pages/executive-os/contracts-portfolio";
-import ContractDetail from "@/pages/executive-os/contracts-detail";
-import InspectionsPortfolio from "@/pages/executive-os/inspections-portfolio";
-import InspectionDetail from "@/pages/executive-os/inspections-detail";
+import CommandDeck from "@/pages/command-deck";
+import CommandDeckUpsell from "@/pages/command-deck-upsell";
+import MobilizationPortfolio from "@/pages/command-deck/mobilization-portfolio";
+import MobilizationDetail from "@/pages/command-deck/mobilization-detail";
+import ProjectSetupPortfolio from "@/pages/command-deck/project-setup-portfolio";
+import ProjectSetupDetail from "@/pages/command-deck/project-setup-detail";
+import PreConstructionPortfolio from "@/pages/command-deck/pre-construction-portfolio";
+import PreConstructionDetail from "@/pages/command-deck/pre-construction-detail";
+import FinancialsPortfolio from "@/pages/command-deck/financials-portfolio";
+import BoardPackets from "@/pages/command-deck/board-packets";
+import ContractsPortfolio from "@/pages/command-deck/contracts-portfolio";
+import ContractDetail from "@/pages/command-deck/contracts-detail";
+import InspectionsPortfolio from "@/pages/command-deck/inspections-portfolio";
+import InspectionDetail from "@/pages/command-deck/inspections-detail";
 import { LEAN_MODULES } from "@shared/lean-modules-catalog";
-import { LeanModuleDetailPage, LeanModulePortfolioPage } from "@/pages/executive-os/lean-module";
+import { LeanModuleDetailPage, LeanModulePortfolioPage } from "@/pages/command-deck/lean-module";
 import InviteAcceptPage from "@/pages/invite-accept";
 // Lazy: subs never touch the rest of the app, and PMs never touch this page.
 // Keeping it out of the main chunk trims the initial bundle for both.
@@ -175,8 +175,8 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
   "/deleted-items": DeletedItemsPage,
   "/settings": SettingsPage,
   "/settings/team": TeamSettingsPage,
-  "/executive-os": ExecutiveOs,
-  "/executive-os/upsell": ExecutiveOsUpsell,
+  "/executive-os": CommandDeck,
+  "/executive-os/upsell": CommandDeckUpsell,
   "/executive-os/project-setup": ProjectSetupPortfolio,
   "/executive-os/project-setup/:id": ProjectSetupDetail,
   "/executive-os/pre-construction": PreConstructionPortfolio,
@@ -200,7 +200,7 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
       ];
     }),
   ),
-  // Explicit overrides for graduated exec-os modules. These MUST come after
+  // Explicit overrides for graduated Command Deck modules. These MUST come after
   // the LEAN_MODULES.flatMap spread above so they win the key collision on
   // /executive-os/financials. Board packets is a fresh route with no lean-
   // module analog, but lives here to keep the graduated modules together.
@@ -270,15 +270,15 @@ function AccessRestricted() {
   );
 }
 
-const EXEC_OS_UPSELL_PATH = "/executive-os/upsell";
+const COMMAND_DECK_UPSELL_PATH = "/executive-os/upsell";
 
 function AccessGate() {
   const [loc] = useLocation();
   const { isAllowed } = useAccess();
-  // Executive OS is a paid per-seat add-on. Gating here rather than at each of
-  // the ~60 exec-OS route patterns covers the generated lean-module routes too.
+  // Command Deck is a paid per-seat add-on. Gating here rather than at each of
+  // the ~60 /executive-os route patterns covers the generated lean-module routes too.
   // This is a UX redirect only — the API is enforced by requireExecutiveOs.
-  const execOs = useExecutiveOsEntitlement();
+  const commandDeck = useCommandDeckEntitlement();
   // Play a soft ding whenever a new sticky note or sticker appears on the
   // org's shared corkboard. Mounted here (inside the auth wall) so we don't
   // poll for anonymous users and so the hook has a session identity to skip
@@ -289,11 +289,11 @@ function AccessGate() {
   // no upsell flash here; the isLoading check is belt-and-braces.
   if (
     loc.startsWith("/executive-os") &&
-    loc !== EXEC_OS_UPSELL_PATH &&
-    !execOs.isLoading &&
-    !execOs.hasAccess
+    loc !== COMMAND_DECK_UPSELL_PATH &&
+    !commandDeck.isLoading &&
+    !commandDeck.hasAccess
   ) {
-    return <Redirect to={EXEC_OS_UPSELL_PATH} />;
+    return <Redirect to={COMMAND_DECK_UPSELL_PATH} />;
   }
   return <AppRouter />;
 }

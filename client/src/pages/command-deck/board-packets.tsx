@@ -1,5 +1,5 @@
 /**
- * Executive OS \u2014 Board Packets.
+ * Command Deck \u2014 Board Packets.
  *
  * One-click PDF export that assembles the org's portfolio health, financial
  * rollup, and consolidated risk register into a single board-ready document.

@@ -1,4 +1,4 @@
-// Soft gates between Executive OS lifecycle modules.
+// Soft gates between Command Deck lifecycle modules.
 //
 // A gate never blocks — `blockedBy` exists for a future module that needs a
 // hard stop, but every current gate returns warnings only. The rule is that a

@@ -117,7 +117,7 @@ export async function generateKickoffAgenda(
     r.h1("Project Setup Not Initialized");
     r.unavailable(
       "This project has no Project Setup record, so there is no kickoff to agenda. " +
-      "Open Executive OS → Project Setup and run the opt-in seed.",
+      "Open Command Deck → Project Setup and run the opt-in seed.",
     );
     r.end();
     return;

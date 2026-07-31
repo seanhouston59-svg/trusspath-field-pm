@@ -10,10 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   useCurrentOrg, useOrgMembers, useOrgInvites, useCreateInvite, useRevokeInvite, useUpdateMemberRole, useRemoveMember,
-  useSetMemberExecutiveOs,
+  useSetMemberCommandDeck,
   type Membership,
 } from "@/hooks/use-data";
-import { useExecutiveOsEntitlement } from "@/hooks/use-entitlements";
+import { useCommandDeckEntitlement } from "@/hooks/use-entitlements";
 import { EXEC_OS_SYSTEM_ACTOR } from "@shared/schema";
 import { BillingSection } from "@/components/billing-section";
 import { useAuth } from "@/lib/auth";
@@ -38,7 +38,7 @@ function auditDate(iso: string): string {
 
 type TeamMember = Membership & { email: string; displayName?: string };
 
-// One-line attribution for the Executive OS add-on. Returns null when there is
+// One-line attribution for the Command Deck add-on. Returns null when there is
 // nothing worth saying — no grant, or a grant that predates the audit columns.
 function execOsAuditCaption(m: TeamMember, roster: TeamMember[]): string | null {
   if (m.hasExecutiveOs) {
@@ -73,15 +73,15 @@ export default function TeamSettingsPage() {
   const revokeInvite = useRevokeInvite();
   const updateRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
-  const setExecOs = useSetMemberExecutiveOs();
-  const { seatCount: execOsSeatCount } = useExecutiveOsEntitlement();
+  const setExecOs = useSetMemberCommandDeck();
+  const { seatCount: execOsSeatCount } = useCommandDeckEntitlement();
   const { toast } = useToast();
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("pm");
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
-  // Optimistic overrides for the Executive OS switches, keyed by membership id.
+  // Optimistic overrides for the Command Deck switches, keyed by membership id.
   // Cleared once the mutation settles so the server row takes over again.
   const [execOsPending, setExecOsPending] = useState<Record<number, boolean>>({});
 
@@ -130,14 +130,14 @@ export default function TeamSettingsPage() {
     try {
       await setExecOs.mutateAsync({ id: m.id, enabled });
       toast({
-        title: enabled ? "Executive OS enabled" : "Executive OS removed",
+        title: enabled ? "Command Deck enabled" : "Command Deck removed",
         description: enabled
-          ? `${m.displayName || m.email} now has Executive OS. $5/mo was added to your subscription, prorated.`
-          : `${m.displayName || m.email} no longer has Executive OS. Your subscription drops $5/mo.`,
+          ? `${m.displayName || m.email} now has Command Deck. $5/mo was added to your subscription, prorated.`
+          : `${m.displayName || m.email} no longer has Command Deck. Your subscription drops $5/mo.`,
       });
     } catch (err: any) {
       toast({
-        title: "Could not update Executive OS",
+        title: "Could not update Command Deck",
         description: err?.message || "Please try again.",
         variant: "destructive",
       });
@@ -300,7 +300,7 @@ export default function TeamSettingsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* Executive OS add-on. Gated on canManage rather than
+                    {/* Command Deck add-on. Gated on canManage rather than
                         canModifyThisMember because owners and admins may grant
                         the add-on to themselves — unlike a role change. */}
                     {canManage && m.status === "active" && (
@@ -311,8 +311,8 @@ export default function TeamSettingsPage() {
                           disabled={execOsPending[m.id] !== undefined}
                           data-testid={`switch-exec-os-${m.id}`}
                         />
-                        <span className="hidden sm:inline">Executive OS ($5/mo)</span>
-                        <span className="sm:hidden">Exec OS</span>
+                        <span className="hidden sm:inline">Command Deck ($5/mo)</span>
+                        <span className="sm:hidden">Command Deck</span>
                       </label>
                     )}
                     {canModifyThisMember ? (
@@ -359,7 +359,7 @@ export default function TeamSettingsPage() {
           </div>
           {canManage && (
             <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-              Executive OS seats: <span className="font-semibold text-foreground">{execOsSeatCount}</span>
+              Command Deck seats: <span className="font-semibold text-foreground">{execOsSeatCount}</span>
               {" · "}
               <span className="font-semibold text-foreground">${execOsSeatCount * 5}/mo</span> added to your subscription
             </p>

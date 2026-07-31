@@ -138,11 +138,11 @@ export const APP_NAV: NavGroup[] = [
     ],
   },
   {
-    // Executive OS lays out job lifecycle first, then cross-cutting workstreams.
+    // Command Deck lays out job lifecycle first, then cross-cutting workstreams.
     // "Phases" runs in job order from Project Setup through Post-Occupancy.
     // "Always On" holds modules that run every day of the job (Schedule, Financials,
     // Safety, Quality, etc.) and have no natural phase slot.
-    title: "Executive OS",
+    title: "Command Deck",
     items: [
       { href: "/executive-os", label: "Overview", icon: "Sparkles" },
       { subheader: "Phases" },

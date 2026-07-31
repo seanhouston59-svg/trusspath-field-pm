@@ -1,5 +1,5 @@
 /**
- * Executive OS — Contract Detail.
+ * Command Deck — Contract Detail.
  *
  * Full-field edit surface for a single contract row. Inline save on every
  * field group so an executive can update COI expiration or status in seconds

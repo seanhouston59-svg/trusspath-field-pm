@@ -104,7 +104,7 @@ const PLANS: Plan[] = [
   },
 ];
 
-/** Price of the Executive OS per-seat add-on, in dollars/user/month.
+/** Price of the Command Deck per-seat add-on, in dollars/user/month.
  *  Mirrors EXECUTIVE_OS_ADDON_AMOUNT_CENTS in server/lib/plans.ts. */
 const EXEC_OS_MONTHLY = 5;
 
@@ -266,7 +266,7 @@ const FEATURED = [
   },
   {
     id: "featured-exec-os",
-    kicker: "Executive OS",
+    kicker: "Command Deck",
     title: "The whole book of work, one screen",
     body: "Portfolio roll-ups across every job — setup, pre-con, mobilization, financials, contracts, inspections. Board packets generated from live project data.",
     img: execOsImg,
@@ -343,7 +343,7 @@ const BUCKETS = [
   {
     id: "exec-os",
     icon: BarChart3,
-    title: "Executive OS",
+    title: "Command Deck",
     body: "The portfolio layer above your projects: cross-job roll-ups, stage-gate readiness, contracts, inspections, and board packets.",
     items: ["Portfolio roll-ups", "Financials", "Contracts register", "Board packets"],
     chip: `$${EXEC_OS_MONTHLY}/user/mo`,
@@ -379,8 +379,8 @@ const FAQS: { q: string; a: string }[] = [
     a: "Every plan is a flat monthly rate with seats included — 3 on Starter, 5 on Pro, 10 on Enterprise. Extra people are billed at the plan's overage rate ($19, $29, or $39 per seat per month). No per-project fees. Starter caps at 5 active projects; Pro and Enterprise are unlimited.",
   },
   {
-    q: "What is the Executive OS add-on?",
-    a: `Executive OS is the portfolio layer above your projects — cross-job roll-ups, stage-gate readiness, financial summaries, contracts, inspections, and board packets. It is $${EXEC_OS_MONTHLY} per user per month, granted seat by seat by an owner or admin under Settings → Team, and prorated onto your existing subscription immediately. Turn it off any time and the charge drops at the next invoice.`,
+    q: "What is the Command Deck add-on?",
+    a: `Command Deck is the portfolio layer above your projects — cross-job roll-ups, stage-gate readiness, financial summaries, contracts, inspections, and board packets. It is $${EXEC_OS_MONTHLY} per user per month, granted seat by seat by an owner or admin under Settings → Team, and prorated onto your existing subscription immediately. Turn it off any time and the charge drops at the next invoice.`,
   },
   {
     q: "Do subcontractors need a paid seat?",
@@ -584,7 +584,7 @@ export default function Landing() {
             </h2>
             <p className="lp-muted mt-3">
               Eight areas, one login, one source of truth. Nothing here is a separate purchase
-              except Executive OS.
+              except Command Deck.
             </p>
           </div>
           <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -754,7 +754,7 @@ export default function Landing() {
             })}
           </div>
 
-          {/* Executive OS add-on callout */}
+          {/* Command Deck add-on callout */}
           <div
             id="exec-os-addon"
             className="lp-card mt-6 flex flex-col items-start gap-5 rounded-lg p-6 md:flex-row md:items-center md:justify-between"
@@ -764,7 +764,7 @@ export default function Landing() {
               <div className="lp-accent-soft grid size-10 shrink-0 place-items-center rounded-md"><Layers className="size-5" /></div>
               <div>
                 <div className="font-display text-lg font-bold">
-                  + ${EXEC_OS_MONTHLY}/user/month — Executive OS add-on
+                  + ${EXEC_OS_MONTHLY}/user/month — Command Deck add-on
                 </div>
                 <p className="lp-muted mt-1 max-w-2xl text-sm leading-relaxed">
                   Portfolio roll-ups, stage-gate readiness, financial summaries, contracts,
@@ -909,7 +909,7 @@ export default function Landing() {
               <ul className="lp-muted mt-3 space-y-2 text-sm">
                 <li><button onClick={() => scrollTo("product")} className="lp-link">Overview</button></li>
                 <li><button onClick={() => scrollTo("field-kit")} className="lp-link">Field kit</button></li>
-                <li><button onClick={() => scrollTo("exec-os-addon")} className="lp-link">Executive OS</button></li>
+                <li><button onClick={() => scrollTo("exec-os-addon")} className="lp-link">Command Deck</button></li>
                 <li><Link href="/subs" className="lp-link">Sub Drop</Link></li>
                 <li><button onClick={() => scrollTo("pricing")} className="lp-link">Pricing</button></li>
               </ul>
