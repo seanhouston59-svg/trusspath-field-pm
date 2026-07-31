@@ -129,7 +129,10 @@ const R = {
   executiveOsInspections: "/executive-os/inspections",
   executiveOsInspectionsDetail: "/executive-os/inspections/:id",
   executiveOsBoardPackets: "/executive-os/board-packets",
+  adminIndex: "/admin",
   adminSignups: "/admin/signups",
+  adminAccounts: "/admin/accounts",
+  adminDemoAccounts: "/admin/demo-accounts",
   // Mobile field kit (PWA) routes
   field: "/field",
   fieldDailyLog: "/field/daily-log",
@@ -176,7 +179,15 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     // Executive OS is no longer filtered out here — it is a paid per-seat
     // add-on enforced server-side off memberships.has_executive_os, and this
     // access-level system is a client-side preview, not authorization.
-    allowedRoutes: ALL.filter((r) => r !== R.settings && r !== R.settingsTeam && r !== R.adminSignups),
+    allowedRoutes: ALL.filter(
+      (r) =>
+        r !== R.settings &&
+        r !== R.settingsTeam &&
+        r !== R.adminIndex &&
+        r !== R.adminSignups &&
+        r !== R.adminAccounts &&
+        r !== R.adminDemoAccounts,
+    ),
   },
   {
     slug: "superintendent",

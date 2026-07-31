@@ -100,6 +100,9 @@ import DeletedItemsPage from "@/pages/deleted-items";
 import { TermsOfService, PrivacyPolicy } from "@/pages/legal";
 import { ForgotPassword, ResetPassword } from "@/pages/password-reset";
 import AdminSignups from "@/pages/admin-signups";
+import AdminIndex from "@/pages/admin-index";
+import AdminAccounts from "@/pages/admin-accounts";
+import AdminDemoAccounts from "@/pages/admin-demo-accounts";
 import Cpm from "@/pages/cpm";
 import Paywall from "@/pages/paywall";
 import TeamSettingsPage from "@/pages/team-settings";
@@ -223,7 +226,10 @@ const ROUTE_COMPONENTS: Record<string, ComponentType> = {
 function AppRouter() {
   return (
     <Switch>
+      <Route path="/admin" component={AdminIndex} />
       <Route path="/admin/signups" component={AdminSignups} />
+      <Route path="/admin/accounts" component={AdminAccounts} />
+      <Route path="/admin/demo-accounts" component={AdminDemoAccounts} />
       {APP_ROUTES.filter((p) => ROUTE_COMPONENTS[p]).map((p) => (
         <Route key={p} path={p} component={ROUTE_COMPONENTS[p]} />
       ))}

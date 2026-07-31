@@ -297,6 +297,16 @@ function SidebarFooter() {
         </div>
         <Pencil className="size-3.5 text-sidebar-foreground/40" />
       </button>
+      {account?.role === "owner" && (
+        <Link
+          href="/admin"
+          data-testid="link-admin"
+          className="flex w-full items-center gap-2 rounded-md border border-sidebar-border/60 bg-transparent px-3 py-2 text-sm text-sidebar-foreground/70 hover:text-sidebar-accent-foreground hover-elevate"
+        >
+          <ShieldCheck className="size-4" />
+          Admin
+        </Link>
+      )}
       <button
         onClick={doLogout}
         data-testid="button-logout"
