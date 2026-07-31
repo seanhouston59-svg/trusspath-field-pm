@@ -4,20 +4,21 @@ import "./index.css";
 import { initPwa } from "./lib/pwa";
 import { initOfflineQueue } from "./lib/offline-queue";
 
-// Public paths that may be typed, shared, or linked as a real URL. Vercel
-// rewrites them all to index.html, so without this the empty hash collapsed to
-// "#/" and every one of them rendered the landing page.
-const PUBLIC_PATH_ROUTES: Record<string, string> = {
-  "/login": "/login",
+// Vercel rewrites every non-asset path to index.html, so we seed the hash from
+// the pathname before wouter mounts. Named aliases (e.g. /sign-in -> /login)
+// live in PUBLIC_PATH_ALIASES; every other pathname passes through as-is so
+// direct-navs to /admin, /admin/accounts, /admin/demo-accounts, etc. match
+// their hash routes instead of collapsing to "#/" and rendering the landing.
+const PUBLIC_PATH_ALIASES: Record<string, string> = {
   "/sign-in": "/login",
   "/signin": "/login",
-  "/signup": "/signup",
   "/sign-up": "/signup",
 };
 
 if (!window.location.hash) {
   const path = window.location.pathname.replace(/\/+$/, "");
-  window.location.hash = `#${PUBLIC_PATH_ROUTES[path] ?? "/"}`;
+  const target = PUBLIC_PATH_ALIASES[path] ?? (path || "/");
+  window.location.hash = `#${target}`;
 }
 
 // Register the PWA service worker + wire the offline queue drain listeners
