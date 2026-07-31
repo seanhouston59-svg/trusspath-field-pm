@@ -1,6 +1,6 @@
 /**
  * Project Setup rollup — the single computation behind the health endpoint,
- * the Executive OS portfolio cards, and the Mobilization soft gate.
+ * the Command Deck portfolio cards, and the Mobilization soft gate.
  *
  * Kept out of routes.ts for the same reason as mobilizationRollup: the gate
  * endpoint and the portfolio endpoint both need this math, and two copies

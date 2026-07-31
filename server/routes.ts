@@ -59,7 +59,7 @@ import { renderPreConstructionPlan, preConstructionPlanMeta } from "./reports/pr
 import { renderDesignReviewReport, designReviewReportMeta } from "./reports/design-review-report";
 import { renderBuyoutPlan, buyoutPlanMeta } from "./reports/buyout-plan";
 import {
-  PLANS, TRIAL_DAYS, EXECUTIVE_OS_ADDON_AMOUNT_CENTS,
+  PLANS, TRIAL_DAYS, COMMAND_DECK_ADDON_AMOUNT_CENTS,
   type PlanTier, type Billing,
 } from "./lib/plans";
 import {
@@ -70,9 +70,9 @@ import {
   getOrganization, updateOrgBilling, getOrgByStripeCustomerId,
   updateOrgTimezone, isValidTimezone, updateOrgDisabledIntegrations, isIntegrationKey,
   countActiveSeats,
-  countExecOsSeats, setMembershipExecutiveOs, syncExecOsSeatsForOrg, revokeAllExecOsForOrg,
+  countCommandDeckSeats, setMembershipCommandDeck, syncCommandDeckSeatsForOrg, revokeAllCommandDeckForOrg,
 } from "./lib/orgs";
-import { resolveMembership, requireCap, requireRole, requireExecutiveOs } from "./lib/mt-middleware";
+import { resolveMembership, requireCap, requireRole, requireCommandDeck } from "./lib/mt-middleware";
 import { classifyUpload } from "./sub-drop-classifier";
 import { SUB_TRADES, type SubTrade } from "@shared/schema";
 import { randomBytes as randomBytesForToken } from "node:crypto";
@@ -1213,9 +1213,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   app.use(authMiddleware);
   // Resolve req.membership/req.organization for every authenticated request.
   app.use(resolveMembership);
-  // Enforce the Executive OS add-on entitlement on the exec-OS API surface.
+  // Enforce the Command Deck add-on entitlement across that API surface.
   // Runs after resolveMembership so req.membership is populated.
-  app.use(requireExecutiveOs);
+  app.use(requireCommandDeck);
 
   // ==== Multi-tenant helpers ====
   // Verify the given project belongs to the caller's org; returns 404 otherwise.
@@ -3029,7 +3029,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
    * so calling this repeatedly won't create duplicates. Existing custom or
    * mobilization milestones are untouched.
    */
-  app.post("/api/executive-os/milestones/seed-all", async (req: any, res) => {
+  app.post("/api/command-deck/milestones/seed-all", async (req: any, res) => {
     const orgId = req.organizationId;
     if (!orgId) return res.status(400).json({ message: "organization required" });
     const projects = await storage.getProjects(orgId);
@@ -3066,7 +3066,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ alerts, generatedAt: new Date().toISOString() });
   });
 
-  /* ========================= Mobilization (Executive OS) =========================
+  /* ========================= Mobilization (Command Deck) =========================
    * Every route is nested under /api/projects/:id/mobilization so access is
    * gated by requireProjectAccess — there is no org-wide mobilization list
    * except the portfolio rollup at the bottom, which derives its project set
@@ -3358,7 +3358,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   }
 
   // Portfolio rollup across every project the caller can see.
-  app.get("/api/executive-os/mobilization", async (req: any, res) => {
+  app.get("/api/command-deck/mobilization", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
       // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —
       // the single OWNER_EMAIL admin account sees every tenant by design.
@@ -3382,7 +3382,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(rows);
   });
 
-  /* ======================= Project Setup (Executive OS) =======================
+  /* ======================= Project Setup (Command Deck) =======================
    * Pre-mobilization intake — the source for the Project Charter and Kickoff
    * Agenda. Same shape as the mobilization block above: everything nested under
    * /api/projects/:id so requireProjectAccess is the only authorization check,
@@ -3607,7 +3607,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     });
   }
 
-  app.get("/api/executive-os/project-setup", async (req: any, res) => {
+  app.get("/api/command-deck/project-setup", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
       // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —
       // the single OWNER_EMAIL admin account sees every tenant by design.
@@ -3622,7 +3622,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(rows);
   });
 
-  /* ----------------------- Pre-Construction (Executive OS) ------------------
+  /* ----------------------- Pre-Construction (Command Deck) ------------------
    * Same shape as the two blocks above: everything nested under
    * /api/projects/:id so requireProjectAccess is the only authorization check,
    * plus one org-derived portfolio route at the bottom.
@@ -3972,7 +3972,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   }
 
   // ---------------------------------------------------------------------
-  // Lean Executive OS modules (4-22). Every lifecycle module beyond Pre-Con
+  // Lean Command Deck modules (4-22). Every lifecycle module beyond Pre-Con
   // shares one route surface, keyed by module slug. Cheaper to grow than 19
   // hand-rolled route sets and doesn't lock the URL shape when a module
   // graduates to its own schema — the eventual purpose-built routes can
@@ -4225,13 +4225,13 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
 
   /**
    * Portfolio rollup across every project + every lean module for the caller's
-   * org. Powers the Executive OS landing page's per-project health strip.
+   * org. Powers the Command Deck landing page's per-project health strip.
    *
    * Returns { projects, rollups } separately so the client can iterate every
    * project even when it has zero lean-module activity yet (empty projects
    * still deserve a card, they just render as "not started" across the strip).
    */
-  app.get("/api/executive-os/lean-rollup", async (req: any, res) => {
+  app.get("/api/command-deck/lean-rollup", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
       // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —
       // the single OWNER_EMAIL admin account sees every tenant by design.
@@ -4252,7 +4252,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
    * page needs a cross-project feed. Keeps everything org-scoped by filtering
    * on organization_id (or bypassing for the platform-owner account).
    */
-  app.get("/api/executive-os/board-packet-history", async (req: any, res) => {
+  app.get("/api/command-deck/board-packet-history", async (req: any, res) => {
     const isOwner = req.account?.role === "owner";
     const orgId = req.organizationId ?? null;
     if (!isOwner && orgId === null) {
@@ -4264,7 +4264,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const kind = "board_packet";
     const limit = 20;
     const rows: any[] = isOwner
-      // UNSCOPED: owner sees every tenant. Same rule as other exec-os endpoints.
+      // UNSCOPED: owner sees every tenant. Same rule as other Command Deck endpoints.
       ? await pgSql`
           SELECT id, organization_id, project_id, actor_account_id, actor_name,
                  kind, title, subtitle, meta, source_type, source_id,
@@ -4309,7 +4309,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
    * Returns { orgTotals, projects: [...] } so the client can show both the
    * headline chips and a per-project drill-down table in one paint.
    */
-  app.get("/api/executive-os/financials-rollup", async (req: any, res) => {
+  app.get("/api/command-deck/financials-rollup", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
       // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess.
       ? await storage.getProjects()
@@ -4324,7 +4324,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
    * PDF is streamed directly — no persistence — so history is derived from
    * project events (kind='board_packet') logged after each successful render.
    */
-  app.get("/api/executive-os/board-packet.pdf", async (req: any, res) => {
+  app.get("/api/command-deck/board-packet.pdf", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
       // UNSCOPED: platform-owner bypass.
       ? await storage.getProjects()
@@ -4388,22 +4388,22 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         title: "Board packet exported",
         subtitle: `${orgProjects.length} project(s) · prepared by ${preparedBy}`,
         meta: { period, projectCount: orgProjects.length, preparedBy },
-        sourceType: "executive_os",
+        sourceType: "command_deck",
       });
     }
   });
 
-  /* ----------------------- Executive OS: Contracts ----------------------- */
+  /* ----------------------- Command Deck: Contracts ----------------------- */
   // Purpose-built contracts register. Org-scoped everywhere; projectId is
   // optional so org-level MSAs and umbrella agreements can live here too.
-  app.get("/api/executive-os/contracts", async (req: any, res) => {
+  app.get("/api/command-deck/contracts", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
     const rows = await storage.contracts.list(req.organizationId, Number.isFinite(projectId) ? projectId : undefined);
     res.json(rows);
   });
 
-  app.get("/api/executive-os/contracts/:id", async (req: any, res) => {
+  app.get("/api/command-deck/contracts/:id", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
@@ -4412,7 +4412,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(row);
   });
 
-  app.post("/api/executive-os/contracts", async (req: any, res) => {
+  app.post("/api/command-deck/contracts", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const parsed = insertContractSchema.safeParse({ ...req.body, organizationId: req.organizationId });
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
@@ -4420,7 +4420,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.status(201).json(row);
   });
 
-  app.patch("/api/executive-os/contracts/:id", async (req: any, res) => {
+  app.patch("/api/command-deck/contracts/:id", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
@@ -4429,7 +4429,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(row);
   });
 
-  app.delete("/api/executive-os/contracts/:id", async (req: any, res) => {
+  app.delete("/api/command-deck/contracts/:id", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
@@ -4438,15 +4438,15 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ ok: true });
   });
 
-  /* ---------------------- Executive OS: Inspections ---------------------- */
-  app.get("/api/executive-os/inspections", async (req: any, res) => {
+  /* ---------------------- Command Deck: Inspections ---------------------- */
+  app.get("/api/command-deck/inspections", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
     const rows = await storage.inspections.list(req.organizationId, Number.isFinite(projectId) ? projectId : undefined);
     res.json(rows);
   });
 
-  app.get("/api/executive-os/inspections/:id", async (req: any, res) => {
+  app.get("/api/command-deck/inspections/:id", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
@@ -4455,7 +4455,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(row);
   });
 
-  app.post("/api/executive-os/inspections", async (req: any, res) => {
+  app.post("/api/command-deck/inspections", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const parsed = insertInspectionSchema.safeParse({ ...req.body, organizationId: req.organizationId });
     if (!parsed.success) return res.status(400).json({ message: parsed.error.message });
@@ -4463,7 +4463,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.status(201).json(row);
   });
 
-  app.patch("/api/executive-os/inspections/:id", async (req: any, res) => {
+  app.patch("/api/command-deck/inspections/:id", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
@@ -4472,7 +4472,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json(row);
   });
 
-  app.delete("/api/executive-os/inspections/:id", async (req: any, res) => {
+  app.delete("/api/command-deck/inspections/:id", async (req: any, res) => {
     if (typeof req.organizationId !== "number") return res.status(400).json({ message: "organization required" });
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ message: "invalid id" });
@@ -4481,7 +4481,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     res.json({ ok: true });
   });
 
-  app.get("/api/executive-os/pre-construction", async (req: any, res) => {
+  app.get("/api/command-deck/pre-construction", async (req: any, res) => {
     const orgProjects = req.account?.role === "owner"
       // UNSCOPED: platform-owner bypass, same rule as requireProjectAccess —
       // the single OWNER_EMAIL admin account sees every tenant by design.
@@ -4712,7 +4712,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     // failure below marks the event as processed and the next retry skips it.
     // Accepted deliberately — every handler here is a pure reconcile today:
     // updateOrgBilling writes values read straight off the event, and
-    // syncExecOsSeatsForOrg re-derives Stripe quantities from the current DB
+    // syncCommandDeckSeatsForOrg re-derives Stripe quantities from the current DB
     // state rather than incrementing. So a dropped retry costs at most a stale
     // column that the next real Stripe event corrects. Rolling the row back on
     // failure would reopen the double-process window this guard exists to close.
@@ -4759,8 +4759,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
             // subscription, so an org that lapsed and came back has no add-on
             // item even though grants may still exist. Without this re-sync
             // those grants would silently stop billing.
-            await syncExecOsSeatsForOrg(stripe, orgId).catch(e =>
-              console.error("[stripe webhook] exec-os re-sync failed:", e));
+            await syncCommandDeckSeatsForOrg(stripe, orgId).catch(e =>
+              console.error("[stripe webhook] command-deck re-sync failed:", e));
           }
           break;
         }
@@ -4797,8 +4797,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
             });
             // Defensive re-sync: plan changes and portal-driven edits can drop
             // or reshape items behind our back.
-            await syncExecOsSeatsForOrg(stripe, orgId).catch(e =>
-              console.error("[stripe webhook] exec-os re-sync failed:", e));
+            await syncCommandDeckSeatsForOrg(stripe, orgId).catch(e =>
+              console.error("[stripe webhook] command-deck re-sync failed:", e));
           }
           break;
         }
@@ -4810,9 +4810,9 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
             // reactivations start from a clean slate.
             await updateOrgBilling(orgId, { subscriptionStatus: "canceled", cancelAtPeriodEnd: false });
             // Immediate revoke on lapse. Stripe has already dropped the add-on
-            // item, so keeping grants would hand out Executive OS for free.
+            // item, so keeping grants would hand out Command Deck for free.
             // Deliberately not restored on resubscribe — an admin re-grants.
-            await revokeAllExecOsForOrg(orgId);
+            await revokeAllCommandDeckForOrg(orgId);
           }
           break;
         }
@@ -4956,7 +4956,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
   // (multi-tenant billing lives on the org, not the account).
   app.get("/api/billing/status", async (req: any, res) => {
     if (!req.account) return res.status(401).json({ error: "Not authenticated" });
-    // Legacy platform-owners bypass the add-on the same way requireExecutiveOs
+    // Legacy platform-owners bypass the add-on the same way requireCommandDeck
     // does, so the client gate agrees with what the API will actually serve.
     const isPlatformOwner = req.account.role === "owner";
     if (!req.organizationId) {
@@ -4968,7 +4968,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     const org = await getOrganization(req.organizationId);
     if (!org) return res.status(404).json({ error: "Organization not found" });
     const seats = await countActiveSeats(org.id);
-    const execOsSeatCount = await countExecOsSeats(org.id);
+    const commandDeckSeatCount = await countCommandDeckSeats(org.id);
     const plan = org.subscriptionPlan ? PLANS[org.subscriptionPlan as PlanTier] : null;
     res.json({
       plan: org.subscriptionPlan || null,
@@ -4984,8 +4984,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         overage: plan ? Math.max(0, seats - plan.includedSeats) : null,
       },
       entitlements: {
-        commandDeck: isPlatformOwner || !!req.membership?.hasExecutiveOs,
-        commandDeckSeatCount: execOsSeatCount,
+        commandDeck: isPlatformOwner || !!req.membership?.hasCommandDeck,
+        commandDeckSeatCount: commandDeckSeatCount,
       },
     });
   });
@@ -5864,24 +5864,24 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     }
 
     await removeMembership(id);
-    // Removal is a soft delete, so an Executive OS grant left on the row would
+    // Removal is a soft delete, so a Command Deck grant left on the row would
     // keep billing a seat nobody can use. Clear it before either sync.
-    if (target.hasExecutiveOs) await setMembershipExecutiveOs(id, false, String(req.account.id));
+    if (target.hasCommandDeck) await setMembershipCommandDeck(id, false, String(req.account.id));
     // Fire-and-forget seat sync so the next invoice reflects the removed seat.
     if (stripe) syncSeatsForOrg(stripe, req.organizationId).catch(e => console.error("[members:delete] seat sync failed:", e));
-    if (stripe && target.hasExecutiveOs) {
-      syncExecOsSeatsForOrg(stripe, req.organizationId).catch(e => console.error("[members:delete] exec-os sync failed:", e));
+    if (stripe && target.hasCommandDeck) {
+      syncCommandDeckSeatsForOrg(stripe, req.organizationId).catch(e => console.error("[members:delete] command-deck sync failed:", e));
     }
     res.json({ ok: true });
   });
 
-  /* ---------------------- Executive OS add-on grants ---------------------- */
+  /* ---------------------- Command Deck add-on grants ---------------------- */
   // Granting spends money (a prorated $5/seat/mo charge). manageMembers is
   // owners+admins, which is the audience that already adds billable seats by
   // inviting members, so the same capability guards this.
 
-  // GET /api/org/members/exec-os — members plus their add-on flag.
-  app.get("/api/org/members/exec-os", requireCap("manageMembers"), async (req: any, res) => {
+  // GET /api/org/members/command-deck — members plus their add-on flag.
+  app.get("/api/org/members/command-deck", requireCap("manageMembers"), async (req: any, res) => {
     const rows = await listMembershipsForOrg(req.organizationId);
     res.json({
       members: rows.map(m => ({
@@ -5891,20 +5891,20 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         status: m.status,
         email: m.email,
         displayName: m.displayName,
-        hasExecutiveOs: !!m.hasExecutiveOs,
-        executiveOsGrantedAt: m.executiveOsGrantedAt ?? null,
-        executiveOsGrantedBy: m.executiveOsGrantedBy ?? null,
-        executiveOsRevokedAt: m.executiveOsRevokedAt ?? null,
-        executiveOsRevokedBy: m.executiveOsRevokedBy ?? null,
+        hasCommandDeck: !!m.hasCommandDeck,
+        commandDeckGrantedAt: m.commandDeckGrantedAt ?? null,
+        commandDeckGrantedBy: m.commandDeckGrantedBy ?? null,
+        commandDeckRevokedAt: m.commandDeckRevokedAt ?? null,
+        commandDeckRevokedBy: m.commandDeckRevokedBy ?? null,
       })),
-      seatCount: await countExecOsSeats(req.organizationId),
-      unitAmountCents: EXECUTIVE_OS_ADDON_AMOUNT_CENTS,
+      seatCount: await countCommandDeckSeats(req.organizationId),
+      unitAmountCents: COMMAND_DECK_ADDON_AMOUNT_CENTS,
     });
   });
 
   // Shared guard: the target membership must be in the caller's own org, so an
   // admin can't grant a paid seat inside someone else's tenant.
-  async function execOsTarget(req: any, res: any) {
+  async function commandDeckTarget(req: any, res: any) {
     const id = parseInt(req.params.membershipId, 10);
     if (!Number.isFinite(id)) { res.status(400).json({ message: "Invalid membership id" }); return null; }
     const target = await getMembership(id);
@@ -5919,40 +5919,40 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     return target;
   }
 
-  // POST /api/org/members/:membershipId/exec-os — grant the add-on.
-  app.post("/api/org/members/:membershipId/exec-os", requireCap("manageMembers"), async (req: any, res) => {
-    const target = await execOsTarget(req, res);
+  // POST /api/org/members/:membershipId/command-deck — grant the add-on.
+  app.post("/api/org/members/:membershipId/command-deck", requireCap("manageMembers"), async (req: any, res) => {
+    const target = await commandDeckTarget(req, res);
     if (!target) return;
-    const updated = target.hasExecutiveOs
+    const updated = target.hasCommandDeck
       ? target
-      : await setMembershipExecutiveOs(target.id, true, String(req.account.id));
+      : await setMembershipCommandDeck(target.id, true, String(req.account.id));
     // Awaited, not fire-and-forget: the client invalidates billing status right
     // after this resolves, so the seat count it refetches must already be real.
     if (stripe) {
       try {
-        await syncExecOsSeatsForOrg(stripe, req.organizationId);
+        await syncCommandDeckSeatsForOrg(stripe, req.organizationId);
       } catch (e) {
-        console.error("[exec-os:grant] seat sync failed:", e);
+        console.error("[command-deck:grant] seat sync failed:", e);
       }
     }
-    res.json({ member: updated, seatCount: await countExecOsSeats(req.organizationId) });
+    res.json({ member: updated, seatCount: await countCommandDeckSeats(req.organizationId) });
   });
 
-  // DELETE /api/org/members/:membershipId/exec-os — revoke the add-on.
-  app.delete("/api/org/members/:membershipId/exec-os", requireCap("manageMembers"), async (req: any, res) => {
-    const target = await execOsTarget(req, res);
+  // DELETE /api/org/members/:membershipId/command-deck — revoke the add-on.
+  app.delete("/api/org/members/:membershipId/command-deck", requireCap("manageMembers"), async (req: any, res) => {
+    const target = await commandDeckTarget(req, res);
     if (!target) return;
-    const updated = target.hasExecutiveOs
-      ? await setMembershipExecutiveOs(target.id, false, String(req.account.id))
+    const updated = target.hasCommandDeck
+      ? await setMembershipCommandDeck(target.id, false, String(req.account.id))
       : target;
     if (stripe) {
       try {
-        await syncExecOsSeatsForOrg(stripe, req.organizationId);
+        await syncCommandDeckSeatsForOrg(stripe, req.organizationId);
       } catch (e) {
-        console.error("[exec-os:revoke] seat sync failed:", e);
+        console.error("[command-deck:revoke] seat sync failed:", e);
       }
     }
-    res.json({ member: updated, seatCount: await countExecOsSeats(req.organizationId) });
+    res.json({ member: updated, seatCount: await countCommandDeckSeats(req.organizationId) });
   });
 
   // GET /api/org/invites — list pending invites.

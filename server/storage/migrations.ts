@@ -326,18 +326,42 @@ export async function migrate() {
   // `memberships` is drizzle-push managed and deliberately not created here, so
   // a bare ALTER would throw on a database that hasn't been pushed yet. The
   // guard keeps a cold serverless start from serving requests against a table
-  // missing the Executive OS add-on column.
+  // missing the Command Deck add-on column.
+  //
+  // The five add-on columns shipped as has_executive_os / executive_os_* and are
+  // renamed in place here. RENAME COLUMN preserves every value, and running the
+  // renames before the ADD COLUMN statements below is what keeps that true: a
+  // fresh ADD would leave the populated legacy column stranded beside an empty
+  // new one. Each rename is guarded on the legacy column still being present and
+  // the new name still being absent, so re-running migrate() is a no-op and a
+  // database created after the rename skips straight to the ADDs.
   await sql`DO $$
+    DECLARE c RECORD;
     BEGIN
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'memberships') THEN
-        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS has_executive_os BOOLEAN NOT NULL DEFAULT false;
+        FOR c IN SELECT * FROM (VALUES
+          ('has_executive_os'::text,  'has_command_deck'::text),
+          ('executive_os_granted_at', 'command_deck_granted_at'),
+          ('executive_os_granted_by', 'command_deck_granted_by'),
+          ('executive_os_revoked_at', 'command_deck_revoked_at'),
+          ('executive_os_revoked_by', 'command_deck_revoked_by')
+        ) AS t(legacy_name, new_name)
+        LOOP
+          IF EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name = 'memberships' AND column_name::text = c.legacy_name)
+             AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                             WHERE table_name = 'memberships' AND column_name::text = c.new_name) THEN
+            EXECUTE format('ALTER TABLE memberships RENAME COLUMN %I TO %I', c.legacy_name, c.new_name);
+          END IF;
+        END LOOP;
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS has_command_deck BOOLEAN NOT NULL DEFAULT false;
         -- Audit trail for add-on grants/revokes. TEXT ISO-8601 to match every
         -- other timestamp in this schema. Left unbackfilled: grants made before
         -- these columns existed have no recorded actor.
-        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS executive_os_granted_at TEXT;
-        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS executive_os_granted_by TEXT;
-        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS executive_os_revoked_at TEXT;
-        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS executive_os_revoked_by TEXT;
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS command_deck_granted_at TEXT;
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS command_deck_granted_by TEXT;
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS command_deck_revoked_at TEXT;
+        ALTER TABLE memberships ADD COLUMN IF NOT EXISTS command_deck_revoked_by TEXT;
       END IF;
     END $$`;
   await sql`CREATE TABLE IF NOT EXISTS sessions (
@@ -477,7 +501,7 @@ export async function migrate() {
     created_at TEXT NOT NULL
   )`;
 
-  // Mobilization (Executive OS). One plan per project; the rest hang off
+  // Mobilization (Command Deck). One plan per project; the rest hang off
   // project_id. Timeline rows live in `milestones` with kind='mobilization'.
   await sql`CREATE TABLE IF NOT EXISTS mobilization_plans (
     id SERIAL PRIMARY KEY,
@@ -646,7 +670,7 @@ export async function migrate() {
   await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS on_call_rotation TEXT`;
   await sql`ALTER TABLE mobilization_plans ADD COLUMN IF NOT EXISTS subcontractor_foremen TEXT`;
 
-  // Project Setup (Executive OS). Pre-mobilization intake — one setup row per
+  // Project Setup (Command Deck). Pre-mobilization intake — one setup row per
   // project, everything else hangs off project_id. Money and percentages are
   // TEXT so a numeric round-trip can't shift a contract value.
   await sql`CREATE TABLE IF NOT EXISTS project_setup (
@@ -757,7 +781,7 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS project_setup_signatures_project_idx
     ON project_setup_signatures (project_id)`;
 
-  // Pre-Construction (Executive OS). Sits between Project Setup and
+  // Pre-Construction (Command Deck). Sits between Project Setup and
   // Mobilization — design tracking, VE, permitting, prequal, buyout and
   // long-lead procurement. One row per project, everything else on project_id.
   // Money is TEXT so a numeric round-trip can't shift a bid or PO value.
@@ -961,7 +985,7 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS pre_construction_signatures_project_idx
     ON pre_construction_signatures (project_id)`;
 
-  // Lean Executive OS modules (4-22). Shared parent + item tables keyed by
+  // Lean Command Deck modules (4-22). Shared parent + item tables keyed by
   // (project_id, module_id). See shared/schema.ts leanModuleState + leanModuleItems.
   await sql`CREATE TABLE IF NOT EXISTS lean_module_state (
     id SERIAL PRIMARY KEY,
@@ -1019,7 +1043,7 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS lean_module_item_attachments_project_module_idx
     ON lean_module_item_attachments (project_id, module_id)`;
 
-  // Executive OS: purpose-built Contracts register.
+  // Command Deck: purpose-built Contracts register.
   await sql`CREATE TABLE IF NOT EXISTS contracts (
     id SERIAL PRIMARY KEY,
     organization_id INTEGER NOT NULL,
@@ -1041,7 +1065,7 @@ export async function migrate() {
   await sql`CREATE INDEX IF NOT EXISTS contracts_org_idx ON contracts (organization_id)`;
   await sql`CREATE INDEX IF NOT EXISTS contracts_project_idx ON contracts (project_id)`;
 
-  // Executive OS: purpose-built Inspections register.
+  // Command Deck: purpose-built Inspections register.
   await sql`CREATE TABLE IF NOT EXISTS inspections (
     id SERIAL PRIMARY KEY,
     organization_id INTEGER NOT NULL,

@@ -6,7 +6,7 @@
  * styling. Quick-create dialog covers the "just left the site, need to log
  * a passed inspection" case.
  *
- * Data source: GET /api/executive-os/inspections
+ * Data source: GET /api/command-deck/inspections
  */
 import { useState } from "react";
 import { Link } from "wouter";
@@ -73,8 +73,8 @@ export default function InspectionsPortfolio() {
   });
 
   const { data: rows, isLoading, error } = useQuery<Inspection[]>({
-    queryKey: ["/api/executive-os/inspections"],
-    queryFn: async () => (await apiRequest("GET", "/api/executive-os/inspections")).json(),
+    queryKey: ["/api/command-deck/inspections"],
+    queryFn: async () => (await apiRequest("GET", "/api/command-deck/inspections")).json(),
   });
   const { data: projects } = useQuery<Project[]>({ queryKey: ["/api/projects"] });
 
@@ -85,11 +85,11 @@ export default function InspectionsPortfolio() {
       for (const k of Object.keys(payload)) {
         if (payload[k] === "") payload[k] = null;
       }
-      const res = await apiRequest("POST", "/api/executive-os/inspections", payload);
+      const res = await apiRequest("POST", "/api/command-deck/inspections", payload);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/executive-os/inspections"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/command-deck/inspections"] });
       setDialogOpen(false);
       setForm({
         projectId: "", inspectionType: "Foundation", inspector: "", inspectorAgency: "",

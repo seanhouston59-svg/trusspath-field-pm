@@ -58,7 +58,7 @@ function keysFor(projectId: number | undefined) {
     bundle: ["/api/projects", projectId, "pre-construction"] as const,
     health: ["/api/projects", projectId, "pre-construction", "health"] as const,
     gate: ["/api/projects", projectId, "mobilization", "gate"] as const,
-    portfolio: ["/api/executive-os/pre-construction"] as const,
+    portfolio: ["/api/command-deck/pre-construction"] as const,
   };
 }
 
@@ -78,7 +78,7 @@ export function usePreConstructionHealth(projectId: number | undefined) {
 
 export function usePreConstructionPortfolio() {
   return useQuery<PreConstructionPortfolioRow[]>({
-    queryKey: ["/api/executive-os/pre-construction"],
+    queryKey: ["/api/command-deck/pre-construction"],
   });
 }
 

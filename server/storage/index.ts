@@ -62,7 +62,7 @@ export class DatabaseStorage implements IStorage {
   private readonly jarvis = new JarvisRepo();
   private readonly timesheets = new TimesheetsRepo();
   private readonly system = new SystemRepo(this);
-  // Purpose-built exec-os registers (contracts + inspections). Exposed as
+  // Purpose-built Command Deck registers (contracts + inspections). Exposed as
   // public members so route handlers can call them directly — they are not
   // part of IStorage yet to avoid churning the interface.
   public readonly contracts = new ContractsRepo();
@@ -258,7 +258,7 @@ export class DatabaseStorage implements IStorage {
   getLongLeadItemById: IStorage["getLongLeadItemById"] = (...a) => this.preConstruction.getLongLeadItemById(...a);
   getPreconSignatureById: IStorage["getPreconSignatureById"] = (...a) => this.preConstruction.getPreconSignatureById(...a);
 
-  // Lean Executive OS modules (4-22)
+  // Lean Command Deck modules (4-22)
   getLeanModuleBundle: IStorage["getLeanModuleBundle"] = (...a) => this.leanModules.getBundle(...a);
   ensureLeanModuleState: IStorage["ensureLeanModuleState"] = (...a) => this.leanModules.ensureState(...a);
   updateLeanModuleState: IStorage["updateLeanModuleState"] = (...a) => this.leanModules.updateState(...a);

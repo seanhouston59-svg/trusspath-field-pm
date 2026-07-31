@@ -5,7 +5,7 @@ import { db } from "./db";
 import { ensureReady } from "./ready";
 
 /**
- * Executive OS contracts register — one row per contract or subcontract.
+ * Command Deck contracts register — one row per contract or subcontract.
  * Always org-scoped. Optional projectId (null = org-level / MSA).
  */
 export class ContractsRepo {

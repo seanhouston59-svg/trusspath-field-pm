@@ -109,32 +109,27 @@ export function requireRole(...allowed: OrgRole[]) {
 // the surface is ~40 endpoints, so per-route decoration would silently miss
 // some and would not cover routes added later.
 //
-// Both API prefixes are matched: the endpoints still live under
-// /api/executive-os (renamed separately from the UI URLs), and matching
-// /api/command-deck too means a renamed endpoint arrives already gated rather
-// than briefly open.
-const EXEC_OS_PATH_PATTERNS: RegExp[] = [
-  /^\/api\/executive-os\//,
+const COMMAND_DECK_PATH_PATTERNS: RegExp[] = [
   /^\/api\/command-deck\//,
   /^\/api\/projects\/[^/]+\/(mobilization|project-setup|pre-construction)(\/|$)/,
   /^\/api\/projects\/[^/]+\/modules(\/|$)/,
 ];
 
-export function isExecutiveOsPath(path: string): boolean {
-  return EXEC_OS_PATH_PATTERNS.some(re => re.test(path));
+export function isCommandDeckApiPath(path: string): boolean {
+  return COMMAND_DECK_PATH_PATTERNS.some(re => re.test(path));
 }
 
-export function requireExecutiveOs(req: any, res: any, next: any) {
+export function requireCommandDeck(req: any, res: any, next: any) {
   const p = req.path || req.url?.split("?")[0] || "";
-  if (!isExecutiveOsPath(p)) return next();
+  if (!isCommandDeckApiPath(p)) return next();
   // Legacy platform-owners bypass, matching resolveMembership's membership and
   // paywall checks. They frequently have no membership row at all, so without
   // this they would lose the surface entirely.
   if (req.account?.role === "owner") return next();
-  if (req.membership?.hasExecutiveOs !== true) {
+  if (req.membership?.hasCommandDeck !== true) {
     return res.status(403).json({
       message: "Command Deck is a paid add-on. Ask an owner or admin to enable it for your seat.",
-      reason: "exec_os_not_entitled",
+      reason: "command_deck_not_entitled",
     });
   }
   next();

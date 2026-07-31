@@ -119,7 +119,7 @@ export interface IStorage {
   updateMilestone(id: number, data: Partial<InsertMilestone>): Promise<Milestone | undefined>;
   deleteMilestone(id: number): Promise<void>;
 
-  // ----- Mobilization (Executive OS) -----
+  // ----- Mobilization (Command Deck) -----
   seedMobilization(projectId: number, startDate?: string | null): Promise<void>;
   getMobilizationPlan(projectId: number): Promise<MobilizationPlan | undefined>;
   upsertMobilizationPlan(projectId: number, data: Partial<InsertMobilizationPlan>): Promise<MobilizationPlan>;
@@ -195,7 +195,7 @@ export interface IStorage {
   getDeliverableById(id: number): Promise<ProjectSetupDeliverable | null>;
   getSetupSignatureById(id: number): Promise<ProjectSetupSignature | null>;
 
-  // ----- Pre-Construction (Executive OS) -----
+  // ----- Pre-Construction (Command Deck) -----
   seedPreConstruction(projectId: number, organizationId: number | null): Promise<void>;
   getPreConstruction(projectId: number): Promise<PreConstruction | null>;
   getPreConstructionBundle(projectId: number): Promise<{
@@ -243,7 +243,7 @@ export interface IStorage {
   getLongLeadItemById(id: number): Promise<PreConstructionLongLeadItem | null>;
   getPreconSignatureById(id: number): Promise<PreConstructionSignature | null>;
 
-  // ----- Lean Executive OS modules (4-22) -----
+  // ----- Lean Command Deck modules (4-22) -----
   getLeanModuleBundle(projectId: number, moduleId: string): Promise<{
     state: LeanModuleState | null;
     items: LeanModuleItem[];

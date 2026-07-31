@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import heroImg from "@/assets/landing/hero.webp";
 import fieldKitImg from "@/assets/landing/field_kit.webp";
-import execOsImg from "@/assets/landing/exec_os.webp";
+import commandDeckImg from "@/assets/landing/command_deck.webp";
 import subDropImg from "@/assets/landing/sub_drop.webp";
 
 /* ============================ Pricing config ============================ */
@@ -105,8 +105,8 @@ const PLANS: Plan[] = [
 ];
 
 /** Price of the Command Deck per-seat add-on, in dollars/user/month.
- *  Mirrors EXECUTIVE_OS_ADDON_AMOUNT_CENTS in server/lib/plans.ts. */
-const EXEC_OS_MONTHLY = 5;
+ *  Mirrors COMMAND_DECK_ADDON_AMOUNT_CENTS in server/lib/plans.ts. */
+const COMMAND_DECK_MONTHLY = 5;
 
 /* ============================ Subscribe CTA ============================ */
 // The landing subscribe CTA hands off to /signup which is the single source
@@ -265,16 +265,16 @@ const FEATURED = [
     anchor: "field-kit",
   },
   {
-    id: "featured-exec-os",
+    id: "featured-command-deck",
     kicker: "Command Deck",
     title: "The whole book of work, one screen",
     body: "Portfolio roll-ups across every job — setup, pre-con, mobilization, financials, contracts, inspections. Board packets generated from live project data.",
-    img: execOsImg,
+    img: commandDeckImg,
     w: 1200,
     h: 800,
     alt: "Executive reviewing portfolio dashboards for multiple construction projects",
-    anchor: "exec-os-addon",
-    chip: `$${EXEC_OS_MONTHLY}/user/mo add-on`,
+    anchor: "command-deck-addon",
+    chip: `$${COMMAND_DECK_MONTHLY}/user/mo add-on`,
   },
   {
     id: "featured-sub-drop",
@@ -341,12 +341,12 @@ const BUCKETS = [
     items: ["QR onboarding", "Upload inbox", "PM review + categorize", "Zero seat cost"],
   },
   {
-    id: "exec-os",
+    id: "command-deck",
     icon: BarChart3,
     title: "Command Deck",
     body: "The portfolio layer above your projects: cross-job roll-ups, stage-gate readiness, contracts, inspections, and board packets.",
     items: ["Portfolio roll-ups", "Financials", "Contracts register", "Board packets"],
-    chip: `$${EXEC_OS_MONTHLY}/user/mo`,
+    chip: `$${COMMAND_DECK_MONTHLY}/user/mo`,
   },
 ];
 
@@ -380,7 +380,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What is the Command Deck add-on?",
-    a: `Command Deck is the portfolio layer above your projects — cross-job roll-ups, stage-gate readiness, financial summaries, contracts, inspections, and board packets. It is $${EXEC_OS_MONTHLY} per user per month, granted seat by seat by an owner or admin under Settings → Team, and prorated onto your existing subscription immediately. Turn it off any time and the charge drops at the next invoice.`,
+    a: `Command Deck is the portfolio layer above your projects — cross-job roll-ups, stage-gate readiness, financial summaries, contracts, inspections, and board packets. It is $${COMMAND_DECK_MONTHLY} per user per month, granted seat by seat by an owner or admin under Settings → Team, and prorated onto your existing subscription immediately. Turn it off any time and the charge drops at the next invoice.`,
   },
   {
     q: "Do subcontractors need a paid seat?",
@@ -554,7 +554,7 @@ export default function Landing() {
                   <div className="flex items-center gap-2">
                     <span className="ff-kicker lp-accent-text text-[10px]">{f.kicker}</span>
                     {f.chip && (
-                      <span className="lp-accent-soft rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-bold" data-testid="chip-exec-os-addon">
+                      <span className="lp-accent-soft rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-bold" data-testid="chip-command-deck-addon">
                         {f.chip}
                       </span>
                     )}
@@ -756,15 +756,15 @@ export default function Landing() {
 
           {/* Command Deck add-on callout */}
           <div
-            id="exec-os-addon"
+            id="command-deck-addon"
             className="lp-card mt-6 flex flex-col items-start gap-5 rounded-lg p-6 md:flex-row md:items-center md:justify-between"
-            data-testid="exec-os-addon-callout"
+            data-testid="command-deck-addon-callout"
           >
             <div className="flex items-start gap-3">
               <div className="lp-accent-soft grid size-10 shrink-0 place-items-center rounded-md"><Layers className="size-5" /></div>
               <div>
                 <div className="font-display text-lg font-bold">
-                  + ${EXEC_OS_MONTHLY}/user/month — Command Deck add-on
+                  + ${COMMAND_DECK_MONTHLY}/user/month — Command Deck add-on
                 </div>
                 <p className="lp-muted mt-1 max-w-2xl text-sm leading-relaxed">
                   Portfolio roll-ups, stage-gate readiness, financial summaries, contracts,
@@ -774,9 +774,9 @@ export default function Landing() {
               </div>
             </div>
             <button
-              onClick={() => scrollTo("featured-exec-os")}
+              onClick={() => scrollTo("featured-command-deck")}
               className="lp-rule inline-flex shrink-0 items-center gap-1.5 rounded-md border px-4 py-2.5 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
-              data-testid="button-exec-os-learn-more"
+              data-testid="button-command-deck-learn-more"
             >
               What's inside <ArrowRight className="size-3.5" />
             </button>
@@ -909,7 +909,7 @@ export default function Landing() {
               <ul className="lp-muted mt-3 space-y-2 text-sm">
                 <li><button onClick={() => scrollTo("product")} className="lp-link">Overview</button></li>
                 <li><button onClick={() => scrollTo("field-kit")} className="lp-link">Field kit</button></li>
-                <li><button onClick={() => scrollTo("exec-os-addon")} className="lp-link">Command Deck</button></li>
+                <li><button onClick={() => scrollTo("command-deck-addon")} className="lp-link">Command Deck</button></li>
                 <li><Link href="/subs" className="lp-link">Sub Drop</Link></li>
                 <li><button onClick={() => scrollTo("pricing")} className="lp-link">Pricing</button></li>
               </ul>

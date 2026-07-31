@@ -5,7 +5,7 @@ import { db } from "./db";
 import { ensureReady } from "./ready";
 
 /**
- * Executive OS inspections register — one row per AHJ / third-party inspection.
+ * Command Deck inspections register — one row per AHJ / third-party inspection.
  * Always org-scoped and project-scoped.
  */
 export class InspectionsRepo {

@@ -58,7 +58,7 @@ export default function BoardPackets() {
   // Org-wide board-packet export history. Endpoint returns the latest 20
   // `board_packet` events across every project the caller can see.
   const { data: historyData, isLoading: historyLoading, refetch } = useQuery<ProjectEventRow[]>({
-    queryKey: ["/api/executive-os/board-packet-history"],
+    queryKey: ["/api/command-deck/board-packet-history"],
   });
 
   const events = historyData ?? [];
@@ -70,7 +70,7 @@ export default function BoardPackets() {
     if (period.trim()) params.set("period", period.trim());
     if (preparedBy.trim()) params.set("preparedBy", preparedBy.trim());
     if (preparedByRole.trim()) params.set("preparedByRole", preparedByRole.trim());
-    const url = `/api/executive-os/board-packet.pdf${params.toString() ? `?${params.toString()}` : ""}`;
+    const url = `/api/command-deck/board-packet.pdf${params.toString() ? `?${params.toString()}` : ""}`;
     // Opening in a new tab keeps the current page mounted so history refreshes
     // don't lose form state. The browser's PDF viewer handles print/download.
     const win = window.open(url, "_blank", "noopener,noreferrer");

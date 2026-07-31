@@ -84,7 +84,7 @@ export function useMobilizationHealth(projectId: number | undefined) {
 }
 
 export function useMobilizationPortfolio() {
-  return useQuery<MobilizationPortfolioRow[]>({ queryKey: ["/api/executive-os/mobilization"] });
+  return useQuery<MobilizationPortfolioRow[]>({ queryKey: ["/api/command-deck/mobilization"] });
 }
 
 type Resource =
@@ -96,7 +96,7 @@ function useInvalidateMobilization(projectId: number | undefined) {
   return () => {
     qc.invalidateQueries({ queryKey: keys.bundle });
     qc.invalidateQueries({ queryKey: keys.health });
-    qc.invalidateQueries({ queryKey: ["/api/executive-os/mobilization"] });
+    qc.invalidateQueries({ queryKey: ["/api/command-deck/mobilization"] });
   };
 }
 

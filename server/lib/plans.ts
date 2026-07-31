@@ -73,12 +73,15 @@ export const PLANS: Record<PlanTier, PlanConfig> = {
 export const TRIAL_DAYS = 14;
 
 /* ------------------------------ Add-ons ------------------------------ */
-// Executive OS: a per-seat add-on billed alongside the org's base subscription
+// Command Deck: a per-seat add-on billed alongside the org's base subscription
 // as a third subscription item. Price ids are hardcoded here to match how base
 // plans work — the STRIPE_PRICE_* env-var generation was abandoned and its
 // endpoint now returns 410.
 //
-// Both prices MUST be tagged metadata.kind = 'addon_exec_os' in Stripe. The
+// Both prices MUST be tagged metadata.kind = 'addon_exec_os' in Stripe. That
+// literal predates the Command Deck rename and is deliberately left alone: it
+// lives in the Stripe account, not this repo, and renaming it here without
+// re-tagging every existing price would be a silent mismatch. The
 // webhook derives the org's plan by scanning items for metadata.kind === 'base'
 // and breaking on the first match, so tagging either price 'base' would silently
 // clobber organizations.subscription_plan.
@@ -90,24 +93,24 @@ export const TRIAL_DAYS = 14;
 // Before production launch: create the same product/price in the LIVE Stripe
 // account (metadata.kind = "addon_exec_os") and swap this value.
 // Annual price is still a TODO — create when annual billing goes live.
-export const EXECUTIVE_OS_ADDON_PRICE_IDS = {
+export const COMMAND_DECK_ADDON_PRICE_IDS = {
   monthly: "price_1TyhFwCL31xFtol4GQDNjiN0",
-  annual: "price_TODO_EXEC_OS_ADDON_ANNUAL",
+  annual: "price_TODO_COMMAND_DECK_ADDON_ANNUAL",
 } as const;
 
-/** Per-seat price of the Executive OS add-on, in cents. */
-export const EXECUTIVE_OS_ADDON_AMOUNT_CENTS = 500;
+/** Per-seat price of the Command Deck add-on, in cents. */
+export const COMMAND_DECK_ADDON_AMOUNT_CENTS = 500;
 
 // Pick the add-on price whose interval matches the subscription's. Mirrors how the
 // webhook derives the org's billing interval (server/routes.ts): find the item tagged
 // metadata.kind='base' and read its recurring interval. Stripe requires every item on
 // a subscription to share one interval, so the first item is a safe fallback when the
 // base tag is missing.
-export function getExecOsPriceIdForSubscription(subscription: any): string {
+export function getCommandDeckPriceIdForSubscription(subscription: any): string {
   const items = subscription?.items?.data || [];
   const base = items.find((i: any) => i.price?.metadata?.kind === "base") || items[0];
   const billing: Billing = base?.price?.recurring?.interval === "year" ? "annual" : "monthly";
-  return EXECUTIVE_OS_ADDON_PRICE_IDS[billing];
+  return COMMAND_DECK_ADDON_PRICE_IDS[billing];
 }
 
 /** Compute how many overage seats above the plan's included count. */

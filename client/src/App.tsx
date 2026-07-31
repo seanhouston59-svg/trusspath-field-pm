@@ -298,7 +298,7 @@ function AccessGate() {
   const { isAllowed } = useAccess();
   // Command Deck is a paid per-seat add-on. Gating here rather than at each of
   // the ~60 /command-deck route patterns covers the generated lean-module routes too.
-  // This is a UX redirect only — the API is enforced by requireExecutiveOs.
+  // This is a UX redirect only — the API is enforced by requireCommandDeck.
   const commandDeck = useCommandDeckEntitlement();
   // Play a soft ding whenever a new sticky note or sticker appears on the
   // org's shared corkboard. Mounted here (inside the auth wall) so we don't
