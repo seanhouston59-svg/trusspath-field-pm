@@ -51,19 +51,19 @@ export const EVENT_KINDS = {
   MESSAGE_POSTED: "message.posted",
   NOTE_ADDED: "note.added",
 
-  // Mobilization (Executive OS)
+  // Mobilization (Command Deck)
   MOBILIZATION_ITEM_COMPLETED: "mobilization.item_completed",
   MOBILIZATION_PERMIT_APPROVED: "mobilization.permit_approved",
   MOBILIZATION_REPORT_GENERATED: "mobilization.report_generated",
 
-  // Project Setup (Executive OS)
+  // Project Setup (Command Deck)
   PROJECT_SETUP_CHARTER_APPROVED: "project_setup.charter_approved",
   PROJECT_SETUP_DELIVERABLE_COMPLETED: "project_setup.deliverable_completed",
   PROJECT_SETUP_KICKOFF_SCHEDULED: "project_setup.kickoff_scheduled",
   PROJECT_SETUP_CHARTER_REPORT_GENERATED: "project_setup.charter_report_generated",
   PROJECT_SETUP_KICKOFF_AGENDA_GENERATED: "project_setup.kickoff_agenda_generated",
 
-  // Pre-Construction (Executive OS)
+  // Pre-Construction (Command Deck)
   PRECON_PLAN_APPROVED: "pre_construction.plan_approved",
   PRECON_PERMIT_ISSUED: "pre_construction.permit_issued",
   PRECON_BID_PACKAGE_AWARDED: "pre_construction.bid_package_awarded",
@@ -73,7 +73,7 @@ export const EVENT_KINDS = {
   PRECON_DESIGN_REVIEW_REPORT_GENERATED: "pre_construction.design_review_report_generated",
   PRECON_BUYOUT_REPORT_GENERATED: "pre_construction.buyout_report_generated",
 
-  // Executive OS — Board Packets. Logged once per successful PDF export.
+  // Command Deck — Board Packets. Logged once per successful PDF export.
   // Written against the first project the caller can see (event schema requires
   // a projectId), but the packet itself is org-wide.
   BOARD_PACKET_GENERATED: "board_packet",

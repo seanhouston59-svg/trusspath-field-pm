@@ -4962,7 +4962,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
     if (!req.organizationId) {
       return res.json({
         plan: null, status: null, billing: null, currentPeriodEnd: null, hasCustomer: false,
-        entitlements: { executiveOs: isPlatformOwner, execOsSeatCount: 0 },
+        entitlements: { commandDeck: isPlatformOwner, commandDeckSeatCount: 0 },
       });
     }
     const org = await getOrganization(req.organizationId);
@@ -4984,8 +4984,8 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
         overage: plan ? Math.max(0, seats - plan.includedSeats) : null,
       },
       entitlements: {
-        executiveOs: isPlatformOwner || !!req.membership?.hasExecutiveOs,
-        execOsSeatCount: execOsSeatCount,
+        commandDeck: isPlatformOwner || !!req.membership?.hasExecutiveOs,
+        commandDeckSeatCount: execOsSeatCount,
       },
     });
   });
@@ -5913,7 +5913,7 @@ export async function registerRoutes(_httpServer: Server, app: Express): Promise
       return null;
     }
     if (target.status !== "active") {
-      res.status(400).json({ message: "Cannot change Executive OS for an inactive member" });
+      res.status(400).json({ message: "Cannot change Command Deck for an inactive member" });
       return null;
     }
     return target;

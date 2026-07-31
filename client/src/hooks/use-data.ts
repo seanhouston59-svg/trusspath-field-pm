@@ -804,9 +804,9 @@ export type BillingStatus = {
   cancelAtPeriodEnd?: boolean;
   hasCustomer: boolean;
   seats?: { active: number; included: number | null; overage: number | null };
-  // Server-derived feature entitlements. `executiveOs` is the caller's own seat;
-  // `execOsSeatCount` is the org-wide granted count that drives the add-on line.
-  entitlements?: { executiveOs: boolean; execOsSeatCount: number };
+  // Server-derived feature entitlements. `commandDeck` is the caller's own seat;
+  // `commandDeckSeatCount` is the org-wide granted count that drives the add-on line.
+  entitlements?: { commandDeck: boolean; commandDeckSeatCount: number };
 };
 export function useBillingStatus() {
   return useQuery<BillingStatus>({
@@ -941,18 +941,18 @@ export function useRemoveMember() {
     },
   });
 }
-/* ------------------- Executive OS add-on (per-seat) ------------------- */
+/* ------------------- Command Deck add-on (per-seat) ------------------- */
 // Grant/revoke both move money, so they invalidate billing status alongside the
 // member lists — with staleTime: Infinity an omitted key shows a stale seat
 // count indefinitely.
-function invalidateExecOs(qc: ReturnType<typeof useQueryClient>) {
+function invalidateCommandDeck(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["/api/org/members/exec-os"] });
   qc.invalidateQueries({ queryKey: ["/api/org/members"] });
   qc.invalidateQueries({ queryKey: ["/api/org/current"] });
   qc.invalidateQueries({ queryKey: ["/api/billing/status"] });
 }
 
-export function useSetMemberExecutiveOs() {
+export function useSetMemberCommandDeck() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, enabled }: { id: number; enabled: boolean }) => {
@@ -962,7 +962,7 @@ export function useSetMemberExecutiveOs() {
       );
       return res.json();
     },
-    onSuccess: () => invalidateExecOs(qc),
+    onSuccess: () => invalidateCommandDeck(qc),
   });
 }
 

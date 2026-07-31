@@ -1,4 +1,4 @@
-// Catalog for the 19 lean Executive OS modules (lifecycle order 4-22).
+// Catalog for the 19 lean Command Deck modules (lifecycle order 4-22).
 //
 // Each entry defines what a module is called, what it's for, what its rows
 // represent, and what categories those rows fall into. The client uses this

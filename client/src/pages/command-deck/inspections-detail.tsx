@@ -1,5 +1,5 @@
 /**
- * Executive OS — Inspection Detail.
+ * Command Deck — Inspection Detail.
  *
  * Edit surface for a single inspection: type, inspector, date, result,
  * follow-up items, notes. Delete via confirm.

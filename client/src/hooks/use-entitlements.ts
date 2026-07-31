@@ -7,7 +7,7 @@
 
 import { useBillingStatus } from "./use-data";
 
-export function useExecutiveOsEntitlement(): {
+export function useCommandDeckEntitlement(): {
   hasAccess: boolean;
   seatCount: number;
   isLoading: boolean;
@@ -17,8 +17,8 @@ export function useExecutiveOsEntitlement(): {
     // Loading and errored both read as "no access" so the caller never leaks a
     // gated view; callers must check isLoading before rendering an upsell, or
     // it will flash on every cold load.
-    hasAccess: data?.entitlements?.executiveOs === true,
-    seatCount: data?.entitlements?.execOsSeatCount ?? 0,
+    hasAccess: data?.entitlements?.commandDeck === true,
+    seatCount: data?.entitlements?.commandDeckSeatCount ?? 0,
     isLoading,
   };
 }

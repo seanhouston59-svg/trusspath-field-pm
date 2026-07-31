@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Rocket, ClipboardList, Ruler, DollarSign, FileText, FileSignature, ClipboardCheck, ChevronRight } from "lucide-react";
-import { LeanPortfolioRollup } from "@/components/executive-os/lean-portfolio-rollup";
+import { LeanPortfolioRollup } from "@/components/command-deck/lean-portfolio-rollup";
 
 type ModuleCard = {
   href: string;
@@ -13,7 +13,7 @@ type ModuleCard = {
 };
 
 // Ordered chronologically along the lifecycle so an executive scans the
-// landing top-to-bottom the same way a project moves through the OS.
+// landing top-to-bottom the same way a project moves through Command Deck.
 // Financials + Board Packets sit at the bottom because they're cross-cutting
 // surfaces that aggregate the other modules, not a lifecycle stage.
 const MODULES: ModuleCard[] = [
@@ -76,16 +76,16 @@ const MODULES: ModuleCard[] = [
 ];
 
 /**
- * Executive OS landing.
+ * Command Deck landing.
  *
  * Hosts the executive-level operating surfaces: per-lifecycle-stage portfolios
  * (Project Setup, Pre-Construction, Mobilization), the cross-cutting Financials
  * rollup, and one-click Board Packet PDF export. The full 19-cell lean-module
  * strip lives below the primary cards for deeper drill-down.
  */
-export default function ExecutiveOs() {
+export default function CommandDeck() {
   return (
-    <Layout title="Executive OS">
+    <Layout title="Command Deck">
       <div className="mx-auto max-w-6xl px-4 py-8">
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader className="flex flex-row items-center gap-3">
@@ -93,10 +93,10 @@ export default function ExecutiveOs() {
               <Sparkles className="size-5" />
             </div>
             <div>
-              <CardTitle className="text-xl">Executive OS</CardTitle>
+              <CardTitle className="text-xl">Command Deck</CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
                 Portfolio KPIs, financial rollups, board-ready packets, and
-                cross-project risk — a single command deck for the executive team.
+                cross-project risk — a single surface for the executive team.
               </p>
             </div>
           </CardHeader>

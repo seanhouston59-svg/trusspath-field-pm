@@ -5,8 +5,8 @@ import { BarChart3, Check, Copy, FileText, Layers, Lock, ShieldCheck } from "luc
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCurrentOrg, useSetMemberExecutiveOs } from "@/hooks/use-data";
-import { useExecutiveOsEntitlement } from "@/hooks/use-entitlements";
+import { useCurrentOrg, useSetMemberCommandDeck } from "@/hooks/use-data";
+import { useCommandDeckEntitlement } from "@/hooks/use-entitlements";
 import { useToast } from "@/hooks/use-toast";
 
 const PITCH = [
@@ -32,10 +32,10 @@ const PITCH = [
   },
 ];
 
-export default function ExecutiveOsUpsellPage() {
+export default function CommandDeckUpsellPage() {
   const { data: orgData } = useCurrentOrg();
-  const { seatCount } = useExecutiveOsEntitlement();
-  const setExecOs = useSetMemberExecutiveOs();
+  const { seatCount } = useCommandDeckEntitlement();
+  const setExecOs = useSetMemberCommandDeck();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
@@ -52,13 +52,13 @@ export default function ExecutiveOsUpsellPage() {
       // the route gate sees the new entitlement instead of bouncing us back here.
       await qc.refetchQueries({ queryKey: ["/api/billing/status"] });
       toast({
-        title: "Executive OS enabled",
+        title: "Command Deck enabled",
         description: "$5/month was added to your subscription, prorated for this cycle.",
       });
       window.location.hash = "/executive-os";
     } catch (err: any) {
       toast({
-        title: "Could not enable Executive OS",
+        title: "Could not enable Command Deck",
         description: err?.message || "Please try again.",
         variant: "destructive",
       });
@@ -66,7 +66,7 @@ export default function ExecutiveOsUpsellPage() {
   }
 
   function copyRequest() {
-    const body = `Hi — could you enable the Executive OS add-on for my TrussPath seat${orgName ? ` on ${orgName}` : ""}? It's $5/user/month and I need the portfolio roll-ups. You can turn it on under Settings → Team.`;
+    const body = `Hi — could you enable the Command Deck add-on for my TrussPath seat${orgName ? ` on ${orgName}` : ""}? It's $5/user/month and I need the portfolio roll-ups. You can turn it on under Settings → Team.`;
     navigator.clipboard.writeText(body).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -74,13 +74,13 @@ export default function ExecutiveOsUpsellPage() {
   }
 
   return (
-    <Layout title="Executive OS">
+    <Layout title="Command Deck">
       <div className="mx-auto max-w-4xl space-y-8 p-6">
         <div>
           <Badge variant="secondary" className="gap-1.5">
             <Lock className="size-3" /> Paid add-on
           </Badge>
-          <h1 className="mt-3 font-display text-3xl font-bold">Executive OS</h1>
+          <h1 className="mt-3 font-display text-3xl font-bold">Command Deck</h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             The portfolio layer above your projects. Built for the people who answer for all of
             them at once — not the ones running a single job.
@@ -111,7 +111,7 @@ export default function ExecutiveOsUpsellPage() {
             <>
               <h2 className="font-display text-lg font-bold">Turn it on for your seat</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                You manage this org, so you can enable Executive OS for yourself right now.
+                You manage this org, so you can enable Command Deck for yourself right now.
                 {seatCount > 0 && ` Your org has ${seatCount} seat${seatCount === 1 ? "" : "s"} enabled.`}
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -127,7 +127,7 @@ export default function ExecutiveOsUpsellPage() {
             <>
               <h2 className="font-display text-lg font-bold">Ask your admin to enable this</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Executive OS is granted per seat by an owner or admin on your organization.
+                Command Deck is granted per seat by an owner or admin on your organization.
                 Copy the message below and send it their way.
               </p>
               <div className="mt-4">

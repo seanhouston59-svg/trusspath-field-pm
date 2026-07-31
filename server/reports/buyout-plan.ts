@@ -297,7 +297,7 @@ export function renderBuyoutPlan(
     r.p(
       "No buyout signers are on the Pre-Construction sign-off block. Add the " +
       "Preconstruction Lead, Chief Estimator and Project Executive in " +
-      "Executive OS → Pre-Construction → Signatures.",
+      "Command Deck → Pre-Construction → Signatures.",
       { muted: true },
     );
   } else {

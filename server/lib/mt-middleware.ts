@@ -127,7 +127,7 @@ export function requireExecutiveOs(req: any, res: any, next: any) {
   if (req.account?.role === "owner") return next();
   if (req.membership?.hasExecutiveOs !== true) {
     return res.status(403).json({
-      message: "Executive OS is a paid add-on. Ask an owner or admin to enable it for your seat.",
+      message: "Command Deck is a paid add-on. Ask an owner or admin to enable it for your seat.",
       reason: "exec_os_not_entitled",
     });
   }

@@ -378,7 +378,7 @@ export function renderPreConstructionPlan(
   } else {
     r.callout(
       "Not yet approved. This plan is a working document until the Preconstruction Lead " +
-      "and Project Executive approve it in Executive OS → Pre-Construction.",
+      "and Project Executive approve it in Command Deck → Pre-Construction.",
       "warn",
     );
   }

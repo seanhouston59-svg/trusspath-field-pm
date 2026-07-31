@@ -1,5 +1,5 @@
 /**
- * Lean-module portfolio rollup for the Executive OS landing page.
+ * Lean-module portfolio rollup for the Command Deck landing page.
  *
  * Renders one row per project. Each row shows a 19-cell strip \u2014 one cell per
  * lean lifecycle module, colored by status and badged with an open-item count.

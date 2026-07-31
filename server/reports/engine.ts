@@ -122,7 +122,7 @@ export class ReportBuilder {
       info: {
         Title: `${meta.title} — ${meta.projectName}`,
         Author: meta.preparedBy,
-        Creator: "TrussPath Executive OS",
+        Creator: "TrussPath Command Deck",
       },
     });
     this.doc.on("pageAdded", () => {
@@ -215,7 +215,7 @@ export class ReportBuilder {
     d.fillColor(PALETTE.white).font("Helvetica-Bold").fontSize(13)
       .text("TRUSSPATH", MARGIN, MARGIN + 6, { characterSpacing: 3 });
     d.font("Helvetica").fontSize(9).fillColor("#94A3B8")
-      .text("EXECUTIVE OS", MARGIN, MARGIN + 26, { characterSpacing: 2 });
+      .text("COMMAND DECK", MARGIN, MARGIN + 26, { characterSpacing: 2 });
 
     d.fillColor(PALETTE.white).font("Times-Bold").fontSize(38)
       .text(this.meta.title.toUpperCase(), MARGIN, bandH - 150, { width: CONTENT_W });

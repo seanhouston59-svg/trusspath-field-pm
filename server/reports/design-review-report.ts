@@ -288,7 +288,7 @@ export function renderDesignReviewReport(
     r.p(
       "No design coordination signers are on the Pre-Construction sign-off block. " +
       "Add the Design Manager, Architect of Record and Engineer of Record in " +
-      "Executive OS → Pre-Construction → Signatures.",
+      "Command Deck → Pre-Construction → Signatures.",
       { muted: true },
     );
   } else {

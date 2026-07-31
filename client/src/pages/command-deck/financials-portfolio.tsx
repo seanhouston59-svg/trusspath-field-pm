@@ -1,5 +1,5 @@
 /**
- * Executive OS \u2014 Financials Portfolio.
+ * Command Deck \u2014 Financials Portfolio.
  *
  * Org-wide rollup of every dollar signal the app currently tracks: contract
  * value, approved + pending change orders, subcontract commitments, PO

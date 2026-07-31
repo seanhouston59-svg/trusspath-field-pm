@@ -1,5 +1,5 @@
 /**
- * Shared page for the 19 lean Executive OS lifecycle modules (4-22).
+ * Shared page for the 19 lean Command Deck lifecycle modules (4-22).
  *
  * The same component renders both the portfolio (list of projects, each with a
  * row-count summary) and the detail (single project, editable state + item
@@ -40,8 +40,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LeanItemPasteDialog } from "@/components/executive-os/lean-item-paste-dialog";
-import { LeanItemAttachmentsButton } from "@/components/executive-os/lean-item-attachments-button";
+import { LeanItemPasteDialog } from "@/components/command-deck/lean-item-paste-dialog";
+import { LeanItemAttachmentsButton } from "@/components/command-deck/lean-item-attachments-button";
 import { cn } from "@/lib/utils";
 import type { LeanModuleItem, Project, TeamMember } from "@shared/schema";
 import { useTeam } from "@/hooks/use-data";

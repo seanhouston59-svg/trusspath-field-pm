@@ -129,7 +129,7 @@ export async function generateProjectCharter(
     r.sectionBreak();
     r.h1("Project Setup Not Initialized");
     r.unavailable(
-      "This project has no Project Setup record. Open Executive OS → Project Setup and " +
+      "This project has no Project Setup record. Open Command Deck → Project Setup and " +
       "run the opt-in seed to populate the charter.",
     );
     r.end();
