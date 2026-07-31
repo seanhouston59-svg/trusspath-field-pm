@@ -1,5 +1,5 @@
 /**
- * Mobilization Plan — the first Executive OS deliverable.
+ * Mobilization Plan — the first Command Deck deliverable.
  *
  * Renders the full 15-section mobilization outline plus the standard executive
  * report sections (financials, quality, safety, RFI/CO, manpower) from the

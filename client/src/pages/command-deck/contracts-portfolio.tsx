@@ -6,7 +6,7 @@
  * link to a detail page for full edit; a quick-create dialog covers the
  * common "new sub just executed" case without leaving the list.
  *
- * Data source: GET /api/executive-os/contracts
+ * Data source: GET /api/command-deck/contracts
  */
 import { useState } from "react";
 import { Link } from "wouter";
@@ -83,8 +83,8 @@ export default function ContractsPortfolio() {
   });
 
   const { data: rows, isLoading, error } = useQuery<Contract[]>({
-    queryKey: ["/api/executive-os/contracts"],
-    queryFn: async () => (await apiRequest("GET", "/api/executive-os/contracts")).json(),
+    queryKey: ["/api/command-deck/contracts"],
+    queryFn: async () => (await apiRequest("GET", "/api/command-deck/contracts")).json(),
   });
 
   const createMut = useMutation({
@@ -95,11 +95,11 @@ export default function ContractsPortfolio() {
       for (const k of Object.keys(payload)) {
         if (payload[k] === "") payload[k] = null;
       }
-      const res = await apiRequest("POST", "/api/executive-os/contracts", payload);
+      const res = await apiRequest("POST", "/api/command-deck/contracts", payload);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/executive-os/contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/command-deck/contracts"] });
       setDialogOpen(false);
       setForm({
         counterpartyName: "", counterpartyType: "subcontractor", scopeSummary: "",

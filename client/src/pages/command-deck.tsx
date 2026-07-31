@@ -23,7 +23,7 @@ const MODULES: ModuleCard[] = [
     Icon: ClipboardList,
     description:
       "Charter, stakeholders, contract documents, deliverables, and kickoff — the intake step before pre-construction begins.",
-    testId: "exec-os-project-setup-link",
+    testId: "command-deck-project-setup-link",
   },
   {
     href: "/command-deck/pre-construction",
@@ -31,7 +31,7 @@ const MODULES: ModuleCard[] = [
     Icon: Ruler,
     description:
       "Design tracking, RFIs, value engineering, permits, prequalification, bid packages, and long-lead procurement — through plan approval and full buyout.",
-    testId: "exec-os-pre-construction-link",
+    testId: "command-deck-pre-construction-link",
   },
   {
     href: "/command-deck/mobilization",
@@ -39,7 +39,7 @@ const MODULES: ModuleCard[] = [
     Icon: Rocket,
     description:
       "Readiness across every project — checklist, permits, equipment, utilities, onboarding, milestones, and risks from Notice to Proceed through the first day of earthwork.",
-    testId: "exec-os-mobilization-link",
+    testId: "command-deck-mobilization-link",
   },
   {
     href: "/command-deck/contracts",
@@ -47,7 +47,7 @@ const MODULES: ModuleCard[] = [
     Icon: FileSignature,
     description:
       "Owner contract, subcontracts, and vendor agreements in one register — party, scope, value, dates, insurance certs, bonds, and status across every project.",
-    testId: "exec-os-contracts-link",
+    testId: "command-deck-contracts-link",
   },
   {
     href: "/command-deck/inspections",
@@ -55,7 +55,7 @@ const MODULES: ModuleCard[] = [
     Icon: ClipboardCheck,
     description:
       "Every third-party and AHJ inspection across the portfolio — type, inspector, result, and follow-up items — with pass/fail rollup and open-item drill-down.",
-    testId: "exec-os-inspections-link",
+    testId: "command-deck-inspections-link",
   },
   {
     href: "/command-deck/financials",
@@ -63,7 +63,7 @@ const MODULES: ModuleCard[] = [
     Icon: DollarSign,
     description:
       "Org-wide budget vs. committed cost, approved and pending change orders, contingency remaining, and per-project drill-down.",
-    testId: "exec-os-financials-link",
+    testId: "command-deck-financials-link",
   },
   {
     href: "/command-deck/board-packets",
@@ -71,7 +71,7 @@ const MODULES: ModuleCard[] = [
     Icon: FileText,
     description:
       "One-click PDF export that assembles portfolio health, top risks, and the financial rollup into a board-ready document.",
-    testId: "exec-os-board-packets-link",
+    testId: "command-deck-board-packets-link",
   },
 ];
 

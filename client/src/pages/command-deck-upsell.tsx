@@ -35,7 +35,7 @@ const PITCH = [
 export default function CommandDeckUpsellPage() {
   const { data: orgData } = useCurrentOrg();
   const { seatCount } = useCommandDeckEntitlement();
-  const setExecOs = useSetMemberCommandDeck();
+  const setCommandDeck = useSetMemberCommandDeck();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
@@ -47,7 +47,7 @@ export default function CommandDeckUpsellPage() {
   async function handleEnableForMe() {
     if (!myMembership) return;
     try {
-      await setExecOs.mutateAsync({ id: myMembership.id, enabled: true });
+      await setCommandDeck.mutateAsync({ id: myMembership.id, enabled: true });
       // The mutation already invalidates billing status; wait for the refetch so
       // the route gate sees the new entitlement instead of bouncing us back here.
       await qc.refetchQueries({ queryKey: ["/api/billing/status"] });
@@ -115,8 +115,8 @@ export default function CommandDeckUpsellPage() {
                 {seatCount > 0 && ` Your org has ${seatCount} seat${seatCount === 1 ? "" : "s"} enabled.`}
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <Button onClick={handleEnableForMe} disabled={setExecOs.isPending} data-testid="button-exec-os-enable-me">
-                  {setExecOs.isPending ? "Enabling…" : "Enable for me — $5/mo"}
+                <Button onClick={handleEnableForMe} disabled={setCommandDeck.isPending} data-testid="button-command-deck-enable-me">
+                  {setCommandDeck.isPending ? "Enabling…" : "Enable for me — $5/mo"}
                 </Button>
                 <Link href="/settings/team" className="text-sm font-medium text-primary hover:underline">
                   Manage team access →
@@ -131,7 +131,7 @@ export default function CommandDeckUpsellPage() {
                 Copy the message below and send it their way.
               </p>
               <div className="mt-4">
-                <Button variant="outline" onClick={copyRequest} data-testid="button-exec-os-copy-request">
+                <Button variant="outline" onClick={copyRequest} data-testid="button-command-deck-copy-request">
                   {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                   {copied ? "Copied" : "Copy request message"}
                 </Button>

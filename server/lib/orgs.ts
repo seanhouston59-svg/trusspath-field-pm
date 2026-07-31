@@ -6,13 +6,13 @@ import { randomBytes } from "node:crypto";
 import { db } from "../storage";
 import {
   organizations, memberships, invites, projectMembers,
-  ROLE_CAPS, EXEC_OS_SYSTEM_ACTOR, type OrgRole,
+  ROLE_CAPS, COMMAND_DECK_SYSTEM_ACTOR, type OrgRole,
   type Organization, type Membership, type Invite,
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import {
   PLANS, buildSubscriptionItems, TRIAL_DAYS,
-  EXECUTIVE_OS_ADDON_PRICE_IDS, getExecOsPriceIdForSubscription,
+  COMMAND_DECK_ADDON_PRICE_IDS, getCommandDeckPriceIdForSubscription,
   type PlanTier, type Billing,
 } from "./plans";
 
@@ -249,37 +249,37 @@ export async function countActiveSeats(organizationId: number): Promise<number> 
   return rows.length;
 }
 
-// Executive OS add-on seat count = active memberships with the add-on granted.
+// Command Deck add-on seat count = active memberships with the add-on granted.
 // This is the authoritative quantity for the Stripe add-on subscription item.
-export async function countExecOsSeats(organizationId: number): Promise<number> {
+export async function countCommandDeckSeats(organizationId: number): Promise<number> {
   const rows = await db.select().from(memberships).where(and(
     eq(memberships.organizationId, organizationId),
     eq(memberships.status, "active"),
-    eq(memberships.hasExecutiveOs, true),
+    eq(memberships.hasCommandDeck, true),
   ));
   return rows.length;
 }
 
 // `actor` is the accounts.id of the admin making the change, or
-// EXEC_OS_SYSTEM_ACTOR when no human is behind it. A grant clears the revoked_*
+// COMMAND_DECK_SYSTEM_ACTOR when no human is behind it. A grant clears the revoked_*
 // pair so the row reads as actively granted; a revoke leaves granted_* intact so
 // the last grant stays attributable.
-export async function setMembershipExecutiveOs(
+export async function setMembershipCommandDeck(
   id: number,
-  hasExecutiveOs: boolean,
+  hasCommandDeck: boolean,
   actor: string,
 ): Promise<Membership | undefined> {
   const now = new Date().toISOString();
-  const audit = hasExecutiveOs
+  const audit = hasCommandDeck
     ? {
-        executiveOsGrantedAt: now,
-        executiveOsGrantedBy: actor,
-        executiveOsRevokedAt: null,
-        executiveOsRevokedBy: null,
+        commandDeckGrantedAt: now,
+        commandDeckGrantedBy: actor,
+        commandDeckRevokedAt: null,
+        commandDeckRevokedBy: null,
       }
-    : { executiveOsRevokedAt: now, executiveOsRevokedBy: actor };
+    : { commandDeckRevokedAt: now, commandDeckRevokedBy: actor };
   const [row] = await db.update(memberships)
-    .set({ hasExecutiveOs, ...audit })
+    .set({ hasCommandDeck, ...audit })
     .where(eq(memberships.id, id))
     .returning();
   return row;
@@ -290,16 +290,16 @@ export async function setMembershipExecutiveOs(
 // with the subscription, so leaving grants in place would hand out free access.
 // Scoped to rows that actually hold the grant so the revoke stamp is not written
 // onto members who never had it.
-export async function revokeAllExecOsForOrg(organizationId: number): Promise<void> {
+export async function revokeAllCommandDeckForOrg(organizationId: number): Promise<void> {
   await db.update(memberships)
     .set({
-      hasExecutiveOs: false,
-      executiveOsRevokedAt: new Date().toISOString(),
-      executiveOsRevokedBy: EXEC_OS_SYSTEM_ACTOR,
+      hasCommandDeck: false,
+      commandDeckRevokedAt: new Date().toISOString(),
+      commandDeckRevokedBy: COMMAND_DECK_SYSTEM_ACTOR,
     })
     .where(and(
       eq(memberships.organizationId, organizationId),
-      eq(memberships.hasExecutiveOs, true),
+      eq(memberships.hasCommandDeck, true),
     ));
 }
 
@@ -442,7 +442,7 @@ export async function syncSeatsForOrg(
   return { synced: true, overageQty };
 }
 
-// Reconcile the Executive OS add-on subscription item against the number of
+// Reconcile the Command Deck add-on subscription item against the number of
 // memberships holding the grant. Mirrors syncSeatsForOrg, with two differences:
 // every entitled seat is billable (there is no included-seat allowance), and the
 // item is matched by the add-on price ids so it stays independent of the base and
@@ -455,7 +455,7 @@ export async function syncSeatsForOrg(
 // subscription item whose recurring interval differs from the subscription's, so an
 // annual org needs the annual price. Existing items are matched against both prices
 // because an org can change billing interval over its lifetime.
-export async function syncExecOsSeatsForOrg(
+export async function syncCommandDeckSeatsForOrg(
   stripe: any,
   organizationId: number,
 ): Promise<{ synced: boolean; quantity?: number; reason?: string }> {
@@ -466,11 +466,11 @@ export async function syncExecOsSeatsForOrg(
   // works locally, there is just nothing to bill.
   if (!org.stripeSubscriptionId) return { synced: false, reason: "no_subscription" };
 
-  const quantity = await countExecOsSeats(organizationId);
+  const quantity = await countCommandDeckSeats(organizationId);
 
   const sub = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
-  const addonPriceId = getExecOsPriceIdForSubscription(sub);
-  const knownAddonPriceIds: string[] = Object.values(EXECUTIVE_OS_ADDON_PRICE_IDS);
+  const addonPriceId = getCommandDeckPriceIdForSubscription(sub);
+  const knownAddonPriceIds: string[] = Object.values(COMMAND_DECK_ADDON_PRICE_IDS);
   const addonItem = sub.items?.data?.find((i: any) => knownAddonPriceIds.includes(i.price?.id));
 
   if (quantity === 0) {

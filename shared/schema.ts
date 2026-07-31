@@ -45,26 +45,31 @@ export const memberships = pgTable("memberships", {
   role: text("role").notNull(), // owner | admin | pm | foreman | viewer
   status: text("status").notNull().default("active"), // active | removed
   createdAt: text("created_at").notNull(),
-  // Executive OS paid add-on, granted per seat at $5/user/month. Billing is
+  // Command Deck paid add-on, granted per seat at $5/user/month. Billing is
   // driven off the count of memberships with this set, so it is the single
   // source of truth for both entitlement and the Stripe subscription quantity.
-  hasExecutiveOs: boolean("has_executive_os").notNull().default(false),
+  //
+  // These five columns shipped as has_executive_os / executive_os_* and were
+  // renamed in place; see the rename block in server/storage/migrations.ts.
+  hasCommandDeck: boolean("has_command_deck").notNull().default(false),
   // Audit trail for the add-on. Granted/revoked pairs are independent: a revoke
   // leaves the granted_* values in place so the last grant stays legible.
-  // Null granted_at on a row with hasExecutiveOs = true means the grant predates
+  // Null granted_at on a row with hasCommandDeck = true means the grant predates
   // this column and the grantor is unknown.
-  executiveOsGrantedAt: text("executive_os_granted_at"),
+  commandDeckGrantedAt: text("command_deck_granted_at"),
   // Actor, not a foreign key: holds either an accounts.id (as a string) or the
-  // EXEC_OS_SYSTEM_ACTOR sentinel for revokes the Stripe webhook performs with
-  // no human behind them.
-  executiveOsGrantedBy: text("executive_os_granted_by"),
-  executiveOsRevokedAt: text("executive_os_revoked_at"),
-  executiveOsRevokedBy: text("executive_os_revoked_by"),
+  // COMMAND_DECK_SYSTEM_ACTOR sentinel for revokes the Stripe webhook performs
+  // with no human behind them.
+  commandDeckGrantedBy: text("command_deck_granted_by"),
+  commandDeckRevokedAt: text("command_deck_revoked_at"),
+  commandDeckRevokedBy: text("command_deck_revoked_by"),
 });
 
 // Stand-in actor for add-on changes with no human behind them — currently only
-// the mass revoke when Stripe reports the org's subscription is gone.
-export const EXEC_OS_SYSTEM_ACTOR = "system:stripe_webhook";
+// the mass revoke when Stripe reports the org's subscription is gone. The value
+// is persisted in command_deck_granted_by / command_deck_revoked_by, so it must
+// not change even though the constant was renamed.
+export const COMMAND_DECK_SYSTEM_ACTOR = "system:stripe_webhook";
 
 /* -------------------------------- Invites -------------------------------- */
 // Pending email invites to join an organization. Consumed when the invitee
@@ -804,7 +809,7 @@ export const timeEntries = pgTable("time_entries", {
 });
 
 /* ----------------------------- Mobilization ------------------------------ */
-// Executive OS > Mobilization. One plan per project; every other table hangs
+// Command Deck > Mobilization. One plan per project; every other table hangs
 // off project_id directly so a tab can be queried without joining the plan.
 // The mobilization milestone timeline reuses the shared `milestones` table
 // with kind="mobilization" rather than duplicating a schedule table here.
@@ -1001,7 +1006,7 @@ export const mobilizationSectionNotes = pgTable("mobilization_section_notes", {
     .on(t.projectId, t.section),
 }));
 
-/* ======================= Project Setup (Executive OS) ====================
+/* ======================= Project Setup (Command Deck) ====================
  * Pre-mobilization intake. One setup row per project drives the Project
  * Charter and Kickoff Agenda documents; stakeholders, contract docs,
  * deliverables and signatures hang off project_id. Money and percentages are
@@ -1127,7 +1132,7 @@ export const projectSetupSignatures = pgTable("project_setup_signatures", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
-/* ====================== Pre-Construction (Executive OS) ==================
+/* ====================== Pre-Construction (Command Deck) ==================
  * Sits between Project Setup and Mobilization: design tracking, value
  * engineering, permitting, subcontractor prequal, bid buyout and long-lead
  * procurement. One pre_construction row per project drives the documents;
@@ -1355,7 +1360,7 @@ export const preConstructionLongLeadItems = pgTable("pre_construction_long_lead_
 
 // Sign-off block on the Pre-Construction Plan. Same shape as
 // mobilization_signatures and project_setup_signatures.
-/* -------- Lean Executive OS modules (4-22) ------------------------------
+/* -------- Lean Command Deck modules (4-22) ------------------------------
  *
  * Lifecycle modules 4-22 (Site Logistics through Risk & Insurance) share two
  * tables: `lean_module_state` for the per-module parent record and
@@ -1653,7 +1658,7 @@ export type DemoRequest = typeof demoRequests.$inferSelect;
 export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
 
 /* ----------------------------- Contracts -------------------------------- */
-// Executive OS contracts register. One row per contract or subcontract on a
+// Command Deck contracts register. One row per contract or subcontract on a
 // project. Money as text (parsed defensively) matches the pattern used by
 // financials / change-orders in the newer surfaces. Purpose-built (not lean)
 // because contracts have structured fields the lean shell can't express:
@@ -1695,7 +1700,7 @@ export type Contract = typeof contracts.$inferSelect;
 export type InsertContract = z.infer<typeof insertContractSchema>;
 
 /* ----------------------------- Inspections ------------------------------ */
-// Executive OS inspections log. AHJ and third-party inspections across the
+// Command Deck inspections log. AHJ and third-party inspections across the
 // portfolio: type, inspector, date, result, follow-up items.
 export const inspections = pgTable("inspections", {
   id: serial("id").primaryKey(),

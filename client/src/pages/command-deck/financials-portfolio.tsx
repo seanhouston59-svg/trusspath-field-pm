@@ -5,7 +5,7 @@
  * value, approved + pending change orders, subcontract commitments, PO
  * commitments, VE savings, and cost-impact exposure from open design RFIs.
  *
- * Data source: GET /api/executive-os/financials-rollup
+ * Data source: GET /api/command-deck/financials-rollup
  * Server aggregator: server/financials-rollup.ts
  *
  * Per-project rows link to the existing lean-module Financials detail page
@@ -107,7 +107,7 @@ function StatChip({ label, value, tone }: { label: string; value: string; tone?:
 
 export default function FinancialsPortfolio() {
   const { data, isLoading, error } = useQuery<FinancialsRollup>({
-    queryKey: ["/api/executive-os/financials-rollup"],
+    queryKey: ["/api/command-deck/financials-rollup"],
   });
 
   const projects = data?.projects ?? [];

@@ -43,8 +43,8 @@ export default function ContractDetail() {
   const contractId = Number(id);
 
   const { data, isLoading, error } = useQuery<Contract>({
-    queryKey: [`/api/executive-os/contracts/${contractId}`],
-    queryFn: async () => (await apiRequest("GET", `/api/executive-os/contracts/${contractId}`)).json(),
+    queryKey: [`/api/command-deck/contracts/${contractId}`],
+    queryFn: async () => (await apiRequest("GET", `/api/command-deck/contracts/${contractId}`)).json(),
     enabled: Number.isFinite(contractId),
   });
 
@@ -63,12 +63,12 @@ export default function ContractDetail() {
         const v = (form as Record<string, unknown>)[k];
         payload[k] = v === "" ? null : v ?? null;
       }
-      const res = await apiRequest("PATCH", `/api/executive-os/contracts/${contractId}`, payload);
+      const res = await apiRequest("PATCH", `/api/command-deck/contracts/${contractId}`, payload);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/executive-os/contracts/${contractId}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/executive-os/contracts"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/command-deck/contracts/${contractId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/command-deck/contracts"] });
       toast({ title: "Contract updated" });
     },
     onError: (e: Error) => toast({ title: "Failed to update", description: e.message, variant: "destructive" }),
@@ -76,10 +76,10 @@ export default function ContractDetail() {
 
   const deleteMut = useMutation({
     mutationFn: async () => {
-      await apiRequest("DELETE", `/api/executive-os/contracts/${contractId}`);
+      await apiRequest("DELETE", `/api/command-deck/contracts/${contractId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/executive-os/contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/command-deck/contracts"] });
       toast({ title: "Contract deleted" });
       setLocation("/command-deck/contracts");
     },

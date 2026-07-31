@@ -184,7 +184,7 @@ export const ACCESS_LEVELS: AccessLevelDef[] = [
     canManageTeam: true, canManageSettings: false, canManageIntegrations: true,
     canViewFinancials: true, canDelete: true, canCreateEdit: true, canResetData: false,
     // Command Deck is no longer filtered out here — it is a paid per-seat
-    // add-on enforced server-side off memberships.has_executive_os, and this
+    // add-on enforced server-side off memberships.has_command_deck, and this
     // access-level system is a client-side preview, not authorization.
     allowedRoutes: withLegacyCommandDeck(
       ALL.filter(

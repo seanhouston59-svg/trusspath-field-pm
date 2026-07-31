@@ -14,7 +14,7 @@ import {
   type Membership,
 } from "@/hooks/use-data";
 import { useCommandDeckEntitlement } from "@/hooks/use-entitlements";
-import { EXEC_OS_SYSTEM_ACTOR } from "@shared/schema";
+import { COMMAND_DECK_SYSTEM_ACTOR } from "@shared/schema";
 import { BillingSection } from "@/components/billing-section";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -40,17 +40,17 @@ type TeamMember = Membership & { email: string; displayName?: string };
 
 // One-line attribution for the Command Deck add-on. Returns null when there is
 // nothing worth saying — no grant, or a grant that predates the audit columns.
-function execOsAuditCaption(m: TeamMember, roster: TeamMember[]): string | null {
-  if (m.hasExecutiveOs) {
-    if (!m.executiveOsGrantedAt) return null;
-    const grantor = roster.find(x => String(x.accountId) === m.executiveOsGrantedBy);
+function commandDeckAuditCaption(m: TeamMember, roster: TeamMember[]): string | null {
+  if (m.hasCommandDeck) {
+    if (!m.commandDeckGrantedAt) return null;
+    const grantor = roster.find(x => String(x.accountId) === m.commandDeckGrantedBy);
     // A grantor missing from the roster has since been removed from the org.
     const who = grantor ? (grantor.displayName || grantor.email) : "a former member";
-    return `Granted by ${who} · ${auditDate(m.executiveOsGrantedAt)}`;
+    return `Granted by ${who} · ${auditDate(m.commandDeckGrantedAt)}`;
   }
   // Only surface the automatic revoke: it explains access disappearing with no
   // admin behind it. An admin's own revoke needs no caption.
-  if (m.executiveOsRevokedBy === EXEC_OS_SYSTEM_ACTOR) {
+  if (m.commandDeckRevokedBy === COMMAND_DECK_SYSTEM_ACTOR) {
     return "Revoked automatically (subscription lapsed)";
   }
   return null;
@@ -73,8 +73,8 @@ export default function TeamSettingsPage() {
   const revokeInvite = useRevokeInvite();
   const updateRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
-  const setExecOs = useSetMemberCommandDeck();
-  const { seatCount: execOsSeatCount } = useCommandDeckEntitlement();
+  const setCommandDeck = useSetMemberCommandDeck();
+  const { seatCount: commandDeckSeatCount } = useCommandDeckEntitlement();
   const { toast } = useToast();
 
   const [inviteEmail, setInviteEmail] = useState("");
@@ -83,7 +83,7 @@ export default function TeamSettingsPage() {
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
   // Optimistic overrides for the Command Deck switches, keyed by membership id.
   // Cleared once the mutation settles so the server row takes over again.
-  const [execOsPending, setExecOsPending] = useState<Record<number, boolean>>({});
+  const [commandDeckPending, setCommandDeckPending] = useState<Record<number, boolean>>({});
 
   const members = membersData?.members || [];
   const invites = invitesData?.invites || [];
@@ -125,10 +125,10 @@ export default function TeamSettingsPage() {
     }
   }
 
-  async function handleToggleExecOs(m: Membership & { email: string; displayName?: string }, enabled: boolean) {
-    setExecOsPending(prev => ({ ...prev, [m.id]: enabled }));
+  async function handleToggleCommandDeck(m: Membership & { email: string; displayName?: string }, enabled: boolean) {
+    setCommandDeckPending(prev => ({ ...prev, [m.id]: enabled }));
     try {
-      await setExecOs.mutateAsync({ id: m.id, enabled });
+      await setCommandDeck.mutateAsync({ id: m.id, enabled });
       toast({
         title: enabled ? "Command Deck enabled" : "Command Deck removed",
         description: enabled
@@ -142,7 +142,7 @@ export default function TeamSettingsPage() {
         variant: "destructive",
       });
     } finally {
-      setExecOsPending(prev => {
+      setCommandDeckPending(prev => {
         const next = { ...prev };
         delete next[m.id];
         return next;
@@ -283,7 +283,7 @@ export default function TeamSettingsPage() {
               const canModify = canManage && !isMe && !(isPrimaryOwner && !isOwner);
               const canModifyOwner = isOwner; // only owners can touch other owners
               const canModifyThisMember = canModify && (m.role !== "owner" || canModifyOwner);
-              const execOsCaption = execOsAuditCaption(m, members);
+              const commandDeckCaption = commandDeckAuditCaption(m, members);
               return (
                 <div key={m.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0 flex-1">
@@ -293,9 +293,9 @@ export default function TeamSettingsPage() {
                       {isPrimaryOwner && <Badge variant="outline" className="text-[10px]">primary owner</Badge>}
                     </div>
                     <div className="text-xs text-muted-foreground">{m.email}</div>
-                    {canManage && execOsCaption && (
-                      <div className="text-xs text-muted-foreground/80" data-testid={`text-exec-os-audit-${m.id}`}>
-                        {execOsCaption}
+                    {canManage && commandDeckCaption && (
+                      <div className="text-xs text-muted-foreground/80" data-testid={`text-command-deck-audit-${m.id}`}>
+                        {commandDeckCaption}
                       </div>
                     )}
                   </div>
@@ -306,10 +306,10 @@ export default function TeamSettingsPage() {
                     {canManage && m.status === "active" && (
                       <label className="flex cursor-pointer items-center gap-2 pr-1 text-xs text-muted-foreground">
                         <Switch
-                          checked={execOsPending[m.id] ?? !!m.hasExecutiveOs}
-                          onCheckedChange={(v) => handleToggleExecOs(m, v)}
-                          disabled={execOsPending[m.id] !== undefined}
-                          data-testid={`switch-exec-os-${m.id}`}
+                          checked={commandDeckPending[m.id] ?? !!m.hasCommandDeck}
+                          onCheckedChange={(v) => handleToggleCommandDeck(m, v)}
+                          disabled={commandDeckPending[m.id] !== undefined}
+                          data-testid={`switch-command-deck-${m.id}`}
                         />
                         <span className="hidden sm:inline">Command Deck ($5/mo)</span>
                         <span className="sm:hidden">Command Deck</span>
@@ -359,9 +359,9 @@ export default function TeamSettingsPage() {
           </div>
           {canManage && (
             <p className="mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
-              Command Deck seats: <span className="font-semibold text-foreground">{execOsSeatCount}</span>
+              Command Deck seats: <span className="font-semibold text-foreground">{commandDeckSeatCount}</span>
               {" · "}
-              <span className="font-semibold text-foreground">${execOsSeatCount * 5}/mo</span> added to your subscription
+              <span className="font-semibold text-foreground">${commandDeckSeatCount * 5}/mo</span> added to your subscription
             </p>
           )}
         </section>

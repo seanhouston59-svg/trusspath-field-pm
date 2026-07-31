@@ -1,7 +1,7 @@
 /**
- * Executive OS document engine.
+ * Command Deck document engine.
  *
- * ReportBuilder wraps pdfkit with the layout vocabulary every Executive OS
+ * ReportBuilder wraps pdfkit with the layout vocabulary every Command Deck
  * report shares — cover page, running header/footer, headings, tables,
  * checklists, stat rows, and the standard executive sections (financials,
  * schedule, quality, safety, risk, manpower, sign-off).

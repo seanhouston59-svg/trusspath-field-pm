@@ -1,5 +1,5 @@
 /**
- * Cross-module rollups for Executive OS reports.
+ * Cross-module rollups for Command Deck reports.
  *
  * Every report pulls from the same notebook tables, so the aggregation lives
  * here rather than in each report file. Loaders return plain numbers/arrays and

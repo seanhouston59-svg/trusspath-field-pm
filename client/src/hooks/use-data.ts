@@ -496,7 +496,7 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/projects/${id}`); },
     // A project delete cascades into every project-scoped list (tasks, RFIs,
-    // photos, timesheets, exec-os modules…), so blanket-invalidate rather than
+    // photos, timesheets, Command Deck modules…), so blanket-invalidate rather than
     // try to enumerate them.
     onSuccess: () => { qc.invalidateQueries(); },
   });
@@ -853,9 +853,9 @@ export function useUpcomingInvoice() {
 }
 
 /* ----------------------- Organization / Team ----------------------- */
-// The executiveOs* fields are the add-on audit trail. All nullable: grants made
+// The commandDeck* fields are the add-on audit trail. All nullable: grants made
 // before those columns existed carry no attribution.
-export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string; hasExecutiveOs?: boolean; executiveOsGrantedAt?: string | null; executiveOsGrantedBy?: string | null; executiveOsRevokedAt?: string | null; executiveOsRevokedBy?: string | null };
+export type Membership = { id: number; accountId: number; organizationId: number; role: "owner"|"admin"|"pm"|"foreman"|"viewer"; status: string; createdAt: string; hasCommandDeck?: boolean; commandDeckGrantedAt?: string | null; commandDeckGrantedBy?: string | null; commandDeckRevokedAt?: string | null; commandDeckRevokedBy?: string | null };
 export type Invite = { id: number; token: string; organizationId: number; email: string; role: string; createdAt: string; expiresAt: string; acceptedAt: string | null };
 export type OrgSummary = { id: number; name: string; slug: string; ownerAccountId: number; subscriptionStatus: string | null; subscriptionPlan: string | null; subscriptionBilling: string | null; trialEndsAt: string | null; timezone: string; disabledIntegrations?: Record<string, boolean> | null; };
 
@@ -946,7 +946,7 @@ export function useRemoveMember() {
 // member lists — with staleTime: Infinity an omitted key shows a stale seat
 // count indefinitely.
 function invalidateCommandDeck(qc: ReturnType<typeof useQueryClient>) {
-  qc.invalidateQueries({ queryKey: ["/api/org/members/exec-os"] });
+  qc.invalidateQueries({ queryKey: ["/api/org/members/command-deck"] });
   qc.invalidateQueries({ queryKey: ["/api/org/members"] });
   qc.invalidateQueries({ queryKey: ["/api/org/current"] });
   qc.invalidateQueries({ queryKey: ["/api/billing/status"] });
@@ -958,7 +958,7 @@ export function useSetMemberCommandDeck() {
     mutationFn: async ({ id, enabled }: { id: number; enabled: boolean }) => {
       const res = await apiRequest(
         enabled ? "POST" : "DELETE",
-        `/api/org/members/${id}/exec-os`,
+        `/api/org/members/${id}/command-deck`,
       );
       return res.json();
     },

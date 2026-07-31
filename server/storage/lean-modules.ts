@@ -1,5 +1,5 @@
 /**
- * Storage repo for the 19 lean Executive OS lifecycle modules (4-22).
+ * Storage repo for the 19 lean Command Deck lifecycle modules (4-22).
  *
  * All 19 share two tables (`lean_module_state` + `lean_module_items`) keyed by
  * (projectId, moduleId). Every method takes moduleId as an argument so this

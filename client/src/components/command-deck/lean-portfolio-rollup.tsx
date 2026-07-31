@@ -6,7 +6,7 @@
  * Click a cell to jump straight to that project's module detail page.
  *
  * The whole thing is powered by a single call to
- * GET /api/executive-os/lean-rollup, which returns every project the caller's
+ * GET /api/command-deck/lean-rollup, which returns every project the caller's
  * org can see plus the aggregate state/item counts for every (project, module)
  * pair that has activity. Empty pairs render as "not started" without a
  * dedicated backend row.
@@ -221,7 +221,7 @@ function ProjectRollupRow({
 
 export function LeanPortfolioRollup() {
   const { data, isLoading, isError } = useQuery<RollupResponse>({
-    queryKey: ["/api/executive-os/lean-rollup"],
+    queryKey: ["/api/command-deck/lean-rollup"],
   });
 
   return (

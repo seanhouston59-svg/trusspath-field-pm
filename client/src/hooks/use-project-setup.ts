@@ -40,7 +40,7 @@ function keysFor(projectId: number | undefined) {
     bundle: ["/api/projects", projectId, "project-setup"] as const,
     health: ["/api/projects", projectId, "project-setup", "health"] as const,
     gate: ["/api/projects", projectId, "mobilization", "gate"] as const,
-    portfolio: ["/api/executive-os/project-setup"] as const,
+    portfolio: ["/api/command-deck/project-setup"] as const,
   };
 }
 
@@ -59,7 +59,7 @@ export function useProjectSetupHealth(projectId: number | undefined) {
 }
 
 export function useProjectSetupPortfolio() {
-  return useQuery<ProjectSetupPortfolioRow[]>({ queryKey: ["/api/executive-os/project-setup"] });
+  return useQuery<ProjectSetupPortfolioRow[]>({ queryKey: ["/api/command-deck/project-setup"] });
 }
 
 /** Soft gate for the Mobilization page — warnings only, never blocks. */

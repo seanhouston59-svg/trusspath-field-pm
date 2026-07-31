@@ -1,6 +1,6 @@
 /**
  * Financials rollup — aggregates every financial signal in the app into a
- * single portfolio snapshot for the Executive OS Financials dashboard.
+ * single portfolio snapshot for the Command Deck Financials dashboard.
  *
  * There is no dedicated "actuals" or "invoices" table today, so this
  * aggregator pulls what the app actually has:

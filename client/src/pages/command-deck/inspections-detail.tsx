@@ -42,8 +42,8 @@ export default function InspectionDetail() {
   const inspectionId = Number(id);
 
   const { data, isLoading, error } = useQuery<Inspection>({
-    queryKey: [`/api/executive-os/inspections/${inspectionId}`],
-    queryFn: async () => (await apiRequest("GET", `/api/executive-os/inspections/${inspectionId}`)).json(),
+    queryKey: [`/api/command-deck/inspections/${inspectionId}`],
+    queryFn: async () => (await apiRequest("GET", `/api/command-deck/inspections/${inspectionId}`)).json(),
     enabled: Number.isFinite(inspectionId),
   });
   const { data: projects } = useQuery<Project[]>({ queryKey: ["/api/projects"] });
@@ -62,12 +62,12 @@ export default function InspectionDetail() {
         const v = (form as Record<string, unknown>)[k];
         payload[k] = v === "" ? null : v ?? null;
       }
-      const res = await apiRequest("PATCH", `/api/executive-os/inspections/${inspectionId}`, payload);
+      const res = await apiRequest("PATCH", `/api/command-deck/inspections/${inspectionId}`, payload);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/executive-os/inspections/${inspectionId}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/executive-os/inspections"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/command-deck/inspections/${inspectionId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/command-deck/inspections"] });
       toast({ title: "Inspection updated" });
     },
     onError: (e: Error) => toast({ title: "Failed to update", description: e.message, variant: "destructive" }),
@@ -75,10 +75,10 @@ export default function InspectionDetail() {
 
   const deleteMut = useMutation({
     mutationFn: async () => {
-      await apiRequest("DELETE", `/api/executive-os/inspections/${inspectionId}`);
+      await apiRequest("DELETE", `/api/command-deck/inspections/${inspectionId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/executive-os/inspections"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/command-deck/inspections"] });
       toast({ title: "Inspection deleted" });
       setLocation("/command-deck/inspections");
     },
