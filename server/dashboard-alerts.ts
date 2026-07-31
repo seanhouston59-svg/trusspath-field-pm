@@ -220,7 +220,7 @@ export async function buildDashboardAlerts(
         icon: "ClipboardCheck",
         text: `${ins.inspectionType} — failed, follow-up open`,
         meta: `${projectName(ins.projectId)} · ${ins.followUpItems.split("\n")[0].slice(0, 60)}`,
-        href: `/executive-os/inspections/${ins.id}`,
+        href: `/command-deck/inspections/${ins.id}`,
         phase: "inspections",
         dueDate: ins.inspectionDate,
       });
@@ -236,7 +236,7 @@ export async function buildDashboardAlerts(
           icon: "ClipboardCheck",
           text: `${ins.inspectionType} inspection`,
           meta: `${projectName(ins.projectId)} · ${ins.inspector} · ${fmtDue(d)}`,
-          href: `/executive-os/inspections/${ins.id}`,
+          href: `/command-deck/inspections/${ins.id}`,
           phase: "inspections",
           dueDate: ins.inspectionDate,
         });
@@ -255,7 +255,7 @@ export async function buildDashboardAlerts(
         icon: "ShieldAlert",
         text: `COI expired — ${c.counterpartyName}`,
         meta: `${Math.abs(d)}d past expiration${c.insuranceCertNumber ? ` · ${c.insuranceCertNumber}` : ""}`,
-        href: `/executive-os/contracts/${c.id}`,
+        href: `/command-deck/contracts/${c.id}`,
         phase: "contracts",
         dueDate: c.insuranceCertExpiration,
       });
@@ -266,7 +266,7 @@ export async function buildDashboardAlerts(
         icon: "ShieldAlert",
         text: `COI expires soon — ${c.counterpartyName}`,
         meta: `expires in ${d}d${c.insuranceCertNumber ? ` · ${c.insuranceCertNumber}` : ""}`,
-        href: `/executive-os/contracts/${c.id}`,
+        href: `/command-deck/contracts/${c.id}`,
         phase: "contracts",
         dueDate: c.insuranceCertExpiration,
       });

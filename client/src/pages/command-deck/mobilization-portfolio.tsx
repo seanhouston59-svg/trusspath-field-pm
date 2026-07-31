@@ -21,7 +21,7 @@ function ProjectCard({ row }: { row: MobilizationPortfolioRow }) {
   const { permitStatus } = row;
   return (
     <Link
-      href={`/executive-os/mobilization/${row.projectId}`}
+      href={`/command-deck/mobilization/${row.projectId}`}
       className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/30"
       data-testid={`mob-portfolio-card-${row.projectId}`}
     >

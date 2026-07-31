@@ -4,7 +4,7 @@
  * The same component renders both the portfolio (list of projects, each with a
  * row-count summary) and the detail (single project, editable state + item
  * list) depending on which prop is passed. App.tsx wires 38 route entries at
- * `/executive-os/:slug` and `/executive-os/:slug/:id` to this component.
+ * `/command-deck/:slug` and `/command-deck/:slug/:id` to this component.
  *
  * When any module graduates to a purpose-built schema (like Pre-Con did), swap
  * that module's route mapping over to its own portfolio/detail pages and
@@ -118,7 +118,7 @@ function PortfolioProjectRow({ moduleId, project }: { moduleId: string; project:
   const openItems = items.filter((i) => i.status !== "complete" && i.status !== "n_a").length;
   return (
     <Link
-      href={`/executive-os/${moduleId}/${project.id}`}
+      href={`/command-deck/${moduleId}/${project.id}`}
       className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/30"
       data-testid={`lean-${moduleId}-card-${project.id}`}
     >
@@ -300,7 +300,7 @@ function LeanModuleDetail({ moduleId, projectId }: { moduleId: string; projectId
     <Layout title={def.title}>
       <div className="mx-auto max-w-5xl px-4 py-6">
         <Link
-          href={`/executive-os/${moduleId}`}
+          href={`/command-deck/${moduleId}`}
           className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ChevronLeft className="size-4" />

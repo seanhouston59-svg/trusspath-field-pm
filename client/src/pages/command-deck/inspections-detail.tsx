@@ -80,7 +80,7 @@ export default function InspectionDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/executive-os/inspections"] });
       toast({ title: "Inspection deleted" });
-      setLocation("/executive-os/inspections");
+      setLocation("/command-deck/inspections");
     },
     onError: (e: Error) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" }),
   });
@@ -97,7 +97,7 @@ export default function InspectionDetail() {
       <Layout title="Inspection">
         <div className="mx-auto max-w-3xl p-4">
           <div className="text-sm text-red-500">Inspection not found.</div>
-          <Link href="/executive-os/inspections" className="mt-4 inline-flex items-center gap-1 text-sm underline">
+          <Link href="/command-deck/inspections" className="mt-4 inline-flex items-center gap-1 text-sm underline">
             <ArrowLeft className="size-4" /> Back to Inspections
           </Link>
         </div>
@@ -109,7 +109,7 @@ export default function InspectionDetail() {
     <Layout title={data.inspectionType}>
       <div className="mx-auto max-w-3xl px-4 py-6">
         <Link
-          href="/executive-os/inspections"
+          href="/command-deck/inspections"
           className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> All inspections

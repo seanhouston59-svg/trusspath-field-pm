@@ -242,13 +242,13 @@ function SetupGateBanner({ projectId }: { projectId: number | undefined }) {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Link
-            href={`/executive-os/project-setup/${projectId}`}
+            href={`/command-deck/project-setup/${projectId}`}
             className="whitespace-nowrap text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
           >
             View Project Setup →
           </Link>
           <Link
-            href={`/executive-os/pre-construction/${projectId}`}
+            href={`/command-deck/pre-construction/${projectId}`}
             className="whitespace-nowrap text-xs font-semibold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
           >
             View Pre-Construction →
@@ -260,7 +260,7 @@ function SetupGateBanner({ projectId }: { projectId: number | undefined }) {
 }
 
 export default function MobilizationDetail() {
-  const [, params] = useRoute("/executive-os/mobilization/:id");
+  const [, params] = useRoute("/command-deck/mobilization/:id");
   const projectId = params?.id ? parseInt(params.id, 10) : undefined;
   const [tab, setTab] = useState("overview");
 
@@ -275,7 +275,7 @@ export default function MobilizationDetail() {
   return (
     <Layout title="Mobilization">
       <div className="mx-auto max-w-6xl px-4 py-6">
-        <Link href="/executive-os/mobilization" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/command-deck/mobilization" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" /> All projects
         </Link>
 

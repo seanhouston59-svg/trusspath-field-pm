@@ -179,7 +179,7 @@ export default function ContractsPortfolio() {
                 {rows!.map((r) => (
                   <Link
                     key={r.id}
-                    href={`/executive-os/contracts/${r.id}`}
+                    href={`/command-deck/contracts/${r.id}`}
                     className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/50"
                     data-testid={`contract-row-${r.id}`}
                   >

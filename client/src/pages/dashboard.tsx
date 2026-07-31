@@ -183,12 +183,12 @@ function useDashboardCtx() {
   const spendPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
   const showMoney = can("canViewFinancials");
   // Budget links point at the Command Deck financials module, but some roles
-  // (Project Manager) can see money without being allowed into /executive-os.
+  // (Project Manager) can see money without being allowed into /command-deck.
   // Fall back to the projects list / project detail, which also carry budget.
-  const canOpenExecFinancials = isAllowed("/executive-os/financials");
-  const financialsHref = canOpenExecFinancials ? "/executive-os/financials" : "/projects";
+  const canOpenExecFinancials = isAllowed("/command-deck/financials");
+  const financialsHref = canOpenExecFinancials ? "/command-deck/financials" : "/projects";
   const projectFinancialsHref = (id: number) =>
-    canOpenExecFinancials ? `/executive-os/financials/${id}` : `/projects/${id}`;
+    canOpenExecFinancials ? `/command-deck/financials/${id}` : `/projects/${id}`;
   const projectCounts = (id: number) => ({
     rfi: rfis.filter((r) => r.projectId === id && r.status === "Open").length,
     sub: subs.filter((s) => s.projectId === id && s.status !== "Closed").length,

@@ -87,7 +87,7 @@ function ReportButtons({ projectId, seeded }: { projectId?: number; seeded: bool
 }
 
 export default function PreConstructionDetail() {
-  const [, params] = useRoute("/executive-os/pre-construction/:id");
+  const [, params] = useRoute("/command-deck/pre-construction/:id");
   const projectId = params?.id ? parseInt(params.id, 10) : undefined;
   const [tab, setTab] = useState("overview");
 
@@ -99,7 +99,7 @@ export default function PreConstructionDetail() {
   return (
     <Layout title="Pre-Construction">
       <div className="mx-auto max-w-6xl px-4 py-6">
-        <Link href="/executive-os/pre-construction" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/command-deck/pre-construction" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" /> All projects
         </Link>
 

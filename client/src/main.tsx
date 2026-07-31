@@ -3,6 +3,7 @@ import App from "./App";
 import "./index.css";
 import { initPwa } from "./lib/pwa";
 import { initOfflineQueue } from "./lib/offline-queue";
+import { toCommandDeckUrl } from "@shared/app-manifest";
 
 // Vercel rewrites every non-asset path to index.html, so we seed the hash from
 // the pathname before wouter mounts. Named aliases (e.g. /sign-in -> /login)
@@ -17,7 +18,10 @@ const PUBLIC_PATH_ALIASES: Record<string, string> = {
 
 if (!window.location.hash) {
   const path = window.location.pathname.replace(/\/+$/, "");
-  const target = PUBLIC_PATH_ALIASES[path] ?? (path || "/");
+  const aliased = PUBLIC_PATH_ALIASES[path] ?? (path || "/");
+  // Collapse the pre-rename /executive-os/* pathnames here rather than letting
+  // them seed a legacy hash — one rewrite at boot beats a redirect render.
+  const target = toCommandDeckUrl(aliased) ?? aliased;
   window.location.hash = `#${target}`;
 }
 

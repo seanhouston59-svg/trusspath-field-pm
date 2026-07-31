@@ -133,7 +133,7 @@ function GenerateReportDialog({ projectId, kind, seeded }: {
 }
 
 export default function ProjectSetupDetail() {
-  const [, params] = useRoute("/executive-os/project-setup/:id");
+  const [, params] = useRoute("/command-deck/project-setup/:id");
   const projectId = params?.id ? parseInt(params.id, 10) : undefined;
   const [tab, setTab] = useState("overview");
 
@@ -145,7 +145,7 @@ export default function ProjectSetupDetail() {
   return (
     <Layout title="Project Setup">
       <div className="mx-auto max-w-6xl px-4 py-6">
-        <Link href="/executive-os/project-setup" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link href="/command-deck/project-setup" className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" /> All projects
         </Link>
 

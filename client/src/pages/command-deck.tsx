@@ -18,7 +18,7 @@ type ModuleCard = {
 // surfaces that aggregate the other modules, not a lifecycle stage.
 const MODULES: ModuleCard[] = [
   {
-    href: "/executive-os/project-setup",
+    href: "/command-deck/project-setup",
     label: "Project Setup",
     Icon: ClipboardList,
     description:
@@ -26,7 +26,7 @@ const MODULES: ModuleCard[] = [
     testId: "exec-os-project-setup-link",
   },
   {
-    href: "/executive-os/pre-construction",
+    href: "/command-deck/pre-construction",
     label: "Pre-Construction",
     Icon: Ruler,
     description:
@@ -34,7 +34,7 @@ const MODULES: ModuleCard[] = [
     testId: "exec-os-pre-construction-link",
   },
   {
-    href: "/executive-os/mobilization",
+    href: "/command-deck/mobilization",
     label: "Mobilization",
     Icon: Rocket,
     description:
@@ -42,7 +42,7 @@ const MODULES: ModuleCard[] = [
     testId: "exec-os-mobilization-link",
   },
   {
-    href: "/executive-os/contracts",
+    href: "/command-deck/contracts",
     label: "Contracts Register",
     Icon: FileSignature,
     description:
@@ -50,7 +50,7 @@ const MODULES: ModuleCard[] = [
     testId: "exec-os-contracts-link",
   },
   {
-    href: "/executive-os/inspections",
+    href: "/command-deck/inspections",
     label: "Inspections",
     Icon: ClipboardCheck,
     description:
@@ -58,7 +58,7 @@ const MODULES: ModuleCard[] = [
     testId: "exec-os-inspections-link",
   },
   {
-    href: "/executive-os/financials",
+    href: "/command-deck/financials",
     label: "Financials",
     Icon: DollarSign,
     description:
@@ -66,7 +66,7 @@ const MODULES: ModuleCard[] = [
     testId: "exec-os-financials-link",
   },
   {
-    href: "/executive-os/board-packets",
+    href: "/command-deck/board-packets",
     label: "Board Packets",
     Icon: FileText,
     description:

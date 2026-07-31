@@ -167,7 +167,7 @@ export default function InspectionsPortfolio() {
                 {rows!.map((r) => (
                   <Link
                     key={r.id}
-                    href={`/executive-os/inspections/${r.id}`}
+                    href={`/command-deck/inspections/${r.id}`}
                     className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/50"
                     data-testid={`inspection-row-${r.id}`}
                   >
