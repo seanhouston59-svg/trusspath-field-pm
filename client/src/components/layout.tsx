@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 import { Logo, Avatar } from "@/components/bits";
-import { APP_NAV } from "@shared/app-manifest";
+import { APP_NAV, isNavLink, type NavItem } from "@shared/app-manifest";
 import { useSettings } from "@/hooks/use-data";
 import { useAccess, ACCESS_LEVELS } from "@/lib/access";
 import { useAuth } from "@/lib/auth";
@@ -82,6 +82,18 @@ function writeCollapsedGroups(state: Record<string, boolean>) {
   }
 }
 
+// Access filtering applies to links only — a subheader has no href to check.
+// A subheader whose links were all filtered out would render as an orphaned
+// label, so drop any that is no longer followed by a visible link.
+function visibleNavItems(items: NavItem[], isAllowed: (href: string) => boolean): NavItem[] {
+  const allowed = items.filter((i) => !isNavLink(i) || isAllowed(i.href));
+  return allowed.filter((item, i) => {
+    if (isNavLink(item)) return true;
+    const next = allowed[i + 1];
+    return next !== undefined && isNavLink(next);
+  });
+}
+
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   const { isAllowed } = useAccess();
@@ -101,7 +113,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   // Precompute active-href logic once per render.
-  const allHrefs = APP_NAV.flatMap((g) => g.items.map((i) => i.href));
+  const allHrefs = APP_NAV.flatMap((g) => g.items.filter(isNavLink).map((i) => i.href));
   const isActiveHref = (href: string) => {
     if (href === "/") return location === "/";
     if (!location.startsWith(href)) return false;
@@ -111,9 +123,10 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1" style={{ WebkitOverflowScrolling: "touch" }} aria-label="Primary">
       {APP_NAV.map((group) => {
-        const items = group.items.filter(({ href }) => isAllowed(href));
-        if (items.length === 0) return null;
-        const groupHasActive = items.some((it) => isActiveHref(it.href));
+        const items = visibleNavItems(group.items, isAllowed);
+        const links = items.filter(isNavLink);
+        if (links.length === 0) return null;
+        const groupHasActive = links.some((it) => isActiveHref(it.href));
         // Force expand if this group contains the active route — you should
         // always see where you are.
         // Default to collapsed when the persisted state has no opinion.
@@ -144,13 +157,25 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
               <span className="flex-1">{group.title}</span>
               {isCollapsed && (
                 <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-                  {items.length}
+                  {links.length}
                 </span>
               )}
             </button>
             {!isCollapsed && (
               <div id={`nav-group-${group.title.replace(/\s+/g, "-")}`} className="mt-0.5 flex flex-col gap-0">
-                {items.map(({ href, label, icon }) => {
+                {items.map((item) => {
+                  if (!isNavLink(item)) {
+                    return (
+                      <div
+                        key={`subheader-${item.subheader}`}
+                        data-testid={`nav-subheader-${item.subheader.toLowerCase().replace(/\s+/g, "-")}`}
+                        className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-sidebar-foreground/50"
+                      >
+                        {item.subheader}
+                      </div>
+                    );
+                  }
+                  const { href, label, icon } = item;
                   const active = isActiveHref(href);
                   const Icon = ICONS[icon] ?? LayoutDashboard;
                   return (

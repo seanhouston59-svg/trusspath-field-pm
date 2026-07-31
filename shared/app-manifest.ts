@@ -57,7 +57,14 @@ export const APP_ROUTES: RoutePattern[] = [
 ];
 
 export type NavLink = { href: string; label: string; icon: string };
-export type NavGroup = { title: string; items: NavLink[] };
+/** A non-clickable label that divides a group's links into labelled runs. */
+export type NavSubheader = { subheader: string };
+export type NavItem = NavLink | NavSubheader;
+export type NavGroup = { title: string; items: NavItem[] };
+
+export function isNavLink(item: NavItem): item is NavLink {
+  return "href" in item;
+}
 
 /**
  * Sidebar navigation groups (mirrors client/src/components/layout.tsx).
@@ -131,43 +138,44 @@ export const APP_NAV: NavGroup[] = [
     ],
   },
   {
-    // Executive OS — exec-only surface. Contents grow over time.
+    // Executive OS lays out job lifecycle first, then cross-cutting workstreams.
+    // "Phases" runs in job order from Project Setup through Post-Occupancy.
+    // "Always On" holds modules that run every day of the job (Schedule, Financials,
+    // Safety, Quality, etc.) and have no natural phase slot.
     title: "Executive OS",
     items: [
       { href: "/executive-os", label: "Overview", icon: "Sparkles" },
-      // Lifecycle order, not ship order: intake -> design/permit/buyout -> boots
-      // on the ground. Each module shipped after the one below it in this list.
+      { subheader: "Phases" },
       { href: "/executive-os/project-setup", label: "Project Setup", icon: "ClipboardList" },
       { href: "/executive-os/pre-construction", label: "Pre-Construction", icon: "Ruler" },
       { href: "/executive-os/mobilization", label: "Mobilization", icon: "Rocket" },
-      // Skeleton entries for lifecycle modules 4-22. Portfolio pages render a
-      // "coming soon" placeholder until each module ships for real.
       { href: "/executive-os/site-logistics", label: "Site Logistics", icon: "Truck" },
       { href: "/executive-os/sitework", label: "Sitework & Earthwork", icon: "Mountain" },
       { href: "/executive-os/foundations", label: "Foundations", icon: "Layers" },
       { href: "/executive-os/structure", label: "Structure", icon: "Building2" },
-      { href: "/executive-os/material-tracking", label: "Material Tracking", icon: "PackageSearch" },
       { href: "/executive-os/envelope", label: "Building Envelope", icon: "Home" },
       { href: "/executive-os/mep", label: "MEP Rough-in", icon: "Cable" },
       { href: "/executive-os/interior-framing", label: "Interior Framing", icon: "Boxes" },
-      { href: "/executive-os/interior-finishes", label: "Interior Finishes", icon: "Paintbrush" },
       { href: "/executive-os/vertical-transportation", label: "Vertical Transportation", icon: "ArrowUpDown" },
+      { href: "/executive-os/interior-finishes", label: "Interior Finishes", icon: "Paintbrush" },
       { href: "/executive-os/site-improvements", label: "Site Improvements", icon: "Trees" },
       { href: "/executive-os/commissioning", label: "Commissioning", icon: "Gauge" },
       { href: "/executive-os/inspections", label: "Inspections", icon: "ClipboardCheck" },
       { href: "/executive-os/punch-list", label: "Punch List", icon: "ListTodo" },
       { href: "/executive-os/closeout", label: "Closeout & C of O", icon: "PackageCheck" },
-      { href: "/executive-os/om-manuals", label: "O&M Manuals", icon: "BookOpen" },
       { href: "/executive-os/as-builts", label: "As-Built Drawings", icon: "FileSpreadsheet" },
+      { href: "/executive-os/om-manuals", label: "O&M Manuals", icon: "BookOpen" },
       { href: "/executive-os/owner-training", label: "Owner Training", icon: "GraduationCap" },
       { href: "/executive-os/turnover-package", label: "Turnover Package", icon: "PackageOpen" },
       { href: "/executive-os/warranty", label: "Post-Occupancy / Warranty", icon: "BadgeCheck" },
+      { subheader: "Always On" },
+      { href: "/executive-os/schedule", label: "Schedule Control", icon: "CalendarClock" },
+      { href: "/executive-os/financials", label: "Financials", icon: "DollarSign" },
       { href: "/executive-os/safety", label: "Safety", icon: "HardHat" },
       { href: "/executive-os/quality", label: "Quality", icon: "CheckCheck" },
-      { href: "/executive-os/contracts", label: "Contracts Register", icon: "FileSignature" },
-      { href: "/executive-os/financials", label: "Financials", icon: "DollarSign" },
-      { href: "/executive-os/schedule", label: "Schedule Control", icon: "CalendarClock" },
       { href: "/executive-os/meetings", label: "Meetings & Minutes", icon: "Users" },
+      { href: "/executive-os/contracts", label: "Contracts Register", icon: "FileSignature" },
+      { href: "/executive-os/material-tracking", label: "Material Tracking", icon: "PackageSearch" },
       { href: "/executive-os/risk-register", label: "Risk Register", icon: "AlertOctagon" },
       { href: "/executive-os/risk", label: "Insurance & COI", icon: "ShieldAlert" },
       { href: "/executive-os/board-packets", label: "Board Packets", icon: "FileText" },
@@ -196,7 +204,9 @@ export const LANDING_FEATURE_LINKS: { label: string; href: string }[] = [
 
 /** Flatten every link href the app exposes (nav + landing features). */
 export const APP_LINKS: { href: string; label: string; source: "nav" | "landing" }[] = [
-  ...APP_NAV.flatMap((g) => g.items.map((i) => ({ href: i.href, label: i.label, source: "nav" as const }))),
+  ...APP_NAV.flatMap((g) =>
+    g.items.filter(isNavLink).map((i) => ({ href: i.href, label: i.label, source: "nav" as const })),
+  ),
   ...LANDING_FEATURE_LINKS.map((f) => ({ href: f.href, label: f.label, source: "landing" as const })),
 ];
 
