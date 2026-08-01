@@ -30,6 +30,12 @@ const TILES = [
   },
 ] as const;
 
+/** Total length of every list, or undefined if any of them isn't an array. */
+function sumLengths(...lists: unknown[]): number | undefined {
+  if (!lists.every(Array.isArray)) return undefined;
+  return (lists as unknown[][]).reduce((n, list) => n + list.length, 0);
+}
+
 function AdminIndexBody({ ownerEmail }: { ownerEmail: string }) {
   const signups = useQuery<SignupPayload>({
     queryKey: ["/api/admin/signups"],
@@ -38,14 +44,16 @@ function AdminIndexBody({ ownerEmail }: { ownerEmail: string }) {
   const accounts = useAdminAccounts();
   const demoAccounts = useAdminDemoAccounts();
 
-  // Undefined means "still loading or failed" — the tile just omits its badge
-  // rather than rendering a misleading zero.
+  // Undefined means "still loading, failed, or the payload wasn't the shape we
+  // expect" — the tile just omits its badge rather than rendering a misleading
+  // zero. Reading `.length` straight off the payload is not safe: a perfectly
+  // ordinary 200 whose list key is absent (Express drops undefined values, so
+  // res.json({ accounts: undefined }) ships `{}`) would throw during render,
+  // and this component sits under an error boundary that blanks the app.
   const counts: Record<string, number | undefined> = {
-    "/admin/signups": signups.data
-      ? signups.data.subscribers.length + signups.data.demoRequests.length
-      : undefined,
-    "/admin/accounts": accounts.data?.accounts.length,
-    "/admin/demo-accounts": demoAccounts.data?.demoAccounts.length,
+    "/admin/signups": sumLengths(signups.data?.subscribers, signups.data?.demoRequests),
+    "/admin/accounts": sumLengths(accounts.data?.accounts),
+    "/admin/demo-accounts": sumLengths(demoAccounts.data?.demoAccounts),
   };
 
   return (

@@ -13,15 +13,27 @@ type Props = {
   fallback?: (err: Error, reset: () => void) => ReactNode;
   /** If true, render nothing on crash instead of the default banner. */
   silent?: boolean;
+  /**
+   * Changing this discards a caught error. Pass the current route so a crash on
+   * one page doesn't leave every later page stuck on the fallback — React keeps
+   * a tripped boundary tripped forever otherwise, and for a boundary this high
+   * in the tree that reads as a permanently blank app until a full reload.
+   */
+  resetKey?: string | number;
 };
 
-type State = { error: Error | null };
+type State = { error: Error | null; resetKey?: string | number };
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, resetKey: this.props.resetKey };
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
+  }
+
+  static getDerivedStateFromProps(props: Props, state: State): Partial<State> | null {
+    if (props.resetKey === state.resetKey) return null;
+    return { error: null, resetKey: props.resetKey };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from "react";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Switch, Route, Router, Redirect, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 
@@ -460,6 +460,18 @@ function RootRouter() {
   );
 }
 
+// Lives inside <Router> so it can key off the route: navigating away from a
+// page that crashed clears the boundary instead of leaving the whole app on the
+// fallback until the user thinks to hard-reload.
+function AppErrorBoundary({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  return (
+    <ErrorBoundary label="App" resetKey={location}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -468,12 +480,12 @@ function App() {
           <AccessProvider>
             <TooltipProvider>
               <Toaster />
-              <ErrorBoundary label="App">
-                <Router hook={useHashLocationNoQuery}>
+              <Router hook={useHashLocationNoQuery}>
+                <AppErrorBoundary>
                   <RootRouter />
                   <AppChrome />
-                </Router>
-              </ErrorBoundary>
+                </AppErrorBoundary>
+              </Router>
             </TooltipProvider>
           </AccessProvider>
         </AuthProvider>
